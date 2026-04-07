@@ -58,21 +58,26 @@ export default async function AdminClientsPage() {
           <div className="ns">Основное</div>
           <Link href="/admin/clients" className="ni active">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
-              <rect x="2" y="3" width="12" height="10" rx="2"/><line x1="5" y1="7" x2="11" y2="7"/><line x1="5" y1="10" x2="9" y2="10"/>
+              <rect x="2" y="3" width="12" height="10" rx="2"/>
+              <line x1="5" y1="7" x2="11" y2="7"/>
+              <line x1="5" y1="10" x2="9" y2="10"/>
             </svg>
             Клиенты
           </Link>
           <Link href="/admin/payments" className="ni">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
-              <rect x="1" y="4" width="14" height="9" rx="2"/><line x1="1" y1="8" x2="15" y2="8"/>
+              <rect x="1" y="4" width="14" height="9" rx="2"/>
+              <line x1="1" y1="8" x2="15" y2="8"/>
             </svg>
             Платежи
           </Link>
           <div className="ns">Система</div>
           <Link href="/admin" className="ni">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
-              <rect x="1" y="1" width="6" height="6" rx="1.5"/><rect x="9" y="1" width="6" height="6" rx="1.5"/>
-              <rect x="1" y="9" width="6" height="6" rx="1.5"/><rect x="9" y="9" width="6" height="6" rx="1.5"/>
+              <rect x="1" y="1" width="6" height="6" rx="1.5"/>
+              <rect x="9" y="1" width="6" height="6" rx="1.5"/>
+              <rect x="1" y="9" width="6" height="6" rx="1.5"/>
+              <rect x="9" y="9" width="6" height="6" rx="1.5"/>
             </svg>
             Главная
           </Link>
@@ -92,9 +97,16 @@ export default async function AdminClientsPage() {
         <div className="topbar">
           <div className="pt">Клиенты</div>
           <div className="tbr">
-            <span style={{fontSize:12,color:'var(--muted)'}}>
+            <span style={{fontSize:12, color:'var(--muted)'}}>
               {clients?.length ?? 0} клиентов
             </span>
+            <Link href="/admin/clients/new" className="btn-p">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="white" strokeWidth="2.2">
+                <line x1="6" y1="1" x2="6" y2="11"/>
+                <line x1="1" y1="6" x2="11" y2="6"/>
+              </svg>
+              Новый клиент
+            </Link>
             <form action={logout}>
               <button className="btn-s">Выйти</button>
             </form>
@@ -125,8 +137,11 @@ export default async function AdminClientsPage() {
                   const payments = client.payments ?? []
                   const paid = payments.filter((p: any) => p.is_paid).length
                   const total = payments.length
-                  const paidSum = payments.filter((p: any) => p.is_paid).reduce((s: number, p: any) => s + Number(p.plan_sum), 0)
-                  const totalSum = payments.reduce((s: number, p: any) => s + Number(p.plan_sum), 0)
+                  const paidSum = payments
+                    .filter((p: any) => p.is_paid)
+                    .reduce((s: number, p: any) => s + Number(p.plan_sum), 0)
+                  const totalSum = payments
+                    .reduce((s: number, p: any) => s + Number(p.plan_sum), 0)
                   const pct = total > 0 ? Math.round((paid / total) * 100) : 0
 
                   return (
@@ -135,7 +150,7 @@ export default async function AdminClientsPage() {
                         <div className="cn">{client.name}</div>
                         {client.university && <div className="cs">{client.university}</div>}
                       </td>
-                      <td><span style={{fontSize:11,color:'var(--muted)'}}>{client.phone ?? '—'}</span></td>
+                      <td><span style={{fontSize:11, color:'var(--muted)'}}>{client.phone ?? '—'}</span></td>
                       <td><span style={{fontSize:12}}>{client.country ?? '—'}</span></td>
                       <td><span className="stag">{(client.users as any)?.name ?? '—'}</span></td>
                       <td><span className="ctag">{(client.curators as any)?.name ?? '—'}</span></td>
@@ -143,7 +158,9 @@ export default async function AdminClientsPage() {
                       <td><span className="num g">{paidSum.toLocaleString('ru')} ₽</span></td>
                       <td>
                         <div className="tp">
-                          <div className="tpb"><div className="tpf" style={{width:`${pct}%`}}></div></div>
+                          <div className="tpb">
+                            <div className="tpf" style={{width:`${pct}%`}}></div>
+                          </div>
                           <div className="tpp">{pct}%</div>
                         </div>
                       </td>
@@ -158,8 +175,8 @@ export default async function AdminClientsPage() {
                 })}
                 {(!clients || clients.length === 0) && (
                   <tr>
-                    <td colSpan={9} style={{textAlign:'center',color:'var(--muted)',padding:'32px'}}>
-                      Клиентов пока нет
+                    <td colSpan={9} style={{textAlign:'center', color:'var(--muted)', padding:'32px'}}>
+                      Клиентов пока нет — <Link href="/admin/clients/new" style={{color:'var(--purple)'}}>добавить первого</Link>
                     </td>
                   </tr>
                 )}
