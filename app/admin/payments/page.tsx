@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { logout } from '@/app/login/actions'
+import { markPaymentPaid } from './actions'
 
 export default async function AdminPaymentsPage() {
   const supabase = await createClient()
@@ -19,7 +20,6 @@ export default async function AdminPaymentsPage() {
   const initials = (profile?.name || user.email || 'АБ')
     .split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)
 
-  // Получаем все платежи с данными клиентов
   const { data: payments } = await supabase
     .from('payments_view')
     .select(`
@@ -32,23 +32,18 @@ export default async function AdminPaymentsPage() {
     `)
     .order('plan_date', { ascending: true })
 
-  // Группируем по клиентам
   const clientsMap = new Map<number, any>()
   payments?.forEach((p: any) => {
     const clientId = p.clients?.id
     if (!clientId) return
     if (!clientsMap.has(clientId)) {
-      clientsMap.set(clientId, {
-        client: p.clients,
-        payments: []
-      })
+      clientsMap.set(clientId, { client: p.clients, payments: [] })
     }
     clientsMap.get(clientId).payments.push(p)
   })
 
   const groups = Array.from(clientsMap.values())
 
-  // Статистика
   const totalPlan = payments?.reduce((s: number, p: any) => s + Number(p.plan_sum), 0) ?? 0
   const totalPaid = payments?.filter((p: any) => p.is_paid).reduce((s: number, p: any) => s + Number(p.fact_sum || p.plan_sum), 0) ?? 0
   const totalOverdue = payments?.filter((p: any) => p.status === 'overdue').reduce((s: number, p: any) => s + Number(p.plan_sum), 0) ?? 0
@@ -66,6 +61,8 @@ export default async function AdminPaymentsPage() {
   const clientStatusClass: Record<string, string> = {
     active: 'pa', completed: 'pd', frozen: 'pw'
   }
+
+  const today = new Date().toISOString().split('T')[0]
 
   return (
     <div className="app">
@@ -134,7 +131,6 @@ export default async function AdminPaymentsPage() {
           </div>
         </div>
 
-        {/* KPI */}
         <div className="kw">
           <div className="kg k4">
             <div className="kc">
@@ -160,7 +156,6 @@ export default async function AdminPaymentsPage() {
           </div>
         </div>
 
-        {/* Список платежей по клиентам */}
         <div className="cnt">
           {groups.length === 0 && (
             <div style={{textAlign:'center', color:'var(--muted)', padding:48}}>
@@ -184,7 +179,6 @@ export default async function AdminPaymentsPage() {
                 boxShadow: 'var(--sh)',
                 opacity: isDone ? 0.5 : 1
               }}>
-                {/* Шапка группы */}
                 <div style={{
                   display:'flex', alignItems:'center', gap:12,
                   padding:'10px 16px', background:'var(--surf2)',
@@ -214,7 +208,6 @@ export default async function AdminPaymentsPage() {
                   </div>
                 </div>
 
-                {/* Таблица платежей */}
                 <table>
                   <thead>
                     <tr>
@@ -225,41 +218,60 @@ export default async function AdminPaymentsPage() {
                       <th>Дата оплаты</th>
                       <th>Комментарий</th>
                       <th>Статус</th>
+                      <th>Действие</th>
                     </tr>
                   </thead>
                   <tbody>
                     {cPayments.map((p: any) => (
-                      <tr key={p.id} style={{
-                        borderLeft: p.status === 'paid' ? '3px solid var(--green)' :
-                          p.status === 'overdue' ? '3px solid var(--red)' :
-                          p.status === 'soon' ? '3px solid var(--gold)' : 'none'
-                      }}>
-                        <td style={{color:'var(--muted)', fontWeight:700, fontSize:11}}>{p.num}</td>
-                        <td style={{
-                          color: p.status === 'overdue' ? 'var(--red)' :
-                            p.status === 'soon' ? 'var(--gold)' : 'var(--text)',
-                          fontWeight: (p.status === 'overdue' || p.status === 'soon') ? 600 : 400
+                      <>
+                        <tr key={p.id} style={{
+                          borderLeft: p.status === 'paid' ? '3px solid var(--green)' :
+                            p.status === 'overdue' ? '3px solid var(--red)' :
+                            p.status === 'soon' ? '3px solid var(--gold)' : 'none'
                         }}>
-                          {new Date(p.plan_date).toLocaleDateString('ru-RU')}
-                        </td>
-                        <td><span className="num">{Number(p.plan_sum).toLocaleString('ru')} ₽</span></td>
-                        <td>
-                          {p.fact_sum
-                            ? <span className="num g">{Number(p.fact_sum).toLocaleString('ru')} ₽</span>
-                            : <span style={{color:'var(--muted)'}}>—</span>
-                          }
-                        </td>
-                        <td style={{fontSize:11, color:'var(--muted)'}}>
-                          {p.fact_date ? new Date(p.fact_date).toLocaleDateString('ru-RU') : '—'}
-                        </td>
-                        <td style={{fontSize:11, color:'var(--muted)'}}>{p.comment ?? '—'}</td>
-                        <td>
-                          <span className={`pill ${statusClass[p.status]}`}>
-                            <span className="dot"></span>
-                            {statusLabel[p.status]}
-                          </span>
-                        </td>
-                      </tr>
+                          <td style={{color:'var(--muted)', fontWeight:700, fontSize:11}}>{p.num}</td>
+                          <td style={{
+                            color: p.status === 'overdue' ? 'var(--red)' :
+                              p.status === 'soon' ? 'var(--gold)' : 'var(--text)',
+                            fontWeight: (p.status === 'overdue' || p.status === 'soon') ? 600 : 400
+                          }}>
+                            {new Date(p.plan_date).toLocaleDateString('ru-RU')}
+                          </td>
+                          <td><span className="num">{Number(p.plan_sum).toLocaleString('ru')} ₽</span></td>
+                          <td>
+                            {p.fact_sum
+                              ? <span className="num g">{Number(p.fact_sum).toLocaleString('ru')} ₽</span>
+                              : <span style={{color:'var(--muted)'}}>—</span>
+                            }
+                          </td>
+                          <td style={{fontSize:11, color:'var(--muted)'}}>
+                            {p.fact_date ? new Date(p.fact_date).toLocaleDateString('ru-RU') : '—'}
+                          </td>
+                          <td style={{fontSize:11, color:'var(--muted)'}}>{p.comment ?? '—'}</td>
+                          <td>
+                            <span className={`pill ${statusClass[p.status]}`}>
+                              <span className="dot"></span>
+                              {statusLabel[p.status]}
+                            </span>
+                          </td>
+                          <td>
+                            {!p.is_paid && (
+                              <form action={markPaymentPaid} style={{display:'inline'}}>
+                                <input type="hidden" name="payment_id" value={p.id}/>
+                                <input type="hidden" name="fact_sum" value={p.plan_sum}/>
+                                <input type="hidden" name="fact_date" value={today}/>
+                                <button type="submit" style={{
+                                  padding:'4px 10px', background:'var(--green)', color:'#fff',
+                                  border:'none', borderRadius:6, fontSize:11, fontWeight:600,
+                                  cursor:'pointer', fontFamily:'inherit'
+                                }}>
+                                  ✓ Оплачен
+                                </button>
+                              </form>
+                            )}
+                          </td>
+                        </tr>
+                      </>
                     ))}
                   </tbody>
                 </table>
