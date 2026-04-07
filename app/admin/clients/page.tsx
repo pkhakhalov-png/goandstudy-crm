@@ -20,15 +20,33 @@ export default async function AdminClientsPage() {
   const initials = (profile?.name || user.email || 'АБ')
     .split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)
 
-  const { data: clients } = await supabase
+  // Получаем клиентов
+  const { data: rawClients } = await supabase
     .from('clients')
-    .select(`
-      id, name, phone, email, telegram, country, university, status, months, created_at,
-      users!salesperson_id (id, name),
-      curators (id, name),
-      payments (id, num, plan_date, plan_sum, fact_sum, is_paid, status)
-    `)
+    .select('id, name, phone, email, telegram, country, university, status, months, created_at, salesperson_id, curator_id')
     .order('created_at', { ascending: false })
+
+  // Получаем платежи
+  const { data: payments } = await supabase
+    .from('payments_view')
+    .select('id, client_id, num, plan_date, plan_sum, fact_sum, is_paid, status')
+
+  // Получаем пользователей и кураторов
+  const { data: allUsers } = await supabase
+    .from('users')
+    .select('id, name')
+
+  const { data: allCurators } = await supabase
+    .from('curators')
+    .select('id, name')
+
+  // Собираем клиентов с данными
+  const clients = (rawClients ?? []).map(c => ({
+    ...c,
+    salesperson: allUsers?.find(u => u.id === c.salesperson_id) ?? null,
+    curator: allCurators?.find(cur => cur.id === c.curator_id) ?? null,
+    payments: (payments ?? []).filter(p => p.client_id === c.id)
+  }))
 
   const { data: salespersons } = await supabase
     .from('users')
@@ -104,7 +122,7 @@ export default async function AdminClientsPage() {
         <div className="topbar">
           <div className="pt">Клиенты</div>
           <div className="tbr">
-            <span style={{fontSize:12,color:'var(--muted)'}}>{clients?.length ?? 0} клиентов</span>
+            <span style={{fontSize:12, color:'var(--muted)'}}>{clients.length} клиентов</span>
             <Link href="/admin/clients/new" className="btn-p">
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="white" strokeWidth="2.2">
                 <line x1="6" y1="1" x2="6" y2="11"/>
@@ -119,7 +137,7 @@ export default async function AdminClientsPage() {
         </div>
 
         <ClientsPage
-          clients={clients ?? []}
+          clients={clients}
           salespersons={salespersons ?? []}
           curators={curators ?? []}
         />
