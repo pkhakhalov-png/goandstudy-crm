@@ -42,7 +42,8 @@ export function PaymentsClient({ allPayments, salespersons, curators }: Props) {
     })
   }
 
-  function toggleForm(paymentId: number) {
+  function toggleForm(e: React.MouseEvent, paymentId: number) {
+    e.stopPropagation()
     setOpenForms(prev => {
       const next = new Set(prev)
       next.has(paymentId) ? next.delete(paymentId) : next.add(paymentId)
@@ -57,7 +58,6 @@ export function PaymentsClient({ allPayments, salespersons, curators }: Props) {
     setOpenForms(prev => { const n = new Set(prev); n.delete(paymentId); return n })
   }
 
-  // Группируем ВСЕ платежи по клиентам — каждый клиент один раз
   const clientsMap = new Map<number, { client: any, payments: any[] }>()
   allPayments.forEach((p: any) => {
     const cid = p.clients?.id
@@ -66,7 +66,6 @@ export function PaymentsClient({ allPayments, salespersons, curators }: Props) {
     clientsMap.get(cid)!.payments.push(p)
   })
 
-  // Фильтруем клиентов
   const clientGroups = Array.from(clientsMap.values()).filter(({ client, payments }) => {
     if (filterSalesperson && client.salesperson_id !== filterSalesperson) return false
     if (filterCurator && client.curator_id !== filterCurator) return false
@@ -76,7 +75,6 @@ export function PaymentsClient({ allPayments, salespersons, curators }: Props) {
     return true
   })
 
-  // Сортируем — активные с просрочкой вверху, потом скоро, потом остальные, завершённые внизу
   clientGroups.sort((a, b) => {
     const aOver = a.payments.some(p => p.status === 'overdue')
     const bOver = b.payments.some(p => p.status === 'overdue')
@@ -93,13 +91,11 @@ export function PaymentsClient({ allPayments, salespersons, curators }: Props) {
     return 0
   })
 
-  // KPI
   const totalPlan = allPayments.reduce((s:number,p:any) => s+Number(p.plan_sum),0)
   const totalPaid = allPayments.filter((p:any)=>p.is_paid).reduce((s:number,p:any)=>s+Number(p.fact_sum||p.plan_sum),0)
   const totalOverdue = allPayments.filter((p:any)=>p.status==='overdue').reduce((s:number,p:any)=>s+Number(p.plan_sum),0)
   const totalSoon = allPayments.filter((p:any)=>p.status==='soon').reduce((s:number,p:any)=>s+Number(p.plan_sum),0)
 
-  // Данные для навигатора
   function getMonthData(m: number, y: number) {
     const mp = allPayments.filter((p:any) => {
       const d = new Date(p.plan_date)
@@ -129,7 +125,6 @@ export function PaymentsClient({ allPayments, salespersons, curators }: Props) {
 
   return (
     <div className="main">
-      {/* KPI */}
       <div className="kw">
         <div className="kg k4">
           <div className="kc">
@@ -212,7 +207,7 @@ export function PaymentsClient({ allPayments, salespersons, curators }: Props) {
         </div>
       </div>
 
-      {/* Список клиентов — каждый один раз со всеми платежами */}
+      {/* Список клиентов */}
       <div style={{flex:1,padding:'14px 28px 32px',overflowY:'auto'}}>
         {clientGroups.length === 0 && (
           <div style={{textAlign:'center',color:'var(--muted)',padding:48}}>Платежей нет</div>
@@ -228,7 +223,6 @@ export function PaymentsClient({ allPayments, salespersons, curators }: Props) {
 
           return (
             <div key={client.id} style={{marginBottom:8,border:'1px solid var(--bor)',borderRadius:14,background:'var(--surf)',overflow:'hidden',boxShadow:'var(--sh)',opacity:isDone?0.45:1}}>
-              {/* Шапка */}
               <div onClick={()=>toggleCollapse(client.id)}
                 style={{display:'flex',alignItems:'center',gap:12,padding:'10px 16px',background:'var(--surf2)',borderBottom:isOpen?'1px solid var(--bor)':'none',cursor:'pointer',userSelect:'none'}}>
                 <div style={{width:18,height:18,borderRadius:5,border:'1px solid var(--bor2)',background:'var(--surf)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
@@ -259,7 +253,6 @@ export function PaymentsClient({ allPayments, salespersons, curators }: Props) {
                 </div>
               </div>
 
-              {/* Все платежи клиента */}
               {isOpen && (
                 <table>
                   <thead>
@@ -290,13 +283,13 @@ export function PaymentsClient({ allPayments, salespersons, curators }: Props) {
                             <td style={{fontSize:11,color:'var(--muted)'}}>{p.fact_date?new Date(p.fact_date).toLocaleDateString('ru-RU'):'—'}</td>
                             <td style={{fontSize:11,color:'var(--muted)'}}>{p.comment??'—'}</td>
                             <td><span className={`pill ${statusClass[p.status]}`}><span className="dot"></span>{statusLabel[p.status]}</span></td>
-                            <td>
+                            <td onClick={(e)=>e.stopPropagation()}>
                               {p.is_paid ? (
                                 <div style={{width:16,height:16,borderRadius:5,background:'var(--green)',display:'inline-flex',alignItems:'center',justifyContent:'center'}}>
                                   <svg viewBox="0 0 9 7" fill="none" stroke="white" strokeWidth="2" width="9" height="9"><polyline points="1,3.5 3.5,6 8,1"/></svg>
                                 </div>
                               ) : (
-                                <div onClick={()=>toggleForm(p.id)}
+                                <div onClick={(e)=>toggleForm(e, p.id)}
                                   style={{width:16,height:16,borderRadius:5,border:'1.5px solid var(--bor2)',display:'inline-flex',alignItems:'center',justifyContent:'center',cursor:'pointer',background:isFormOpen?'var(--pl)':'transparent'}}>
                                 </div>
                               )}
@@ -304,7 +297,7 @@ export function PaymentsClient({ allPayments, salespersons, curators }: Props) {
                           </tr>
                           {isFormOpen && !p.is_paid && (
                             <tr key={`form-${p.id}`}>
-                              <td colSpan={8} style={{padding:0,background:'var(--surf2)'}}>
+                              <td colSpan={8} style={{padding:0,background:'var(--surf2)'}} onClick={(e)=>e.stopPropagation()}>
                                 <form action={(fd)=>handlePay(p.id,fd)} style={{padding:'12px 16px'}}>
                                   <input type="hidden" name="payment_id" value={p.id}/>
                                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 2fr auto',gap:8,alignItems:'flex-end'}}>
@@ -328,7 +321,7 @@ export function PaymentsClient({ allPayments, salespersons, curators }: Props) {
                                         style={{padding:'7px 16px',background:'var(--green)',color:'#fff',border:'none',borderRadius:7,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',opacity:isLoading?0.6:1}}>
                                         {isLoading?'...':'Сохранить'}
                                       </button>
-                                      <button type="button" onClick={()=>toggleForm(p.id)}
+                                      <button type="button" onClick={(e)=>toggleForm(e, p.id)}
                                         style={{padding:'7px 12px',background:'transparent',color:'var(--muted)',border:'1px solid var(--bor2)',borderRadius:7,fontSize:12,cursor:'pointer',fontFamily:'inherit'}}>
                                         Отмена
                                       </button>
