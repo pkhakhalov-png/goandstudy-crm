@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
 import { logout } from '@/app/login/actions'
 import { SalesPage } from './SalesPage'
 
@@ -16,7 +17,6 @@ export default async function SalesCabinetPage() {
 
   if (profile?.role === 'admin') redirect('/admin/clients')
 
-  // Получаем только своих клиентов
   const { data: rawClients } = await supabase
     .from('clients')
     .select('id, name, phone, email, telegram, country, university, status, months, created_at, salesperson_id, curator_id')
@@ -55,14 +55,14 @@ export default async function SalesCabinetPage() {
         </div>
         <nav className="nav">
           <div className="ns">Основное</div>
-          <div className="ni active" style={{borderLeftColor:'var(--green)',color:'var(--green)',background:'rgba(22,163,97,.07)'}}>
+          <Link href="/sales" className="ni active" style={{borderLeftColor:'var(--green)',color:'var(--green)',background:'rgba(22,163,97,.07)'}}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
               <rect x="2" y="3" width="12" height="10" rx="2"/>
               <line x1="5" y1="7" x2="11" y2="7"/>
               <line x1="5" y1="10" x2="9" y2="10"/>
             </svg>
             Мои клиенты
-          </div>
+          </Link>
         </nav>
         <div className="sf">
           <div className="ur">
@@ -82,6 +82,12 @@ export default async function SalesCabinetPage() {
           <div className="pt">Мои клиенты</div>
           <div className="tbr">
             <span style={{fontSize:12,color:'var(--muted)'}}>{clients.length} клиентов</span>
+            <Link href="/sales/new" style={{padding:'9px 18px',background:'var(--green)',color:'#fff',border:'none',borderRadius:9,fontSize:13,fontWeight:600,cursor:'pointer',display:'inline-flex',alignItems:'center',gap:7,textDecoration:'none'}}>
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="white" strokeWidth="2.2">
+                <line x1="6" y1="1" x2="6" y2="11"/><line x1="1" y1="6" x2="11" y2="6"/>
+              </svg>
+              Новый клиент
+            </Link>
             <form action={logout}>
               <button className="btn-s">Выйти</button>
             </form>
