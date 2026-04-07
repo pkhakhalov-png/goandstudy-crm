@@ -18,37 +18,30 @@ export function ClientsPage({ clients, salespersons, curators }: Props) {
 
   const filtered = clients.filter(c => {
     if (search && !c.name.toLowerCase().includes(search.toLowerCase())) return false
-    if (filterSalesperson && c.users?.id !== filterSalesperson) return false
-    if (filterCurator && c.curators?.id !== filterCurator) return false
+    if (filterSalesperson && c.salesperson?.id !== filterSalesperson) return false
+    if (filterCurator && c.curator?.id !== filterCurator) return false
     if (filterStatus && c.status !== filterStatus) return false
     return true
   })
 
   const statusLabel: Record<string,string> = { active:'Активный', completed:'Завершён', frozen:'Заморожен' }
   const statusClass: Record<string,string> = { active:'pa', completed:'pd', frozen:'pw' }
-  const payStatusLabel: Record<string,string> = { paid:'Оплачен', overdue:'Просрочен', soon:'Скоро', pending:'Ожидается' }
-  const payStatusClass: Record<string,string> = { paid:'pa', overdue:'po', soon:'ps', pending:'pw' }
 
-  // KPI
   const totalClients = clients.length
   const totalPlan = clients.reduce((s,c) => s + (c.payments?.reduce((ps:number,p:any)=>ps+Number(p.plan_sum),0)??0), 0)
   const totalPaid = clients.reduce((s,c) => s + (c.payments?.filter((p:any)=>p.is_paid).reduce((ps:number,p:any)=>ps+Number(p.plan_sum),0)??0), 0)
   const totalOverdue = clients.reduce((s,c) => s + (c.payments?.filter((p:any)=>p.status==='overdue').reduce((ps:number,p:any)=>ps+Number(p.plan_sum),0)??0), 0)
   const paidPct = totalPlan>0 ? Math.round(totalPaid/totalPlan*100) : 0
 
-  // Детали выбранного клиента
   const sel = selected
   const selPayments = sel?.payments ?? []
-  const selPaid = selPayments.filter((p:any)=>p.is_paid).length
-  const selTotal = selPayments.length
   const selPaidSum = selPayments.filter((p:any)=>p.is_paid).reduce((s:number,p:any)=>s+Number(p.plan_sum),0)
   const selTotalSum = selPayments.reduce((s:number,p:any)=>s+Number(p.plan_sum),0)
   const selDebt = selTotalSum - selPaidSum
-  const selPct = selTotal>0 ? Math.round(selPaid/selTotal*100) : 0
+  const selPct = selPayments.length>0 ? Math.round(selPayments.filter((p:any)=>p.is_paid).length/selPayments.length*100) : 0
 
   return (
     <>
-      {/* KPI */}
       <div className="kw">
         <div className="kg k5" style={{marginBottom:14}}>
           <div className="kc">
@@ -82,10 +75,8 @@ export function ClientsPage({ clients, salespersons, curators }: Props) {
         </div>
       </div>
 
-      {/* Контент */}
       <div className="cnt">
         <div className="lay">
-          {/* Таблица */}
           <div className="tcol">
             <div className="ctrl">
               <div className="sl">Список клиентов</div>
@@ -148,8 +139,8 @@ export function ClientsPage({ clients, salespersons, curators }: Props) {
                           <div className="cn">{c.name}</div>
                           {c.country && <div className="cs">{c.country}{c.university ? ` · ${c.university}` : ''}</div>}
                         </td>
-                        <td><span className="stag">{c.users?.name ?? '—'}</span></td>
-                        <td><span className="ctag">{c.curators?.name ?? '—'}</span></td>
+                        <td><span className="stag">{c.salesperson?.name ?? '—'}</span></td>
+                        <td><span className="ctag">{c.curator?.name ?? '—'}</span></td>
                         <td><span className="num">{totalS.toLocaleString('ru')} ₽</span></td>
                         <td><span className="num g">{paidS.toLocaleString('ru')} ₽</span></td>
                         <td><span className={`num ${debt>0?'o':'m'}`}>{debt.toLocaleString('ru')} ₽</span></td>
@@ -183,7 +174,6 @@ export function ClientsPage({ clients, salespersons, curators }: Props) {
             </div>
           </div>
 
-          {/* Правая панель */}
           {sel && (
             <div className="panel">
               <div className="ph">
@@ -193,14 +183,13 @@ export function ClientsPage({ clients, salespersons, curators }: Props) {
               <div className="pb2">
                 {sel.phone && <div className="ir"><span className="ik">Телефон</span><span className="iv">{sel.phone}</span></div>}
                 {sel.telegram && <div className="ir"><span className="ik">Telegram</span><span className="iv">{sel.telegram}</span></div>}
-                <div className="ir"><span className="ik">Продажник</span><span className="iv g">{sel.users?.name ?? '—'}</span></div>
-                <div className="ir"><span className="ik">Куратор</span><span className="iv p">{sel.curators?.name ?? '—'}</span></div>
+                <div className="ir"><span className="ik">Продажник</span><span className="iv g">{sel.salesperson?.name ?? '—'}</span></div>
+                <div className="ir"><span className="ik">Куратор</span><span className="iv p">{sel.curator?.name ?? '—'}</span></div>
                 <div className="ir"><span className="ik">Договор</span><span className="iv">{selTotalSum.toLocaleString('ru')} ₽</span></div>
                 <div className="ir"><span className="ik">Рассрочка</span><span className="iv">{sel.months} мес.</span></div>
                 <div className="ir"><span className="ik">Оплачено</span><span className="iv g">{selPaidSum.toLocaleString('ru')} ₽</span></div>
                 <div className="ir"><span className="ik">Остаток</span><span className="iv o">{selDebt.toLocaleString('ru')} ₽</span></div>
 
-                {/* Прогресс */}
                 <div style={{margin:'14px 0 2px'}}>
                   <div style={{display:'flex',justifyContent:'space-between',fontSize:11,color:'var(--muted)',marginBottom:5,fontWeight:500}}>
                     <span>Прогресс</span><span>{selPct}%</span>
@@ -210,7 +199,6 @@ export function ClientsPage({ clients, salespersons, curators }: Props) {
                   </div>
                 </div>
 
-                {/* График платежей */}
                 <div style={{fontSize:10,textTransform:'uppercase',letterSpacing:'0.08em',color:'var(--muted2)',fontWeight:600,margin:'16px 0 8px'}}>
                   График платежей
                 </div>
@@ -223,8 +211,10 @@ export function ClientsPage({ clients, salespersons, curators }: Props) {
                   }}>
                     <div style={{fontSize:10,color:'var(--muted)',width:14,fontWeight:700}}>{p.num}</div>
                     <div style={{
-                      fontSize:11,color:p.status==='overdue'?'var(--red)':p.status==='soon'?'var(--gold)':'var(--muted)',
-                      flex:1,fontWeight:(p.status==='overdue'||p.status==='soon')?600:400
+                      fontSize:11,
+                      color:p.status==='overdue'?'var(--red)':p.status==='soon'?'var(--gold)':'var(--muted)',
+                      flex:1,
+                      fontWeight:(p.status==='overdue'||p.status==='soon')?600:400
                     }}>
                       {new Date(p.plan_date).toLocaleDateString('ru-RU')}
                     </div>
