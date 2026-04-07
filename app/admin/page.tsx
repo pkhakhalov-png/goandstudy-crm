@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { Sidebar } from './Sidebar'
+import { Dashboard } from './Dashboard'
 
 export default async function AdminPage() {
   const supabase = await createClient()
@@ -15,6 +16,24 @@ export default async function AdminPage() {
 
   if (profile?.role !== 'admin') redirect('/sales')
 
+  const { data: clients } = await supabase
+    .from('clients')
+    .select('id, name, country, status, salesperson_id, created_at')
+
+  const { data: payments } = await supabase
+    .from('payments_view')
+    .select('id, client_id, plan_sum, fact_sum, is_paid, status, plan_date, fact_date')
+
+  const { data: expenses } = await supabase
+    .from('expenses')
+    .select('id, client_id, plan_sum, fact_sum, is_paid, article')
+
+  const { data: salespersons } = await supabase
+    .from('users')
+    .select('id, name, is_active')
+    .eq('role', 'salesperson')
+    .order('name')
+
   return (
     <div className="app">
       <Sidebar activePage="home" userName={profile?.name || ''} userEmail={user.email || ''} />
@@ -22,11 +41,12 @@ export default async function AdminPage() {
         <div className="topbar">
           <div className="pt">Главная</div>
         </div>
-        <div className="cnt">
-          <p style={{ color: 'var(--muted)', fontSize: 13 }}>
-            Добро пожаловать в CRM Go & Study. Выберите раздел в меню слева.
-          </p>
-        </div>
+        <Dashboard
+          clients={clients ?? []}
+          payments={payments ?? []}
+          expenses={expenses ?? []}
+          salespersons={salespersons ?? []}
+        />
       </div>
     </div>
   )
