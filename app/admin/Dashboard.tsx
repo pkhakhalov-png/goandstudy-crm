@@ -13,11 +13,11 @@ const MONTHS = ['Янв','Фев','Мар','Апр','Май','Июн','Июл','
 
 export function Dashboard({ clients, payments, expenses, salespersons }: Props) {
   const [period, setPeriod] = useState<'year' | 'month'>('year')
+  const [tooltip, setTooltip] = useState<{ x: number, y: number, text: string } | null>(null)
   const now = new Date()
   const currentYear = now.getFullYear()
   const currentMonth = now.getMonth()
 
-  // Фильтр по периоду
   const isInPeriod = (dateStr: string) => {
     if (!dateStr) return false
     const d = new Date(dateStr)
@@ -25,7 +25,6 @@ export function Dashboard({ clients, payments, expenses, salespersons }: Props) 
     return d.getFullYear() === currentYear && d.getMonth() === currentMonth
   }
 
-  // Общие KPI
   const totalRevenuePlan = payments.reduce((s, p) => s + Number(p.plan_sum), 0)
   const totalRevenuePaid = payments.filter(p => p.is_paid).reduce((s, p) => s + Number(p.fact_sum || p.plan_sum), 0)
   const totalOverdue = payments.filter(p => p.status === 'overdue').reduce((s, p) => s + Number(p.plan_sum), 0)
@@ -34,7 +33,6 @@ export function Dashboard({ clients, payments, expenses, salespersons }: Props) 
   const newClients = clients.filter(c => isInPeriod(c.created_at)).length
   const activeClients = clients.filter(c => c.status === 'active').length
 
-  // Данные по месяцам для графика (текущий год)
   const monthlyData = MONTHS.map((label, i) => {
     const monthPayments = payments.filter(p => {
       const d = new Date(p.plan_date)
@@ -50,8 +48,8 @@ export function Dashboard({ clients, payments, expenses, salespersons }: Props) 
   })
 
   const maxVal = Math.max(...monthlyData.map(m => Math.max(m.plan, m.fact)), 1)
+  const maxN = Math.max(...monthlyData.map(m => m.newClients), 1)
 
-  // Топ продажников
   const salesStats = salespersons.map(s => {
     const myClientIds = clients.filter(c => c.salesperson_id === s.id).map(c => c.id)
     const myPayments = payments.filter(p => myClientIds.includes(p.client_id))
@@ -63,17 +61,13 @@ export function Dashboard({ clients, payments, expenses, salespersons }: Props) 
 
   const maxPaid = Math.max(...salesStats.map(s => s.paid), 1)
 
-  // Разбивка по странам
   const countryCounts: Record<string, number> = {}
   clients.forEach(c => {
     if (c.country) countryCounts[c.country] = (countryCounts[c.country] || 0) + 1
   })
-  const topCountries = Object.entries(countryCounts)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 6)
+  const topCountries = Object.entries(countryCounts).sort((a, b) => b[1] - a[1]).slice(0, 6)
   const maxCountry = Math.max(...topCountries.map(c => c[1]), 1)
 
-  // Расходы по статьям
   const expenseByArticle: Record<string, number> = {}
   expenses.filter(e => e.is_paid).forEach(e => {
     expenseByArticle[e.article] = (expenseByArticle[e.article] || 0) + Number(e.fact_sum || e.plan_sum)
@@ -82,8 +76,30 @@ export function Dashboard({ clients, payments, expenses, salespersons }: Props) 
     curator: 'Кураторы', salesperson: 'Продажники', visa: 'Визы', other: 'Прочее'
   }
 
+  const showTooltip = (e: React.MouseEvent, text: string) => {
+    const rect = (e.target as HTMLElement).getBoundingClientRect()
+    const containerRect = (e.currentTarget as HTMLElement).closest('.dashboard-wrap')?.getBoundingClientRect()
+    const x = rect.left - (containerRect?.left ?? 0) + rect.width / 2
+    const y = rect.top - (containerRect?.top ?? 0) - 8
+    setTooltip({ x, y, text })
+  }
+
   return (
-    <div style={{ padding: '20px 28px 40px' }}>
+    <div className="dashboard-wrap" style={{ padding: '20px 28px 40px', position: 'relative' }}>
+
+      {/* Tooltip */}
+      {tooltip && (
+        <div style={{
+          position: 'absolute', left: tooltip.x, top: tooltip.y,
+          transform: 'translate(-50%, -100%)',
+          background: '#14121e', color: '#fff', fontSize: 11, fontWeight: 600,
+          padding: '5px 10px', borderRadius: 7, pointerEvents: 'none', zIndex: 100,
+          whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,.2)'
+        }}>
+          {tooltip.text}
+          <div style={{ position: 'absolute', bottom: -4, left: '50%', transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '4px solid transparent', borderRight: '4px solid transparent', borderTop: '4px solid #14121e' }} />
+        </div>
+      )}
 
       {/* Переключатель */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
@@ -100,7 +116,7 @@ export function Dashboard({ clients, payments, expenses, salespersons }: Props) 
         </div>
       </div>
 
-      {/* KPI карточки */}
+      {/* KPI */}
       <div className="kg k4" style={{ marginBottom: 20 }}>
         <div className="kc">
           <div className="kl">Выручка факт</div>
@@ -118,7 +134,7 @@ export function Dashboard({ clients, payments, expenses, salespersons }: Props) 
         <div className="kc">
           <div className="kl">Просрочка</div>
           <div className="kv r" style={{ fontSize: 17 }}>{totalOverdue.toLocaleString('ru')} ₽</div>
-          <div className="ks">{clients.filter(c => c.payments?.some((p: any) => p.status === 'overdue')).length} клиентов</div>
+          <div className="ks">{clients.filter(c => payments.filter(p => p.client_id === c.id).some(p => p.status === 'overdue')).length} клиентов</div>
         </div>
         <div className="kc">
           <div className="kl">Клиентов</div>
@@ -127,8 +143,8 @@ export function Dashboard({ clients, payments, expenses, salespersons }: Props) 
         </div>
       </div>
 
-      {/* График выручки по месяцам */}
-      <div style={{ background: '#fff', border: '1px solid var(--bor)', borderRadius: 14, padding: '20px 24px', marginBottom: 16, boxShadow: 'var(--sh)' }}>
+      {/* График выручки */}
+      <div style={{ background: '#fff', border: '1px solid var(--bor)', borderRadius: 14, padding: '20px 24px', marginBottom: 16, boxShadow: 'var(--sh)' }} onMouseLeave={() => setTooltip(null)}>
         <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span>Выручка по месяцам — {currentYear}</span>
           <div style={{ display: 'flex', gap: 16, fontSize: 11, color: 'var(--muted)' }}>
@@ -144,8 +160,18 @@ export function Dashboard({ clients, payments, expenses, salespersons }: Props) 
           {monthlyData.map((m, i) => (
             <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, height: '100%', justifyContent: 'flex-end' }}>
               <div style={{ width: '100%', display: 'flex', gap: 2, alignItems: 'flex-end', height: 120 }}>
-                <div style={{ flex: 1, background: 'rgba(177,94,204,.2)', borderRadius: '3px 3px 0 0', height: `${Math.round(m.plan / maxVal * 100)}%`, minHeight: m.plan > 0 ? 2 : 0 }} />
-                <div style={{ flex: 1, background: 'var(--green)', borderRadius: '3px 3px 0 0', height: `${Math.round(m.fact / maxVal * 100)}%`, minHeight: m.fact > 0 ? 2 : 0, opacity: 0.85 }} />
+                <div
+                  onMouseEnter={e => showTooltip(e, `План: ${m.plan.toLocaleString('ru')} ₽`)}
+                  style={{ flex: 1, background: 'rgba(177,94,204,.25)', borderRadius: '3px 3px 0 0', height: `${Math.round(m.plan / maxVal * 100)}%`, minHeight: m.plan > 0 ? 2 : 0, cursor: 'pointer', transition: 'background .15s' }}
+                  onMouseOver={e => (e.currentTarget.style.background = 'rgba(177,94,204,.45)')}
+                  onMouseOut={e => (e.currentTarget.style.background = 'rgba(177,94,204,.25)')}
+                />
+                <div
+                  onMouseEnter={e => showTooltip(e, `Факт: ${m.fact.toLocaleString('ru')} ₽`)}
+                  style={{ flex: 1, background: 'var(--green)', borderRadius: '3px 3px 0 0', height: `${Math.round(m.fact / maxVal * 100)}%`, minHeight: m.fact > 0 ? 2 : 0, opacity: 0.85, cursor: 'pointer', transition: 'opacity .15s' }}
+                  onMouseOver={e => (e.currentTarget.style.opacity = '1')}
+                  onMouseOut={e => (e.currentTarget.style.opacity = '0.85')}
+                />
               </div>
               <div style={{ fontSize: 9, color: 'var(--muted)', fontWeight: 600, marginTop: 4 }}>{m.label}</div>
             </div>
@@ -154,27 +180,28 @@ export function Dashboard({ clients, payments, expenses, salespersons }: Props) 
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
-
-        {/* Новые клиенты по месяцам */}
-        <div style={{ background: '#fff', border: '1px solid var(--bor)', borderRadius: 14, padding: '20px 24px', boxShadow: 'var(--sh)' }}>
+        {/* Новые клиенты */}
+        <div style={{ background: '#fff', border: '1px solid var(--bor)', borderRadius: 14, padding: '20px 24px', boxShadow: 'var(--sh)' }} onMouseLeave={() => setTooltip(null)}>
           <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginBottom: 20 }}>Новые клиенты — {currentYear}</div>
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 80 }}>
-            {monthlyData.map((m, i) => {
-              const maxN = Math.max(...monthlyData.map(x => x.newClients), 1)
-              return (
-                <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                  <div style={{ width: '100%', background: 'var(--purple)', borderRadius: '3px 3px 0 0', height: `${Math.round(m.newClients / maxN * 60)}px`, minHeight: m.newClients > 0 ? 2 : 0, opacity: 0.75 }} />
-                  <div style={{ fontSize: 9, color: 'var(--muted)', fontWeight: 600 }}>{m.label}</div>
-                </div>
-              )
-            })}
+            {monthlyData.map((m, i) => (
+              <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                <div
+                  onMouseEnter={e => m.newClients > 0 ? showTooltip(e, `${m.label}: ${m.newClients} клиентов`) : null}
+                  style={{ width: '100%', background: 'var(--purple)', borderRadius: '3px 3px 0 0', height: `${Math.round(m.newClients / maxN * 60)}px`, minHeight: m.newClients > 0 ? 2 : 0, opacity: 0.75, cursor: m.newClients > 0 ? 'pointer' : 'default', transition: 'opacity .15s' }}
+                  onMouseOver={e => { if (m.newClients > 0) e.currentTarget.style.opacity = '1' }}
+                  onMouseOut={e => { e.currentTarget.style.opacity = '0.75' }}
+                />
+                <div style={{ fontSize: 9, color: 'var(--muted)', fontWeight: 600 }}>{m.label}</div>
+              </div>
+            ))}
           </div>
           <div style={{ marginTop: 12, fontSize: 11, color: 'var(--muted)' }}>
             Всего за год: <strong style={{ color: 'var(--text)' }}>{monthlyData.reduce((s, m) => s + m.newClients, 0)}</strong>
           </div>
         </div>
 
-        {/* Разбивка по странам */}
+        {/* Топ направлений */}
         <div style={{ background: '#fff', border: '1px solid var(--bor)', borderRadius: 14, padding: '20px 24px', boxShadow: 'var(--sh)' }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginBottom: 16 }}>Топ направлений</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -193,8 +220,7 @@ export function Dashboard({ clients, payments, expenses, salespersons }: Props) 
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-
-        {/* Топ продажников */}
+        {/* Продажники */}
         <div style={{ background: '#fff', border: '1px solid var(--bor)', borderRadius: 14, padding: '20px 24px', boxShadow: 'var(--sh)' }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginBottom: 16 }}>Продажники</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -221,7 +247,7 @@ export function Dashboard({ clients, payments, expenses, salespersons }: Props) 
           </div>
         </div>
 
-        {/* Расходы по статьям */}
+        {/* Расходы */}
         <div style={{ background: '#fff', border: '1px solid var(--bor)', borderRadius: 14, padding: '20px 24px', boxShadow: 'var(--sh)' }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginBottom: 16 }}>Расходы по статьям</div>
           {Object.keys(expenseByArticle).length === 0 ? (
