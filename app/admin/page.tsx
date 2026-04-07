@@ -1,6 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { logout } from '@/app/login/actions'
 import { Sidebar } from './Sidebar'
 
 export default async function AdminPage() {
@@ -22,14 +21,9 @@ export default async function AdminPage() {
       <div className="main">
         <div className="topbar">
           <div className="pt">Главная</div>
-          <div className="tbr">
-            <form action={logout}>
-              <button className="btn-s">Выйти</button>
-            </form>
-          </div>
         </div>
         <div className="cnt">
-          <p style={{color:'var(--muted)', fontSize:13}}>
+          <p style={{ color: 'var(--muted)', fontSize: 13 }}>
             Добро пожаловать в CRM Go & Study. Выберите раздел в меню слева.
           </p>
         </div>
