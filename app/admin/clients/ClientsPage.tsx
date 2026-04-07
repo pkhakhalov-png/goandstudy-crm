@@ -9,6 +9,27 @@ interface Props {
   curators: any[]
 }
 
+function getPaymentStatus(client: any) {
+  if (client.status === 'completed') return { label: 'Завершён', cls: 'pd' }
+  const pays = client.payments ?? []
+  const unpaid = pays.filter((p: any) => !p.is_paid)
+  if (unpaid.length === 0) return { label: 'Завершён', cls: 'pd' }
+
+  const hasOverdue = unpaid.some((p: any) => p.status === 'overdue')
+  if (hasOverdue) return { label: 'Просрочка', cls: 'po' }
+
+  const today = new Date()
+  const in7 = new Date(today)
+  in7.setDate(today.getDate() + 7)
+  const hasSoon = unpaid.some((p: any) => {
+    const d = new Date(p.plan_date)
+    return d >= today && d <= in7
+  })
+  if (hasSoon) return { label: 'Скоро платёж', cls: 'ps' }
+
+  return { label: 'В графике', cls: 'pa' }
+}
+
 export function ClientsPage({ clients, salespersons, curators }: Props) {
   const [selected, setSelected] = useState<any>(null)
   const [search, setSearch] = useState('')
@@ -23,9 +44,6 @@ export function ClientsPage({ clients, salespersons, curators }: Props) {
     if (filterStatus && c.status !== filterStatus) return false
     return true
   })
-
-  const statusLabel: Record<string,string> = { active:'Активный', completed:'Завершён', frozen:'Заморожен' }
-  const statusClass: Record<string,string> = { active:'pa', completed:'pd', frozen:'pw' }
 
   const totalClients = clients.length
   const totalPlan = clients.reduce((s,c) => s + (c.payments?.reduce((ps:number,p:any)=>ps+Number(p.plan_sum),0)??0), 0)
@@ -254,12 +272,12 @@ export function ClientsPage({ clients, salespersons, curators }: Props) {
                 const debt = totalS - paidS
                 const pct = pays.length>0 ? Math.round(pays.filter((p:any)=>p.is_paid).length/pays.length*100) : 0
                 const isSel = sel?.id === c.id
-                const isDone = c.status === 'completed'
+                const { label, cls } = getPaymentStatus(c)
 
                 return (
                   <tr key={c.id}
                     onClick={() => setSelected(c)}
-                    style={{ background: isSel ? 'rgba(177,94,204,.07)' : 'transparent', opacity: isDone ? 0.55 : 1, cursor: 'pointer' }}>
+                    style={{ background: isSel ? 'rgba(177,94,204,.07)' : 'transparent', cursor: 'pointer' }}>
                     <td>
                       <div className="cn">{c.name}</div>
                       {c.country && <div className="cs">{c.country}{c.university ? ` · ${c.university}` : ''}</div>}
@@ -276,9 +294,9 @@ export function ClientsPage({ clients, salespersons, curators }: Props) {
                       </div>
                     </td>
                     <td>
-                      <span className={`pill ${statusClass[c.status]}`}>
+                      <span className={`pill ${cls}`}>
                         <span className="dot"></span>
-                        {statusLabel[c.status]}
+                        {label}
                       </span>
                     </td>
                   </tr>
