@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { logout } from '@/app/login/actions'
+import { ClientsPage } from './ClientsPage'
 
 export default async function AdminClientsPage() {
   const supabase = await createClient()
@@ -22,19 +23,25 @@ export default async function AdminClientsPage() {
   const { data: clients } = await supabase
     .from('clients')
     .select(`
-      id, name, phone, country, university, status, created_at,
-      users!salesperson_id (name),
-      curators (name),
-      payments (id, is_paid, plan_sum, plan_date)
+      id, name, phone, email, telegram, country, university, status, months, created_at,
+      users!salesperson_id (id, name),
+      curators (id, name),
+      payments (id, num, plan_date, plan_sum, fact_sum, is_paid, status)
     `)
     .order('created_at', { ascending: false })
 
-  const statusLabel: Record<string, string> = {
-    active: 'Активный', completed: 'Завершён', frozen: 'Заморожен',
-  }
-  const statusClass: Record<string, string> = {
-    active: 'pa', completed: 'pd', frozen: 'pw',
-  }
+  const { data: salespersons } = await supabase
+    .from('users')
+    .select('id, name')
+    .eq('role', 'salesperson')
+    .eq('is_active', true)
+    .order('name')
+
+  const { data: curators } = await supabase
+    .from('curators')
+    .select('id, name')
+    .eq('is_active', true)
+    .order('name')
 
   return (
     <div className="app">
@@ -97,9 +104,7 @@ export default async function AdminClientsPage() {
         <div className="topbar">
           <div className="pt">Клиенты</div>
           <div className="tbr">
-            <span style={{fontSize:12, color:'var(--muted)'}}>
-              {clients?.length ?? 0} клиентов
-            </span>
+            <span style={{fontSize:12,color:'var(--muted)'}}>{clients?.length ?? 0} клиентов</span>
             <Link href="/admin/clients/new" className="btn-p">
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="white" strokeWidth="2.2">
                 <line x1="6" y1="1" x2="6" y2="11"/>
@@ -113,77 +118,11 @@ export default async function AdminClientsPage() {
           </div>
         </div>
 
-        <div className="cnt">
-          <div className="ctrl">
-            <div className="sl">Список клиентов</div>
-          </div>
-          <div className="tw">
-            <table>
-              <thead>
-                <tr>
-                  <th>Клиент</th>
-                  <th>Телефон</th>
-                  <th>Страна</th>
-                  <th>Продажник</th>
-                  <th>Куратор</th>
-                  <th>Договор</th>
-                  <th>Оплачено</th>
-                  <th>Прогресс</th>
-                  <th>Статус</th>
-                </tr>
-              </thead>
-              <tbody>
-                {clients?.map((client) => {
-                  const payments = client.payments ?? []
-                  const paid = payments.filter((p: any) => p.is_paid).length
-                  const total = payments.length
-                  const paidSum = payments
-                    .filter((p: any) => p.is_paid)
-                    .reduce((s: number, p: any) => s + Number(p.plan_sum), 0)
-                  const totalSum = payments
-                    .reduce((s: number, p: any) => s + Number(p.plan_sum), 0)
-                  const pct = total > 0 ? Math.round((paid / total) * 100) : 0
-
-                  return (
-                    <tr key={client.id}>
-                      <td>
-                        <div className="cn">{client.name}</div>
-                        {client.university && <div className="cs">{client.university}</div>}
-                      </td>
-                      <td><span style={{fontSize:11, color:'var(--muted)'}}>{client.phone ?? '—'}</span></td>
-                      <td><span style={{fontSize:12}}>{client.country ?? '—'}</span></td>
-                      <td><span className="stag">{(client.users as any)?.name ?? '—'}</span></td>
-                      <td><span className="ctag">{(client.curators as any)?.name ?? '—'}</span></td>
-                      <td><span className="num">{totalSum.toLocaleString('ru')} ₽</span></td>
-                      <td><span className="num g">{paidSum.toLocaleString('ru')} ₽</span></td>
-                      <td>
-                        <div className="tp">
-                          <div className="tpb">
-                            <div className="tpf" style={{width:`${pct}%`}}></div>
-                          </div>
-                          <div className="tpp">{pct}%</div>
-                        </div>
-                      </td>
-                      <td>
-                        <span className={`pill ${statusClass[client.status]}`}>
-                          <span className="dot"></span>
-                          {statusLabel[client.status]}
-                        </span>
-                      </td>
-                    </tr>
-                  )
-                })}
-                {(!clients || clients.length === 0) && (
-                  <tr>
-                    <td colSpan={9} style={{textAlign:'center', color:'var(--muted)', padding:'32px'}}>
-                      Клиентов пока нет — <Link href="/admin/clients/new" style={{color:'var(--purple)'}}>добавить первого</Link>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <ClientsPage
+          clients={clients ?? []}
+          salespersons={salespersons ?? []}
+          curators={curators ?? []}
+        />
       </div>
     </div>
   )
