@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { logout } from '@/app/login/actions'
-import { PaymentRow } from './PaymentRow'
+import { PaymentsClient } from './PaymentsClient'
 
 export default async function AdminPaymentsPage() {
   const supabase = await createClient()
@@ -25,42 +25,25 @@ export default async function AdminPaymentsPage() {
     .select(`
       id, num, plan_date, plan_sum, fact_sum, fact_date, is_paid, status, comment,
       clients (
-        id, name, phone, country, status,
-        users!salesperson_id (name),
-        curators (name)
+        id, name, phone, country, status, created_at,
+        users!salesperson_id (id, name),
+        curators (id, name)
       )
     `)
-    .order('plan_date', { ascending: true })
+    .order('created_at', { ascending: false, referencedTable: 'clients' })
 
-  const clientsMap = new Map<number, any>()
-  payments?.forEach((p: any) => {
-    const clientId = p.clients?.id
-    if (!clientId) return
-    if (!clientsMap.has(clientId)) {
-      clientsMap.set(clientId, { client: p.clients, payments: [] })
-    }
-    clientsMap.get(clientId).payments.push(p)
-  })
+  const { data: salespersons } = await supabase
+    .from('users')
+    .select('id, name')
+    .eq('role', 'salesperson')
+    .eq('is_active', true)
+    .order('name')
 
-  const groups = Array.from(clientsMap.values())
-
-  const totalPlan = payments?.reduce((s: number, p: any) => s + Number(p.plan_sum), 0) ?? 0
-  const totalPaid = payments?.filter((p: any) => p.is_paid).reduce((s: number, p: any) => s + Number(p.fact_sum || p.plan_sum), 0) ?? 0
-  const totalOverdue = payments?.filter((p: any) => p.status === 'overdue').reduce((s: number, p: any) => s + Number(p.plan_sum), 0) ?? 0
-  const totalSoon = payments?.filter((p: any) => p.status === 'soon').reduce((s: number, p: any) => s + Number(p.plan_sum), 0) ?? 0
-
-  const statusLabel: Record<string, string> = {
-    paid: 'Оплачен', overdue: 'Просрочен', soon: 'Скоро', pending: 'Ожидается'
-  }
-  const statusClass: Record<string, string> = {
-    paid: 'pa', overdue: 'po', soon: 'ps', pending: 'pw'
-  }
-  const clientStatusLabel: Record<string, string> = {
-    active: 'Активный', completed: 'Завершён', frozen: 'Заморожен'
-  }
-  const clientStatusClass: Record<string, string> = {
-    active: 'pa', completed: 'pd', frozen: 'pw'
-  }
+  const { data: curators } = await supabase
+    .from('curators')
+    .select('id, name')
+    .eq('is_active', true)
+    .order('name')
 
   return (
     <div className="app">
@@ -119,122 +102,12 @@ export default async function AdminPaymentsPage() {
         </div>
       </aside>
 
-      <div className="main">
-        <div className="topbar">
-          <div className="pt">Платежи</div>
-          <div className="tbr">
-            <form action={logout}>
-              <button className="btn-s">Выйти</button>
-            </form>
-          </div>
-        </div>
-
-        <div className="kw">
-          <div className="kg k4">
-            <div className="kc">
-              <div className="kl">Всего по договорам</div>
-              <div className="kv" style={{fontSize:17}}>{totalPlan.toLocaleString('ru')} ₽</div>
-              <div className="ks">{payments?.length ?? 0} платежей</div>
-            </div>
-            <div className="kc">
-              <div className="kl">Оплачено</div>
-              <div className="kv g" style={{fontSize:17}}>{totalPaid.toLocaleString('ru')} ₽</div>
-              <div className="ks">{payments?.filter((p:any) => p.is_paid).length} платежей</div>
-            </div>
-            <div className="kc">
-              <div className="kl">Просрочено</div>
-              <div className="kv r" style={{fontSize:17}}>{totalOverdue.toLocaleString('ru')} ₽</div>
-              <div className="ks">{payments?.filter((p:any) => p.status === 'overdue').length} платежей</div>
-            </div>
-            <div className="kc">
-              <div className="kl">Скоро (7 дней)</div>
-              <div className="kv o" style={{fontSize:17}}>{totalSoon.toLocaleString('ru')} ₽</div>
-              <div className="ks">{payments?.filter((p:any) => p.status === 'soon').length} платежей</div>
-            </div>
-          </div>
-        </div>
-
-        <div className="cnt">
-          {groups.length === 0 && (
-            <div style={{textAlign:'center', color:'var(--muted)', padding:48}}>
-              Платежей пока нет
-            </div>
-          )}
-
-          {groups.map(({ client, payments: cPayments }) => {
-            const paid = cPayments.filter((p: any) => p.is_paid).length
-            const total = cPayments.length
-            const pct = total > 0 ? Math.round((paid / total) * 100) : 0
-            const isDone = client.status === 'completed'
-
-            return (
-              <div key={client.id} style={{
-                marginBottom: 8,
-                border: '1px solid var(--bor)',
-                borderRadius: 14,
-                background: 'var(--surf)',
-                overflow: 'hidden',
-                boxShadow: 'var(--sh)',
-                opacity: isDone ? 0.5 : 1
-              }}>
-                <div style={{
-                  display:'flex', alignItems:'center', gap:12,
-                  padding:'10px 16px', background:'var(--surf2)',
-                  borderBottom:'1px solid var(--bor)'
-                }}>
-                  <div style={{fontWeight:700, fontSize:13}}>{client.name}</div>
-                  <div style={{fontSize:11, color:'var(--muted)'}}>· {client.country}</div>
-                  <div style={{flex:1}}></div>
-                  <div style={{display:'flex', alignItems:'center', gap:8, flexWrap:'wrap'}}>
-                    {client.phone && (
-                      <span style={{fontSize:10, padding:'3px 9px', borderRadius:6, background:'var(--bg)', color:'var(--muted)', border:'1px solid var(--bor2)', fontWeight:600}}>
-                        {client.phone}
-                      </span>
-                    )}
-                    <span className="stag">{(client.users as any)?.name ?? '—'}</span>
-                    <span className="ctag">{(client.curators as any)?.name ?? '—'}</span>
-                    <div style={{display:'flex', alignItems:'center', gap:6}}>
-                      <div style={{width:55, height:4, background:'var(--bor2)', borderRadius:20, overflow:'hidden'}}>
-                        <div style={{height:'100%', width:`${pct}%`, background:'linear-gradient(90deg,var(--purple),#d47aff)', borderRadius:20}}></div>
-                      </div>
-                      <span style={{fontSize:11, fontWeight:700, color:'var(--purple)'}}>{pct}%</span>
-                    </div>
-                    <span className={`pill ${clientStatusClass[client.status]}`}>
-                      <span className="dot"></span>
-                      {clientStatusLabel[client.status]}
-                    </span>
-                  </div>
-                </div>
-
-                <table>
-                  <thead>
-                    <tr>
-                      <th>#</th>
-                      <th>Дата план</th>
-                      <th>Сумма план</th>
-                      <th>Сумма факт</th>
-                      <th>Дата оплаты</th>
-                      <th>Комментарий</th>
-                      <th>Статус</th>
-                      <th>Действие</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {cPayments.map((p: any) => (
-                      <PaymentRow
-                        key={p.id}
-                        payment={p}
-                        statusLabel={statusLabel}
-                        statusClass={statusClass}
-                      />
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )
-          })}
-        </div>
-      </div>
+      <PaymentsClient
+        allPayments={payments ?? []}
+        allClients={[]}
+        salespersons={salespersons ?? []}
+        curators={curators ?? []}
+      />
     </div>
   )
 }
