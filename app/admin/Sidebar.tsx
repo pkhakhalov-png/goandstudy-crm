@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { logout } from '@/app/login/actions'
 
 interface Props {
-  activePage: 'clients' | 'payments' | 'expenses' | 'home'
+  activePage: 'clients' | 'payments' | 'expenses' | 'home' | 'sales' | 'settings'
   userName: string
   userEmail: string
 }
@@ -52,6 +52,14 @@ export function Sidebar({ activePage, userName, userEmail }: Props) {
           </svg>
           Расходы
         </Link>
+        <div className="ns">Аналитика</div>
+        <Link href="/admin/sales" className={`ni${activePage==='sales'?' active':''}`}>
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
+            <polyline points="2,13 5,8 8,10 11,4 14,6"/>
+            <line x1="2" y1="14" x2="14" y2="14"/>
+          </svg>
+          Продажники
+        </Link>
         <div className="ns">Система</div>
         <Link href="/admin" className={`ni${activePage==='home'?' active':''}`}>
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
@@ -62,6 +70,13 @@ export function Sidebar({ activePage, userName, userEmail }: Props) {
           </svg>
           Главная
         </Link>
+        <Link href="/admin/settings" className={`ni${activePage==='settings'?' active':''}`}>
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
+            <circle cx="8" cy="8" r="3"/>
+            <path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.42 1.42M11.53 11.53l1.42 1.42M3.05 12.95l1.42-1.42M11.53 4.47l1.42-1.42"/>
+          </svg>
+          Настройки
+        </Link>
       </nav>
       <div className="sf">
         <div className="ur">
@@ -71,6 +86,9 @@ export function Sidebar({ activePage, userName, userEmail }: Props) {
             <div className="us">Администратор</div>
           </div>
         </div>
+        <form action={logout} style={{ marginTop: 8 }}>
+          <button className="btn-s" style={{ width: '100%' }}>Выйти</button>
+        </form>
       </div>
     </aside>
   )
