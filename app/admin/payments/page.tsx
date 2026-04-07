@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { logout } from '@/app/login/actions'
-import { markPaymentPaid } from './actions'
+import { PaymentRow } from './PaymentRow'
 
 export default async function AdminPaymentsPage() {
   const supabase = await createClient()
@@ -61,8 +61,6 @@ export default async function AdminPaymentsPage() {
   const clientStatusClass: Record<string, string> = {
     active: 'pa', completed: 'pd', frozen: 'pw'
   }
-
-  const today = new Date().toISOString().split('T')[0]
 
   return (
     <div className="app">
@@ -223,55 +221,12 @@ export default async function AdminPaymentsPage() {
                   </thead>
                   <tbody>
                     {cPayments.map((p: any) => (
-                      <>
-                        <tr key={p.id} style={{
-                          borderLeft: p.status === 'paid' ? '3px solid var(--green)' :
-                            p.status === 'overdue' ? '3px solid var(--red)' :
-                            p.status === 'soon' ? '3px solid var(--gold)' : 'none'
-                        }}>
-                          <td style={{color:'var(--muted)', fontWeight:700, fontSize:11}}>{p.num}</td>
-                          <td style={{
-                            color: p.status === 'overdue' ? 'var(--red)' :
-                              p.status === 'soon' ? 'var(--gold)' : 'var(--text)',
-                            fontWeight: (p.status === 'overdue' || p.status === 'soon') ? 600 : 400
-                          }}>
-                            {new Date(p.plan_date).toLocaleDateString('ru-RU')}
-                          </td>
-                          <td><span className="num">{Number(p.plan_sum).toLocaleString('ru')} ₽</span></td>
-                          <td>
-                            {p.fact_sum
-                              ? <span className="num g">{Number(p.fact_sum).toLocaleString('ru')} ₽</span>
-                              : <span style={{color:'var(--muted)'}}>—</span>
-                            }
-                          </td>
-                          <td style={{fontSize:11, color:'var(--muted)'}}>
-                            {p.fact_date ? new Date(p.fact_date).toLocaleDateString('ru-RU') : '—'}
-                          </td>
-                          <td style={{fontSize:11, color:'var(--muted)'}}>{p.comment ?? '—'}</td>
-                          <td>
-                            <span className={`pill ${statusClass[p.status]}`}>
-                              <span className="dot"></span>
-                              {statusLabel[p.status]}
-                            </span>
-                          </td>
-                          <td>
-                            {!p.is_paid && (
-                              <form action={markPaymentPaid} style={{display:'inline'}}>
-                                <input type="hidden" name="payment_id" value={p.id}/>
-                                <input type="hidden" name="fact_sum" value={p.plan_sum}/>
-                                <input type="hidden" name="fact_date" value={today}/>
-                                <button type="submit" style={{
-                                  padding:'4px 10px', background:'var(--green)', color:'#fff',
-                                  border:'none', borderRadius:6, fontSize:11, fontWeight:600,
-                                  cursor:'pointer', fontFamily:'inherit'
-                                }}>
-                                  ✓ Оплачен
-                                </button>
-                              </form>
-                            )}
-                          </td>
-                        </tr>
-                      </>
+                      <PaymentRow
+                        key={p.id}
+                        payment={p}
+                        statusLabel={statusLabel}
+                        statusClass={statusClass}
+                      />
                     ))}
                   </tbody>
                 </table>
