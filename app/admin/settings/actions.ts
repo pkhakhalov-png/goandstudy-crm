@@ -1,6 +1,6 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 
 export async function addSalesperson(formData: FormData): Promise<{ error?: string, password?: string }> {
@@ -11,11 +11,10 @@ export async function addSalesperson(formData: FormData): Promise<{ error?: stri
   const email = formData.get('email') as string
   const name = formData.get('name') as string
 
-  // Генерируем временный пароль
   const password = Math.random().toString(36).slice(-8) + 'Gs1!'
 
-  // Создаём пользователя через service role
-  const { data, error } = await supabase.auth.admin.createUser({
+  const adminSupabase = await createAdminClient()
+  const { data, error } = await adminSupabase.auth.admin.createUser({
     email,
     password,
     email_confirm: true,
@@ -24,8 +23,7 @@ export async function addSalesperson(formData: FormData): Promise<{ error?: stri
 
   if (error) return { error: error.message }
 
-  // Обновляем имя в public.users (триггер создаст запись)
-  await supabase.from('users').update({ name }).eq('id', data.user.id)
+  await adminSupabase.from('users').update({ name }).eq('id', data.user.id)
 
   revalidatePath('/admin/settings')
   return { password }
