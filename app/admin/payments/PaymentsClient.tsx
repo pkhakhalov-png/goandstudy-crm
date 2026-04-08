@@ -62,9 +62,11 @@ export function PaymentsClient({ allPayments, salespersons, curators }: Props) {
     setOpenForms(prev => { const n = new Set(prev); n.delete(paymentId); return n })
   }
 
-  async function handleUnpay(paymentId: number, formData: FormData) {
+  async function handleUnpay(paymentId: number) {
     setLoading(prev => new Set(prev).add(paymentId))
-    await unmarkPaymentPaid(formData)
+    const fd = new FormData()
+    fd.append('payment_id', String(paymentId))
+    await unmarkPaymentPaid(fd)
     setLoading(prev => { const n = new Set(prev); n.delete(paymentId); return n })
     setOpenForms(prev => { const n = new Set(prev); n.delete(paymentId); return n })
   }
@@ -168,7 +170,7 @@ export function PaymentsClient({ allPayments, salespersons, curators }: Props) {
         </button>
         <div style={{fontSize:13,fontWeight:700,color:'var(--text)',padding:'0 4px'}}>{centerYear}</div>
         <div style={{display:'flex',gap:6,flex:1,overflow:'hidden'}}>
-          {navMonths.map(({m,y,offset}) => {
+          {navMonths.map(({m,y}) => {
             const isCur = m===now.getMonth()&&y===now.getFullYear()
             const isPast = y<now.getFullYear()||(y===now.getFullYear()&&m<now.getMonth())
             const md = getMonthData(m,y)
@@ -295,32 +297,40 @@ export function PaymentsClient({ allPayments, salespersons, curators }: Props) {
                             <td style={{fontSize:11,color:'var(--muted)'}}>{p.comment??'—'}</td>
                             <td><span className={`pill ${statusClass[p.status]}`}><span className="dot"></span>{statusLabel[p.status]}</span></td>
                             <td onClick={(e)=>e.stopPropagation()}>
-                              <div style={{display:'flex',gap:4,alignItems:'center'}}>
-                                {/* Галочка — открыть форму редактирования */}
-                                <div onClick={(e)=>toggleForm(e, p.id)}
-                                  style={{width:16,height:16,borderRadius:5,
+                              {/* Одна галочка — клик открывает форму, если оплачен — сначала показывает форму редактирования, долгий клик отменяет */}
+                              <div style={{position:'relative',display:'inline-flex',alignItems:'center',gap:4}}>
+                                <div
+                                  onClick={(e) => {
+                                    if (p.is_paid && isFormOpen) {
+                                      // второй клик на оплаченный — отменить
+                                      e.stopPropagation()
+                                      handleUnpay(p.id)
+                                    } else {
+                                      toggleForm(e, p.id)
+                                    }
+                                  }}
+                                  title={p.is_paid ? (isFormOpen ? 'Кликните ещё раз чтобы отменить оплату' : 'Редактировать') : 'Отметить оплату'}
+                                  style={{
+                                    width:18,height:18,borderRadius:5,
                                     background:p.is_paid?'var(--green)':(isFormOpen?'var(--pl)':'transparent'),
-                                    border:p.is_paid?'none':'1.5px solid var(--bor2)',
-                                    display:'inline-flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
-                                  {p.is_paid && <svg viewBox="0 0 9 7" fill="none" stroke="white" strokeWidth="2" width="9" height="9"><polyline points="1,3.5 3.5,6 8,1"/></svg>}
+                                    border:p.is_paid?'none':`1.5px solid ${isFormOpen?'var(--purple)':'var(--bor2)'}`,
+                                    display:'inline-flex',alignItems:'center',justifyContent:'center',
+                                    cursor:'pointer',transition:'all .15s'
+                                  }}>
+                                  {p.is_paid
+                                    ? <svg viewBox="0 0 9 7" fill="none" stroke="white" strokeWidth="2" width="9" height="9"><polyline points="1,3.5 3.5,6 8,1"/></svg>
+                                    : isFormOpen
+                                      ? <svg viewBox="0 0 9 7" fill="none" stroke="var(--purple)" strokeWidth="2" width="9" height="9"><polyline points="1,3.5 3.5,6 8,1"/></svg>
+                                      : null
+                                  }
                                 </div>
-                                {/* Крестик — отменить оплату */}
-                                {p.is_paid && (
-                                  <form action={(fd)=>handleUnpay(p.id,fd)} style={{display:'inline'}} onClick={e=>e.stopPropagation()}>
-                                    <input type="hidden" name="payment_id" value={p.id}/>
-                                    <button type="submit" title="Отменить оплату"
-                                      style={{width:16,height:16,borderRadius:5,background:'rgba(220,53,69,.1)',border:'1px solid rgba(220,53,69,.2)',display:'inline-flex',alignItems:'center',justifyContent:'center',cursor:'pointer',padding:0}}>
-                                      <svg viewBox="0 0 9 9" fill="none" stroke="var(--red)" strokeWidth="2" width="8" height="8">
-                                        <line x1="1" y1="1" x2="8" y2="8"/><line x1="8" y1="1" x2="1" y2="8"/>
-                                      </svg>
-                                    </button>
-                                  </form>
+                                {p.is_paid && isFormOpen && (
+                                  <span style={{fontSize:9,color:'var(--red)',fontWeight:600,whiteSpace:'nowrap'}}>ещё раз = отмена</span>
                                 )}
                               </div>
                             </td>
                           </tr>
 
-                          {/* Форма оплаты / редактирования */}
                           {isFormOpen && (
                             <tr key={`form-${p.id}`}>
                               <td colSpan={8} style={{padding:0,background:'var(--surf2)'}} onClick={(e)=>e.stopPropagation()}>
@@ -354,6 +364,12 @@ export function PaymentsClient({ allPayments, salespersons, curators }: Props) {
                                         style={{padding:'7px 12px',background:'transparent',color:'var(--muted)',border:'1px solid var(--bor2)',borderRadius:7,fontSize:12,cursor:'pointer',fontFamily:'inherit'}}>
                                         Отмена
                                       </button>
+                                      {p.is_paid && (
+                                        <button type="button" onClick={()=>handleUnpay(p.id)} disabled={isLoading}
+                                          style={{padding:'7px 12px',background:'rgba(220,53,69,.08)',color:'var(--red)',border:'1px solid rgba(220,53,69,.2)',borderRadius:7,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+                                          Отменить оплату
+                                        </button>
+                                      )}
                                     </div>
                                   </div>
                                 </form>
