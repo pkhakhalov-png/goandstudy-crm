@@ -15,14 +15,13 @@ export function Sidebar({ activePage, userName, userEmail }: Props) {
     <aside className="sidebar">
       <div className="lw">
         <div className="lr">
-          <div className="li">
-            <svg viewBox="0 0 14 14" fill="none" stroke="white" strokeWidth="1.8" width="15" height="15">
-              <circle cx="7" cy="5" r="3"/><path d="M2 12c0-2.8 2.2-5 5-5s5 2.2 5 5"/>
-            </svg>
-          </div>
-          <div className="lt">Go & Study</div>
+          <img
+            src="https://i.ibb.co/7tNx07SW/GAS-logo-01.png"
+            alt="Go And Study"
+            style={{ height: 32, objectFit: 'contain' }}
+          />
         </div>
-        <div className="ls">CRM система</div>
+        <div className="ls" style={{ paddingLeft: 0, marginTop: 4 }}>CRM система</div>
       </div>
       <div className="rp">
         <div className="rd"></div>

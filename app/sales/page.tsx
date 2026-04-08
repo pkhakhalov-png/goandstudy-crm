@@ -35,27 +35,27 @@ export default async function SalesCabinetPage() {
     payments: (payments ?? []).filter(p => p.client_id === c.id)
   }))
 
+  const initials = (profile?.name || user.email || 'ПП')
+    .split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)
+
   return (
     <div className="app">
       <aside className="sidebar">
         <div className="lw">
-          <div className="lr">
-            <div className="li" style={{background:'var(--green)'}}>
-              <svg viewBox="0 0 14 14" fill="none" stroke="white" strokeWidth="1.8" width="15" height="15">
-                <circle cx="7" cy="5" r="3"/><path d="M2 12c0-2.8 2.2-5 5-5s5 2.2 5 5"/>
-              </svg>
-            </div>
-            <div className="lt">Go & Study</div>
-          </div>
-          <div className="ls">Кабинет продажника</div>
+          <img
+            src="https://i.ibb.co/7tNx07SW/GAS-logo-01.png"
+            alt="Go And Study"
+            style={{ height: 32, objectFit: 'contain', marginBottom: 4 }}
+          />
+          <div className="ls" style={{ paddingLeft: 0 }}>Кабинет продажника</div>
         </div>
-        <div style={{margin:'12px 14px 4px',padding:'8px 12px',background:'rgba(22,163,97,.1)',border:'1px solid rgba(22,163,97,.2)',borderRadius:10}}>
-          <div style={{fontSize:12,fontWeight:700,color:'var(--green)'}}>{profile?.name || user.email}</div>
-          <div style={{fontSize:10,color:'var(--muted)',marginTop:1}}>Продажник</div>
+        <div style={{ margin: '12px 14px 4px', padding: '8px 12px', background: 'rgba(22,163,97,.1)', border: '1px solid rgba(22,163,97,.2)', borderRadius: 10 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--green)' }}>{profile?.name || user.email}</div>
+          <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 1 }}>Продажник</div>
         </div>
         <nav className="nav">
           <div className="ns">Основное</div>
-          <Link href="/sales" className="ni active" style={{borderLeftColor:'var(--green)',color:'var(--green)',background:'rgba(22,163,97,.07)'}}>
+          <Link href="/sales" className="ni active" style={{ borderLeftColor: 'var(--green)', color: 'var(--green)', background: 'rgba(22,163,97,.07)' }}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
               <rect x="2" y="3" width="12" height="10" rx="2"/>
               <line x1="5" y1="7" x2="11" y2="7"/>
@@ -66,14 +66,17 @@ export default async function SalesCabinetPage() {
         </nav>
         <div className="sf">
           <div className="ur">
-            <div className="av" style={{background:'linear-gradient(135deg,#16a361,#0d7a49)'}}>
-              {(profile?.name || user.email || 'ПП').split(' ').map((w:string)=>w[0]).join('').toUpperCase().slice(0,2)}
+            <div className="av" style={{ background: 'linear-gradient(135deg,#16a361,#0d7a49)' }}>
+              {initials}
             </div>
             <div>
               <div className="un">{profile?.name || user.email}</div>
               <div className="us">Продажник</div>
             </div>
           </div>
+          <form action={logout} style={{ marginTop: 8 }}>
+            <button className="btn-s" style={{ width: '100%' }}>Выйти</button>
+          </form>
         </div>
       </aside>
 
@@ -81,16 +84,13 @@ export default async function SalesCabinetPage() {
         <div className="topbar">
           <div className="pt">Мои клиенты</div>
           <div className="tbr">
-            <span style={{fontSize:12,color:'var(--muted)'}}>{clients.length} клиентов</span>
-            <Link href="/sales/new" style={{padding:'9px 18px',background:'var(--green)',color:'#fff',border:'none',borderRadius:9,fontSize:13,fontWeight:600,cursor:'pointer',display:'inline-flex',alignItems:'center',gap:7,textDecoration:'none'}}>
+            <span style={{ fontSize: 12, color: 'var(--muted)' }}>{clients.length} клиентов</span>
+            <Link href="/sales/new" style={{ padding: '9px 18px', background: 'var(--green)', color: '#fff', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 7, textDecoration: 'none' }}>
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="white" strokeWidth="2.2">
                 <line x1="6" y1="1" x2="6" y2="11"/><line x1="1" y1="6" x2="11" y2="6"/>
               </svg>
               Новый клиент
             </Link>
-            <form action={logout}>
-              <button className="btn-s">Выйти</button>
-            </form>
           </div>
         </div>
 
