@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { addExpense, markExpensePaid, markExpenseUnpaid, updateExpense, addFixedExpenseRecord, markFixedRecordPaid, markFixedRecordUnpaid } from './actions'
+import { addExpense, markExpensePaid, markExpenseUnpaid, updateExpense, addFixedExpenseRecord, markFixedRecordPaid, markFixedRecordUnpaid, deleteFixedExpenseRecord } from './actions'
 
 interface Props {
   clients: any[]
@@ -63,14 +63,11 @@ export function ExpensesClient({ clients, expenses, fixedExpenses, fixedRecords 
   const activeGroups = Array.from(filteredClientsMap.values()).filter(g => g.expenses.length > 0 && g.client.status !== 'completed')
   const doneGroups = Array.from(filteredClientsMap.values()).filter(g => g.expenses.length > 0 && g.client.status === 'completed')
 
-  // KPI
   const totalPlan = expenses.reduce((s,e) => s+Number(e.plan_sum),0)
   const totalPaid = expenses.filter(e=>e.is_paid).reduce((s,e) => s+Number(e.fact_sum||e.plan_sum),0)
   const totalPending = expenses.filter(e=>!e.is_paid).reduce((s,e) => s+Number(e.plan_sum),0)
   const curatorPending = expenses.filter(e=>e.article==='curator'&&!e.is_paid).reduce((s,e)=>s+Number(e.plan_sum),0)
   const agentPending = expenses.filter(e=>e.article==='salesperson'&&!e.is_paid).reduce((s,e)=>s+Number(e.plan_sum),0)
-
-  // Фиксированные — считаем из записей (amount больше нет в fixed_expenses)
   const fixedTotalPaid = fixedRecords.filter(r=>r.is_paid).reduce((s,r)=>s+Number(r.fact_amount||r.amount),0)
   const fixedRecordsThisMonth = fixedRecords.filter(r => r.month === fixedMonth)
   const fixedRecordsPaid = fixedRecordsThisMonth.filter(r=>r.is_paid).reduce((s,r)=>s+Number(r.fact_amount||r.amount),0)
@@ -284,9 +281,7 @@ export function ExpensesClient({ clients, expenses, fixedExpenses, fixedRecords 
         {isOpen && (
           <table>
             <thead>
-              <tr>
-                <th>Статья</th><th>Кому</th><th>Дата план</th><th>Сумма план</th><th>Факт</th><th>Дата выплаты</th><th>Статус</th><th style={{width:60}}>✓</th>
-              </tr>
+              <tr><th>Статья</th><th>Кому</th><th>Дата план</th><th>Сумма план</th><th>Факт</th><th>Дата выплаты</th><th>Статус</th><th style={{width:60}}>✓</th></tr>
             </thead>
             <tbody>
               {cExp.length === 0 && <tr><td colSpan={8} style={{textAlign:'center',color:'var(--muted)',padding:20,fontSize:12}}>Нет расходов</td></tr>}
@@ -509,7 +504,7 @@ export function ExpensesClient({ clients, expenses, fixedExpenses, fixedRecords 
                   ) : (
                     <table>
                       <thead>
-                        <tr><th>Сумма</th><th>Факт</th><th>Дата выплаты</th><th>Примечание</th><th>Статус</th><th style={{width:40}}>✓</th></tr>
+                        <tr><th>Сумма</th><th>Факт</th><th>Дата выплаты</th><th>Примечание</th><th>Статус</th><th style={{width:60}}>✓</th></tr>
                       </thead>
                       <tbody>
                         {records.map((r:any) => {
@@ -523,17 +518,28 @@ export function ExpensesClient({ clients, expenses, fixedExpenses, fixedRecords 
                                 <td style={{fontSize:11,color:'var(--muted)'}}>{r.note||'—'}</td>
                                 <td>{r.is_paid?<span className="pill pa"><span className="dot"/>Выплачен</span>:<span className="pill ps"><span className="dot"/>Ожидается</span>}</td>
                                 <td style={{textAlign:'center'}}>
-                                  {r.is_paid ? (
-                                    <form action={markFixedRecordUnpaid} style={{display:'inline'}}>
+                                  <div style={{display:'flex',gap:4,alignItems:'center',justifyContent:'center'}}>
+                                    {r.is_paid ? (
+                                      <form action={markFixedRecordUnpaid} style={{display:'inline'}}>
+                                        <input type="hidden" name="record_id" value={r.id}/>
+                                        <button type="submit" style={{width:16,height:16,borderRadius:5,background:'var(--green)',border:'none',display:'inline-flex',alignItems:'center',justifyContent:'center',cursor:'pointer',padding:0}}>
+                                          <svg viewBox="0 0 9 7" fill="none" stroke="white" strokeWidth="2" width="9" height="9"><polyline points="1,3.5 3.5,6 8,1"/></svg>
+                                        </button>
+                                      </form>
+                                    ) : (
+                                      <div onClick={()=>setOpenFixedPayForms(prev=>{const n=new Set(prev);n.has(r.id)?n.delete(r.id):n.add(r.id);return n})}
+                                        style={{width:16,height:16,borderRadius:5,border:'1.5px solid var(--bor2)',display:'inline-flex',alignItems:'center',justifyContent:'center',cursor:'pointer',background:isPayOpen?'var(--pl)':'transparent'}}/>
+                                    )}
+                                    <form action={deleteFixedExpenseRecord} style={{display:'inline'}}>
                                       <input type="hidden" name="record_id" value={r.id}/>
-                                      <button type="submit" style={{width:16,height:16,borderRadius:5,background:'var(--green)',border:'none',display:'inline-flex',alignItems:'center',justifyContent:'center',cursor:'pointer',padding:0}}>
-                                        <svg viewBox="0 0 9 7" fill="none" stroke="white" strokeWidth="2" width="9" height="9"><polyline points="1,3.5 3.5,6 8,1"/></svg>
+                                      <button type="submit" title="Удалить"
+                                        style={{width:16,height:16,borderRadius:5,background:'rgba(220,53,69,.08)',border:'1px solid rgba(220,53,69,.2)',display:'inline-flex',alignItems:'center',justifyContent:'center',cursor:'pointer',padding:0}}>
+                                        <svg viewBox="0 0 9 9" fill="none" stroke="var(--red)" strokeWidth="2" width="8" height="8">
+                                          <line x1="1" y1="1" x2="8" y2="8"/><line x1="8" y1="1" x2="1" y2="8"/>
+                                        </svg>
                                       </button>
                                     </form>
-                                  ) : (
-                                    <div onClick={()=>setOpenFixedPayForms(prev=>{const n=new Set(prev);n.has(r.id)?n.delete(r.id):n.add(r.id);return n})}
-                                      style={{width:16,height:16,borderRadius:5,border:'1.5px solid var(--bor2)',display:'inline-flex',alignItems:'center',justifyContent:'center',cursor:'pointer',background:isPayOpen?'var(--pl)':'transparent',margin:'0 auto'}}/>
-                                  )}
+                                  </div>
                                 </td>
                               </tr>
                               {isPayOpen && !r.is_paid && (
