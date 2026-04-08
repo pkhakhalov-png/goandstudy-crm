@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { markPaymentPaid } from './actions'
+import { markPaymentPaid, unmarkPaymentPaid, editPayment } from './actions'
 
 const MONTHS = ['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек']
 
@@ -51,9 +51,20 @@ export function PaymentsClient({ allPayments, salespersons, curators }: Props) {
     })
   }
 
-  async function handlePay(paymentId: number, formData: FormData) {
+  async function handlePay(paymentId: number, formData: FormData, isPaid: boolean) {
     setLoading(prev => new Set(prev).add(paymentId))
-    await markPaymentPaid(formData)
+    if (isPaid) {
+      await editPayment(formData)
+    } else {
+      await markPaymentPaid(formData)
+    }
+    setLoading(prev => { const n = new Set(prev); n.delete(paymentId); return n })
+    setOpenForms(prev => { const n = new Set(prev); n.delete(paymentId); return n })
+  }
+
+  async function handleUnpay(paymentId: number, formData: FormData) {
+    setLoading(prev => new Set(prev).add(paymentId))
+    await unmarkPaymentPaid(formData)
     setLoading(prev => { const n = new Set(prev); n.delete(paymentId); return n })
     setOpenForms(prev => { const n = new Set(prev); n.delete(paymentId); return n })
   }
@@ -207,7 +218,7 @@ export function PaymentsClient({ allPayments, salespersons, curators }: Props) {
         </div>
       </div>
 
-      {/* Список клиентов */}
+      {/* Список */}
       <div style={{flex:1,padding:'14px 28px 32px',overflowY:'auto'}}>
         {clientGroups.length === 0 && (
           <div style={{textAlign:'center',color:'var(--muted)',padding:48}}>Платежей нет</div>
@@ -284,44 +295,62 @@ export function PaymentsClient({ allPayments, salespersons, curators }: Props) {
                             <td style={{fontSize:11,color:'var(--muted)'}}>{p.comment??'—'}</td>
                             <td><span className={`pill ${statusClass[p.status]}`}><span className="dot"></span>{statusLabel[p.status]}</span></td>
                             <td onClick={(e)=>e.stopPropagation()}>
-                              {p.is_paid ? (
-                                <div style={{width:16,height:16,borderRadius:5,background:'var(--green)',display:'inline-flex',alignItems:'center',justifyContent:'center'}}>
-                                  <svg viewBox="0 0 9 7" fill="none" stroke="white" strokeWidth="2" width="9" height="9"><polyline points="1,3.5 3.5,6 8,1"/></svg>
-                                </div>
-                              ) : (
+                              <div style={{display:'flex',gap:4,alignItems:'center'}}>
+                                {/* Галочка — открыть форму редактирования */}
                                 <div onClick={(e)=>toggleForm(e, p.id)}
-                                  style={{width:16,height:16,borderRadius:5,border:'1.5px solid var(--bor2)',display:'inline-flex',alignItems:'center',justifyContent:'center',cursor:'pointer',background:isFormOpen?'var(--pl)':'transparent'}}>
+                                  style={{width:16,height:16,borderRadius:5,
+                                    background:p.is_paid?'var(--green)':(isFormOpen?'var(--pl)':'transparent'),
+                                    border:p.is_paid?'none':'1.5px solid var(--bor2)',
+                                    display:'inline-flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
+                                  {p.is_paid && <svg viewBox="0 0 9 7" fill="none" stroke="white" strokeWidth="2" width="9" height="9"><polyline points="1,3.5 3.5,6 8,1"/></svg>}
                                 </div>
-                              )}
+                                {/* Крестик — отменить оплату */}
+                                {p.is_paid && (
+                                  <form action={(fd)=>handleUnpay(p.id,fd)} style={{display:'inline'}} onClick={e=>e.stopPropagation()}>
+                                    <input type="hidden" name="payment_id" value={p.id}/>
+                                    <button type="submit" title="Отменить оплату"
+                                      style={{width:16,height:16,borderRadius:5,background:'rgba(220,53,69,.1)',border:'1px solid rgba(220,53,69,.2)',display:'inline-flex',alignItems:'center',justifyContent:'center',cursor:'pointer',padding:0}}>
+                                      <svg viewBox="0 0 9 9" fill="none" stroke="var(--red)" strokeWidth="2" width="8" height="8">
+                                        <line x1="1" y1="1" x2="8" y2="8"/><line x1="8" y1="1" x2="1" y2="8"/>
+                                      </svg>
+                                    </button>
+                                  </form>
+                                )}
+                              </div>
                             </td>
                           </tr>
-                          {isFormOpen && !p.is_paid && (
+
+                          {/* Форма оплаты / редактирования */}
+                          {isFormOpen && (
                             <tr key={`form-${p.id}`}>
                               <td colSpan={8} style={{padding:0,background:'var(--surf2)'}} onClick={(e)=>e.stopPropagation()}>
-                                <form action={(fd)=>handlePay(p.id,fd)} style={{padding:'12px 16px'}}>
+                                <form action={(fd)=>handlePay(p.id,fd,p.is_paid)} style={{padding:'12px 16px'}}>
                                   <input type="hidden" name="payment_id" value={p.id}/>
+                                  <div style={{fontSize:11,color:p.is_paid?'var(--purple)':'var(--green)',fontWeight:600,marginBottom:8}}>
+                                    {p.is_paid ? '✏️ Редактировать платёж' : '✅ Отметить оплату'}
+                                  </div>
                                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 2fr auto',gap:8,alignItems:'flex-end'}}>
                                     <div>
                                       <div style={{fontSize:10,color:'var(--muted)',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:3}}>Дата оплаты</div>
-                                      <input name="fact_date" type="date" defaultValue={today}
+                                      <input name="fact_date" type="date" defaultValue={p.fact_date||today}
                                         style={{width:'100%',padding:'7px 10px',border:'1px solid var(--bor2)',borderRadius:7,fontSize:12,fontFamily:'inherit',outline:'none',background:'var(--surf)'}}/>
                                     </div>
                                     <div>
                                       <div style={{fontSize:10,color:'var(--muted)',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:3}}>Сумма факт</div>
-                                      <input name="fact_sum" type="number" defaultValue={p.plan_sum}
+                                      <input name="fact_sum" type="number" defaultValue={p.fact_sum||p.plan_sum}
                                         style={{width:'100%',padding:'7px 10px',border:'1px solid var(--bor2)',borderRadius:7,fontSize:12,fontFamily:'inherit',outline:'none',background:'var(--surf)'}}/>
                                     </div>
                                     <div>
                                       <div style={{fontSize:10,color:'var(--muted)',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:3}}>Комментарий</div>
-                                      <input name="comment" placeholder="Способ оплаты..."
+                                      <input name="comment" defaultValue={p.comment||''} placeholder="Способ оплаты..."
                                         style={{width:'100%',padding:'7px 10px',border:'1px solid var(--bor2)',borderRadius:7,fontSize:12,fontFamily:'inherit',outline:'none',background:'var(--surf)'}}/>
                                     </div>
                                     <div style={{display:'flex',gap:6}}>
                                       <button type="submit" disabled={isLoading}
-                                        style={{padding:'7px 16px',background:'var(--green)',color:'#fff',border:'none',borderRadius:7,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',opacity:isLoading?0.6:1}}>
+                                        style={{padding:'7px 16px',background:p.is_paid?'var(--purple)':'var(--green)',color:'#fff',border:'none',borderRadius:7,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',opacity:isLoading?0.6:1}}>
                                         {isLoading?'...':'Сохранить'}
                                       </button>
-                                      <button type="button" onClick={(e)=>toggleForm(e, p.id)}
+                                      <button type="button" onClick={(e)=>toggleForm(e,p.id)}
                                         style={{padding:'7px 12px',background:'transparent',color:'var(--muted)',border:'1px solid var(--bor2)',borderRadius:7,fontSize:12,cursor:'pointer',fontFamily:'inherit'}}>
                                         Отмена
                                       </button>
