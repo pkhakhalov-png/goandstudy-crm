@@ -1,7 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { logout } from '@/app/login/actions'
 import { SalesPage } from './SalesPage'
 import { SalesSidebar } from './SalesSidebar'
 
@@ -30,11 +29,15 @@ export default async function SalesCabinetPage() {
 
   const { data: allCurators } = await supabase.from('curators').select('id, name')
 
-  const { data: expenses } = await supabase
-    .from('expenses')
-    .select('id, client_id, plan_sum, fact_sum, is_paid, fact_date, plan_date, article')
-    .eq('article', 'salesperson')
-    .in('client_id', (rawClients ?? []).map(c => c.id))
+  const clientIds = (rawClients ?? []).map(c => c.id)
+
+  const { data: expenses } = clientIds.length > 0
+    ? await supabase
+        .from('expenses')
+        .select('id, client_id, plan_sum, fact_sum, is_paid, fact_date, plan_date, article')
+        .eq('article', 'salesperson')
+        .in('client_id', clientIds)
+    : { data: [] }
 
   const clients = (rawClients ?? []).map(c => ({
     ...c,
