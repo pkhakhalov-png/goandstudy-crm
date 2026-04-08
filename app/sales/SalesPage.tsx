@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { markPaymentPaidSales, unmarkPaymentPaidSales } from './actions'
 
 interface Props {
   clients: any[]
@@ -11,10 +12,8 @@ function getPaymentStatus(client: any) {
   const pays = client.payments ?? []
   const unpaid = pays.filter((p: any) => !p.is_paid)
   if (unpaid.length === 0) return { label: 'Завершён', cls: 'pd' }
-
   const hasOverdue = unpaid.some((p: any) => p.status === 'overdue')
   if (hasOverdue) return { label: 'Просрочка', cls: 'po' }
-
   const today = new Date()
   const in7 = new Date(today)
   in7.setDate(today.getDate() + 7)
@@ -23,13 +22,14 @@ function getPaymentStatus(client: any) {
     return d >= today && d <= in7
   })
   if (hasSoon) return { label: 'Скоро платёж', cls: 'ps' }
-
   return { label: 'В графике', cls: 'pa' }
 }
 
 export function SalesPage({ clients }: Props) {
   const [selected, setSelected] = useState<any>(clients[0] ?? null)
   const [search, setSearch] = useState('')
+  const [openPayForm, setOpenPayForm] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
 
   const filtered = clients.filter(c =>
     !search || c.name.toLowerCase().includes(search.toLowerCase())
@@ -42,10 +42,25 @@ export function SalesPage({ clients }: Props) {
 
   const sel = selected
   const selPayments = (sel?.payments ?? []).sort((a:any,b:any) => a.num - b.num)
-  const selPaidSum = selPayments.filter((p:any)=>p.is_paid).reduce((s:number,p:any)=>s+Number(p.plan_sum),0)
+  const selPaidSum = selPayments.filter((p:any)=>p.is_paid).reduce((s:number,p:any)=>s+Number(p.fact_sum||p.plan_sum),0)
   const selTotalSum = selPayments.reduce((s:number,p:any)=>s+Number(p.plan_sum),0)
   const selDebt = selTotalSum - selPaidSum
   const selPct = selPayments.length>0 ? Math.round(selPayments.filter((p:any)=>p.is_paid).length/selPayments.length*100) : 0
+
+  const today = new Date().toISOString().split('T')[0]
+
+  async function handleMarkPaid(formData: FormData) {
+    setLoading(true)
+    await markPaymentPaidSales(formData)
+    setLoading(false)
+    setOpenPayForm(null)
+  }
+
+  async function handleUnmark(formData: FormData) {
+    setLoading(true)
+    await unmarkPaymentPaidSales(formData)
+    setLoading(false)
+  }
 
   return (
     <>
@@ -111,15 +126,14 @@ export function SalesPage({ clients }: Props) {
                 <tbody>
                   {filtered.map((c:any) => {
                     const pays = c.payments ?? []
-                    const paidS = pays.filter((p:any)=>p.is_paid).reduce((s:number,p:any)=>s+Number(p.plan_sum),0)
+                    const paidS = pays.filter((p:any)=>p.is_paid).reduce((s:number,p:any)=>s+Number(p.fact_sum||p.plan_sum),0)
                     const totalS = pays.reduce((s:number,p:any)=>s+Number(p.plan_sum),0)
                     const debt = totalS - paidS
                     const pct = pays.length>0 ? Math.round(pays.filter((p:any)=>p.is_paid).length/pays.length*100) : 0
                     const isSel = sel?.id === c.id
                     const { label, cls } = getPaymentStatus(c)
-
                     return (
-                      <tr key={c.id} onClick={()=>setSelected(c)}
+                      <tr key={c.id} onClick={()=>{ setSelected(c); setOpenPayForm(null) }}
                         style={{background:isSel?'var(--rs)':'transparent',cursor:'pointer'}}>
                         <td>
                           <div className="cn">{c.name}</div>
@@ -136,10 +150,7 @@ export function SalesPage({ clients }: Props) {
                           </div>
                         </td>
                         <td>
-                          <span className={`pill ${cls}`}>
-                            <span className="dot"></span>
-                            {label}
-                          </span>
+                          <span className={`pill ${cls}`}><span className="dot"></span>{label}</span>
                         </td>
                       </tr>
                     )
@@ -184,25 +195,84 @@ export function SalesPage({ clients }: Props) {
                 <div style={{fontSize:10,textTransform:'uppercase',letterSpacing:'0.08em',color:'var(--muted2)',fontWeight:600,margin:'16px 0 8px'}}>
                   График платежей
                 </div>
-                {selPayments.map((p:any) => (
-                  <div key={p.id} style={{
-                    display:'flex',alignItems:'center',gap:8,padding:'7px 10px',
-                    borderRadius:9,marginBottom:5,
-                    border:`1px solid ${p.status==='paid'?'rgba(22,163,97,.2)':p.status==='overdue'?'rgba(220,53,69,.2)':p.status==='soon'?'rgba(201,125,0,.2)':'var(--bor)'}`,
-                    background:p.status==='paid'?'rgba(22,163,97,.05)':p.status==='overdue'?'rgba(220,53,69,.05)':p.status==='soon'?'rgba(201,125,0,.05)':'var(--surf2)'
-                  }}>
-                    <div style={{fontSize:10,color:'var(--muted)',width:14,fontWeight:700}}>{p.num}</div>
-                    <div style={{fontSize:11,color:p.status==='overdue'?'var(--red)':p.status==='soon'?'var(--gold)':'var(--muted)',flex:1,fontWeight:(p.status==='overdue'||p.status==='soon')?600:400}}>
-                      {new Date(p.plan_date).toLocaleDateString('ru-RU')}
+
+                {selPayments.map((p:any) => {
+                  const isFormOpen = openPayForm === p.id
+                  return (
+                    <div key={p.id} style={{marginBottom:6}}>
+                      {/* Строка платежа */}
+                      <div style={{
+                        display:'flex',alignItems:'center',gap:8,padding:'8px 10px',
+                        borderRadius:9,
+                        border:`1px solid ${p.status==='paid'?'rgba(22,163,97,.2)':p.status==='overdue'?'rgba(220,53,69,.2)':p.status==='soon'?'rgba(201,125,0,.2)':'var(--bor)'}`,
+                        background:p.status==='paid'?'rgba(22,163,97,.05)':p.status==='overdue'?'rgba(220,53,69,.05)':p.status==='soon'?'rgba(201,125,0,.05)':'var(--surf2)'
+                      }}>
+                        <div style={{fontSize:10,color:'var(--muted)',width:14,fontWeight:700,flexShrink:0}}>{p.num}</div>
+                        <div style={{fontSize:11,color:p.status==='overdue'?'var(--red)':p.status==='soon'?'var(--gold)':'var(--muted)',flex:1,fontWeight:(p.status==='overdue'||p.status==='soon')?600:400}}>
+                          {new Date(p.plan_date).toLocaleDateString('ru-RU')}
+                        </div>
+                        <div style={{fontSize:11,fontWeight:700,fontVariantNumeric:'tabular-nums',color:p.status==='paid'?'var(--green)':p.status==='overdue'?'var(--red)':p.status==='soon'?'var(--gold)':'var(--muted)'}}>
+                          {Number(p.plan_sum).toLocaleString('ru')} ₽
+                        </div>
+                        {/* Галочка */}
+                        <div
+                          onClick={()=>setOpenPayForm(isFormOpen ? null : p.id)}
+                          style={{
+                            width:18,height:18,borderRadius:5,flexShrink:0,cursor:'pointer',
+                            background:p.is_paid?'var(--green)':(isFormOpen?'rgba(22,163,97,.15)':'transparent'),
+                            border:p.is_paid?'none':`1.5px solid ${isFormOpen?'var(--green)':'var(--bor2)'}`,
+                            display:'inline-flex',alignItems:'center',justifyContent:'center'
+                          }}>
+                          {p.is_paid && <svg viewBox="0 0 9 7" fill="none" stroke="white" strokeWidth="2" width="9" height="9"><polyline points="1,3.5 3.5,6 8,1"/></svg>}
+                        </div>
+                      </div>
+
+                      {/* Форма отметки / редактирования */}
+                      {isFormOpen && (
+                        <div style={{padding:'10px 12px',background:'var(--surf)',border:'1px solid var(--bor2)',borderRadius:9,marginTop:4}}>
+                          {p.is_paid && (
+                            <div style={{fontSize:11,color:'var(--muted)',marginBottom:8}}>
+                              Оплачен {p.fact_date?new Date(p.fact_date).toLocaleDateString('ru-RU'):''} · {p.fact_sum?Number(p.fact_sum).toLocaleString('ru')+' ₽':''}
+                              {p.comment && <div style={{marginTop:2}}>💬 {p.comment}</div>}
+                            </div>
+                          )}
+                          <form action={p.is_paid ? handleUnmark : handleMarkPaid}>
+                            <input type="hidden" name="payment_id" value={p.id}/>
+                            {!p.is_paid && (
+                              <>
+                                <div style={{marginBottom:7}}>
+                                  <div style={{fontSize:10,color:'var(--muted)',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:3}}>Дата оплаты</div>
+                                  <input name="fact_date" type="date" defaultValue={today}
+                                    style={{width:'100%',padding:'6px 10px',border:'1px solid var(--bor2)',borderRadius:7,fontSize:12,fontFamily:'inherit',outline:'none',background:'var(--surf2)'}}/>
+                                </div>
+                                <div style={{marginBottom:7}}>
+                                  <div style={{fontSize:10,color:'var(--muted)',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:3}}>Сумма факт</div>
+                                  <input name="fact_sum" type="number" defaultValue={p.plan_sum}
+                                    style={{width:'100%',padding:'6px 10px',border:'1px solid var(--bor2)',borderRadius:7,fontSize:12,fontFamily:'inherit',outline:'none',background:'var(--surf2)'}}/>
+                                </div>
+                                <div style={{marginBottom:10}}>
+                                  <div style={{fontSize:10,color:'var(--muted)',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:3}}>Комментарий</div>
+                                  <input name="comment" placeholder="Способ оплаты..."
+                                    style={{width:'100%',padding:'6px 10px',border:'1px solid var(--bor2)',borderRadius:7,fontSize:12,fontFamily:'inherit',outline:'none',background:'var(--surf2)'}}/>
+                                </div>
+                              </>
+                            )}
+                            <div style={{display:'flex',gap:6}}>
+                              <button type="submit" disabled={loading}
+                                style={{flex:1,padding:'7px 0',background:p.is_paid?'rgba(220,53,69,.08)':'var(--green)',color:p.is_paid?'var(--red)':'#fff',border:p.is_paid?'1px solid rgba(220,53,69,.2)':'none',borderRadius:7,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',opacity:loading?0.6:1}}>
+                                {loading?'...':p.is_paid?'Отменить оплату':'✓ Отметить оплату'}
+                              </button>
+                              <button type="button" onClick={()=>setOpenPayForm(null)}
+                                style={{padding:'7px 12px',background:'transparent',color:'var(--muted)',border:'1px solid var(--bor2)',borderRadius:7,fontSize:12,cursor:'pointer',fontFamily:'inherit'}}>
+                                ✕
+                              </button>
+                            </div>
+                          </form>
+                        </div>
+                      )}
                     </div>
-                    <div style={{fontSize:11,fontWeight:700,fontVariantNumeric:'tabular-nums',color:p.status==='paid'?'var(--green)':p.status==='overdue'?'var(--red)':p.status==='soon'?'var(--gold)':'var(--muted)'}}>
-                      {Number(p.plan_sum).toLocaleString('ru')} ₽
-                    </div>
-                    <div style={{width:16,height:16,borderRadius:5,background:p.is_paid?'var(--green)':'transparent',border:p.is_paid?'none':'1.5px solid var(--bor2)',display:'inline-flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
-                      {p.is_paid && <svg viewBox="0 0 9 7" fill="none" stroke="white" strokeWidth="2" width="9" height="9"><polyline points="1,3.5 3.5,6 8,1"/></svg>}
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
           )}
