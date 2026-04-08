@@ -27,6 +27,11 @@ export default async function AdminSettingsPage() {
     .select('id, name, is_active, created_at')
     .order('created_at', { ascending: true })
 
+  const { data: fixedExpenses } = await supabase
+    .from('fixed_expenses')
+    .select('*')
+    .order('created_at', { ascending: true })
+
   return (
     <div className="app">
       <Sidebar activePage="settings" userName={profile?.name || ''} userEmail={user.email || ''} />
@@ -37,6 +42,7 @@ export default async function AdminSettingsPage() {
         <SettingsClient
           salespersons={salespersons ?? []}
           curators={curators ?? []}
+          fixedExpenses={fixedExpenses ?? []}
         />
       </div>
     </div>
