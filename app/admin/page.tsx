@@ -26,13 +26,18 @@ export default async function AdminPage() {
 
   const { data: expenses } = await supabase
     .from('expenses')
-    .select('id, client_id, plan_sum, fact_sum, is_paid, article')
+    .select('id, client_id, plan_sum, fact_sum, is_paid, article, who, plan_date, fact_date')
 
   const { data: salespersons } = await supabase
     .from('users')
     .select('id, name, is_active')
     .eq('role', 'salesperson')
     .order('name')
+
+  const { data: fixedExpenses } = await supabase
+    .from('fixed_expenses')
+    .select('id, name, amount, period, article, is_active')
+    .eq('is_active', true)
 
   return (
     <div className="app">
@@ -46,6 +51,7 @@ export default async function AdminPage() {
           payments={payments ?? []}
           expenses={expenses ?? []}
           salespersons={salespersons ?? []}
+          fixedExpenses={fixedExpenses ?? []}
         />
       </div>
     </div>
