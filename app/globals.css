@@ -32,11 +32,13 @@ html, body {
   font-family: 'Segoe UI', system-ui, sans-serif;
 }
 
+/* ── APP LAYOUT ── */
 .app {
   display: flex;
   min-height: 100vh;
 }
 
+/* ── SIDEBAR ── */
 .sidebar {
   width: var(--sw);
   background: var(--surf);
@@ -48,6 +50,15 @@ html, body {
   display: flex;
   flex-direction: column;
   z-index: 20;
+  transition: transform 0.25s ease;
+}
+
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.4);
+  z-index: 19;
 }
 
 .lw {
@@ -199,6 +210,7 @@ html, body {
   margin-top: 1px;
 }
 
+/* ── MAIN ── */
 .main {
   flex: 1;
   margin-left: var(--sw);
@@ -208,6 +220,7 @@ html, body {
   min-width: 0;
 }
 
+/* ── TOPBAR ── */
 .topbar {
   padding: 14px 28px;
   border-bottom: 1px solid var(--bor);
@@ -232,6 +245,21 @@ html, body {
   gap: 10px;
 }
 
+/* Бургер кнопка — скрыта на десктопе */
+.burger-btn {
+  display: none;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--bor2);
+  border-radius: 9px;
+  background: var(--surf);
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* ── BUTTONS ── */
 .btn-p {
   padding: 9px 18px;
   background: var(--purple);
@@ -249,9 +277,7 @@ html, body {
   text-decoration: none;
 }
 
-.btn-p:hover {
-  opacity: 0.88;
-}
+.btn-p:hover { opacity: 0.88; }
 
 .btn-s {
   padding: 7px 14px;
@@ -265,6 +291,7 @@ html, body {
   font-family: inherit;
 }
 
+/* ── CONTENT ── */
 .cnt {
   flex: 1;
   padding: 18px 28px 32px;
@@ -305,6 +332,7 @@ html, body {
   font-family: inherit;
 }
 
+/* ── TABLE ── */
 .tw {
   background: var(--surf);
   border: 1px solid var(--bor);
@@ -342,19 +370,16 @@ td {
   vertical-align: middle;
 }
 
-tbody tr:last-child td {
-  border-bottom: none;
-}
+tbody tr:last-child td { border-bottom: none; }
 
 tbody tr {
   transition: background 0.12s;
   cursor: pointer;
 }
 
-tbody tr:hover {
-  background: var(--rh);
-}
+tbody tr:hover { background: var(--rh); }
 
+/* ── TYPOGRAPHY ── */
 .cn {
   font-weight: 700;
   font-size: 13px;
@@ -379,6 +404,7 @@ tbody tr:hover {
 .num.o { color: var(--gold); }
 .num.m { color: var(--muted); }
 
+/* ── PILLS ── */
 .pill {
   display: inline-flex;
   align-items: center;
@@ -404,6 +430,7 @@ tbody tr:hover {
   flex-shrink: 0;
 }
 
+/* ── TAGS ── */
 .ctag {
   display: inline-block;
   padding: 3px 9px;
@@ -428,6 +455,7 @@ tbody tr:hover {
   white-space: nowrap;
 }
 
+/* ── PROGRESS ── */
 .tp {
   display: flex;
   align-items: center;
@@ -456,6 +484,7 @@ tbody tr:hover {
   min-width: 28px;
 }
 
+/* ── LAYOUT HELPERS ── */
 .lay {
   display: flex;
   gap: 16px;
@@ -514,9 +543,7 @@ tbody tr:hover {
   font-size: 12px;
 }
 
-.ir:last-of-type {
-  border-bottom: none;
-}
+.ir:last-of-type { border-bottom: none; }
 
 .ik { color: var(--muted); }
 .iv { font-weight: 600; color: var(--text); }
@@ -524,6 +551,7 @@ tbody tr:hover {
 .iv.g { color: var(--green); }
 .iv.o { color: var(--gold); }
 
+/* ── KPI CARDS ── */
 .kw {
   padding: 20px 28px 0;
 }
@@ -571,4 +599,127 @@ tbody tr:hover {
   font-size: 11px;
   color: var(--muted);
   margin-top: 6px;
+}
+
+.kpg {
+  height: 3px;
+  background: var(--bor2);
+  border-radius: 20px;
+  overflow: hidden;
+  margin-top: 8px;
+}
+
+.kpf {
+  height: 100%;
+  background: linear-gradient(90deg, var(--purple), #d47aff);
+  border-radius: 20px;
+}
+
+/* ════════════════════════════════
+   MOBILE — 768px и меньше
+════════════════════════════════ */
+@media (max-width: 768px) {
+
+  /* Сайдбар скрыт по умолчанию, выезжает по бургеру */
+  .sidebar {
+    transform: translateX(-100%);
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  .sidebar-overlay.open {
+    display: block;
+  }
+
+  /* Бургер кнопка видна */
+  .burger-btn {
+    display: flex;
+  }
+
+  /* Основной контент на всю ширину */
+  .main {
+    margin-left: 0;
+  }
+
+  /* Topbar компактнее */
+  .topbar {
+    padding: 12px 16px;
+  }
+
+  /* KPI гриды — 2 колонки на мобиле */
+  .k4, .k5 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .kw {
+    padding: 14px 16px 0;
+  }
+
+  .kc {
+    padding: 12px 14px;
+  }
+
+  .kv {
+    font-size: 16px;
+  }
+
+  /* Контент */
+  .cnt {
+    padding: 14px 16px 24px;
+  }
+
+  /* Таблицы — горизонтальный скролл */
+  .tw {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  table {
+    min-width: 600px;
+  }
+
+  /* Layout панель — вертикально */
+  .lay {
+    flex-direction: column;
+  }
+
+  .panel {
+    width: 100%;
+    min-width: 0;
+    position: static;
+    max-height: none;
+  }
+
+  /* Паддинги в блоках расходов/платежей */
+  .main > div[style*="padding: 20px 28px"],
+  .main > div[style*="padding:'20px 28px"] {
+    padding: 14px 16px !important;
+  }
+}
+
+/* ════════════════════════════════
+   MOBILE — 480px и меньше
+════════════════════════════════ */
+@media (max-width: 480px) {
+
+  /* KPI — 1 колонка на маленьких */
+  .k4, .k5 {
+    grid-template-columns: 1fr;
+  }
+
+  .pt {
+    font-size: 13px;
+  }
+
+  th {
+    padding: 9px 10px;
+    font-size: 9px;
+  }
+
+  td {
+    padding: 10px 10px;
+    font-size: 11px;
+  }
 }
