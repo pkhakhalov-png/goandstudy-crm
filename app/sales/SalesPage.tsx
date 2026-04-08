@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { markPaymentPaidSales, unmarkPaymentPaidSales } from './actions'
 
 interface Props {
@@ -26,21 +27,24 @@ function getPaymentStatus(client: any) {
 }
 
 export function SalesPage({ clients }: Props) {
-  const [selected, setSelected] = useState<any>(clients[0] ?? null)
+  const router = useRouter()
+  const [selectedId, setSelectedId] = useState<number | null>(clients[0]?.id ?? null)
   const [search, setSearch] = useState('')
   const [openPayForm, setOpenPayForm] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+
+  // Всегда берём актуальный клиент из props (после router.refresh() придут свежие данные)
+  const sel = clients.find(c => c.id === selectedId) ?? clients[0] ?? null
 
   const filtered = clients.filter(c =>
     !search || c.name.toLowerCase().includes(search.toLowerCase())
   )
 
   const totalPlan = clients.reduce((s,c) => s+(c.payments?.reduce((ps:number,p:any)=>ps+Number(p.plan_sum),0)??0),0)
-  const totalPaid = clients.reduce((s,c) => s+(c.payments?.filter((p:any)=>p.is_paid).reduce((ps:number,p:any)=>ps+Number(p.plan_sum),0)??0),0)
+  const totalPaid = clients.reduce((s,c) => s+(c.payments?.filter((p:any)=>p.is_paid).reduce((ps:number,p:any)=>ps+Number(p.fact_sum||p.plan_sum),0)??0),0)
   const totalOverdue = clients.reduce((s,c) => s+(c.payments?.filter((p:any)=>p.status==='overdue').reduce((ps:number,p:any)=>ps+Number(p.plan_sum),0)??0),0)
   const totalSoon = clients.reduce((s,c) => s+(c.payments?.filter((p:any)=>p.status==='soon').reduce((ps:number,p:any)=>ps+Number(p.plan_sum),0)??0),0)
 
-  const sel = selected
   const selPayments = (sel?.payments ?? []).sort((a:any,b:any) => a.num - b.num)
   const selPaidSum = selPayments.filter((p:any)=>p.is_paid).reduce((s:number,p:any)=>s+Number(p.fact_sum||p.plan_sum),0)
   const selTotalSum = selPayments.reduce((s:number,p:any)=>s+Number(p.plan_sum),0)
@@ -52,6 +56,7 @@ export function SalesPage({ clients }: Props) {
   async function handleMarkPaid(formData: FormData) {
     setLoading(true)
     await markPaymentPaidSales(formData)
+    router.refresh()
     setLoading(false)
     setOpenPayForm(null)
   }
@@ -59,7 +64,9 @@ export function SalesPage({ clients }: Props) {
   async function handleUnmark(formData: FormData) {
     setLoading(true)
     await unmarkPaymentPaidSales(formData)
+    router.refresh()
     setLoading(false)
+    setOpenPayForm(null)
   }
 
   return (
@@ -133,7 +140,7 @@ export function SalesPage({ clients }: Props) {
                     const isSel = sel?.id === c.id
                     const { label, cls } = getPaymentStatus(c)
                     return (
-                      <tr key={c.id} onClick={()=>{ setSelected(c); setOpenPayForm(null) }}
+                      <tr key={c.id} onClick={()=>{ setSelectedId(c.id); setOpenPayForm(null) }}
                         style={{background:isSel?'var(--rs)':'transparent',cursor:'pointer'}}>
                         <td>
                           <div className="cn">{c.name}</div>
@@ -188,7 +195,7 @@ export function SalesPage({ clients }: Props) {
                     <span>Прогресс</span><span>{selPct}%</span>
                   </div>
                   <div style={{height:6,background:'var(--bor2)',borderRadius:20,overflow:'hidden'}}>
-                    <div style={{height:'100%',width:`${selPct}%`,background:'linear-gradient(90deg,var(--green),#5fd6a4)',borderRadius:20}}></div>
+                    <div style={{height:'100%',width:`${selPct}%`,background:'linear-gradient(90deg,var(--green),#5fd6a4)',borderRadius:20}}/>
                   </div>
                 </div>
 
@@ -200,10 +207,8 @@ export function SalesPage({ clients }: Props) {
                   const isFormOpen = openPayForm === p.id
                   return (
                     <div key={p.id} style={{marginBottom:6}}>
-                      {/* Строка платежа */}
                       <div style={{
-                        display:'flex',alignItems:'center',gap:8,padding:'8px 10px',
-                        borderRadius:9,
+                        display:'flex',alignItems:'center',gap:8,padding:'8px 10px',borderRadius:9,
                         border:`1px solid ${p.status==='paid'?'rgba(22,163,97,.2)':p.status==='overdue'?'rgba(220,53,69,.2)':p.status==='soon'?'rgba(201,125,0,.2)':'var(--bor)'}`,
                         background:p.status==='paid'?'rgba(22,163,97,.05)':p.status==='overdue'?'rgba(220,53,69,.05)':p.status==='soon'?'rgba(201,125,0,.05)':'var(--surf2)'
                       }}>
@@ -214,7 +219,6 @@ export function SalesPage({ clients }: Props) {
                         <div style={{fontSize:11,fontWeight:700,fontVariantNumeric:'tabular-nums',color:p.status==='paid'?'var(--green)':p.status==='overdue'?'var(--red)':p.status==='soon'?'var(--gold)':'var(--muted)'}}>
                           {Number(p.plan_sum).toLocaleString('ru')} ₽
                         </div>
-                        {/* Галочка */}
                         <div
                           onClick={()=>setOpenPayForm(isFormOpen ? null : p.id)}
                           style={{
@@ -227,12 +231,11 @@ export function SalesPage({ clients }: Props) {
                         </div>
                       </div>
 
-                      {/* Форма отметки / редактирования */}
                       {isFormOpen && (
                         <div style={{padding:'10px 12px',background:'var(--surf)',border:'1px solid var(--bor2)',borderRadius:9,marginTop:4}}>
                           {p.is_paid && (
                             <div style={{fontSize:11,color:'var(--muted)',marginBottom:8}}>
-                              Оплачен {p.fact_date?new Date(p.fact_date).toLocaleDateString('ru-RU'):''} · {p.fact_sum?Number(p.fact_sum).toLocaleString('ru')+' ₽':''}
+                              Оплачен {p.fact_date?new Date(p.fact_date).toLocaleDateString('ru-RU'):''}{p.fact_sum?` · ${Number(p.fact_sum).toLocaleString('ru')} ₽`:''}
                               {p.comment && <div style={{marginTop:2}}>💬 {p.comment}</div>}
                             </div>
                           )}
