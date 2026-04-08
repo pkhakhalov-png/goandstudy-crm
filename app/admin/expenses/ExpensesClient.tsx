@@ -12,6 +12,11 @@ interface Props {
 
 const MONTHS_RU = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь']
 
+const articleColors: Record<string,string> = { office:'rgba(22,163,97,.08)', salary:'rgba(177,94,204,.08)', software:'rgba(201,125,0,.08)', marketing:'rgba(220,53,69,.08)', other:'rgba(20,18,30,.04)' }
+const articleTextColors: Record<string,string> = { office:'var(--green)', salary:'var(--purple)', software:'var(--gold)', marketing:'var(--red)', other:'var(--muted)' }
+const articleLabel: Record<string,string> = { office:'Офис', salary:'ЗП', software:'ПО/Подписки', marketing:'Маркетинг', other:'Прочее' }
+const periodLabel: Record<string,string> = { monthly:'Ежемесячно', quarterly:'Ежеквартально', yearly:'Ежегодно', once:'Разово' }
+
 export function ExpensesClient({ clients, expenses, fixedExpenses, fixedRecords }: Props) {
   const now = new Date()
   const [tab, setTab] = useState<'all' | 'curators' | 'salespersons' | 'fixed'>('all')
@@ -58,28 +63,21 @@ export function ExpensesClient({ clients, expenses, fixedExpenses, fixedRecords 
   const activeGroups = Array.from(filteredClientsMap.values()).filter(g => g.expenses.length > 0 && g.client.status !== 'completed')
   const doneGroups = Array.from(filteredClientsMap.values()).filter(g => g.expenses.length > 0 && g.client.status === 'completed')
 
+  // KPI
   const totalPlan = expenses.reduce((s,e) => s+Number(e.plan_sum),0)
   const totalPaid = expenses.filter(e=>e.is_paid).reduce((s,e) => s+Number(e.fact_sum||e.plan_sum),0)
   const totalPending = expenses.filter(e=>!e.is_paid).reduce((s,e) => s+Number(e.plan_sum),0)
   const curatorPending = expenses.filter(e=>e.article==='curator'&&!e.is_paid).reduce((s,e)=>s+Number(e.plan_sum),0)
   const agentPending = expenses.filter(e=>e.article==='salesperson'&&!e.is_paid).reduce((s,e)=>s+Number(e.plan_sum),0)
 
-  // Фиксированные расходы — сумма в месяц
-  const fixedMonthly = fixedExpenses.reduce((s, e) => {
-    if (e.period === 'monthly') return s + Number(e.amount)
-    if (e.period === 'quarterly') return s + Number(e.amount) / 3
-    if (e.period === 'yearly') return s + Number(e.amount) / 12
-    return s
-  }, 0)
-
-  // Записи фиксированных расходов за выбранный месяц
+  // Фиксированные — считаем из записей (amount больше нет в fixed_expenses)
+  const fixedTotalPaid = fixedRecords.filter(r=>r.is_paid).reduce((s,r)=>s+Number(r.fact_amount||r.amount),0)
   const fixedRecordsThisMonth = fixedRecords.filter(r => r.month === fixedMonth)
-  const fixedRecordsPaid = fixedRecordsThisMonth.filter(r => r.is_paid).reduce((s,r) => s+Number(r.fact_amount||r.amount),0)
-  const fixedRecordsPending = fixedRecordsThisMonth.filter(r => !r.is_paid).reduce((s,r) => s+Number(r.amount),0)
+  const fixedRecordsPaid = fixedRecordsThisMonth.filter(r=>r.is_paid).reduce((s,r)=>s+Number(r.fact_amount||r.amount),0)
+  const fixedRecordsPending = fixedRecordsThisMonth.filter(r=>!r.is_paid).reduce((s,r)=>s+Number(r.amount),0)
 
   const today = new Date().toISOString().split('T')[0]
 
-  // Навигация по месяцам для фиксированных
   function shiftFixedMonth(dir: number) {
     const [y, m] = fixedMonth.split('-').map(Number)
     let nm = m + dir, ny = y
@@ -112,7 +110,11 @@ export function ExpensesClient({ clients, expenses, fixedExpenses, fixedRecords 
         const months = [...new Set(yearExp.map((e:any) => new Date(e.plan_date || e.created_at || Date.now()).getMonth()))].sort((a,b) => b-a)
         const byMonth = months.map(month => {
           const monthExp = yearExp.filter((e:any) => new Date(e.plan_date || e.created_at || Date.now()).getMonth() === month)
-          return { month, monthExp, monthPaid: monthExp.filter((e:any)=>e.is_paid).reduce((s:number,e:any)=>s+Number(e.fact_sum||e.plan_sum),0), monthPending: monthExp.filter((e:any)=>!e.is_paid).reduce((s:number,e:any)=>s+Number(e.plan_sum),0) }
+          return {
+            month, monthExp,
+            monthPaid: monthExp.filter((e:any)=>e.is_paid).reduce((s:number,e:any)=>s+Number(e.fact_sum||e.plan_sum),0),
+            monthPending: monthExp.filter((e:any)=>!e.is_paid).reduce((s:number,e:any)=>s+Number(e.plan_sum),0)
+          }
         })
         return { year, yearExp, yearPaid, yearPending, byMonth }
       })
@@ -197,7 +199,10 @@ export function ExpensesClient({ clients, expenses, fixedExpenses, fixedRecords 
                                   const client = clients.find(cl => cl.id === e.client_id)
                                   return (
                                     <tr key={e.id} style={{opacity:e.is_paid?0.65:1}}>
-                                      <td><div style={{fontSize:12,fontWeight:600}}>{client?.name??'—'}</div><div style={{fontSize:10,color:'var(--muted)'}}>{client?.country??''}</div></td>
+                                      <td>
+                                        <div style={{fontSize:12,fontWeight:600}}>{client?.name??'—'}</div>
+                                        <div style={{fontSize:10,color:'var(--muted)'}}>{client?.country??''}</div>
+                                      </td>
                                       <td style={{fontSize:11,color:'var(--muted)'}}>{e.plan_date?new Date(e.plan_date).toLocaleDateString('ru-RU'):'—'}</td>
                                       <td><span className="num">{Number(e.plan_sum).toLocaleString('ru')} ₽</span></td>
                                       <td>{e.fact_sum?<span className="num m">{Number(e.fact_sum).toLocaleString('ru')} ₽</span>:<span style={{color:'var(--muted)'}}>—</span>}</td>
@@ -278,7 +283,11 @@ export function ExpensesClient({ clients, expenses, fixedExpenses, fixedRecords 
         )}
         {isOpen && (
           <table>
-            <thead><tr><th>Статья</th><th>Кому</th><th>Дата план</th><th>Сумма план</th><th>Факт</th><th>Дата выплаты</th><th>Статус</th><th style={{width:60}}>✓</th></tr></thead>
+            <thead>
+              <tr>
+                <th>Статья</th><th>Кому</th><th>Дата план</th><th>Сумма план</th><th>Факт</th><th>Дата выплаты</th><th>Статус</th><th style={{width:60}}>✓</th>
+              </tr>
+            </thead>
             <tbody>
               {cExp.length === 0 && <tr><td colSpan={8} style={{textAlign:'center',color:'var(--muted)',padding:20,fontSize:12}}>Нет расходов</td></tr>}
               {cExp.map((e:any) => {
@@ -295,9 +304,15 @@ export function ExpensesClient({ clients, expenses, fixedExpenses, fixedRecords 
                           {categoryLabel[e.article]??e.article}
                         </span>
                       </td>
-                      <td style={{fontSize:11,color:e.article==='curator'?'var(--purple)':e.article==='salesperson'?'var(--gold)':'var(--muted)',fontWeight:(e.article==='curator'||e.article==='salesperson')?600:400}}>{e.who??'—'}</td>
+                      <td style={{fontSize:11,color:e.article==='curator'?'var(--purple)':e.article==='salesperson'?'var(--gold)':'var(--muted)',fontWeight:(e.article==='curator'||e.article==='salesperson')?600:400}}>
+                        {e.who??'—'}
+                      </td>
                       <td style={{fontSize:11,color:'var(--muted)'}}>{e.plan_date?new Date(e.plan_date).toLocaleDateString('ru-RU'):'—'}</td>
-                      <td><span className="num" style={{cursor:'pointer',textDecoration:'underline dotted'}} onClick={(ev)=>toggleEditForm(ev,e.id)}>{Number(e.plan_sum).toLocaleString('ru')} ₽</span></td>
+                      <td>
+                        <span className="num" style={{cursor:'pointer',textDecoration:'underline dotted'}} onClick={(ev)=>toggleEditForm(ev,e.id)}>
+                          {Number(e.plan_sum).toLocaleString('ru')} ₽
+                        </span>
+                      </td>
                       <td>{e.fact_sum?<span className="num m">{Number(e.fact_sum).toLocaleString('ru')} ₽</span>:<span style={{color:'var(--muted)'}}>—</span>}</td>
                       <td style={{fontSize:11,color:'var(--muted)'}}>{e.fact_date?new Date(e.fact_date).toLocaleDateString('ru-RU'):'—'}</td>
                       <td>{e.is_paid?<span className="pill pa"><span className="dot"/>Выплачен</span>:<span className="pill ps"><span className="dot"/>Ожидается</span>}</td>
@@ -392,12 +407,12 @@ export function ExpensesClient({ clients, expenses, fixedExpenses, fixedRecords 
           <div className="kc">
             <div className="kl">К выплате</div>
             <div className="kv o" style={{fontSize:17}}>{totalPending.toLocaleString('ru')} ₽</div>
-            <div className="ks">кредиторка</div>
+            <div className="ks">кредиторка · кураторы: {curatorPending.toLocaleString('ru')} ₽</div>
           </div>
           <div className="kc">
-            <div className="kl">Фикс. расходы/мес</div>
-            <div className="kv p" style={{fontSize:17}}>{Math.round(fixedMonthly).toLocaleString('ru')} ₽</div>
-            <div className="ks">кураторы долг: {curatorPending.toLocaleString('ru')} ₽</div>
+            <div className="kl">Фикс. расходы (выплачено)</div>
+            <div className="kv p" style={{fontSize:17}}>{fixedTotalPaid.toLocaleString('ru')} ₽</div>
+            <div className="ks">агенты долг: {agentPending.toLocaleString('ru')} ₽</div>
           </div>
         </div>
       </div>
@@ -427,10 +442,9 @@ export function ExpensesClient({ clients, expenses, fixedExpenses, fixedRecords 
       {/* Контент */}
       <div style={{flex:1,padding:'14px 28px 32px',overflowY:'auto'}}>
 
-        {/* ФИКСИРОВАННЫЕ РАСХОДЫ */}
+        {/* ФИКСИРОВАННЫЕ */}
         {tab === 'fixed' && (
           <div>
-            {/* Навигатор месяца */}
             <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:16}}>
               <button onClick={()=>shiftFixedMonth(-1)} style={{width:28,height:28,border:'1px solid var(--bor2)',borderRadius:7,background:'#fff',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
                 <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" width="12" height="12"><polyline points="10,4 6,8 10,12"/></svg>
@@ -439,28 +453,21 @@ export function ExpensesClient({ clients, expenses, fixedExpenses, fixedRecords 
               <button onClick={()=>shiftFixedMonth(1)} style={{width:28,height:28,border:'1px solid var(--bor2)',borderRadius:7,background:'#fff',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
                 <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" width="12" height="12"><polyline points="6,4 10,8 6,12"/></svg>
               </button>
-              <div style={{marginLeft:'auto',display:'flex',gap:16,fontSize:12}}>
+              <div style={{marginLeft:'auto',display:'flex',gap:20,fontSize:12}}>
                 <span style={{color:'var(--muted)'}}>Выплачено: <strong style={{color:'var(--green)'}}>{fixedRecordsPaid.toLocaleString('ru')} ₽</strong></span>
                 <span style={{color:'var(--muted)'}}>Осталось: <strong style={{color:fixedRecordsPending>0?'var(--gold)':'var(--muted)'}}>{fixedRecordsPending.toLocaleString('ru')} ₽</strong></span>
-                <span style={{color:'var(--muted)'}}>Норма/мес: <strong>{Math.round(fixedMonthly).toLocaleString('ru')} ₽</strong></span>
               </div>
             </div>
 
-            {/* Список статей */}
             {fixedExpenses.length === 0 && (
-              <div style={{textAlign:'center',color:'var(--muted)',padding:48}}>Нет фиксированных расходов — добавьте в Настройках</div>
+              <div style={{textAlign:'center',color:'var(--muted)',padding:48}}>Нет статей — добавьте в Настройках</div>
             )}
+
             {fixedExpenses.map(fe => {
               const records = fixedRecordsThisMonth.filter(r => r.fixed_expense_id === fe.id)
               const isAddOpen = openFixedForms.has(fe.id)
-              const articleColors: Record<string,string> = { office:'rgba(22,163,97,.08)', salary:'rgba(177,94,204,.08)', software:'rgba(201,125,0,.08)', marketing:'rgba(220,53,69,.08)', other:'rgba(20,18,30,.04)' }
-              const articleTextColors: Record<string,string> = { office:'var(--green)', salary:'var(--purple)', software:'var(--gold)', marketing:'var(--red)', other:'var(--muted)' }
-              const articleLabel: Record<string,string> = { office:'Офис', salary:'ЗП', software:'ПО/Подписки', marketing:'Маркетинг', other:'Прочее' }
-              const periodLabel: Record<string,string> = { monthly:'Ежемесячно', quarterly:'Ежеквартально', yearly:'Ежегодно', once:'Разово' }
-
               return (
                 <div key={fe.id} style={{marginBottom:8,background:'#fff',border:'1px solid var(--bor)',borderRadius:14,overflow:'hidden',boxShadow:'var(--sh)'}}>
-                  {/* Шапка статьи */}
                   <div style={{display:'flex',alignItems:'center',gap:12,padding:'12px 16px',background:'var(--surf2)',borderBottom:'1px solid var(--bor)'}}>
                     <div style={{flex:1}}>
                       <div style={{fontSize:13,fontWeight:700,color:'var(--text)'}}>{fe.name}</div>
@@ -471,18 +478,12 @@ export function ExpensesClient({ clients, expenses, fixedExpenses, fixedRecords 
                         <span style={{fontSize:10,color:'var(--muted)',fontWeight:500}}>{periodLabel[fe.period]||fe.period}</span>
                       </div>
                     </div>
-                    <div style={{textAlign:'right',marginRight:16}}>
-                      <div style={{fontSize:13,fontWeight:700,color:'var(--text)'}}>{Number(fe.amount).toLocaleString('ru')} ₽</div>
-                      <div style={{fontSize:10,color:'var(--muted)'}}>за период</div>
-                    </div>
-                    <button
-                      onClick={()=>setOpenFixedForms(prev=>{const n=new Set(prev);n.has(fe.id)?n.delete(fe.id):n.add(fe.id);return n})}
+                    <button onClick={()=>setOpenFixedForms(prev=>{const n=new Set(prev);n.has(fe.id)?n.delete(fe.id):n.add(fe.id);return n})}
                       style={{padding:'5px 12px',background:isAddOpen?'var(--bg)':'var(--purple)',color:isAddOpen?'var(--muted)':'#fff',border:isAddOpen?'1px solid var(--bor2)':'none',borderRadius:7,fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
                       {isAddOpen?'Отмена':'+ Добавить запись'}
                     </button>
                   </div>
 
-                  {/* Форма добавления записи */}
                   {isAddOpen && (
                     <div style={{padding:'12px 16px',background:'rgba(177,94,204,.04)',borderBottom:'1px solid var(--bor)'}}>
                       <form action={async(fd)=>{await addFixedExpenseRecord(fd);setOpenFixedForms(prev=>{const n=new Set(prev);n.delete(fe.id);return n})}}>
@@ -490,8 +491,8 @@ export function ExpensesClient({ clients, expenses, fixedExpenses, fixedRecords 
                         <input type="hidden" name="month" value={fixedMonth}/>
                         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr auto',gap:8,alignItems:'flex-end'}}>
                           <div>
-                            <div style={{fontSize:10,color:'var(--muted)',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:3}}>Сумма</div>
-                            <input name="amount" type="number" defaultValue={fe.amount} style={{width:'100%',padding:'7px 10px',border:'1px solid var(--bor2)',borderRadius:7,fontSize:12,fontFamily:'inherit',outline:'none',background:'var(--surf)'}}/>
+                            <div style={{fontSize:10,color:'var(--muted)',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:3}}>Сумма *</div>
+                            <input name="amount" type="number" required placeholder="50000" style={{width:'100%',padding:'7px 10px',border:'1px solid var(--bor2)',borderRadius:7,fontSize:12,fontFamily:'inherit',outline:'none',background:'var(--surf)'}}/>
                           </div>
                           <div>
                             <div style={{fontSize:10,color:'var(--muted)',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:3}}>Примечание</div>
@@ -503,19 +504,19 @@ export function ExpensesClient({ clients, expenses, fixedExpenses, fixedRecords 
                     </div>
                   )}
 
-                  {/* Записи за месяц */}
                   {records.length === 0 ? (
                     <div style={{padding:'12px 16px',fontSize:12,color:'var(--muted)'}}>Нет записей за {fixedMonthLabel} — нажмите "+ Добавить запись"</div>
                   ) : (
                     <table>
-                      <thead><tr><th>Месяц</th><th>Сумма</th><th>Факт</th><th>Дата выплаты</th><th>Примечание</th><th>Статус</th><th style={{width:40}}>✓</th></tr></thead>
+                      <thead>
+                        <tr><th>Сумма</th><th>Факт</th><th>Дата выплаты</th><th>Примечание</th><th>Статус</th><th style={{width:40}}>✓</th></tr>
+                      </thead>
                       <tbody>
                         {records.map((r:any) => {
                           const isPayOpen = openFixedPayForms.has(r.id)
                           return (
                             <>
                               <tr key={r.id} style={{opacity:r.is_paid?0.65:1}}>
-                                <td style={{fontSize:11,color:'var(--muted)'}}>{fixedMonthLabel}</td>
                                 <td><span className="num">{Number(r.amount).toLocaleString('ru')} ₽</span></td>
                                 <td>{r.fact_amount?<span className="num m">{Number(r.fact_amount).toLocaleString('ru')} ₽</span>:<span style={{color:'var(--muted)'}}>—</span>}</td>
                                 <td style={{fontSize:11,color:'var(--muted)'}}>{r.fact_date?new Date(r.fact_date).toLocaleDateString('ru-RU'):'—'}</td>
@@ -537,7 +538,7 @@ export function ExpensesClient({ clients, expenses, fixedExpenses, fixedRecords 
                               </tr>
                               {isPayOpen && !r.is_paid && (
                                 <tr key={`fpay-${r.id}`}>
-                                  <td colSpan={7} style={{padding:0,background:'var(--surf2)'}}>
+                                  <td colSpan={6} style={{padding:0,background:'var(--surf2)'}}>
                                     <form action={async(fd)=>{await markFixedRecordPaid(fd);setOpenFixedPayForms(prev=>{const n=new Set(prev);n.delete(r.id);return n})}} style={{padding:'12px 16px'}}>
                                       <input type="hidden" name="record_id" value={r.id}/>
                                       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr auto',gap:8,alignItems:'flex-end'}}>
