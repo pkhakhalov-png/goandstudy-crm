@@ -72,7 +72,6 @@ export async function addFixedExpense(formData: FormData): Promise<void> {
   const supabase = await createClient()
   await supabase.from('fixed_expenses').insert({
     name: formData.get('name') as string,
-    amount: Number(formData.get('amount')),
     period: formData.get('period') as string,
     article: formData.get('article') as string,
   })
@@ -83,7 +82,6 @@ export async function updateFixedExpense(formData: FormData): Promise<void> {
   const supabase = await createClient()
   await supabase.from('fixed_expenses').update({
     name: formData.get('name') as string,
-    amount: Number(formData.get('amount')),
     period: formData.get('period') as string,
     article: formData.get('article') as string,
   }).eq('id', formData.get('id') as string)
