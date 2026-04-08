@@ -66,3 +66,58 @@ export async function updateExpense(formData: FormData): Promise<void> {
 
   revalidatePath('/admin/expenses')
 }
+
+export async function addFixedExpenseRecord(formData: FormData): Promise<void> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return
+
+  const month = formData.get('month') as string
+  const fixedId = formData.get('fixed_id') as string
+
+  const { data: fixed } = await supabase
+    .from('fixed_expenses')
+    .select('*')
+    .eq('id', fixedId)
+    .single()
+
+  if (!fixed) return
+
+  await supabase.from('fixed_expense_records').insert({
+    fixed_expense_id: fixedId,
+    month,
+    amount: Number(formData.get('amount') || fixed.amount),
+    is_paid: false,
+    note: formData.get('note') as string || null,
+  })
+
+  revalidatePath('/admin/expenses')
+}
+
+export async function markFixedRecordPaid(formData: FormData): Promise<void> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return
+
+  await supabase.from('fixed_expense_records').update({
+    is_paid: true,
+    fact_date: formData.get('fact_date') as string,
+    fact_amount: Number(formData.get('fact_amount')),
+  }).eq('id', formData.get('record_id') as string)
+
+  revalidatePath('/admin/expenses')
+}
+
+export async function markFixedRecordUnpaid(formData: FormData): Promise<void> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return
+
+  await supabase.from('fixed_expense_records').update({
+    is_paid: false,
+    fact_date: null,
+    fact_amount: null,
+  }).eq('id', formData.get('record_id') as string)
+
+  revalidatePath('/admin/expenses')
+}

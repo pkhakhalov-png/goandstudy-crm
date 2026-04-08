@@ -27,6 +27,17 @@ export default async function AdminExpensesPage() {
     .select('id, client_id, article, who, plan_date, plan_sum, fact_date, fact_sum, is_paid, status, note')
     .order('created_at', { ascending: false })
 
+  const { data: fixedExpenses } = await supabase
+    .from('fixed_expenses')
+    .select('*')
+    .eq('is_active', true)
+    .order('created_at', { ascending: true })
+
+  const { data: fixedRecords } = await supabase
+    .from('fixed_expense_records')
+    .select('*, fixed_expenses(name, article)')
+    .order('month', { ascending: false })
+
   return (
     <div className="app">
       <Sidebar activePage="expenses" userName={profile?.name || ''} userEmail={user.email || ''} />
@@ -42,6 +53,8 @@ export default async function AdminExpensesPage() {
         <ExpensesClient
           clients={rawClients ?? []}
           expenses={expenses ?? []}
+          fixedExpenses={fixedExpenses ?? []}
+          fixedRecords={fixedRecords ?? []}
         />
       </div>
     </div>
