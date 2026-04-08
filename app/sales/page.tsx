@@ -41,13 +41,13 @@ export default async function SalesCabinetPage() {
   return (
     <div className="app">
       <aside className="sidebar">
-        <div className="lw">
+        <div className="lw" style={{ textAlign: 'center', padding: '20px 16px 14px' }}>
           <img
             src="https://i.ibb.co/7tNx07SW/GAS-logo-01.png"
             alt="Go And Study"
-            style={{ height: 32, objectFit: 'contain', marginBottom: 4 }}
+            style={{ height: 72, objectFit: 'contain', display: 'block', margin: '0 auto 6px' }}
           />
-          <div className="ls" style={{ paddingLeft: 0 }}>Кабинет продажника</div>
+          <div style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.05em' }}>Кабинет продажника</div>
         </div>
         <div style={{ margin: '12px 14px 4px', padding: '8px 12px', background: 'rgba(22,163,97,.1)', border: '1px solid rgba(22,163,97,.2)', borderRadius: 10 }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--green)' }}>{profile?.name || user.email}</div>
@@ -93,7 +93,6 @@ export default async function SalesCabinetPage() {
             </Link>
           </div>
         </div>
-
         <SalesPage clients={clients} />
       </div>
     </div>

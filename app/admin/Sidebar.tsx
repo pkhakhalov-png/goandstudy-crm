@@ -13,15 +13,13 @@ export function Sidebar({ activePage, userName, userEmail }: Props) {
 
   return (
     <aside className="sidebar">
-      <div className="lw">
-        <div className="lr">
-          <img
-            src="https://i.ibb.co/7tNx07SW/GAS-logo-01.png"
-            alt="Go And Study"
-            style={{ height: 32, objectFit: 'contain' }}
-          />
-        </div>
-        <div className="ls" style={{ paddingLeft: 0, marginTop: 4 }}>CRM система</div>
+      <div className="lw" style={{ textAlign: 'center', padding: '20px 16px 14px' }}>
+        <img
+          src="https://i.ibb.co/7tNx07SW/GAS-logo-01.png"
+          alt="Go And Study"
+          style={{ height: 48, objectFit: 'contain', display: 'block', margin: '0 auto 6px' }}
+        />
+        <div style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.05em' }}>CRM система</div>
       </div>
       <div className="rp">
         <div className="rd"></div>

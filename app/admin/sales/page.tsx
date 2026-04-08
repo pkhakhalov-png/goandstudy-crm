@@ -2,7 +2,11 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { Sidebar } from '../Sidebar'
 
-export default async function AdminSalesPage() {
+export default async function AdminSalesPage({
+  searchParams,
+}: {
+  searchParams: { month?: string }
+}) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
@@ -15,6 +19,15 @@ export default async function AdminSalesPage() {
 
   if (profile?.role !== 'admin') redirect('/sales')
 
+  // Определяем период
+  const now = new Date()
+  const monthParam = searchParams.month || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const [year, month] = monthParam.split('-').map(Number)
+  const periodStart = `${year}-${String(month).padStart(2, '0')}-01`
+  const periodEnd = new Date(year, month, 0).toISOString().split('T')[0]
+
+  const PLAN = 900000
+
   const { data: salespersons } = await supabase
     .from('users')
     .select('id, name, email, is_active')
@@ -23,39 +36,88 @@ export default async function AdminSalesPage() {
 
   const { data: clients } = await supabase
     .from('clients')
-    .select('id, name, country, status, salesperson_id, created_at')
+    .select('id, name, country, status, salesperson_id, created_at, months')
 
   const { data: payments } = await supabase
     .from('payments_view')
-    .select('id, client_id, plan_sum, fact_sum, is_paid, status, plan_date')
+    .select('id, client_id, plan_sum, fact_sum, is_paid, status, plan_date, fact_date')
 
   const { data: expenses } = await supabase
     .from('expenses')
     .select('id, client_id, plan_sum, fact_sum, is_paid, article')
     .eq('article', 'salesperson')
 
+  // Список доступных месяцев (последние 12)
+  const months = Array.from({ length: 12 }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    const val = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    const label = d.toLocaleDateString('ru', { month: 'long', year: 'numeric' })
+    return { val, label }
+  })
+
   const salesStats = (salespersons ?? []).map(s => {
     const myClients = (clients ?? []).filter(c => c.salesperson_id === s.id)
     const myClientIds = myClients.map(c => c.id)
-    const myPayments = (payments ?? []).filter(p => myClientIds.includes(p.client_id))
-    const myExpenses = (expenses ?? []).filter(e => myClientIds.includes(e.client_id))
 
-    const totalClients = myClients.length
-    const activeClients = myClients.filter(c => c.status === 'active').length
-    const totalPlan = myPayments.reduce((sum, p) => sum + Number(p.plan_sum), 0)
-    const totalPaid = myPayments.filter(p => p.is_paid).reduce((sum, p) => sum + Number(p.fact_sum || p.plan_sum), 0)
-    const totalOverdue = myPayments.filter(p => p.status === 'overdue').reduce((sum, p) => sum + Number(p.plan_sum), 0)
-    const salaryPlan = myExpenses.reduce((sum, e) => sum + Number(e.plan_sum), 0)
-    const salaryPaid = myExpenses.filter(e => e.is_paid).reduce((sum, e) => sum + Number(e.fact_sum || e.plan_sum), 0)
-    const pct = totalPlan > 0 ? Math.round(totalPaid / totalPlan * 100) : 0
+    // Новые договоры за период (клиенты созданные в этом месяце)
+    const newClients = myClients.filter(c => {
+      const d = c.created_at?.slice(0, 10)
+      return d >= periodStart && d <= periodEnd
+    })
+    const newContractsSum = newClients.reduce((sum, c) => {
+      const myPays = (payments ?? []).filter(p => p.client_id === c.id)
+      return sum + myPays.reduce((s, p) => s + Number(p.plan_sum), 0)
+    }, 0)
 
-    return { ...s, totalClients, activeClients, totalPlan, totalPaid, totalOverdue, salaryPlan, salaryPaid, pct }
+    // Поступления факт за период
+    const factPaid = (payments ?? [])
+      .filter(p =>
+        myClientIds.includes(p.client_id) &&
+        p.is_paid &&
+        p.fact_date >= periodStart &&
+        p.fact_date <= periodEnd
+      )
+      .reduce((sum, p) => sum + Number(p.fact_sum || p.plan_sum), 0)
+
+    // Просрочка (все времена, не только месяц)
+    const overdue = (payments ?? [])
+      .filter(p => myClientIds.includes(p.client_id) && p.status === 'overdue')
+      .reduce((sum, p) => sum + Number(p.plan_sum), 0)
+
+    // ЗП к выплате за период (10% от поступлений)
+    const salaryDue = Math.round(factPaid * 0.1)
+    const salaryPaid = (expenses ?? [])
+      .filter(e =>
+        myClientIds.includes(e.client_id) &&
+        e.article === 'salesperson' &&
+        e.is_paid
+      )
+      .reduce((sum, e) => sum + Number(e.fact_sum || e.plan_sum), 0)
+
+    const pct = Math.round(factPaid / PLAN * 100)
+
+    return {
+      ...s,
+      totalClients: myClients.length,
+      activeClients: myClients.filter(c => c.status === 'active').length,
+      newClients: newClients.length,
+      newContractsSum,
+      factPaid,
+      overdue,
+      salaryDue,
+      salaryPaid,
+      pct,
+    }
   })
 
-  const totalClients = (clients ?? []).length
-  const totalPlan = (payments ?? []).reduce((s, p) => s + Number(p.plan_sum), 0)
-  const totalPaid = (payments ?? []).filter(p => p.is_paid).reduce((s, p) => s + Number(p.fact_sum || p.plan_sum), 0)
-  const totalOverdue = (payments ?? []).filter(p => p.status === 'overdue').reduce((s, p) => s + Number(p.plan_sum), 0)
+  // Итого по команде
+  const teamFactPaid = salesStats.reduce((s, x) => s + x.factPaid, 0)
+  const teamNewContracts = salesStats.reduce((s, x) => s + x.newContractsSum, 0)
+  const teamOverdue = salesStats.reduce((s, x) => s + x.overdue, 0)
+  const teamSalary = salesStats.reduce((s, x) => s + x.salaryDue, 0)
+  const teamPlan = PLAN * (salespersons?.filter(s => s.is_active).length ?? 1)
+
+  const monthLabel = new Date(year, month - 1, 1).toLocaleDateString('ru', { month: 'long', year: 'numeric' })
 
   return (
     <div className="app">
@@ -63,39 +125,55 @@ export default async function AdminSalesPage() {
       <div className="main">
         <div className="topbar">
           <div className="pt">Аналитика продажников</div>
+          <div className="tbr">
+            <form method="GET">
+              <select
+                name="month"
+                defaultValue={monthParam}
+                onChange={(e: any) => e.target.form.submit()}
+                style={{ padding: '7px 12px', border: '1px solid rgba(0,0,0,.12)', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', background: '#fff', color: '#14121e', cursor: 'pointer' }}
+              >
+                {months.map(m => (
+                  <option key={m.val} value={m.val}>{m.label}</option>
+                ))}
+              </select>
+            </form>
+          </div>
         </div>
 
-        {/* KPI */}
+        {/* KPI команды */}
         <div className="kw">
           <div className="kg k4" style={{ marginBottom: 14 }}>
             <div className="kc">
-              <div className="kl">Продажников</div>
-              <div className="kv p">{salespersons?.length ?? 0}</div>
-              <div className="ks">{salespersons?.filter(s => s.is_active).length ?? 0} активных</div>
+              <div className="kl">Новых договоров</div>
+              <div className="kv p" style={{ fontSize: 17 }}>{teamNewContracts.toLocaleString('ru')} ₽</div>
+              <div className="ks">{monthLabel}</div>
             </div>
             <div className="kc">
-              <div className="kl">Клиентов всего</div>
-              <div className="kv">{totalClients}</div>
+              <div className="kl">Поступило факт</div>
+              <div className="kv g" style={{ fontSize: 17 }}>{teamFactPaid.toLocaleString('ru')} ₽</div>
+              <div className="ks">план команды: {teamPlan.toLocaleString('ru')} ₽</div>
+              <div className="kpg">
+                <div className="kpf" style={{ width: `${Math.min(teamPlan > 0 ? Math.round(teamFactPaid / teamPlan * 100) : 0, 100)}%` }}></div>
+              </div>
+            </div>
+            <div className="kc">
+              <div className="kl">Просрочка</div>
+              <div className="kv r" style={{ fontSize: 17 }}>{teamOverdue.toLocaleString('ru')} ₽</div>
               <div className="ks">по всем продажникам</div>
             </div>
             <div className="kc">
-              <div className="kl">Выручка оплачено</div>
-              <div className="kv g" style={{ fontSize: 17 }}>{totalPaid.toLocaleString('ru')} ₽</div>
-              <div className="ks">план: {totalPlan.toLocaleString('ru')} ₽</div>
-              <div className="kpg"><div className="kpf" style={{ width: `${totalPlan > 0 ? Math.round(totalPaid / totalPlan * 100) : 0}%` }}></div></div>
-            </div>
-            <div className="kc">
-              <div className="kl">Просрочено</div>
-              <div className="kv r" style={{ fontSize: 17 }}>{totalOverdue.toLocaleString('ru')} ₽</div>
-              <div className="ks">требует внимания</div>
+              <div className="kl">ЗП к выплате</div>
+              <div className="kv o" style={{ fontSize: 17 }}>{teamSalary.toLocaleString('ru')} ₽</div>
+              <div className="ks">10% от поступлений</div>
             </div>
           </div>
         </div>
 
-        {/* Таблица */}
+        {/* Таблица по продажникам */}
         <div className="cnt">
           <div className="ctrl" style={{ marginBottom: 12 }}>
-            <div className="sl">По продажникам</div>
+            <div className="sl">Эффективность — {monthLabel}</div>
           </div>
           <div className="tw">
             <table>
@@ -103,20 +181,18 @@ export default async function AdminSalesPage() {
                 <tr>
                   <th>Продажник</th>
                   <th>Клиентов</th>
-                  <th>Активных</th>
-                  <th>Договоров (план)</th>
-                  <th>Оплачено</th>
-                  <th>Просрочено</th>
-                  <th>ЗП план</th>
-                  <th>ЗП выплачено</th>
-                  <th>Прогресс</th>
-                  <th>Статус</th>
+                  <th>Новых договоров</th>
+                  <th>Поступило факт</th>
+                  <th>План 900 000 ₽</th>
+                  <th>% плана</th>
+                  <th>Просрочка</th>
+                  <th>ЗП к выплате</th>
                 </tr>
               </thead>
               <tbody>
                 {salesStats.length === 0 && (
                   <tr>
-                    <td colSpan={10} style={{ textAlign: 'center', color: 'var(--muted)', padding: 32 }}>
+                    <td colSpan={8} style={{ textAlign: 'center', color: 'var(--muted)', padding: 32 }}>
                       Продажников пока нет
                     </td>
                   </tr>
@@ -139,34 +215,43 @@ export default async function AdminSalesPage() {
                         </div>
                       </div>
                     </td>
-                    <td><span className="num">{s.totalClients}</span></td>
-                    <td><span className="num p">{s.activeClients}</span></td>
-                    <td><span className="num">{s.totalPlan.toLocaleString('ru')} ₽</span></td>
-                    <td><span className="num g">{s.totalPaid.toLocaleString('ru')} ₽</span></td>
                     <td>
-                      {s.totalOverdue > 0
-                        ? <span className="num r">{s.totalOverdue.toLocaleString('ru')} ₽</span>
-                        : <span style={{ color: 'var(--muted)' }}>—</span>
-                      }
+                      <span className="num">{s.totalClients}</span>
+                      {s.newClients > 0 && (
+                        <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 700, color: 'var(--green)', background: 'rgba(22,163,97,.1)', padding: '1px 6px', borderRadius: 10 }}>
+                          +{s.newClients}
+                        </span>
+                      )}
                     </td>
-                    <td><span className="num">{s.salaryPlan.toLocaleString('ru')} ₽</span></td>
+                    <td><span className="num p">{s.newContractsSum.toLocaleString('ru')} ₽</span></td>
+                    <td><span className="num g">{s.factPaid.toLocaleString('ru')} ₽</span></td>
                     <td>
-                      {s.salaryPaid > 0
-                        ? <span className="num g">{s.salaryPaid.toLocaleString('ru')} ₽</span>
-                        : <span style={{ color: 'var(--muted)' }}>—</span>
-                      }
-                    </td>
-                    <td>
-                      <div className="tp">
-                        <div className="tpb"><div className="tpf" style={{ width: `${s.pct}%` }}></div></div>
-                        <div className="tpp">{s.pct}%</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ width: 80, height: 5, background: 'rgba(0,0,0,.08)', borderRadius: 20, overflow: 'hidden' }}>
+                          <div style={{
+                            height: '100%', borderRadius: 20,
+                            width: `${Math.min(s.pct, 100)}%`,
+                            background: s.pct >= 100 ? 'var(--green)' : s.pct >= 60 ? 'var(--purple)' : 'var(--red)'
+                          }} />
+                        </div>
                       </div>
                     </td>
                     <td>
-                      {s.is_active
-                        ? <span className="pill pa"><span className="dot"></span>Активен</span>
-                        : <span className="pill pw"><span className="dot"></span>Неактивен</span>
+                      <span style={{
+                        fontWeight: 700, fontSize: 13,
+                        color: s.pct >= 100 ? 'var(--green)' : s.pct >= 60 ? 'var(--gold)' : 'var(--red)'
+                      }}>
+                        {s.pct}%
+                      </span>
+                    </td>
+                    <td>
+                      {s.overdue > 0
+                        ? <span className="num r">{s.overdue.toLocaleString('ru')} ₽</span>
+                        : <span style={{ color: 'var(--muted)' }}>—</span>
                       }
+                    </td>
+                    <td>
+                      <span className="num o">{s.salaryDue.toLocaleString('ru')} ₽</span>
                     </td>
                   </tr>
                 ))}

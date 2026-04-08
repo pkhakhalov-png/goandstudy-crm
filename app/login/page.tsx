@@ -29,19 +29,16 @@ export default function LoginPage() {
       fontFamily: "'Segoe UI', system-ui, sans-serif",
       padding: '20px',
     }}>
-      <div style={{ width: '100%', maxWidth: 400 }}>
-
-        {/* Лого */}
+      <div style={{ width: '100%', maxWidth: 420 }}>
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
           <img
             src="https://i.ibb.co/7tNx07SW/GAS-logo-01.png"
             alt="Go And Study"
-            style={{ height: 56, objectFit: 'contain', marginBottom: 16 }}
+            style={{ height: 72, objectFit: 'contain', display: 'block', margin: '0 auto 12px' }}
           />
           <div style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 500 }}>CRM система</div>
         </div>
 
-        {/* Карточка */}
         <div style={{
           background: '#fff',
           border: '1px solid var(--bor)',
@@ -66,15 +63,7 @@ export default function LoginPage() {
                 type="email"
                 required
                 placeholder="your@email.com"
-                style={{
-                  width: '100%', padding: '10px 14px',
-                  background: 'var(--bg)', border: '1px solid var(--bor2)',
-                  borderRadius: 9, fontSize: 13, color: 'var(--text)',
-                  fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box',
-                  transition: 'border-color .15s',
-                }}
-                onFocus={e => e.target.style.borderColor = 'var(--purple)'}
-                onBlur={e => e.target.style.borderColor = 'rgba(0,0,0,.12)'}
+                style={{ width: '100%', padding: '10px 14px', background: 'var(--bg)', border: '1px solid var(--bor2)', borderRadius: 9, fontSize: 13, color: 'var(--text)', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }}
               />
             </div>
 
@@ -87,15 +76,7 @@ export default function LoginPage() {
                 type="password"
                 required
                 placeholder="••••••••"
-                style={{
-                  width: '100%', padding: '10px 14px',
-                  background: 'var(--bg)', border: '1px solid var(--bor2)',
-                  borderRadius: 9, fontSize: 13, color: 'var(--text)',
-                  fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box',
-                  transition: 'border-color .15s',
-                }}
-                onFocus={e => e.target.style.borderColor = 'var(--purple)'}
-                onBlur={e => e.target.style.borderColor = 'rgba(0,0,0,.12)'}
+                style={{ width: '100%', padding: '10px 14px', background: 'var(--bg)', border: '1px solid var(--bor2)', borderRadius: 9, fontSize: 13, color: 'var(--text)', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }}
               />
             </div>
 
@@ -108,21 +89,11 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              style={{
-                width: '100%', padding: '11px',
-                background: loading ? 'rgba(177,94,204,.5)' : 'var(--purple)',
-                color: '#fff', border: 'none', borderRadius: 9,
-                fontSize: 14, fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer',
-                fontFamily: 'inherit', transition: 'opacity .15s',
-              }}
+              style={{ width: '100%', padding: '11px', background: loading ? 'rgba(177,94,204,.5)' : 'var(--purple)', color: '#fff', border: 'none', borderRadius: 9, fontSize: 14, fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}
             >
               {loading ? 'Вход...' : 'Войти'}
             </button>
           </form>
-        </div>
-
-        <div style={{ textAlign: 'center', marginTop: 20, fontSize: 11, color: 'var(--muted)' }}>
-          Go And Study © {new Date().getFullYear()}
         </div>
       </div>
     </div>
