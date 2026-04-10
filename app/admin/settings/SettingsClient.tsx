@@ -12,12 +12,12 @@ type Curator = { id: string; name: string; is_active: boolean }
 type FixedExpense = { id: string; name: string; period: string; article: string; is_active: boolean }
 
 const cardStyle = {
-  background: 'rgba(255,255,255,.55)', backdropFilter: 'blur(20px) saturate(180%)', WebkitBackdropFilter: 'blur(20px) saturate(180%)', border: '1px solid rgba(0,0,0,.07)', borderRadius: 14,
+  background: '#fff', border: '1px solid rgba(0,0,0,.07)', borderRadius: 14,
   overflow: 'hidden' as const, boxShadow: '0 1px 4px rgba(0,0,0,.07)', marginBottom: 20,
 }
 const inputStyle = {
   flex: 1, padding: '8px 12px', border: '1px solid rgba(0,0,0,.12)', borderRadius: 8,
-  fontSize: 13, fontFamily: 'inherit', outline: 'none', background: 'rgba(255,255,255,.55)', backdropFilter: 'blur(20px) saturate(180%)', WebkitBackdropFilter: 'blur(20px) saturate(180%)', color: '#14121e', minWidth: 120,
+  fontSize: 13, fontFamily: 'inherit', outline: 'none', background: '#fff', color: '#14121e', minWidth: 120,
 }
 const thStyle = {
   padding: '10px 20px', fontSize: 10, color: '#8a8796', fontWeight: 600 as const,
@@ -89,11 +89,11 @@ export function SettingsClient({ salespersons, curators, fixedExpenses }: {
                     <form action={handleResetPassword} style={{ display: 'inline' }}>
                       <input type="hidden" name="id" value={s.id} />
                       <input type="hidden" name="name" value={s.name} />
-                      <button type="submit" style={{ padding: '5px 12px', background: 'rgba(255,255,255,.55)', backdropFilter: 'blur(20px) saturate(180%)', WebkitBackdropFilter: 'blur(20px) saturate(180%)', border: '1px solid rgba(0,0,0,.12)', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer', color: '#B15ECC', fontFamily: 'inherit' }}>Сбросить пароль</button>
+                      <button type="submit" style={{ padding: '5px 12px', background: '#fff', border: '1px solid rgba(0,0,0,.12)', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer', color: '#B15ECC', fontFamily: 'inherit' }}>Сбросить пароль</button>
                     </form>
                     <form action={s.is_active ? deactivateSalesperson : activateSalesperson} style={{ display: 'inline' }}>
                       <input type="hidden" name="id" value={s.id} />
-                      <button type="submit" style={{ padding: '5px 12px', background: 'rgba(255,255,255,.55)', backdropFilter: 'blur(20px) saturate(180%)', WebkitBackdropFilter: 'blur(20px) saturate(180%)', border: '1px solid rgba(0,0,0,.12)', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer', color: s.is_active ? '#dc3545' : '#16a361', fontFamily: 'inherit' }}>
+                      <button type="submit" style={{ padding: '5px 12px', background: '#fff', border: '1px solid rgba(0,0,0,.12)', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer', color: s.is_active ? '#dc3545' : '#16a361', fontFamily: 'inherit' }}>
                         {s.is_active ? 'Деактивировать' : 'Активировать'}
                       </button>
                     </form>
@@ -127,7 +127,7 @@ export function SettingsClient({ salespersons, curators, fixedExpenses }: {
                       <input type="hidden" name="id" value={c.id} />
                       <input name="name" defaultValue={c.name} style={{ ...inputStyle, flex: 'none', width: 160 }} autoFocus />
                       <button type="submit" style={{ padding: '5px 10px', background: '#16a361', color: '#fff', border: 'none', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>✓</button>
-                      <button type="button" onClick={() => setEditingCurator(null)} style={{ padding: '5px 10px', background: 'rgba(255,255,255,.55)', backdropFilter: 'blur(20px) saturate(180%)', WebkitBackdropFilter: 'blur(20px) saturate(180%)', border: '1px solid rgba(0,0,0,.12)', borderRadius: 7, fontSize: 11, cursor: 'pointer' }}>✕</button>
+                      <button type="button" onClick={() => setEditingCurator(null)} style={{ padding: '5px 10px', background: '#fff', border: '1px solid rgba(0,0,0,.12)', borderRadius: 7, fontSize: 11, cursor: 'pointer' }}>✕</button>
                     </form>
                   ) : (
                     <span style={{ fontSize: 13, fontWeight: 600 }}>{c.name}</span>
@@ -141,10 +141,10 @@ export function SettingsClient({ salespersons, curators, fixedExpenses }: {
                 </td>
                 <td style={{ padding: '12px 20px' }}>
                   <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                    <button type="button" onClick={() => setEditingCurator(c.id)} style={{ padding: '5px 12px', background: 'rgba(255,255,255,.55)', backdropFilter: 'blur(20px) saturate(180%)', WebkitBackdropFilter: 'blur(20px) saturate(180%)', border: '1px solid rgba(0,0,0,.12)', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer', color: '#8a8796', fontFamily: 'inherit' }}>Переименовать</button>
+                    <button type="button" onClick={() => setEditingCurator(c.id)} style={{ padding: '5px 12px', background: '#fff', border: '1px solid rgba(0,0,0,.12)', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer', color: '#8a8796', fontFamily: 'inherit' }}>Переименовать</button>
                     <form action={c.is_active ? deactivateCurator : activateCurator} style={{ display: 'inline' }}>
                       <input type="hidden" name="id" value={c.id} />
-                      <button type="submit" style={{ padding: '5px 12px', background: 'rgba(255,255,255,.55)', backdropFilter: 'blur(20px) saturate(180%)', WebkitBackdropFilter: 'blur(20px) saturate(180%)', border: '1px solid rgba(0,0,0,.12)', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer', color: c.is_active ? '#dc3545' : '#16a361', fontFamily: 'inherit' }}>
+                      <button type="submit" style={{ padding: '5px 12px', background: '#fff', border: '1px solid rgba(0,0,0,.12)', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer', color: c.is_active ? '#dc3545' : '#16a361', fontFamily: 'inherit' }}>
                         {c.is_active ? 'Деактивировать' : 'Активировать'}
                       </button>
                     </form>
@@ -171,7 +171,7 @@ export function SettingsClient({ salespersons, curators, fixedExpenses }: {
             </div>
             <div>
               <div style={{ fontSize: 10, color: '#8a8796', fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: '0.05em', marginBottom: 4 }}>Период</div>
-              <select name="period" style={{ width: '100%', padding: '8px 12px', border: '1px solid rgba(0,0,0,.12)', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', outline: 'none', background: 'rgba(255,255,255,.55)', backdropFilter: 'blur(20px) saturate(180%)', WebkitBackdropFilter: 'blur(20px) saturate(180%)' }}>
+              <select name="period" style={{ width: '100%', padding: '8px 12px', border: '1px solid rgba(0,0,0,.12)', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', outline: 'none', background: '#fff' }}>
                 <option value="monthly">Ежемесячно</option>
                 <option value="quarterly">Ежеквартально</option>
                 <option value="yearly">Ежегодно</option>
@@ -180,7 +180,7 @@ export function SettingsClient({ salespersons, curators, fixedExpenses }: {
             </div>
             <div>
               <div style={{ fontSize: 10, color: '#8a8796', fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: '0.05em', marginBottom: 4 }}>Статья</div>
-              <select name="article" style={{ width: '100%', padding: '8px 12px', border: '1px solid rgba(0,0,0,.12)', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', outline: 'none', background: 'rgba(255,255,255,.55)', backdropFilter: 'blur(20px) saturate(180%)', WebkitBackdropFilter: 'blur(20px) saturate(180%)' }}>
+              <select name="article" style={{ width: '100%', padding: '8px 12px', border: '1px solid rgba(0,0,0,.12)', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', outline: 'none', background: '#fff' }}>
                 <option value="office">Офис</option>
                 <option value="salary">ЗП</option>
                 <option value="software">ПО/Подписки</option>
@@ -207,13 +207,13 @@ export function SettingsClient({ salespersons, curators, fixedExpenses }: {
                     <form action={async (fd) => { await updateFixedExpense(fd); setEditingFixed(null) }} style={{ display: 'flex', gap: 6, flexWrap: 'wrap' as const }}>
                       <input type="hidden" name="id" value={e.id} />
                       <input name="name" defaultValue={e.name} style={{ ...inputStyle, flex: 'none', width: 200 }} autoFocus />
-                      <select name="period" defaultValue={e.period} style={{ padding: '7px 10px', border: '1px solid rgba(0,0,0,.12)', borderRadius: 7, fontSize: 12, fontFamily: 'inherit', outline: 'none', background: 'rgba(255,255,255,.55)', backdropFilter: 'blur(20px) saturate(180%)', WebkitBackdropFilter: 'blur(20px) saturate(180%)' }}>
+                      <select name="period" defaultValue={e.period} style={{ padding: '7px 10px', border: '1px solid rgba(0,0,0,.12)', borderRadius: 7, fontSize: 12, fontFamily: 'inherit', outline: 'none', background: '#fff' }}>
                         <option value="monthly">Ежемесячно</option>
                         <option value="quarterly">Ежеквартально</option>
                         <option value="yearly">Ежегодно</option>
                         <option value="once">Разово</option>
                       </select>
-                      <select name="article" defaultValue={e.article} style={{ padding: '7px 10px', border: '1px solid rgba(0,0,0,.12)', borderRadius: 7, fontSize: 12, fontFamily: 'inherit', outline: 'none', background: 'rgba(255,255,255,.55)', backdropFilter: 'blur(20px) saturate(180%)', WebkitBackdropFilter: 'blur(20px) saturate(180%)' }}>
+                      <select name="article" defaultValue={e.article} style={{ padding: '7px 10px', border: '1px solid rgba(0,0,0,.12)', borderRadius: 7, fontSize: 12, fontFamily: 'inherit', outline: 'none', background: '#fff' }}>
                         <option value="office">Офис</option>
                         <option value="salary">ЗП</option>
                         <option value="software">ПО/Подписки</option>
@@ -221,7 +221,7 @@ export function SettingsClient({ salespersons, curators, fixedExpenses }: {
                         <option value="other">Прочее</option>
                       </select>
                       <button type="submit" style={{ padding: '5px 10px', background: '#16a361', color: '#fff', border: 'none', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>✓</button>
-                      <button type="button" onClick={() => setEditingFixed(null)} style={{ padding: '5px 10px', background: 'rgba(255,255,255,.55)', backdropFilter: 'blur(20px) saturate(180%)', WebkitBackdropFilter: 'blur(20px) saturate(180%)', border: '1px solid rgba(0,0,0,.12)', borderRadius: 7, fontSize: 11, cursor: 'pointer' }}>✕</button>
+                      <button type="button" onClick={() => setEditingFixed(null)} style={{ padding: '5px 10px', background: '#fff', border: '1px solid rgba(0,0,0,.12)', borderRadius: 7, fontSize: 11, cursor: 'pointer' }}>✕</button>
                     </form>
                   ) : (
                     <span style={{ fontSize: 13, fontWeight: 600 }}>{e.name}</span>
@@ -241,17 +241,17 @@ export function SettingsClient({ salespersons, curators, fixedExpenses }: {
                 </td>
                 <td style={{ padding: '12px 20px' }}>
                   <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                    <button type="button" onClick={() => setEditingFixed(e.id)} style={{ padding: '5px 12px', background: 'rgba(255,255,255,.55)', backdropFilter: 'blur(20px) saturate(180%)', WebkitBackdropFilter: 'blur(20px) saturate(180%)', border: '1px solid rgba(0,0,0,.12)', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer', color: '#8a8796', fontFamily: 'inherit' }}>Изменить</button>
+                    <button type="button" onClick={() => setEditingFixed(e.id)} style={{ padding: '5px 12px', background: '#fff', border: '1px solid rgba(0,0,0,.12)', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer', color: '#8a8796', fontFamily: 'inherit' }}>Изменить</button>
                     <form action={toggleFixedExpense} style={{ display: 'inline' }}>
                       <input type="hidden" name="id" value={e.id} />
                       <input type="hidden" name="is_active" value={String(e.is_active)} />
-                      <button type="submit" style={{ padding: '5px 12px', background: 'rgba(255,255,255,.55)', backdropFilter: 'blur(20px) saturate(180%)', WebkitBackdropFilter: 'blur(20px) saturate(180%)', border: '1px solid rgba(0,0,0,.12)', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer', color: e.is_active ? '#dc3545' : '#16a361', fontFamily: 'inherit' }}>
+                      <button type="submit" style={{ padding: '5px 12px', background: '#fff', border: '1px solid rgba(0,0,0,.12)', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer', color: e.is_active ? '#dc3545' : '#16a361', fontFamily: 'inherit' }}>
                         {e.is_active ? 'Отключить' : 'Включить'}
                       </button>
                     </form>
                     <form action={deleteFixedExpense} style={{ display: 'inline' }}>
                       <input type="hidden" name="id" value={e.id} />
-                      <button type="submit" style={{ padding: '5px 12px', background: 'rgba(255,255,255,.55)', backdropFilter: 'blur(20px) saturate(180%)', WebkitBackdropFilter: 'blur(20px) saturate(180%)', border: '1px solid rgba(220,53,69,.2)', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer', color: '#dc3545', fontFamily: 'inherit' }}>Удалить</button>
+                      <button type="submit" style={{ padding: '5px 12px', background: '#fff', border: '1px solid rgba(220,53,69,.2)', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer', color: '#dc3545', fontFamily: 'inherit' }}>Удалить</button>
                     </form>
                   </div>
                 </td>

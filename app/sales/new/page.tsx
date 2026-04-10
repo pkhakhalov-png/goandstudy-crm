@@ -7,7 +7,7 @@ import { createClientSales } from './actions'
 const inputStyle = {
   width: '100%',
   padding: '9px 12px',
-  background: 'rgba(255,255,255,.55)', backdropFilter: 'blur(20px) saturate(180%)', WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+  background: '#fff',
   border: '1px solid rgba(0,0,0,.12)',
   borderRadius: 8,
   fontSize: 13,
@@ -28,7 +28,7 @@ const labelStyle = {
 }
 
 const cardStyle = {
-  background: 'rgba(255,255,255,.55)', backdropFilter: 'blur(20px) saturate(180%)', WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+  background: '#fff',
   border: '1px solid rgba(0,0,0,.07)',
   borderRadius: 14,
   padding: '20px 24px',

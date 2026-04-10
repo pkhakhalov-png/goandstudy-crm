@@ -129,7 +129,7 @@ export function Dashboard({ clients, payments, expenses, salespersons, fixedExpe
     return (
       <div style={{display:'flex',flexDirection:'column',gap:16}}>
         {stats.map(s => (
-          <div key={s.name} style={{background:'rgba(255,255,255,.55)',backdropFilter:'blur(20px) saturate(180%)',WebkitBackdropFilter:'blur(20px) saturate(180%)',border:'1px solid var(--bor)',borderRadius:14,overflow:'hidden',boxShadow:'var(--sh)'}}>
+          <div key={s.name} style={{background:'#fff',border:'1px solid var(--bor)',borderRadius:14,overflow:'hidden',boxShadow:'var(--sh)'}}>
             <div style={{padding:'14px 20px',background:'var(--surf2)',borderBottom:'1px solid var(--bor)',display:'flex',alignItems:'center',gap:14}}>
               <div style={{width:38,height:38,borderRadius:'50%',background:gradient,display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,color:'#fff',fontWeight:700,flexShrink:0}}>
                 {s.name.slice(0,2).toUpperCase()}
@@ -235,11 +235,11 @@ export function Dashboard({ clients, payments, expenses, salespersons, fixedExpe
       {/* Переключатель месяца + табы */}
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20}}>
         <div style={{display:'flex',alignItems:'center',gap:10}}>
-          <button onClick={()=>shiftMonth(-1)} style={{width:28,height:28,border:'1px solid var(--bor2)',borderRadius:7,background:'rgba(255,255,255,.55)',backdropFilter:'blur(20px) saturate(180%)',WebkitBackdropFilter:'blur(20px) saturate(180%)',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
+          <button onClick={()=>shiftMonth(-1)} style={{width:28,height:28,border:'1px solid var(--bor2)',borderRadius:7,background:'#fff',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" width="12" height="12"><polyline points="10,4 6,8 10,12"/></svg>
           </button>
           <div style={{fontSize:15,fontWeight:700,color:'var(--text)',minWidth:160,textAlign:'center'}}>{MONTHS_FULL[viewMonth]} {viewYear}</div>
-          <button onClick={()=>shiftMonth(1)} style={{width:28,height:28,border:'1px solid var(--bor2)',borderRadius:7,background:'rgba(255,255,255,.55)',backdropFilter:'blur(20px) saturate(180%)',WebkitBackdropFilter:'blur(20px) saturate(180%)',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
+          <button onClick={()=>shiftMonth(1)} style={{width:28,height:28,border:'1px solid var(--bor2)',borderRadius:7,background:'#fff',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" width="12" height="12"><polyline points="6,4 10,8 6,12"/></svg>
           </button>
         </div>
@@ -281,7 +281,7 @@ export function Dashboard({ clients, payments, expenses, salespersons, fixedExpe
           </div>
 
           {/* График выручки — НАВЕРХУ */}
-          <div style={{background:'rgba(255,255,255,.55)',backdropFilter:'blur(20px) saturate(180%)',WebkitBackdropFilter:'blur(20px) saturate(180%)',border:'1px solid var(--bor)',borderRadius:14,padding:'18px 24px',marginBottom:16,boxShadow:'var(--sh)'}} onMouseLeave={()=>setTooltip(null)}>
+          <div style={{background:'#fff',border:'1px solid var(--bor)',borderRadius:14,padding:'18px 24px',marginBottom:16,boxShadow:'var(--sh)'}} onMouseLeave={()=>setTooltip(null)}>
             <div style={{fontSize:12,fontWeight:700,color:'var(--text)',marginBottom:4,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
               <span>Выручка {currentYear}</span>
               <div style={{display:'flex',gap:16,fontSize:11,color:'var(--muted)'}}>
@@ -320,7 +320,7 @@ export function Dashboard({ clients, payments, expenses, salespersons, fixedExpe
           </div>
 
           {/* Поступления месяца */}
-          <div style={{background:'rgba(255,255,255,.55)',backdropFilter:'blur(20px) saturate(180%)',WebkitBackdropFilter:'blur(20px) saturate(180%)',border:'1px solid var(--bor)',borderRadius:14,padding:'18px 24px',marginBottom:16,boxShadow:'var(--sh)'}}>
+          <div style={{background:'#fff',border:'1px solid var(--bor)',borderRadius:14,padding:'18px 24px',marginBottom:16,boxShadow:'var(--sh)'}}>
             <div style={{fontSize:12,fontWeight:700,color:'var(--text)',marginBottom:14}}>{MONTHS_FULL[viewMonth]} {viewYear} — поступления от клиентов</div>
             <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:16,marginBottom:14}}>
               <div>
@@ -352,7 +352,7 @@ export function Dashboard({ clients, payments, expenses, salespersons, fixedExpe
 
           {/* Кто должен — раскрывается */}
           {monthDebtors.length > 0 && (
-            <div style={{background:'rgba(255,255,255,.55)',backdropFilter:'blur(20px) saturate(180%)',WebkitBackdropFilter:'blur(20px) saturate(180%)',border:'1px solid var(--bor)',borderRadius:14,marginBottom:16,boxShadow:'var(--sh)',overflow:'hidden'}}>
+            <div style={{background:'#fff',border:'1px solid var(--bor)',borderRadius:14,marginBottom:16,boxShadow:'var(--sh)',overflow:'hidden'}}>
               <div onClick={()=>setDebtorsOpen(!debtorsOpen)}
                 style={{padding:'14px 20px',display:'flex',alignItems:'center',gap:10,cursor:'pointer',background:'var(--surf2)',borderBottom:debtorsOpen?'1px solid var(--bor)':'none'}}>
                 <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" width="10" height="10"
@@ -386,7 +386,7 @@ export function Dashboard({ clients, payments, expenses, salespersons, fixedExpe
           )}
 
           {/* Расходы месяца */}
-          <div style={{background:'rgba(255,255,255,.55)',backdropFilter:'blur(20px) saturate(180%)',WebkitBackdropFilter:'blur(20px) saturate(180%)',border:'1px solid var(--bor)',borderRadius:14,padding:'18px 24px',boxShadow:'var(--sh)'}}>
+          <div style={{background:'#fff',border:'1px solid var(--bor)',borderRadius:14,padding:'18px 24px',boxShadow:'var(--sh)'}}>
             <div style={{fontSize:12,fontWeight:700,color:'var(--text)',marginBottom:12}}>Расходы в {MONTHS_FULL[viewMonth]} {viewYear}</div>
             <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:16,marginBottom:10}}>
               <div>

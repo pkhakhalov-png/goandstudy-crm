@@ -141,7 +141,7 @@ export function ExpensesClient({ clients, expenses, fixedExpenses, fixedRecords 
         {stats.map(s => {
           const unpaidOnly = staffUnpaidOnly.has(s.name)
           return (
-            <div key={s.name} style={{marginBottom:16,background:'rgba(255,255,255,.55)',backdropFilter:'blur(20px) saturate(180%)',WebkitBackdropFilter:'blur(20px) saturate(180%)',border:'1px solid var(--bor)',borderRadius:14,overflow:'hidden',boxShadow:'var(--sh)'}}>
+            <div key={s.name} style={{marginBottom:16,background:'#fff',border:'1px solid var(--bor)',borderRadius:14,overflow:'hidden',boxShadow:'var(--sh)'}}>
               {/* Шапка */}
               <div style={{padding:'14px 20px',background:'var(--surf2)',borderBottom:'1px solid var(--bor)',display:'flex',alignItems:'center',gap:16}}>
                 <div style={{width:38,height:38,borderRadius:'50%',background:gradient,display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,color:'#fff',fontWeight:700,flexShrink:0}}>
@@ -516,11 +516,11 @@ export function ExpensesClient({ clients, expenses, fixedExpenses, fixedRecords 
         {tab === 'fixed' && (
           <div>
             <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:16}}>
-              <button onClick={()=>shiftFixedMonth(-1)} style={{width:28,height:28,border:'1px solid var(--bor2)',borderRadius:7,background:'rgba(255,255,255,.55)',backdropFilter:'blur(20px) saturate(180%)',WebkitBackdropFilter:'blur(20px) saturate(180%)',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
+              <button onClick={()=>shiftFixedMonth(-1)} style={{width:28,height:28,border:'1px solid var(--bor2)',borderRadius:7,background:'#fff',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
                 <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" width="12" height="12"><polyline points="10,4 6,8 10,12"/></svg>
               </button>
               <div style={{fontSize:14,fontWeight:700,color:'var(--text)',minWidth:140,textAlign:'center'}}>{fixedMonthLabel}</div>
-              <button onClick={()=>shiftFixedMonth(1)} style={{width:28,height:28,border:'1px solid var(--bor2)',borderRadius:7,background:'rgba(255,255,255,.55)',backdropFilter:'blur(20px) saturate(180%)',WebkitBackdropFilter:'blur(20px) saturate(180%)',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
+              <button onClick={()=>shiftFixedMonth(1)} style={{width:28,height:28,border:'1px solid var(--bor2)',borderRadius:7,background:'#fff',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
                 <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" width="12" height="12"><polyline points="6,4 10,8 6,12"/></svg>
               </button>
               <div style={{marginLeft:'auto',display:'flex',gap:20,fontSize:12}}>
@@ -537,7 +537,7 @@ export function ExpensesClient({ clients, expenses, fixedExpenses, fixedRecords 
               const records = fixedRecordsThisMonth.filter(r => r.fixed_expense_id === fe.id)
               const isAddOpen = openFixedForms.has(fe.id)
               return (
-                <div key={fe.id} style={{marginBottom:8,background:'rgba(255,255,255,.55)',backdropFilter:'blur(20px) saturate(180%)',WebkitBackdropFilter:'blur(20px) saturate(180%)',border:'1px solid var(--bor)',borderRadius:14,overflow:'hidden',boxShadow:'var(--sh)'}}>
+                <div key={fe.id} style={{marginBottom:8,background:'#fff',border:'1px solid var(--bor)',borderRadius:14,overflow:'hidden',boxShadow:'var(--sh)'}}>
                   <div style={{display:'flex',alignItems:'center',gap:12,padding:'12px 16px',background:'var(--surf2)',borderBottom:'1px solid var(--bor)'}}>
                     <div style={{flex:1}}>
                       <div style={{fontSize:13,fontWeight:700,color:'var(--text)'}}>{fe.name}</div>
