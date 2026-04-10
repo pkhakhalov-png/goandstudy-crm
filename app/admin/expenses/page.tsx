@@ -45,6 +45,7 @@ export default async function AdminExpensesPage() {
         <div className="topbar">
           <div className="pt">Расходы</div>
           <div className="tbr">
+            <span style={{fontSize:12,color:'var(--muted)'}}>{new Date().toLocaleDateString('ru-RU',{day:'numeric',month:'long',year:'numeric'})}</span>
             <form action={logout}>
               <button className="btn-s">Выйти</button>
             </form>

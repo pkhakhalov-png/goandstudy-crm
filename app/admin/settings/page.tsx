@@ -38,6 +38,7 @@ export default async function AdminSettingsPage() {
       <div className="main">
         <div className="topbar">
           <div className="pt">Настройки</div>
+          <span style={{fontSize:12,color:'var(--muted)'}}>{new Date().toLocaleDateString('ru-RU',{day:'numeric',month:'long',year:'numeric'})}</span>
         </div>
         <SettingsClient
           salespersons={salespersons ?? []}

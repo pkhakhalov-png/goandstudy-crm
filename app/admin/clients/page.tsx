@@ -50,6 +50,7 @@ export default async function AdminClientsPage() {
         <div className="topbar">
           <div className="pt">Клиенты</div>
           <div className="tbr">
+            <span style={{fontSize:12,color:'var(--muted)'}}>{new Date().toLocaleDateString('ru-RU',{day:'numeric',month:'long',year:'numeric'})}</span>
             <span style={{fontSize:12, color:'var(--muted)'}}>{clients.length} клиентов</span>
             <Link href="/admin/clients/new" className="btn-p">
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="white" strokeWidth="2.2">

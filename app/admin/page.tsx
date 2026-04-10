@@ -45,6 +45,7 @@ export default async function AdminPage() {
       <div className="main">
         <div className="topbar">
           <div className="pt">Главная</div>
+          <span style={{fontSize:12,color:'var(--muted)'}}>{new Date().toLocaleDateString('ru-RU',{day:'numeric',month:'long',year:'numeric'})}</span>
         </div>
         <Dashboard
           clients={clients ?? []}

@@ -36,6 +36,7 @@ export default async function AdminSalesPage() {
       <div className="main">
         <div className="topbar">
           <div className="pt">Аналитика продажников</div>
+          <span style={{fontSize:12,color:'var(--muted)'}}>{new Date().toLocaleDateString('ru-RU',{day:'numeric',month:'long',year:'numeric'})}</span>
         </div>
         <SalesAnalytics
           salespersons={salespersons ?? []}
