@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, Fragment } from 'react'
 import { addExpense, markExpensePaid, markExpenseUnpaid, updateExpense, addFixedExpenseRecord, markFixedRecordPaid, markFixedRecordUnpaid, deleteFixedExpenseRecord, deleteExpense } from './actions'
 
 interface Props {
@@ -218,8 +218,8 @@ export function ExpensesClient({ clients, expenses, fixedExpenses, fixedRecords 
                               const client = clients.find(cl => cl.id === e.client_id)
                               const isPayOpen = openPayForms.has(e.id)
                               return (
-                                <>
-                                  <tr key={e.id} style={{opacity:e.is_paid?0.65:1}}>
+                                <Fragment key={e.id}>
+                                  <tr style={{opacity:e.is_paid?0.65:1}}>
                                     <td>
                                       <div style={{fontSize:12,fontWeight:600}}>{client?.name??'—'}</div>
                                       <div style={{fontSize:10,color:'var(--muted)'}}>{client?.country??''}</div>
@@ -282,7 +282,7 @@ export function ExpensesClient({ clients, expenses, fixedExpenses, fixedRecords 
                                       </td>
                                     </tr>
                                   )}
-                                </>
+                                </Fragment>
                               )
                             })}
                           </tbody>
@@ -364,7 +364,7 @@ export function ExpensesClient({ clients, expenses, fixedExpenses, fixedRecords 
                 const isPayOpen = openPayForms.has(e.id)
                 const isEditOpen = openEditForms.has(e.id)
                 return (
-                  <>
+                  <Fragment key={e.id}>
                     <tr key={e.id} style={{opacity:e.is_paid?0.65:1}}>
                       <td>
                         <span style={{display:'inline-block',padding:'3px 9px',borderRadius:6,fontSize:10,fontWeight:600,
@@ -449,7 +449,7 @@ export function ExpensesClient({ clients, expenses, fixedExpenses, fixedRecords 
                         </td>
                       </tr>
                     )}
-                  </>
+                  </Fragment>
                 )
               })}
             </tbody>
@@ -585,8 +585,8 @@ export function ExpensesClient({ clients, expenses, fixedExpenses, fixedRecords 
                         {records.map((r:any) => {
                           const isPayOpen = openFixedPayForms.has(r.id)
                           return (
-                            <>
-                              <tr key={r.id} style={{opacity:r.is_paid?0.65:1}}>
+                            <Fragment key={r.id}>
+                              <tr style={{opacity:r.is_paid?0.65:1}}>
                                 <td><span className="num">{Number(r.amount).toLocaleString('ru')} ₽</span></td>
                                 <td>{r.fact_amount?<span className="num m">{Number(r.fact_amount).toLocaleString('ru')} ₽</span>:<span style={{color:'var(--muted)'}}>—</span>}</td>
                                 <td style={{fontSize:11,color:'var(--muted)'}}>{r.fact_date?new Date(r.fact_date).toLocaleDateString('ru-RU'):'—'}</td>
@@ -645,7 +645,7 @@ export function ExpensesClient({ clients, expenses, fixedExpenses, fixedRecords 
                                   </td>
                                 </tr>
                               )}
-                            </>
+                            </Fragment>
                           )
                         })}
                       </tbody>

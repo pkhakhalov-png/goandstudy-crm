@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, Fragment } from 'react'
 import { markPaymentPaid, unmarkPaymentPaid, editPayment } from './actions'
 
 const MONTHS = ['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек']
@@ -175,8 +175,8 @@ export function PaymentsClient({ allPayments, salespersons, curators }: Props) {
             const isPast = y<now.getFullYear()||(y===now.getFullYear()&&m<now.getMonth())
             const md = getMonthData(m,y)
             return (
-              <div key={`${m}-${y}`}
-                style={{flex:1,background:isCur?'var(--pl)':'var(--surf2)',border:`1px solid ${isCur?'var(--purple)':'var(--bor)'}`,borderRadius:10,padding:'9px 10px',opacity:isPast?0.75:1,minWidth:0}}>
+              <div key={`${m}-${y}`} onClick={()=>{setCenterMonth(m);setCenterYear(y)}}
+                style={{flex:1,background:isCur?'var(--pl)':'var(--surf2)',border:`1px solid ${isCur?'var(--purple)':'var(--bor)'}`,borderRadius:10,padding:'9px 10px',opacity:isPast?0.75:1,minWidth:0,cursor:'pointer'}}>
                 <div style={{fontSize:10,fontWeight:700,color:isCur?'var(--purple)':'var(--muted)',textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:4,whiteSpace:'nowrap'}}>{MONTHS[m]} {y}</div>
                 {md.paid>0 && <div style={{fontSize:12,fontWeight:700,color:'var(--green)',whiteSpace:'nowrap'}}>{(md.paid/1000).toFixed(0)}к ₽</div>}
                 {md.wait>0 && <div style={{fontSize:10,fontWeight:600,color:'var(--gold)',whiteSpace:'nowrap'}}>+{(md.wait/1000).toFixed(0)}к ₽</div>}
@@ -285,8 +285,8 @@ export function PaymentsClient({ allPayments, salespersons, curators }: Props) {
                       const isFormOpen = openForms.has(p.id)
                       const isLoading = loading.has(p.id)
                       return (
-                        <>
-                          <tr key={p.id} style={{borderLeft:p.status==='paid'?'3px solid var(--green)':p.status==='overdue'?'3px solid var(--red)':p.status==='soon'?'3px solid var(--gold)':'none'}}>
+                        <Fragment key={p.id}>
+                          <tr style={{borderLeft:p.status==='paid'?'3px solid var(--green)':p.status==='overdue'?'3px solid var(--red)':p.status==='soon'?'3px solid var(--gold)':'none'}}>
                             <td style={{color:'var(--muted)',fontWeight:700,fontSize:11}}>{p.num}</td>
                             <td style={{color:p.status==='overdue'?'var(--red)':p.status==='soon'?'var(--gold)':'var(--text)',fontWeight:(p.status==='overdue'||p.status==='soon')?600:400}}>
                               {new Date(p.plan_date).toLocaleDateString('ru-RU')}
@@ -376,7 +376,7 @@ export function PaymentsClient({ allPayments, salespersons, curators }: Props) {
                               </td>
                             </tr>
                           )}
-                        </>
+                        </Fragment>
                       )
                     })}
                   </tbody>

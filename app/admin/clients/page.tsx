@@ -18,17 +18,21 @@ export default async function AdminClientsPage() {
 
   if (profile?.role !== 'admin') redirect('/sales')
 
-  const { data: rawClients } = await supabase
-    .from('clients')
-    .select('id, name, phone, email, telegram, country, university, status, months, created_at, salesperson_id, curator_id')
-    .order('created_at', { ascending: false })
-
-  const { data: payments } = await supabase
-    .from('payments_view')
-    .select('id, client_id, num, plan_date, plan_sum, fact_sum, is_paid, status')
-
-  const { data: allUsers } = await supabase.from('users').select('id, name')
-  const { data: allCurators } = await supabase.from('curators').select('id, name')
+  const [
+    { data: rawClients },
+    { data: payments },
+    { data: allUsers },
+    { data: allCurators },
+    { data: salespersons },
+    { data: curators },
+  ] = await Promise.all([
+    supabase.from('clients').select('id, name, phone, email, telegram, country, university, status, months, created_at, salesperson_id, curator_id').order('created_at', { ascending: false }),
+    supabase.from('payments_view').select('id, client_id, num, plan_date, plan_sum, fact_sum, is_paid, status'),
+    supabase.from('users').select('id, name'),
+    supabase.from('curators').select('id, name'),
+    supabase.from('users').select('id, name').eq('role', 'salesperson').eq('is_active', true).order('name'),
+    supabase.from('curators').select('id, name').eq('is_active', true).order('name'),
+  ])
 
   const clients = (rawClients ?? []).map(c => ({
     ...c,
@@ -36,12 +40,6 @@ export default async function AdminClientsPage() {
     curator: allCurators?.find(cur => cur.id === c.curator_id) ?? null,
     payments: (payments ?? []).filter(p => p.client_id === c.id)
   }))
-
-  const { data: salespersons } = await supabase
-    .from('users').select('id, name').eq('role', 'salesperson').eq('is_active', true).order('name')
-
-  const { data: curators } = await supabase
-    .from('curators').select('id, name').eq('is_active', true).order('name')
 
   return (
     <div className="app">

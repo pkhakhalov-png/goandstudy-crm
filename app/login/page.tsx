@@ -31,11 +31,13 @@ export default function LoginPage() {
     }}>
       <div style={{ width: '100%', maxWidth: 420 }}>
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <img
-            src="https://i.ibb.co/7tNx07SW/GAS-logo-01.png"
-            alt="Go And Study"
-            style={{ height: 72, objectFit: 'contain', display: 'block', margin: '0 auto 12px' }}
-          />
+          <div className="login-logo-wrap" style={{ margin: '0 auto 12px' }}>
+            <img
+              src="https://i.ibb.co/7tNx07SW/GAS-logo-01.png"
+              alt="Go And Study"
+              style={{ height: 120, objectFit: 'contain', display: 'block' }}
+            />
+          </div>
           <div style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 500 }}>CRM система</div>
         </div>
 

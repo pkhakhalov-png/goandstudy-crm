@@ -17,26 +17,17 @@ export default async function AdminExpensesPage() {
 
   if (profile?.role !== 'admin') redirect('/sales')
 
-  const { data: rawClients } = await supabase
-    .from('clients')
-    .select('id, name, country, status')
-    .order('created_at', { ascending: false })
-
-  const { data: expenses } = await supabase
-    .from('expenses')
-    .select('id, client_id, article, who, plan_date, plan_sum, fact_date, fact_sum, is_paid, status, note')
-    .order('created_at', { ascending: false })
-
-  const { data: fixedExpenses } = await supabase
-    .from('fixed_expenses')
-    .select('*')
-    .eq('is_active', true)
-    .order('created_at', { ascending: true })
-
-  const { data: fixedRecords } = await supabase
-    .from('fixed_expense_records')
-    .select('*, fixed_expenses(name, article)')
-    .order('month', { ascending: false })
+  const [
+    { data: rawClients },
+    { data: expenses },
+    { data: fixedExpenses },
+    { data: fixedRecords },
+  ] = await Promise.all([
+    supabase.from('clients').select('id, name, country, status').order('created_at', { ascending: false }),
+    supabase.from('expenses').select('id, client_id, article, who, plan_date, plan_sum, fact_date, fact_sum, is_paid, status, note').order('created_at', { ascending: false }),
+    supabase.from('fixed_expenses').select('*').eq('is_active', true).order('created_at', { ascending: true }),
+    supabase.from('fixed_expense_records').select('*, fixed_expenses(name, article)').order('month', { ascending: false }),
+  ])
 
   return (
     <div className="app">

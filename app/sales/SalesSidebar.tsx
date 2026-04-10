@@ -1,20 +1,23 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, Suspense } from 'react'
 import Link from 'next/link'
 import { logout } from '@/app/login/actions'
+import { WelcomeOverlay } from '@/components/WelcomeOverlay'
 
 interface Props {
   userName: string
   userEmail: string
   initials: string
+  activePage?: 'clients' | 'invoices'
 }
 
-export function SalesSidebar({ userName, userEmail, initials }: Props) {
+export function SalesSidebar({ userName, userEmail, initials, activePage = 'clients' }: Props) {
   const [open, setOpen] = useState(false)
 
   return (
     <>
+      <Suspense><WelcomeOverlay /></Suspense>
       {/* Оверлей */}
       <div
         className={`sidebar-overlay${open ? ' open' : ''}`}
@@ -37,14 +40,24 @@ export function SalesSidebar({ userName, userEmail, initials }: Props) {
         </div>
         <nav className="nav">
           <div className="ns">Основное</div>
-          <Link href="/sales" onClick={() => setOpen(false)} className="ni active"
-            style={{ borderLeftColor: 'var(--green)', color: 'var(--green)', background: 'rgba(22,163,97,.07)' }}>
+          <Link href="/sales" onClick={() => setOpen(false)} className={`ni${activePage==='clients'?' active':''}`}
+            style={activePage==='clients' ? { borderLeftColor: 'var(--green)', color: 'var(--green)', background: 'rgba(22,163,97,.07)' } : undefined}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
               <rect x="2" y="3" width="12" height="10" rx="2"/>
               <line x1="5" y1="7" x2="11" y2="7"/>
               <line x1="5" y1="10" x2="9" y2="10"/>
             </svg>
             Мои клиенты
+          </Link>
+          <Link href="/sales/invoices" onClick={() => setOpen(false)} className={`ni${activePage==='invoices'?' active':''}`}
+            style={activePage==='invoices' ? { borderLeftColor: 'var(--green)', color: 'var(--green)', background: 'rgba(22,163,97,.07)' } : undefined}>
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
+              <rect x="2" y="1" width="12" height="14" rx="2"/>
+              <line x1="5" y1="5" x2="11" y2="5"/>
+              <line x1="5" y1="8" x2="9" y2="8"/>
+              <line x1="5" y1="11" x2="8" y2="11"/>
+            </svg>
+            Счета
           </Link>
         </nav>
         <div className="sf">

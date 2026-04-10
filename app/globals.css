@@ -749,8 +749,155 @@ tbody tr {
   }
 }
 
-.cnt, .kw {
-  animation: fadeInUp 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+/* .cnt/.kw entrance — only on welcome, see .app-enter below */
+
+/* ── WORKSPACE ENTRANCE ── */
+@keyframes sidebarSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-100%);
+  }
+  60% {
+    opacity: 1;
+    transform: translateX(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes mainReveal {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(12px);
+    filter: blur(6px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    filter: blur(0);
+  }
+}
+
+@keyframes topbarDrop {
+  from {
+    opacity: 0;
+    transform: translateY(-100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes cardPop {
+  from {
+    opacity: 0;
+    transform: scale(0.85) translateY(16px);
+  }
+  70% {
+    transform: scale(1.03) translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes navItemSlide {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Entrance animations — only after login (class added by WelcomeOverlay) */
+.app-enter > .sidebar {
+  animation: sidebarSlideIn 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.2s both;
+}
+
+.app-enter > .main {
+  animation: mainReveal 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.3s both;
+}
+
+.app-enter > .main > .topbar {
+  animation: topbarDrop 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.5s both;
+}
+
+.app-enter .kc {
+  animation: cardPop 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.app-enter .kc:nth-child(1) { animation-delay: 0.55s; }
+.app-enter .kc:nth-child(2) { animation-delay: 0.65s; }
+.app-enter .kc:nth-child(3) { animation-delay: 0.75s; }
+.app-enter .kc:nth-child(4) { animation-delay: 0.85s; }
+.app-enter .kc:nth-child(5) { animation-delay: 0.95s; }
+
+.app-enter .sidebar .ni {
+  animation: navItemSlide 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.app-enter .sidebar .ni:nth-child(1) { animation-delay: 0.35s; }
+.app-enter .sidebar .ni:nth-child(2) { animation-delay: 0.42s; }
+.app-enter .sidebar .ni:nth-child(3) { animation-delay: 0.49s; }
+.app-enter .sidebar .ni:nth-child(4) { animation-delay: 0.56s; }
+.app-enter .sidebar .ni:nth-child(5) { animation-delay: 0.63s; }
+.app-enter .sidebar .ni:nth-child(6) { animation-delay: 0.70s; }
+.app-enter .sidebar .ni:nth-child(7) { animation-delay: 0.77s; }
+
+.app-enter .sidebar .lw {
+  animation: fadeInUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.25s both;
+}
+
+.app-enter .sidebar .rp {
+  animation: fadeInUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.4s both;
+}
+
+.app-enter .sidebar .sf {
+  animation: fadeInUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.75s both;
+}
+
+.app-enter .cnt,
+.app-enter .kw {
+  animation: fadeInUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.6s both;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Login logo shine */
+.login-logo-wrap {
+  position: relative;
+  display: inline-block;
+  overflow: hidden;
+  border-radius: 16px;
+}
+.login-logo-wrap::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(
+    105deg,
+    transparent 20%,
+    rgba(255,255,255,0) 40%,
+    rgba(255,255,255,.65) 50%,
+    rgba(255,255,255,0) 60%,
+    transparent 80%
+  );
+  animation: logoShine 3s ease-in-out infinite;
+}
+@keyframes logoShine {
+  0%   { left: -100%; }
+  40%  { left: 130%; }
+  100% { left: 130%; }
 }
 
 /* ════════════════════════════════
@@ -764,6 +911,14 @@ tbody tr {
 
   .sidebar.open {
     transform: translateX(0);
+  }
+
+  .app-enter > .sidebar,
+  .app-enter .sidebar .ni,
+  .app-enter .sidebar .lw,
+  .app-enter .sidebar .rp,
+  .app-enter .sidebar .sf {
+    animation: none !important;
   }
 
   .sidebar-overlay.open {

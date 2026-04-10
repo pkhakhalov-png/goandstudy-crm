@@ -6,10 +6,10 @@ import { redirect } from 'next/navigation'
 export async function login(formData: FormData) {
   const supabase = await createClient()
 
-  const { error } = await supabase.auth.signInWithPassword({
-    email: formData.get('email') as string,
-    password: formData.get('password') as string,
-  })
+  const email = (formData.get('email') as string).trim()
+  const password = formData.get('password') as string
+
+  const { error } = await supabase.auth.signInWithPassword({ email, password })
 
   if (error) {
     return { error: 'Неверный email или пароль' }
@@ -26,9 +26,9 @@ export async function login(formData: FormData) {
     .single()
 
   if (profile?.role === 'admin') {
-    redirect('/admin')
+    redirect('/admin?welcome=1')
   } else {
-    redirect('/sales')
+    redirect('/sales?welcome=1')
   }
 }
 

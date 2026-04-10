@@ -16,19 +16,15 @@ export default async function AdminSalesPage() {
 
   if (profile?.role !== 'admin') redirect('/sales')
 
-  const { data: salespersons } = await supabase
-    .from('users')
-    .select('id, name, email, is_active')
-    .eq('role', 'salesperson')
-    .order('name')
-
-  const { data: clients } = await supabase
-    .from('clients')
-    .select('id, name, country, status, salesperson_id, created_at, months')
-
-  const { data: payments } = await supabase
-    .from('payments_view')
-    .select('id, client_id, plan_sum, fact_sum, is_paid, status, plan_date, fact_date')
+  const [
+    { data: salespersons },
+    { data: clients },
+    { data: payments },
+  ] = await Promise.all([
+    supabase.from('users').select('id, name, email, is_active').eq('role', 'salesperson').order('name'),
+    supabase.from('clients').select('id, name, country, status, salesperson_id, created_at, months'),
+    supabase.from('payments_view').select('id, client_id, plan_sum, fact_sum, is_paid, status, plan_date, fact_date'),
+  ])
 
   return (
     <div className="app">

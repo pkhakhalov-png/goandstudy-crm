@@ -17,17 +17,15 @@ export default async function SalesCabinetPage() {
 
   if (profile?.role === 'admin') redirect('/admin/clients')
 
-  const { data: rawClients } = await supabase
-    .from('clients')
-    .select('id, name, phone, email, telegram, country, university, status, months, created_at, salesperson_id, curator_id')
-    .eq('salesperson_id', user.id)
-    .order('created_at', { ascending: false })
-
-  const { data: payments } = await supabase
-    .from('payments_view')
-    .select('id, client_id, num, plan_date, plan_sum, fact_sum, fact_date, is_paid, status, comment')
-
-  const { data: allCurators } = await supabase.from('curators').select('id, name')
+  const [
+    { data: rawClients },
+    { data: payments },
+    { data: allCurators },
+  ] = await Promise.all([
+    supabase.from('clients').select('id, name, phone, email, telegram, country, university, status, months, created_at, salesperson_id, curator_id').eq('salesperson_id', user.id).order('created_at', { ascending: false }),
+    supabase.from('payments_view').select('id, client_id, num, plan_date, plan_sum, fact_sum, fact_date, is_paid, status, comment'),
+    supabase.from('curators').select('id, name'),
+  ])
 
   const clientIds = (rawClients ?? []).map(c => c.id)
 
