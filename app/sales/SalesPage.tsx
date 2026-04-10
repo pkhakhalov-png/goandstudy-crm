@@ -178,7 +178,7 @@ export function SalesPage({ clients, expenses }: Props) {
             const key = `${m.year}-${m.month}`
             const isOpen = expandedMonths.has(key)
             return (
-              <div key={key} style={{marginBottom:8,background:'#fff',border:'1px solid var(--bor)',borderRadius:14,overflow:'hidden',boxShadow:'var(--sh)'}}>
+              <div key={key} style={{marginBottom:8,background:'rgba(255,255,255,.55)',backdropFilter:'blur(20px) saturate(180%)',WebkitBackdropFilter:'blur(20px) saturate(180%)',border:'1px solid var(--bor)',borderRadius:14,overflow:'hidden',boxShadow:'var(--sh)'}}>
                 <div onClick={()=>toggleMonth(key)}
                   style={{display:'flex',alignItems:'center',gap:12,padding:'14px 20px',cursor:'pointer',background:'var(--surf2)',borderBottom:isOpen?'1px solid var(--bor)':'none'}}>
                   <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" width="10" height="10"
