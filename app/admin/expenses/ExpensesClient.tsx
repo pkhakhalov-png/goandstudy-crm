@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { addExpense, markExpensePaid, markExpenseUnpaid, updateExpense, addFixedExpenseRecord, markFixedRecordPaid, markFixedRecordUnpaid, deleteFixedExpenseRecord } from './actions'
+import { addExpense, markExpensePaid, markExpenseUnpaid, updateExpense, addFixedExpenseRecord, markFixedRecordPaid, markFixedRecordUnpaid, deleteFixedExpenseRecord, deleteExpense } from './actions'
 
 interface Props {
   clients: any[]
@@ -190,22 +190,74 @@ export function ExpensesClient({ clients, expenses, fixedExpenses, fixedRecords 
                           </div>
                           {isMOpen && (
                             <table>
-                              <thead><tr><th>Клиент</th><th>Дата план</th><th>Сумма план</th><th>Факт</th><th>Дата выплаты</th><th>Статус</th></tr></thead>
+                              <thead>
+                                <tr><th>Клиент</th><th>Дата план</th><th>Сумма план</th><th>Факт</th><th>Дата выплаты</th><th>Статус</th><th style={{width:80}}>✓</th></tr>
+                              </thead>
                               <tbody>
                                 {monthExp.map((e:any) => {
                                   const client = clients.find(cl => cl.id === e.client_id)
+                                  const isPayOpen = openPayForms.has(e.id)
                                   return (
-                                    <tr key={e.id} style={{opacity:e.is_paid?0.65:1}}>
-                                      <td>
-                                        <div style={{fontSize:12,fontWeight:600}}>{client?.name??'—'}</div>
-                                        <div style={{fontSize:10,color:'var(--muted)'}}>{client?.country??''}</div>
-                                      </td>
-                                      <td style={{fontSize:11,color:'var(--muted)'}}>{e.plan_date?new Date(e.plan_date).toLocaleDateString('ru-RU'):'—'}</td>
-                                      <td><span className="num">{Number(e.plan_sum).toLocaleString('ru')} ₽</span></td>
-                                      <td>{e.fact_sum?<span className="num m">{Number(e.fact_sum).toLocaleString('ru')} ₽</span>:<span style={{color:'var(--muted)'}}>—</span>}</td>
-                                      <td style={{fontSize:11,color:'var(--muted)'}}>{e.fact_date?new Date(e.fact_date).toLocaleDateString('ru-RU'):'—'}</td>
-                                      <td>{e.is_paid?<span className="pill pa"><span className="dot"/>Выплачен</span>:<span className="pill ps"><span className="dot"/>Ожидается</span>}</td>
-                                    </tr>
+                                    <>
+                                      <tr key={e.id} style={{opacity:e.is_paid?0.65:1}}>
+                                        <td>
+                                          <div style={{fontSize:12,fontWeight:600}}>{client?.name??'—'}</div>
+                                          <div style={{fontSize:10,color:'var(--muted)'}}>{client?.country??''}</div>
+                                        </td>
+                                        <td style={{fontSize:11,color:'var(--muted)'}}>{e.plan_date?new Date(e.plan_date).toLocaleDateString('ru-RU'):'—'}</td>
+                                        <td><span className="num">{Number(e.plan_sum).toLocaleString('ru')} ₽</span></td>
+                                        <td>{e.fact_sum?<span className="num m">{Number(e.fact_sum).toLocaleString('ru')} ₽</span>:<span style={{color:'var(--muted)'}}>—</span>}</td>
+                                        <td style={{fontSize:11,color:'var(--muted)'}}>{e.fact_date?new Date(e.fact_date).toLocaleDateString('ru-RU'):'—'}</td>
+                                        <td>{e.is_paid?<span className="pill pa"><span className="dot"/>Выплачен</span>:<span className="pill ps"><span className="dot"/>Ожидается</span>}</td>
+                                        <td style={{textAlign:'center'}}>
+                                          <div style={{display:'flex',gap:4,alignItems:'center',justifyContent:'center'}}>
+                                            {e.is_paid ? (
+                                              <form action={markExpenseUnpaid} style={{display:'inline'}}>
+                                                <input type="hidden" name="expense_id" value={e.id}/>
+                                                <button type="submit" style={{width:16,height:16,borderRadius:5,background:'var(--green)',border:'none',display:'inline-flex',alignItems:'center',justifyContent:'center',cursor:'pointer',padding:0}}>
+                                                  <svg viewBox="0 0 9 7" fill="none" stroke="white" strokeWidth="2" width="9" height="9"><polyline points="1,3.5 3.5,6 8,1"/></svg>
+                                                </button>
+                                              </form>
+                                            ) : (
+                                              <div onClick={(ev)=>togglePayForm(ev,e.id)}
+                                                style={{width:16,height:16,borderRadius:5,border:'1.5px solid var(--bor2)',display:'inline-flex',alignItems:'center',justifyContent:'center',cursor:'pointer',background:isPayOpen?'var(--pl)':'transparent'}}/>
+                                            )}
+                                            <form action={deleteExpense} style={{display:'inline'}}>
+                                              <input type="hidden" name="expense_id" value={e.id}/>
+                                              <button type="submit" title="Удалить"
+                                                style={{width:16,height:16,borderRadius:5,background:'rgba(220,53,69,.08)',border:'1px solid rgba(220,53,69,.2)',display:'inline-flex',alignItems:'center',justifyContent:'center',cursor:'pointer',padding:0}}>
+                                                <svg viewBox="0 0 9 9" fill="none" stroke="var(--red)" strokeWidth="2" width="8" height="8">
+                                                  <line x1="1" y1="1" x2="8" y2="8"/><line x1="8" y1="1" x2="1" y2="8"/>
+                                                </svg>
+                                              </button>
+                                            </form>
+                                          </div>
+                                        </td>
+                                      </tr>
+                                      {isPayOpen && !e.is_paid && (
+                                        <tr key={`staffpay-${e.id}`}>
+                                          <td colSpan={7} style={{padding:0,background:'var(--surf2)'}}>
+                                            <form action={async(fd)=>{await markExpensePaid(fd);setOpenPayForms(prev=>{const n=new Set(prev);n.delete(e.id);return n})}} style={{padding:'12px 16px'}}>
+                                              <input type="hidden" name="expense_id" value={e.id}/>
+                                              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr auto',gap:8,alignItems:'flex-end'}}>
+                                                <div>
+                                                  <div style={{fontSize:10,color:'var(--muted)',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:3}}>Дата выплаты</div>
+                                                  <input name="fact_date" type="date" defaultValue={today} style={{width:'100%',padding:'7px 10px',border:'1px solid var(--bor2)',borderRadius:7,fontSize:12,fontFamily:'inherit',outline:'none',background:'var(--surf)'}}/>
+                                                </div>
+                                                <div>
+                                                  <div style={{fontSize:10,color:'var(--muted)',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:3}}>Сумма факт</div>
+                                                  <input name="fact_sum" type="number" defaultValue={e.plan_sum} style={{width:'100%',padding:'7px 10px',border:'1px solid var(--bor2)',borderRadius:7,fontSize:12,fontFamily:'inherit',outline:'none',background:'var(--surf)'}}/>
+                                                </div>
+                                                <div style={{display:'flex',gap:6}}>
+                                                  <button type="submit" style={{padding:'7px 16px',background:'var(--green)',color:'#fff',border:'none',borderRadius:7,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Выплачено</button>
+                                                  <button type="button" onClick={(ev)=>togglePayForm(ev,e.id)} style={{padding:'7px 12px',background:'transparent',color:'var(--muted)',border:'1px solid var(--bor2)',borderRadius:7,fontSize:12,cursor:'pointer',fontFamily:'inherit'}}>Отмена</button>
+                                                </div>
+                                              </div>
+                                            </form>
+                                          </td>
+                                        </tr>
+                                      )}
+                                    </>
                                   )
                                 })}
                               </tbody>

@@ -121,4 +121,16 @@ export async function deleteFixedExpenseRecord(formData: FormData): Promise<void
     .eq('id', formData.get('record_id') as string)
 
   revalidatePath('/admin/expenses')
+  
+}
+export async function deleteExpense(formData: FormData): Promise<void> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return
+
+  await supabase.from('expenses')
+    .delete()
+    .eq('id', formData.get('expense_id') as string)
+
+  revalidatePath('/admin/expenses')
 }
