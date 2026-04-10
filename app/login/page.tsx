@@ -40,11 +40,13 @@ export default function LoginPage() {
         </div>
 
         <div style={{
-          background: '#fff',
-          border: '1px solid var(--bor)',
-          borderRadius: 16,
-          padding: '32px 28px',
-          boxShadow: '0 4px 24px rgba(0,0,0,.07)',
+          background: 'rgba(255,255,255,.55)',
+          backdropFilter: 'blur(20px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+          border: '1px solid rgba(255,255,255,.45)',
+          borderRadius: 20,
+          padding: '36px 32px',
+          boxShadow: '0 8px 40px rgba(0,0,0,.06), 0 0 0 1px rgba(0,0,0,.02)',
         }}>
           <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>
             Добро пожаловать

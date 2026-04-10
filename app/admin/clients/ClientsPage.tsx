@@ -75,7 +75,7 @@ export function ClientsPage({ clients, salespersons, curators }: Props) {
       <div style={{
         position: 'fixed', top: 0, right: 0, bottom: 0,
         width: 320,
-        background: '#fff',
+        background: 'rgba(255,255,255,.55)', backdropFilter: 'blur(20px) saturate(180%)', WebkitBackdropFilter: 'blur(20px) saturate(180%)',
         boxShadow: '-4px 0 24px rgba(0,0,0,.12)',
         zIndex: 50,
         transform: sel ? 'translateX(0)' : 'translateX(100%)',
@@ -238,7 +238,7 @@ export function ClientsPage({ clients, salespersons, curators }: Props) {
               <option value="">Все кураторы</option>
               {curators.map((c:any) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#fff', border: '1px solid rgba(0,0,0,.12)', borderRadius: 9, padding: '7px 13px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,.55)', backdropFilter: 'blur(20px) saturate(180%)', WebkitBackdropFilter: 'blur(20px) saturate(180%)', border: '1px solid rgba(0,0,0,.12)', borderRadius: 9, padding: '7px 13px' }}>
               <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="#8a8796" strokeWidth="1.6"><circle cx="7" cy="7" r="5"/><line x1="11" y1="11" x2="14" y2="14"/></svg>
               <input
                 placeholder="Найти клиента..."

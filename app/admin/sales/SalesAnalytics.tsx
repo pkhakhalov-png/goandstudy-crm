@@ -105,11 +105,11 @@ export function SalesAnalytics({ salespersons, clients, payments }: Props) {
 
       {/* Переключатель месяца */}
       <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:20}}>
-        <button onClick={()=>shiftMonth(-1)} style={{width:28,height:28,border:'1px solid var(--bor2)',borderRadius:7,background:'#fff',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
+        <button onClick={()=>shiftMonth(-1)} style={{width:28,height:28,border:'1px solid var(--bor2)',borderRadius:7,background:'rgba(255,255,255,.55)',backdropFilter:'blur(20px) saturate(180%)',WebkitBackdropFilter:'blur(20px) saturate(180%)',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" width="12" height="12"><polyline points="10,4 6,8 10,12"/></svg>
         </button>
         <div style={{fontSize:15,fontWeight:700,color:'var(--text)',minWidth:160,textAlign:'center'}}>{MONTHS_FULL[viewMonth]} {viewYear}</div>
-        <button onClick={()=>shiftMonth(1)} style={{width:28,height:28,border:'1px solid var(--bor2)',borderRadius:7,background:'#fff',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
+        <button onClick={()=>shiftMonth(1)} style={{width:28,height:28,border:'1px solid var(--bor2)',borderRadius:7,background:'rgba(255,255,255,.55)',backdropFilter:'blur(20px) saturate(180%)',WebkitBackdropFilter:'blur(20px) saturate(180%)',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" width="12" height="12"><polyline points="6,4 10,8 6,12"/></svg>
         </button>
       </div>
@@ -148,7 +148,7 @@ export function SalesAnalytics({ salespersons, clients, payments }: Props) {
         const years: number[] = Array.from(yearsSet).sort((a: number, b: number) => b - a)
 
         return (
-          <div key={s.id} style={{marginBottom:12,background:'#fff',border:'1px solid var(--bor)',borderRadius:14,overflow:'hidden',boxShadow:'var(--sh)',opacity:s.is_active?1:0.5}}>
+          <div key={s.id} style={{marginBottom:12,background:'rgba(255,255,255,.55)',backdropFilter:'blur(20px) saturate(180%)',WebkitBackdropFilter:'blur(20px) saturate(180%)',border:'1px solid var(--bor)',borderRadius:14,overflow:'hidden',boxShadow:'var(--sh)',opacity:s.is_active?1:0.5}}>
 
             {/* Шапка */}
             <div style={{padding:'14px 20px',background:'var(--surf2)',borderBottom:'1px solid var(--bor)',display:'flex',alignItems:'center',gap:14}}>
