@@ -25,15 +25,16 @@ export function ExpensesClient({ clients, expenses, fixedExpenses, fixedRecords 
   const [openPayForms, setOpenPayForms] = useState<Set<string>>(new Set())
   const [openEditForms, setOpenEditForms] = useState<Set<string>>(new Set())
   const [openAddForms, setOpenAddForms] = useState<Set<number>>(new Set())
-  const [expandedYears, setExpandedYears] = useState<Set<string>>(new Set())
   const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set())
+  const [staffUnpaidOnly, setStaffUnpaidOnly] = useState<Set<string>>(new Set())
   const [fixedMonth, setFixedMonth] = useState(`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`)
   const [openFixedForms, setOpenFixedForms] = useState<Set<string>>(new Set())
   const [openFixedPayForms, setOpenFixedPayForms] = useState<Set<string>>(new Set())
 
-  function toggleYear(key: string) { setExpandedYears(prev => { const n = new Set(prev); n.has(key)?n.delete(key):n.add(key); return n }) }
   function toggleMonth(key: string) { setExpandedMonths(prev => { const n = new Set(prev); n.has(key)?n.delete(key):n.add(key); return n }) }
   function toggleCollapse(clientId: number) { setCollapsed(prev => { const n = new Set(prev); n.has(clientId)?n.delete(clientId):n.add(clientId); return n }) }
+  function toggleStaffUnpaid(name: string) { setStaffUnpaidOnly(prev => { const n = new Set(prev); n.has(name)?n.delete(name):n.add(name); return n }) }
+
   function togglePayForm(e: React.MouseEvent, id: string) {
     e.stopPropagation()
     setOpenPayForms(prev => { const n = new Set(prev); n.has(id)?n.delete(id):n.add(id); return n })
@@ -99,23 +100,35 @@ export function ExpensesClient({ clients, expenses, fixedExpenses, fixedRecords 
       const pending = mine.filter((e:any) => !e.is_paid).reduce((s:number,e:any) => s+Number(e.plan_sum),0)
       const total = mine.reduce((s:number,e:any) => s+Number(e.plan_sum),0)
       const clientsCount = [...new Set(mine.map((e:any) => e.client_id))].length
-      const years = [...new Set(mine.map((e:any) => new Date(e.plan_date || e.created_at || Date.now()).getFullYear()))].filter(y => y >= 2026).sort((a,b) => b-a)
-      const byYear = years.map(year => {
-        const yearExp = mine.filter((e:any) => new Date(e.plan_date || e.created_at || Date.now()).getFullYear() === year)
-        const yearPaid = yearExp.filter((e:any)=>e.is_paid).reduce((s:number,e:any)=>s+Number(e.fact_sum||e.plan_sum),0)
-        const yearPending = yearExp.filter((e:any)=>!e.is_paid).reduce((s:number,e:any)=>s+Number(e.plan_sum),0)
-        const months = [...new Set(yearExp.map((e:any) => new Date(e.plan_date || e.created_at || Date.now()).getMonth()))].sort((a,b) => b-a)
-        const byMonth = months.map(month => {
-          const monthExp = yearExp.filter((e:any) => new Date(e.plan_date || e.created_at || Date.now()).getMonth() === month)
-          return {
-            month, monthExp,
-            monthPaid: monthExp.filter((e:any)=>e.is_paid).reduce((s:number,e:any)=>s+Number(e.fact_sum||e.plan_sum),0),
-            monthPending: monthExp.filter((e:any)=>!e.is_paid).reduce((s:number,e:any)=>s+Number(e.plan_sum),0)
-          }
-        })
-        return { year, yearExp, yearPaid, yearPending, byMonth }
+
+      // Группируем по месяцу создания клиента
+      const monthKeys = [...new Set(mine.map((e:any) => {
+        const client = clients.find(c => c.id === e.client_id)
+        const d = new Date(client?.created_at || Date.now())
+        return `${d.getFullYear()}-${d.getMonth()}`
+      }))].sort((a,b) => {
+        const [ay,am] = a.split('-').map(Number)
+        const [by,bm] = b.split('-').map(Number)
+        return by !== ay ? by - ay : bm - am
       })
-      return { name, paid, pending, total, clientsCount, byYear }
+
+      const byMonth = monthKeys.map(mk => {
+        const [year, month] = mk.split('-').map(Number)
+        const monthExp = mine.filter((e:any) => {
+          const client = clients.find(c => c.id === e.client_id)
+          const d = new Date(client?.created_at || Date.now())
+          return d.getFullYear() === year && d.getMonth() === month
+        })
+        return {
+          key: mk,
+          label: `${MONTHS_RU[month]} ${year}`,
+          monthExp,
+          monthPaid: monthExp.filter((e:any)=>e.is_paid).reduce((s:number,e:any)=>s+Number(e.fact_sum||e.plan_sum),0),
+          monthPending: monthExp.filter((e:any)=>!e.is_paid).reduce((s:number,e:any)=>s+Number(e.plan_sum),0)
+        }
+      })
+
+      return { name, paid, pending, total, clientsCount, byMonth }
     }).sort((a,b) => b.total - a.total)
   }
 
@@ -125,153 +138,163 @@ export function ExpensesClient({ clients, expenses, fixedExpenses, fixedRecords 
     if (stats.length === 0) return <div style={{textAlign:'center',color:'var(--muted)',padding:48}}>Нет данных</div>
     return (
       <div>
-        {stats.map(s => (
-          <div key={s.name} style={{marginBottom:16,background:'#fff',border:'1px solid var(--bor)',borderRadius:14,overflow:'hidden',boxShadow:'var(--sh)'}}>
-            <div style={{padding:'14px 20px',background:'var(--surf2)',borderBottom:'1px solid var(--bor)',display:'flex',alignItems:'center',gap:16}}>
-              <div style={{width:38,height:38,borderRadius:'50%',background:gradient,display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,color:'#fff',fontWeight:700,flexShrink:0}}>
-                {s.name !== '—' ? s.name.slice(0,2).toUpperCase() : '?'}
-              </div>
-              <div>
-                <div style={{fontSize:14,fontWeight:700,color:'var(--text)'}}>{s.name}</div>
-                <div style={{fontSize:11,color:'var(--muted)',marginTop:2}}>{s.clientsCount} клиентов</div>
-              </div>
-              <div style={{flex:1}}/>
-              <div style={{display:'flex',gap:24}}>
-                <div style={{textAlign:'right'}}>
-                  <div style={{fontSize:10,color:'var(--muted)',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:2}}>Выплачено</div>
-                  <div style={{fontSize:16,fontWeight:700,color:'var(--green)'}}>{s.paid.toLocaleString('ru')} ₽</div>
+        {stats.map(s => {
+          const unpaidOnly = staffUnpaidOnly.has(s.name)
+          return (
+            <div key={s.name} style={{marginBottom:16,background:'#fff',border:'1px solid var(--bor)',borderRadius:14,overflow:'hidden',boxShadow:'var(--sh)'}}>
+              {/* Шапка */}
+              <div style={{padding:'14px 20px',background:'var(--surf2)',borderBottom:'1px solid var(--bor)',display:'flex',alignItems:'center',gap:16}}>
+                <div style={{width:38,height:38,borderRadius:'50%',background:gradient,display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,color:'#fff',fontWeight:700,flexShrink:0}}>
+                  {s.name !== '—' ? s.name.slice(0,2).toUpperCase() : '?'}
                 </div>
-                <div style={{textAlign:'right'}}>
-                  <div style={{fontSize:10,color:'var(--muted)',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:2}}>Должны</div>
-                  <div style={{fontSize:16,fontWeight:700,color:s.pending>0?'var(--gold)':'var(--muted)'}}>{s.pending.toLocaleString('ru')} ₽</div>
+                <div>
+                  <div style={{fontSize:14,fontWeight:700,color:'var(--text)'}}>{s.name}</div>
+                  <div style={{fontSize:11,color:'var(--muted)',marginTop:2}}>{s.clientsCount} клиентов</div>
                 </div>
-                <div style={{textAlign:'right'}}>
-                  <div style={{fontSize:10,color:'var(--muted)',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:2}}>Всего</div>
-                  <div style={{fontSize:16,fontWeight:700}}>{s.total.toLocaleString('ru')} ₽</div>
-                </div>
-              </div>
-            </div>
-            <div style={{padding:'10px 20px',borderBottom:'1px solid var(--bor)'}}>
-              <div style={{display:'flex',justifyContent:'space-between',fontSize:10,color:'var(--muted)',marginBottom:4}}>
-                <span>Выплачено {s.total>0?Math.round(s.paid/s.total*100):0}%</span>
-                <span>{s.paid.toLocaleString('ru')} / {s.total.toLocaleString('ru')} ₽</span>
-              </div>
-              <div style={{height:5,background:'var(--bor2)',borderRadius:20,overflow:'hidden'}}>
-                <div style={{height:'100%',width:`${s.total>0?Math.round(s.paid/s.total*100):0}%`,background:gradient,borderRadius:20}}/>
-              </div>
-            </div>
-            <div style={{padding:'8px 0'}}>
-              {s.byYear.length === 0 && <div style={{padding:'12px 20px',fontSize:12,color:'var(--muted)'}}>Нет данных с 2026</div>}
-              {s.byYear.map(({year,yearExp,yearPaid,yearPending,byMonth}) => {
-                const yk = `${s.name}-${year}`
-                const isYOpen = expandedYears.has(yk)
-                return (
-                  <div key={year}>
-                    <div onClick={()=>toggleYear(yk)} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 20px',cursor:'pointer',borderTop:'1px solid var(--bor)',background:isYOpen?'rgba(177,94,204,.03)':'transparent'}}>
-                      <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" width="10" height="10" style={{transform:isYOpen?'rotate(90deg)':'none',transition:'transform 0.2s',color:'var(--muted)',flexShrink:0}}><polyline points="3,2 7,5 3,8"/></svg>
-                      <span style={{fontSize:13,fontWeight:700}}>{year}</span>
-                      <span style={{fontSize:11,color:'var(--muted)'}}>{yearExp.length} платежей</span>
-                      <div style={{flex:1}}/>
-                      <span style={{fontSize:12,fontWeight:700,color:'var(--green)',marginRight:16}}>{yearPaid.toLocaleString('ru')} ₽ выплачено</span>
-                      {yearPending > 0 && <span style={{fontSize:12,fontWeight:700,color:'var(--gold)'}}>{yearPending.toLocaleString('ru')} ₽ должны</span>}
-                    </div>
-                    {isYOpen && byMonth.map(({month,monthExp,monthPaid,monthPending}) => {
-                      const mk = `${s.name}-${year}-${month}`
-                      const isMOpen = expandedMonths.has(mk)
-                      return (
-                        <div key={month}>
-                          <div onClick={()=>toggleMonth(mk)} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 20px 8px 36px',cursor:'pointer',borderTop:'1px solid var(--bor)',background:isMOpen?'rgba(177,94,204,.05)':'var(--surf2)'}}>
-                            <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" width="9" height="9" style={{transform:isMOpen?'rotate(90deg)':'none',transition:'transform 0.2s',color:'var(--muted)',flexShrink:0}}><polyline points="3,2 7,5 3,8"/></svg>
-                            <span style={{fontSize:12,fontWeight:600}}>{MONTHS_RU[month]}</span>
-                            <span style={{fontSize:11,color:'var(--muted)'}}>{monthExp.length} платежей</span>
-                            <div style={{flex:1}}/>
-                            {monthPaid > 0 && <span style={{fontSize:11,fontWeight:600,color:'var(--green)',marginRight:12}}>{monthPaid.toLocaleString('ru')} ₽</span>}
-                            {monthPending > 0 && <span style={{fontSize:11,fontWeight:600,color:'var(--gold)'}}>{monthPending.toLocaleString('ru')} ₽ ожидается</span>}
-                          </div>
-                          {isMOpen && (
-                            <table>
-                              <thead>
-                                <tr><th>Клиент</th><th>Дата план</th><th>Сумма план</th><th>Факт</th><th>Дата выплаты</th><th>Статус</th><th style={{width:80}}>✓</th></tr>
-                              </thead>
-                              <tbody>
-                                {monthExp.map((e:any) => {
-                                  const client = clients.find(cl => cl.id === e.client_id)
-                                  const isPayOpen = openPayForms.has(e.id)
-                                  return (
-                                    <>
-                                      <tr key={e.id} style={{opacity:e.is_paid?0.65:1}}>
-                                        <td>
-                                          <div style={{fontSize:12,fontWeight:600}}>{client?.name??'—'}</div>
-                                          <div style={{fontSize:10,color:'var(--muted)'}}>{client?.country??''}</div>
-                                        </td>
-                                        <td style={{fontSize:11,color:'var(--muted)'}}>{e.plan_date?new Date(e.plan_date).toLocaleDateString('ru-RU'):'—'}</td>
-                                        <td><span className="num">{Number(e.plan_sum).toLocaleString('ru')} ₽</span></td>
-                                        <td>{e.fact_sum?<span className="num m">{Number(e.fact_sum).toLocaleString('ru')} ₽</span>:<span style={{color:'var(--muted)'}}>—</span>}</td>
-                                        <td style={{fontSize:11,color:'var(--muted)'}}>{e.fact_date?new Date(e.fact_date).toLocaleDateString('ru-RU'):'—'}</td>
-                                        <td>{e.is_paid?<span className="pill pa"><span className="dot"/>Выплачен</span>:<span className="pill ps"><span className="dot"/>Ожидается</span>}</td>
-                                        <td style={{textAlign:'center'}}>
-                                          <div style={{display:'flex',gap:4,alignItems:'center',justifyContent:'center'}}>
-                                            {e.is_paid ? (
-                                              <form action={markExpenseUnpaid} style={{display:'inline'}}>
-                                                <input type="hidden" name="expense_id" value={e.id}/>
-                                                <button type="submit" style={{width:16,height:16,borderRadius:5,background:'var(--green)',border:'none',display:'inline-flex',alignItems:'center',justifyContent:'center',cursor:'pointer',padding:0}}>
-                                                  <svg viewBox="0 0 9 7" fill="none" stroke="white" strokeWidth="2" width="9" height="9"><polyline points="1,3.5 3.5,6 8,1"/></svg>
-                                                </button>
-                                              </form>
-                                            ) : (
-                                              <div onClick={(ev)=>togglePayForm(ev,e.id)}
-                                                style={{width:16,height:16,borderRadius:5,border:'1.5px solid var(--bor2)',display:'inline-flex',alignItems:'center',justifyContent:'center',cursor:'pointer',background:isPayOpen?'var(--pl)':'transparent'}}/>
-                                            )}
-                                            <form action={deleteExpense} style={{display:'inline'}}>
-                                              <input type="hidden" name="expense_id" value={e.id}/>
-                                              <button type="submit" title="Удалить"
-                                                style={{width:16,height:16,borderRadius:5,background:'rgba(220,53,69,.08)',border:'1px solid rgba(220,53,69,.2)',display:'inline-flex',alignItems:'center',justifyContent:'center',cursor:'pointer',padding:0}}>
-                                                <svg viewBox="0 0 9 9" fill="none" stroke="var(--red)" strokeWidth="2" width="8" height="8">
-                                                  <line x1="1" y1="1" x2="8" y2="8"/><line x1="8" y1="1" x2="1" y2="8"/>
-                                                </svg>
-                                              </button>
-                                            </form>
-                                          </div>
-                                        </td>
-                                      </tr>
-                                      {isPayOpen && !e.is_paid && (
-                                        <tr key={`staffpay-${e.id}`}>
-                                          <td colSpan={7} style={{padding:0,background:'var(--surf2)'}}>
-                                            <form action={async(fd)=>{await markExpensePaid(fd);setOpenPayForms(prev=>{const n=new Set(prev);n.delete(e.id);return n})}} style={{padding:'12px 16px'}}>
-                                              <input type="hidden" name="expense_id" value={e.id}/>
-                                              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr auto',gap:8,alignItems:'flex-end'}}>
-                                                <div>
-                                                  <div style={{fontSize:10,color:'var(--muted)',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:3}}>Дата выплаты</div>
-                                                  <input name="fact_date" type="date" defaultValue={today} style={{width:'100%',padding:'7px 10px',border:'1px solid var(--bor2)',borderRadius:7,fontSize:12,fontFamily:'inherit',outline:'none',background:'var(--surf)'}}/>
-                                                </div>
-                                                <div>
-                                                  <div style={{fontSize:10,color:'var(--muted)',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:3}}>Сумма факт</div>
-                                                  <input name="fact_sum" type="number" defaultValue={e.plan_sum} style={{width:'100%',padding:'7px 10px',border:'1px solid var(--bor2)',borderRadius:7,fontSize:12,fontFamily:'inherit',outline:'none',background:'var(--surf)'}}/>
-                                                </div>
-                                                <div style={{display:'flex',gap:6}}>
-                                                  <button type="submit" style={{padding:'7px 16px',background:'var(--green)',color:'#fff',border:'none',borderRadius:7,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Выплачено</button>
-                                                  <button type="button" onClick={(ev)=>togglePayForm(ev,e.id)} style={{padding:'7px 12px',background:'transparent',color:'var(--muted)',border:'1px solid var(--bor2)',borderRadius:7,fontSize:12,cursor:'pointer',fontFamily:'inherit'}}>Отмена</button>
-                                                </div>
-                                              </div>
-                                            </form>
-                                          </td>
-                                        </tr>
-                                      )}
-                                    </>
-                                  )
-                                })}
-                              </tbody>
-                            </table>
-                          )}
-                        </div>
-                      )
-                    })}
+                <div style={{flex:1}}/>
+                {/* Фильтр "Не оплачено" */}
+                <button onClick={()=>toggleStaffUnpaid(s.name)}
+                  style={{padding:'5px 14px',borderRadius:20,fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:'inherit',
+                    border:`1px solid ${unpaidOnly?'var(--gold)':'var(--bor2)'}`,
+                    background:unpaidOnly?'rgba(201,125,0,.08)':'var(--surf)',
+                    color:unpaidOnly?'var(--gold)':'var(--muted)'}}>
+                  {unpaidOnly ? '● Не оплачено' : 'Не оплачено'}
+                </button>
+                <div style={{display:'flex',gap:24,marginLeft:16}}>
+                  <div style={{textAlign:'right'}}>
+                    <div style={{fontSize:10,color:'var(--muted)',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:2}}>Выплачено</div>
+                    <div style={{fontSize:16,fontWeight:700,color:'var(--green)'}}>{s.paid.toLocaleString('ru')} ₽</div>
                   </div>
-                )
-              })}
+                  <div style={{textAlign:'right'}}>
+                    <div style={{fontSize:10,color:'var(--muted)',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:2}}>Должны</div>
+                    <div style={{fontSize:16,fontWeight:700,color:s.pending>0?'var(--gold)':'var(--muted)'}}>{s.pending.toLocaleString('ru')} ₽</div>
+                  </div>
+                  <div style={{textAlign:'right'}}>
+                    <div style={{fontSize:10,color:'var(--muted)',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:2}}>Всего</div>
+                    <div style={{fontSize:16,fontWeight:700}}>{s.total.toLocaleString('ru')} ₽</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Прогресс */}
+              <div style={{padding:'10px 20px',borderBottom:'1px solid var(--bor)'}}>
+                <div style={{display:'flex',justifyContent:'space-between',fontSize:10,color:'var(--muted)',marginBottom:4}}>
+                  <span>Выплачено {s.total>0?Math.round(s.paid/s.total*100):0}%</span>
+                  <span>{s.paid.toLocaleString('ru')} / {s.total.toLocaleString('ru')} ₽</span>
+                </div>
+                <div style={{height:5,background:'var(--bor2)',borderRadius:20,overflow:'hidden'}}>
+                  <div style={{height:'100%',width:`${s.total>0?Math.round(s.paid/s.total*100):0}%`,background:gradient,borderRadius:20}}/>
+                </div>
+              </div>
+
+              {/* Месяцы по дате создания клиента */}
+              <div style={{padding:'8px 0'}}>
+                {s.byMonth.length === 0 && <div style={{padding:'12px 20px',fontSize:12,color:'var(--muted)'}}>Нет данных</div>}
+                {s.byMonth.map(({key, label, monthExp, monthPaid, monthPending}) => {
+                  const visibleExp = unpaidOnly ? monthExp.filter((e:any) => !e.is_paid) : monthExp
+                  if (unpaidOnly && visibleExp.length === 0) return null
+                  const mk = `${s.name}-${key}`
+                  const isMOpen = expandedMonths.has(mk)
+                  return (
+                    <div key={key}>
+                      <div onClick={()=>toggleMonth(mk)} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 20px',cursor:'pointer',borderTop:'1px solid var(--bor)',background:isMOpen?'rgba(177,94,204,.03)':'transparent'}}>
+                        <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" width="10" height="10" style={{transform:isMOpen?'rotate(90deg)':'none',transition:'transform 0.2s',color:'var(--muted)',flexShrink:0}}><polyline points="3,2 7,5 3,8"/></svg>
+                        <span style={{fontSize:13,fontWeight:700}}>{label}</span>
+                        <span style={{fontSize:11,color:'var(--muted)'}}>{monthExp.length} клиентов</span>
+                        <div style={{flex:1}}/>
+                        {monthPaid > 0 && <span style={{fontSize:12,fontWeight:700,color:'var(--green)',marginRight:16}}>{monthPaid.toLocaleString('ru')} ₽ выплачено</span>}
+                        {monthPending > 0 && <span style={{fontSize:12,fontWeight:700,color:'var(--gold)'}}>{monthPending.toLocaleString('ru')} ₽ должны</span>}
+                      </div>
+                      {isMOpen && (
+                        <table>
+                          <thead>
+                            <tr><th>Клиент</th><th>Дата план</th><th>Сумма план</th><th>Факт</th><th>Дата выплаты</th><th>Статус</th><th style={{width:80}}>✓</th></tr>
+                          </thead>
+                          <tbody>
+                            {visibleExp.length === 0 && (
+                              <tr><td colSpan={7} style={{textAlign:'center',color:'var(--muted)',padding:16,fontSize:12}}>Все выплачено</td></tr>
+                            )}
+                            {visibleExp.map((e:any) => {
+                              const client = clients.find(cl => cl.id === e.client_id)
+                              const isPayOpen = openPayForms.has(e.id)
+                              return (
+                                <>
+                                  <tr key={e.id} style={{opacity:e.is_paid?0.65:1}}>
+                                    <td>
+                                      <div style={{fontSize:12,fontWeight:600}}>{client?.name??'—'}</div>
+                                      <div style={{fontSize:10,color:'var(--muted)'}}>{client?.country??''}</div>
+                                    </td>
+                                    <td style={{fontSize:11,color:'var(--muted)'}}>{e.plan_date?new Date(e.plan_date).toLocaleDateString('ru-RU'):'—'}</td>
+                                    <td><span className="num">{Number(e.plan_sum).toLocaleString('ru')} ₽</span></td>
+                                    <td>{e.fact_sum?<span className="num m">{Number(e.fact_sum).toLocaleString('ru')} ₽</span>:<span style={{color:'var(--muted)'}}>—</span>}</td>
+                                    <td style={{fontSize:11,color:'var(--muted)'}}>{e.fact_date?new Date(e.fact_date).toLocaleDateString('ru-RU'):'—'}</td>
+                                    <td>{e.is_paid?<span className="pill pa"><span className="dot"/>Выплачен</span>:<span className="pill ps"><span className="dot"/>Ожидается</span>}</td>
+                                    <td style={{textAlign:'center'}}>
+                                      <div style={{display:'flex',gap:4,alignItems:'center',justifyContent:'center'}}>
+                                        {e.is_paid ? (
+                                          <form action={markExpenseUnpaid} style={{display:'inline'}}>
+                                            <input type="hidden" name="expense_id" value={e.id}/>
+                                            <button type="submit" style={{width:16,height:16,borderRadius:5,background:'var(--green)',border:'none',display:'inline-flex',alignItems:'center',justifyContent:'center',cursor:'pointer',padding:0}}>
+                                              <svg viewBox="0 0 9 7" fill="none" stroke="white" strokeWidth="2" width="9" height="9"><polyline points="1,3.5 3.5,6 8,1"/></svg>
+                                            </button>
+                                          </form>
+                                        ) : (
+                                          <div onClick={(ev)=>togglePayForm(ev,e.id)}
+                                            style={{width:16,height:16,borderRadius:5,border:'1.5px solid var(--bor2)',display:'inline-flex',alignItems:'center',justifyContent:'center',cursor:'pointer',background:isPayOpen?'var(--pl)':'transparent'}}/>
+                                        )}
+                                        <button
+                                          type="button"
+                                          title="Удалить"
+                                          onClick={async()=>{
+                                            if (!confirm(`Удалить запись расхода для "${client?.name ?? '—'}"?`)) return
+                                            const fd = new FormData()
+                                            fd.append('expense_id', e.id)
+                                            await deleteExpense(fd)
+                                          }}
+                                          style={{width:16,height:16,borderRadius:5,background:'rgba(220,53,69,.08)',border:'1px solid rgba(220,53,69,.2)',display:'inline-flex',alignItems:'center',justifyContent:'center',cursor:'pointer',padding:0}}>
+                                          <svg viewBox="0 0 9 9" fill="none" stroke="var(--red)" strokeWidth="2" width="8" height="8">
+                                            <line x1="1" y1="1" x2="8" y2="8"/><line x1="8" y1="1" x2="1" y2="8"/>
+                                          </svg>
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                  {isPayOpen && !e.is_paid && (
+                                    <tr key={`staffpay-${e.id}`}>
+                                      <td colSpan={7} style={{padding:0,background:'var(--surf2)'}}>
+                                        <form action={async(fd)=>{await markExpensePaid(fd);setOpenPayForms(prev=>{const n=new Set(prev);n.delete(e.id);return n})}} style={{padding:'12px 16px'}}>
+                                          <input type="hidden" name="expense_id" value={e.id}/>
+                                          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr auto',gap:8,alignItems:'flex-end'}}>
+                                            <div>
+                                              <div style={{fontSize:10,color:'var(--muted)',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:3}}>Дата выплаты</div>
+                                              <input name="fact_date" type="date" defaultValue={today} style={{width:'100%',padding:'7px 10px',border:'1px solid var(--bor2)',borderRadius:7,fontSize:12,fontFamily:'inherit',outline:'none',background:'var(--surf)'}}/>
+                                            </div>
+                                            <div>
+                                              <div style={{fontSize:10,color:'var(--muted)',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:3}}>Сумма факт</div>
+                                              <input name="fact_sum" type="number" defaultValue={e.plan_sum} style={{width:'100%',padding:'7px 10px',border:'1px solid var(--bor2)',borderRadius:7,fontSize:12,fontFamily:'inherit',outline:'none',background:'var(--surf)'}}/>
+                                            </div>
+                                            <div style={{display:'flex',gap:6}}>
+                                              <button type="submit" style={{padding:'7px 16px',background:'var(--green)',color:'#fff',border:'none',borderRadius:7,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Выплачено</button>
+                                              <button type="button" onClick={(ev)=>togglePayForm(ev,e.id)} style={{padding:'7px 12px',background:'transparent',color:'var(--muted)',border:'1px solid var(--bor2)',borderRadius:7,fontSize:12,cursor:'pointer',fontFamily:'inherit'}}>Отмена</button>
+                                            </div>
+                                          </div>
+                                        </form>
+                                      </td>
+                                    </tr>
+                                  )}
+                                </>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
     )
   }
@@ -582,15 +605,20 @@ export function ExpensesClient({ clients, expenses, fixedExpenses, fixedRecords 
                                       <div onClick={()=>setOpenFixedPayForms(prev=>{const n=new Set(prev);n.has(r.id)?n.delete(r.id):n.add(r.id);return n})}
                                         style={{width:16,height:16,borderRadius:5,border:'1.5px solid var(--bor2)',display:'inline-flex',alignItems:'center',justifyContent:'center',cursor:'pointer',background:isPayOpen?'var(--pl)':'transparent'}}/>
                                     )}
-                                    <form action={deleteFixedExpenseRecord} style={{display:'inline'}}>
-                                      <input type="hidden" name="record_id" value={r.id}/>
-                                      <button type="submit" title="Удалить"
-                                        style={{width:16,height:16,borderRadius:5,background:'rgba(220,53,69,.08)',border:'1px solid rgba(220,53,69,.2)',display:'inline-flex',alignItems:'center',justifyContent:'center',cursor:'pointer',padding:0}}>
-                                        <svg viewBox="0 0 9 9" fill="none" stroke="var(--red)" strokeWidth="2" width="8" height="8">
-                                          <line x1="1" y1="1" x2="8" y2="8"/><line x1="8" y1="1" x2="1" y2="8"/>
-                                        </svg>
-                                      </button>
-                                    </form>
+                                    <button
+                                      type="button"
+                                      title="Удалить"
+                                      onClick={async()=>{
+                                        if (!confirm('Удалить эту запись?')) return
+                                        const fd = new FormData()
+                                        fd.append('record_id', r.id)
+                                        await deleteFixedExpenseRecord(fd)
+                                      }}
+                                      style={{width:16,height:16,borderRadius:5,background:'rgba(220,53,69,.08)',border:'1px solid rgba(220,53,69,.2)',display:'inline-flex',alignItems:'center',justifyContent:'center',cursor:'pointer',padding:0}}>
+                                      <svg viewBox="0 0 9 9" fill="none" stroke="var(--red)" strokeWidth="2" width="8" height="8">
+                                        <line x1="1" y1="1" x2="8" y2="8"/><line x1="8" y1="1" x2="1" y2="8"/>
+                                      </svg>
+                                    </button>
                                   </div>
                                 </td>
                               </tr>
