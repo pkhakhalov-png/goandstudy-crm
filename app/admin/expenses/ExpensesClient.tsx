@@ -200,7 +200,7 @@ export function ExpensesClient({ clients, expenses, fixedExpenses, fixedRecords 
                       <div onClick={()=>toggleMonth(mk)} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 20px',cursor:'pointer',borderTop:'1px solid var(--bor)',background:isMOpen?'rgba(177,94,204,.03)':'transparent'}}>
                         <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" width="10" height="10" style={{transform:isMOpen?'rotate(90deg)':'none',transition:'transform 0.2s',color:'var(--muted)',flexShrink:0}}><polyline points="3,2 7,5 3,8"/></svg>
                         <span style={{fontSize:13,fontWeight:700}}>{label}</span>
-                        <span style={{fontSize:11,color:'var(--muted)'}}>{monthExp.length} клиентов</span>
+                        <span style={{fontSize:11,color:'var(--muted)'}}>{monthExp.length} платежей</span>
                         <div style={{flex:1}}/>
                         {monthPaid > 0 && <span style={{fontSize:12,fontWeight:700,color:'var(--green)',marginRight:16}}>{monthPaid.toLocaleString('ru')} ₽ выплачено</span>}
                         {monthPending > 0 && <span style={{fontSize:12,fontWeight:700,color:'var(--gold)'}}>{monthPending.toLocaleString('ru')} ₽ должны</span>}
