@@ -47,6 +47,7 @@ export function FunnelClient({ stages: serverStages, deals: serverDeals, salespe
   const [dragDealId, setDragDealId] = useState<string | null>(null)
   const [dragOverStage, setDragOverStage] = useState<string | null>(null)
   const dragCounterRef = useRef<Map<string, number>>(new Map())
+  const wasDragging = useRef(false)
 
   // Sync
   if (serverDeals !== localDeals && !dragDealId) setLocalDeals(serverDeals)
@@ -301,7 +302,10 @@ export function FunnelClient({ stages: serverStages, deals: serverDeals, salespe
                     const isDragging = deal.id === dragDealId
                     const isSelected = selectedDeals.has(deal.id)
                     return (
-                      <div key={deal.id} draggable onDragStart={() => setDragDealId(deal.id)} onClick={() => router.push(`${isAdmin ? '/admin' : '/sales'}/funnel/${deal.id}`)}
+                      <div key={deal.id} draggable
+                        onDragStart={() => { setDragDealId(deal.id); wasDragging.current = true }}
+                        onDragEnd={() => { resetDrag(); setTimeout(() => { wasDragging.current = false }, 50) }}
+                        onClick={() => { if (!wasDragging.current) router.push(`${isAdmin ? '/admin' : '/sales'}/funnel/${deal.id}`) }}
                         style={{
                           background: isSelected ? 'var(--pl)' : 'var(--surf)', border: isSelected ? '1px solid var(--pb)' : '1px solid var(--bor)',
                           borderRadius: 10, padding: '10px 12px', marginBottom: 6, cursor: 'grab',
