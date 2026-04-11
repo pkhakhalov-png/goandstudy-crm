@@ -19,25 +19,47 @@ export default async function SalesFunnelPage() {
   const initials = (profile?.name || user.email || 'ПП')
     .split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)
 
+  const dealsPerStage = 50
+
   const [
     { data: stages },
-    { data: rawDeals },
-    { data: activities },
+    { data: trashedDeals },
   ] = await Promise.all([
     supabase.from('pipeline_stages').select('*').eq('is_active', true).order('position'),
-    supabase.from('deals').select('*').eq('salesperson_id', user.id).is('deleted_at', null).order('updated_at', { ascending: false }),
-    supabase.from('deal_activities').select('id, deal_id, user_id, activity_type, content, metadata, created_at').order('created_at', { ascending: false }).limit(500),
+    supabase.from('deals').select('id, contact_name, contact_phone, budget, stage_id, deleted_at').eq('salesperson_id', user.id).not('deleted_at', 'is', null).order('deleted_at', { ascending: false }),
   ])
 
-  const { data: allUsers } = await supabase.from('users').select('id, name')
-  const userMap = new Map((allUsers ?? []).map(u => [u.id, u.name]))
+  const stageIds = (stages ?? []).map(s => s.id)
 
-  const deals = (rawDeals ?? []).map(d => ({
-    ...d,
-    activities: (activities ?? [])
-      .filter(a => a.deal_id === d.id)
-      .map(a => ({ ...a, user_name: userMap.get(a.user_id) ?? 'Система' }))
-  }))
+  const [dealsResult, countsResult] = await Promise.all([
+    supabase
+      .from('deals')
+      .select('id, title, stage_id, salesperson_id, contact_name, contact_phone, contact_telegram, contact_email, contact_whatsapp, budget, source, created_at, updated_at')
+      .eq('salesperson_id', user.id)
+      .is('deleted_at', null)
+      .order('updated_at', { ascending: false })
+      .limit(dealsPerStage * stageIds.length),
+    supabase
+      .from('deals')
+      .select('stage_id')
+      .eq('salesperson_id', user.id)
+      .is('deleted_at', null),
+  ])
+
+  const rawDeals = dealsResult.data ?? []
+
+  const stageCounts: Record<string, number> = {}
+  for (const d of (countsResult.data ?? [])) {
+    stageCounts[d.stage_id] = (stageCounts[d.stage_id] || 0) + 1
+  }
+
+  const stageDealsCount: Record<string, number> = {}
+  const deals = rawDeals.filter(d => {
+    stageDealsCount[d.stage_id] = (stageDealsCount[d.stage_id] || 0) + 1
+    return stageDealsCount[d.stage_id] <= dealsPerStage
+  })
+
+  const totalDeals = Object.values(stageCounts).reduce((s, c) => s + c, 0)
 
   return (
     <div className="app">
@@ -45,7 +67,7 @@ export default async function SalesFunnelPage() {
       <div className="main" style={{ display: 'flex', flexDirection: 'column' }}>
         <div className="topbar">
           <div className="pt">Мои сделки</div>
-          <span style={{ fontSize: 12, color: 'var(--muted)' }}>{deals.length} сделок</span>
+          <span style={{ fontSize: 12, color: 'var(--muted)' }}>{totalDeals} сделок</span>
         </div>
         <FunnelClient
           stages={stages ?? []}
@@ -53,6 +75,8 @@ export default async function SalesFunnelPage() {
           salespersons={[{ id: user.id, name: profile?.name || '' }]}
           isAdmin={false}
           userId={user.id}
+          trashedDeals={trashedDeals ?? []}
+          stageCounts={stageCounts}
         />
       </div>
     </div>

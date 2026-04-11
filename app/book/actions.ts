@@ -129,32 +129,34 @@ export async function createBooking(formData: FormData) {
     .update({ round_robin_count: assignedUser.round_robin_count + 1 })
     .eq('id', assignedUser.id)
 
-  // 7. Auto-create deal in funnel (with dedup)
+  // 7. Auto-create deal in funnel (with dedup via indexed phone_normalized)
   try {
     const normalizedPhone = normalizePhone(clientPhone)
 
-    // Check for existing deal with same phone
     let existingDeal = null
     if (normalizedPhone) {
-      const { data: allDeals } = await supabase.from('deals').select('id, contact_name, contact_phone, contact_telegram, booking_id')
-      existingDeal = allDeals?.find(d => normalizePhone(d.contact_phone) === normalizedPhone) || null
+      const { data } = await supabase
+        .from('deals')
+        .select('id, contact_telegram, booking_id')
+        .eq('phone_normalized', normalizedPhone)
+        .is('deleted_at', null)
+        .limit(1)
+        .single()
+      existingDeal = data
     }
 
     if (existingDeal) {
-      // Merge: update existing deal with new info where missing
       const updates: Record<string, any> = { updated_at: new Date().toISOString() }
       if (!existingDeal.contact_telegram && clientTelegram) updates.contact_telegram = clientTelegram
       if (!existingDeal.booking_id && insertedBooking?.id) updates.booking_id = insertedBooking.id
       await supabase.from('deals').update(updates).eq('id', existingDeal.id)
 
-      // Log merge activity
       await supabase.from('deal_activities').insert({
         deal_id: existingDeal.id,
         activity_type: 'system',
         content: `Повторная запись объединена (${clientName}, ${clientPhone})`,
       })
     } else {
-      // Create new deal
       const { data: firstStage } = await supabase
         .from('pipeline_stages')
         .select('id')
@@ -171,6 +173,7 @@ export async function createBooking(formData: FormData) {
           contact_name: clientName,
           contact_phone: clientPhone,
           contact_telegram: clientTelegram,
+          phone_normalized: normalizedPhone,
           source: 'booking',
           booking_id: insertedBooking?.id || null,
         })

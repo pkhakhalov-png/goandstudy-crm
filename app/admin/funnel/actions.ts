@@ -5,7 +5,8 @@ import { revalidatePath } from 'next/cache'
 import { normalizePhone } from '@/lib/phone'
 
 function reval() {
-  reval()
+  revalidatePath('/admin/funnel')
+  revalidatePath('/sales/funnel')
 }
 
 export async function moveDeal(formData: FormData) {
@@ -88,13 +89,18 @@ export async function createDeal(formData: FormData) {
 
   if (!title || !contactName) return { error: 'Заполните название и имя контакта' }
 
-  // Check for duplicate by phone
+  // Check for duplicate by phone (indexed lookup)
   const normalized = normalizePhone(contactPhone)
   if (normalized) {
-    const { data: allDeals } = await supabase.from('deals').select('id, contact_name, contact_phone, contact_telegram, contact_email, contact_whatsapp')
-    const duplicate = allDeals?.find(d => normalizePhone(d.contact_phone) === normalized)
+    const { data: duplicate } = await supabase
+      .from('deals')
+      .select('id, contact_telegram, contact_email, contact_whatsapp')
+      .eq('phone_normalized', normalized)
+      .is('deleted_at', null)
+      .limit(1)
+      .single()
+
     if (duplicate) {
-      // Merge into existing deal
       const updates: Record<string, any> = { updated_at: new Date().toISOString() }
       if (!duplicate.contact_telegram && contactTelegram) updates.contact_telegram = contactTelegram
       if (budget > 0) updates.budget = budget
@@ -107,8 +113,7 @@ export async function createDeal(formData: FormData) {
         content: `Дубль объединён: ${contactName} (${contactPhone})`,
       })
 
-      revalidatePath('/admin/funnel')
-      revalidatePath('/sales/funnel')
+      reval()
       return { success: true, merged: true }
     }
   }
@@ -120,6 +125,7 @@ export async function createDeal(formData: FormData) {
     contact_name: contactName,
     contact_phone: contactPhone,
     contact_telegram: contactTelegram,
+    phone_normalized: normalized,
     budget,
     source: 'manual',
   }).select('id').single()
@@ -168,10 +174,12 @@ export async function updateStage(formData: FormData) {
   const stageId = formData.get('stage_id') as string
   const name = formData.get('name') as string | null
   const color = formData.get('color') as string | null
+  const value = formData.get('value') as string | null
 
-  const updates: Record<string, string> = {}
+  const updates: Record<string, string | number> = {}
   if (name) updates.name = name.trim()
   if (color) updates.color = color
+  if (value !== null) updates.value = Number(value)
 
   const { error } = await supabase.from('pipeline_stages').update(updates).eq('id', stageId)
   if (error) return { error: error.message }
@@ -272,10 +280,23 @@ export async function addStage(formData: FormData) {
   const name = (formData.get('name') as string)?.trim()
   if (!name) return { error: 'Укажите название' }
 
-  const { data: maxPos } = await supabase.from('pipeline_stages').select('position').order('position', { ascending: false }).limit(1).single()
-  const position = (maxPos?.position ?? 0) + 1
+  const insertAt = formData.get('position') ? Number(formData.get('position')) : null
 
-  await supabase.from('pipeline_stages').insert({ name, color: '#B15ECC', position, stage_type: 'active', is_active: true })
+  if (insertAt !== null) {
+    // Shift all stages at this position and above
+    const { data: toShift } = await supabase.from('pipeline_stages').select('id, position').gte('position', insertAt).order('position', { ascending: false })
+    if (toShift) {
+      for (const s of toShift) {
+        await supabase.from('pipeline_stages').update({ position: s.position + 1 }).eq('id', s.id)
+      }
+    }
+    await supabase.from('pipeline_stages').insert({ name, color: '#B15ECC', position: insertAt, stage_type: 'active', is_active: true })
+  } else {
+    const { data: maxPos } = await supabase.from('pipeline_stages').select('position').order('position', { ascending: false }).limit(1).single()
+    const position = (maxPos?.position ?? 0) + 1
+    await supabase.from('pipeline_stages').insert({ name, color: '#B15ECC', position, stage_type: 'active', is_active: true })
+  }
+
   reval()
   return { success: true }
 }
@@ -374,4 +395,75 @@ export async function searchClients(query: string) {
   const supabase = await createClient()
   const { data } = await supabase.from('clients').select('id, name, phone, country').or(`name.ilike.%${query}%,phone.ilike.%${query}%`).limit(10)
   return data ?? []
+}
+
+// ═══ DUPLICATE DETECTION ═══
+
+export async function findDuplicates() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Не авторизован', groups: [] }
+
+  const { data, error } = await supabase.rpc('find_duplicate_deals')
+  if (error) return { error: error.message, groups: [] }
+
+  // Fetch full deal info for each group
+  const allIds = (data ?? []).flatMap((g: any) => g.deal_ids)
+  if (allIds.length === 0) return { groups: [] }
+
+  const { data: deals } = await supabase
+    .from('deals')
+    .select('id, title, contact_name, contact_phone, contact_telegram, contact_email, budget, stage_id, source, created_at')
+    .in('id', allIds)
+
+  const dealMap = new Map((deals ?? []).map(d => [d.id, d]))
+
+  const groups = (data ?? []).map((g: any) => ({
+    phone: g.phone,
+    count: Number(g.deal_count),
+    deals: g.deal_ids.map((id: string) => dealMap.get(id)).filter(Boolean),
+  }))
+
+  return { groups }
+}
+
+// ═══ PAGINATION ═══
+
+const DEALS_PER_PAGE = 50
+
+export async function loadMoreDeals(stageId: string, offset: number, salespersonId?: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { deals: [], hasMore: false }
+
+  let query = supabase
+    .from('deals')
+    .select('id, title, stage_id, salesperson_id, contact_name, contact_phone, contact_telegram, contact_email, contact_whatsapp, budget, source, created_at, updated_at')
+    .eq('stage_id', stageId)
+    .is('deleted_at', null)
+    .order('updated_at', { ascending: false })
+    .range(offset, offset + DEALS_PER_PAGE - 1)
+
+  if (salespersonId) query = query.eq('salesperson_id', salespersonId)
+
+  const { data } = await query
+  return {
+    deals: data ?? [],
+    hasMore: (data?.length ?? 0) === DEALS_PER_PAGE,
+  }
+}
+
+export async function mergeDeals(formData: FormData) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Не авторизован' }
+
+  const keepId = formData.get('keep_id') as string
+  const removeIds: string[] = JSON.parse(formData.get('remove_ids') as string)
+
+  const { error } = await supabase.rpc('merge_deals', { keep_id: keepId, remove_ids: removeIds })
+  if (error) return { error: error.message }
+
+  reval()
+  return { success: true }
 }

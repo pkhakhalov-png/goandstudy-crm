@@ -64,7 +64,7 @@ export function SalesPage({ clients, expenses }: Props) {
   // Группируем по месяцам
   const monthsMap = new Map<string, {label: string, year: number, month: number, total: number, paid: number, pending: number, items: any[]}>()
   expenses.forEach(e => {
-    const d = new Date(e.plan_date || Date.now())
+    const d = e.plan_date ? new Date(e.plan_date) : new Date()
     const key = `${d.getFullYear()}-${d.getMonth()}`
     if (!monthsMap.has(key)) {
       monthsMap.set(key, {

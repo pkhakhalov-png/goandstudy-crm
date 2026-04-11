@@ -25,7 +25,7 @@ export default async function SalesSchedulePage() {
     { data: allStats },
   ] = await Promise.all([
     supabase.from('schedule_slots').select('day_of_week, start_time').eq('user_id', user.id).eq('is_active', true),
-    supabase.from('bookings').select('*').eq('salesperson_id', user.id).gte('booking_date', new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0]).order('booking_date', { ascending: true }),
+    supabase.from('bookings').select('*').eq('salesperson_id', user.id).gte('booking_date', new Date(new Date().getTime() - 30 * 86400000).toISOString().split('T')[0]).order('booking_date', { ascending: true }),
     supabase.from('bookings').select('id, status, booking_date').eq('salesperson_id', user.id),
   ])
 
