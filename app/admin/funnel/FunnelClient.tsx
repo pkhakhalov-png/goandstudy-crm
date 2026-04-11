@@ -220,7 +220,7 @@ export function FunnelClient({ stages: serverStages, deals: serverDeals, salespe
                   const stage = localStages.find(s => s.id === deal.stage_id)
                   const sp = salespersons.find(s => s.id === deal.salesperson_id)
                   return (
-                    <tr key={deal.id} onClick={() => router.push(`/admin/funnel/${deal.id}`)} style={{ cursor: 'pointer' }}>
+                    <tr key={deal.id} onClick={() => router.push(`${isAdmin ? '/admin' : '/sales'}/funnel/${deal.id}`)} style={{ cursor: 'pointer' }}>
                       <td onClick={e => e.stopPropagation()}><input type="checkbox" checked={selectedDeals.has(deal.id)} onChange={() => toggleSelect(deal.id)} /></td>
                       <td style={{ fontSize: 11, color: 'var(--muted)', whiteSpace: 'nowrap' }}>{new Date(deal.created_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}</td>
                       <td><span className="cn">{deal.contact_name}</span></td>
@@ -301,7 +301,7 @@ export function FunnelClient({ stages: serverStages, deals: serverDeals, salespe
                     const isDragging = deal.id === dragDealId
                     const isSelected = selectedDeals.has(deal.id)
                     return (
-                      <div key={deal.id} draggable onDragStart={() => setDragDealId(deal.id)} onClick={() => router.push(`/admin/funnel/${deal.id}`)}
+                      <div key={deal.id} draggable onDragStart={() => setDragDealId(deal.id)} onClick={() => router.push(`${isAdmin ? '/admin' : '/sales'}/funnel/${deal.id}`)}
                         style={{
                           background: isSelected ? 'var(--pl)' : 'var(--surf)', border: isSelected ? '1px solid var(--pb)' : '1px solid var(--bor)',
                           borderRadius: 10, padding: '10px 12px', marginBottom: 6, cursor: 'grab',

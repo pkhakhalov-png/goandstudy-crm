@@ -25,7 +25,7 @@ export default async function SalesFunnelPage() {
     { data: activities },
   ] = await Promise.all([
     supabase.from('pipeline_stages').select('*').eq('is_active', true).order('position'),
-    supabase.from('deals').select('*').eq('salesperson_id', user.id).order('updated_at', { ascending: false }),
+    supabase.from('deals').select('*').eq('salesperson_id', user.id).is('deleted_at', null).order('updated_at', { ascending: false }),
     supabase.from('deal_activities').select('id, deal_id, user_id, activity_type, content, metadata, created_at').order('created_at', { ascending: false }).limit(500),
   ])
 
