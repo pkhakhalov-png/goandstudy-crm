@@ -25,6 +25,7 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
     { data: allUsers },
     { data: files },
     { data: messages },
+    { data: tasks },
   ] = await Promise.all([
     supabase.from('deals').select('*').eq('id', id).single(),
     supabase.from('pipeline_stages').select('*').eq('is_active', true).order('position'),
@@ -33,6 +34,7 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
     supabase.from('users').select('id, name'),
     supabase.from('deal_files').select('*').eq('deal_id', id).order('created_at', { ascending: false }),
     supabase.from('deal_messages').select('*').eq('deal_id', id).order('created_at', { ascending: true }),
+    supabase.from('deal_tasks').select('*').eq('deal_id', id).order('created_at', { ascending: true }),
   ])
 
   if (!deal) redirect('/admin/funnel')
@@ -77,6 +79,7 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
         bookingData={bookingData}
         files={files ?? []}
         messages={messages ?? []}
+        tasks={tasks ?? []}
         userId={user.id}
       />
     </div>

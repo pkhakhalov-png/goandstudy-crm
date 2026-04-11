@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { moveDeal, addDealNote, updateDeal } from '../actions'
+import { moveDeal, addDealNote, updateDeal, createDealTask, toggleDealTask, deleteDealTask, linkDealToClient, searchClients } from '../actions'
 import { uploadDealFile, deleteDealFile } from './fileActions'
 
 interface Stage { id: string; name: string; color: string; position: number; stage_type: string }
@@ -16,6 +16,7 @@ interface Props {
   bookingData: any
   files: any[]
   messages: any[]
+  tasks: any[]
   userId: string
 }
 
@@ -35,12 +36,17 @@ function formatSize(bytes: number) {
 const sourceLabel: Record<string, string> = { manual: 'Вручную', booking: 'Запись с сайта', website: 'Сайт', telegram: 'Telegram' }
 const activityIcon: Record<string, string> = { note: '📝', stage_change: '→', system: '⚙️', call: '📞', message: '💬', file_upload: '📎', task_done: '✅' }
 
-export function DealCard({ deal, stages, activities, salespersons, clientData, bookingData, files, messages, userId }: Props) {
-  const [tab, setTab] = useState<'main' | 'activity' | 'files' | 'messages'>('main')
+export function DealCard({ deal, stages, activities, salespersons, clientData, bookingData, files, messages, tasks, userId }: Props) {
+  const [tab, setTab] = useState<'main' | 'activity' | 'files' | 'messages' | 'tasks'>('main')
   const [noteText, setNoteText] = useState('')
   const [saving, setSaving] = useState(false)
   const [editing, setEditing] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [taskTitle, setTaskTitle] = useState('')
+  const [taskDeadline, setTaskDeadline] = useState('')
+  const [clientSearch, setClientSearch] = useState('')
+  const [clientResults, setClientResults] = useState<any[]>([])
+  const [showClientSearch, setShowClientSearch] = useState(false)
 
   const currentStage = stages.find(s => s.id === deal.stage_id)
   const sp = salespersons.find(s => s.id === deal.salesperson_id)
@@ -95,9 +101,48 @@ export function DealCard({ deal, stages, activities, salespersons, clientData, b
     await deleteDealFile(fd)
   }
 
+  async function handleAddTask() {
+    if (!taskTitle.trim()) return
+    setSaving(true)
+    const fd = new FormData()
+    fd.append('deal_id', deal.id); fd.append('title', taskTitle)
+    if (taskDeadline) fd.append('deadline', taskDeadline)
+    await createDealTask(fd)
+    setTaskTitle(''); setTaskDeadline(''); setSaving(false)
+  }
+
+  async function handleToggleTask(taskId: string, isDone: boolean) {
+    const fd = new FormData(); fd.append('task_id', taskId); fd.append('is_done', String(isDone))
+    await toggleDealTask(fd)
+  }
+
+  async function handleDeleteTask(taskId: string) {
+    const fd = new FormData(); fd.append('task_id', taskId); await deleteDealTask(fd)
+  }
+
+  async function handleSearchClients(q: string) {
+    setClientSearch(q)
+    if (q.length < 2) { setClientResults([]); return }
+    const results = await searchClients(q)
+    setClientResults(results)
+  }
+
+  async function handleLinkClient(clientId: number) {
+    const fd = new FormData(); fd.append('deal_id', deal.id); fd.append('client_id', String(clientId))
+    await linkDealToClient(fd); setShowClientSearch(false); setClientSearch(''); setClientResults([])
+  }
+
+  async function handleUnlinkClient() {
+    const fd = new FormData(); fd.append('deal_id', deal.id); fd.append('client_id', '')
+    await linkDealToClient(fd)
+  }
+
+  const overdueTasks = tasks.filter((t: any) => !t.is_done && t.deadline && new Date(t.deadline) < new Date())
+
   const tabs = [
     { key: 'main', label: 'Основное' },
     { key: 'activity', label: `Активность (${activities.length})` },
+    { key: 'tasks', label: `Задачи${tasks.length > 0 ? ` (${tasks.filter((t: any) => !t.is_done).length})` : ''}` },
     { key: 'files', label: `Файлы${files.length > 0 ? ` (${files.length})` : ''}` },
     { key: 'messages', label: `Сообщения${messages.length > 0 ? ` (${messages.length})` : ''}` },
   ] as const
@@ -213,15 +258,36 @@ export function DealCard({ deal, stages, activities, salespersons, clientData, b
           )}
 
           {/* Linked client */}
-          {clientData && (
-            <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--bor2)' }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Клиент в CRM</div>
-              <div style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(52,199,89,.06)', border: '1px solid rgba(52,199,89,.15)', fontSize: 12 }}>
-                <span style={{ fontWeight: 700, color: 'var(--green)' }}>{clientData.name}</span>
-                <span style={{ marginLeft: 8, color: 'var(--muted)' }}>{clientData.country} {clientData.university ? `· ${clientData.university}` : ''}</span>
+          <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--bor2)' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Клиент в CRM</div>
+            {clientData ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ flex: 1, padding: '8px 12px', borderRadius: 8, background: 'rgba(52,199,89,.06)', border: '1px solid rgba(52,199,89,.15)', fontSize: 12 }}>
+                  <span style={{ fontWeight: 700, color: 'var(--green)' }}>{clientData.name}</span>
+                  <span style={{ marginLeft: 8, color: 'var(--muted)' }}>{clientData.country}</span>
+                </div>
+                <button onClick={handleUnlinkClient} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 12 }} title="Отвязать">×</button>
               </div>
-            </div>
-          )}
+            ) : (
+              <>
+                {showClientSearch ? (
+                  <div>
+                    <input value={clientSearch} onChange={e => handleSearchClients(e.target.value)} placeholder="Поиск по имени или телефону..." autoFocus
+                      style={{ width: '100%', padding: '7px 10px', border: '1px solid var(--bor2)', borderRadius: 8, fontSize: 12, fontFamily: 'inherit', outline: 'none', background: 'var(--bg)', marginBottom: 6 }} />
+                    {clientResults.map((c: any) => (
+                      <button key={c.id} onClick={() => handleLinkClient(c.id)}
+                        style={{ display: 'block', width: '100%', textAlign: 'left', padding: '6px 10px', borderRadius: 6, border: 'none', background: 'var(--surf2)', cursor: 'pointer', marginBottom: 4, fontFamily: 'inherit', fontSize: 12 }}>
+                        <span style={{ fontWeight: 600 }}>{c.name}</span> <span style={{ color: 'var(--muted)' }}>{c.phone}</span>
+                      </button>
+                    ))}
+                    <button onClick={() => { setShowClientSearch(false); setClientResults([]) }} style={{ fontSize: 11, color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer', marginTop: 4, fontFamily: 'inherit' }}>Отмена</button>
+                  </div>
+                ) : (
+                  <button onClick={() => setShowClientSearch(true)} className="btn-s" style={{ width: '100%', fontSize: 11 }}>Привязать клиента</button>
+                )}
+              </>
+            )}
+          </div>
 
           {/* Stage pipeline */}
           <div style={{ padding: '16px 20px' }}>
@@ -367,6 +433,55 @@ export function DealCard({ deal, stages, activities, salespersons, clientData, b
                     </div>
                   ))}
                   {activities.length === 0 && <div style={{ textAlign: 'center', color: 'var(--muted)', padding: 40, fontSize: 13 }}>Нет записей в активности</div>}
+                </div>
+              </div>
+            )}
+
+            {/* Задачи */}
+            {tab === 'tasks' && (
+              <div>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+                  <input value={taskTitle} onChange={e => setTaskTitle(e.target.value)} placeholder="Новая задача..."
+                    onKeyDown={e => e.key === 'Enter' && handleAddTask()}
+                    style={{ flex: 1, padding: '10px 14px', border: '1px solid var(--bor2)', borderRadius: 10, fontSize: 13, fontFamily: 'inherit', outline: 'none', background: 'var(--bg)' }} />
+                  <input type="datetime-local" value={taskDeadline} onChange={e => setTaskDeadline(e.target.value)}
+                    style={{ padding: '10px 12px', border: '1px solid var(--bor2)', borderRadius: 10, fontSize: 12, fontFamily: 'inherit', outline: 'none', background: 'var(--bg)' }} />
+                  <button onClick={handleAddTask} disabled={saving || !taskTitle.trim()} className="btn-p" style={{ padding: '10px 16px', fontSize: 12 }}>
+                    {saving ? '...' : 'Добавить'}
+                  </button>
+                </div>
+
+                {tasks.length === 0 && <div style={{ textAlign: 'center', color: 'var(--muted)', padding: 24, fontSize: 12 }}>Нет задач</div>}
+
+                <div style={{ display: 'grid', gap: 6 }}>
+                  {tasks.map((t: any) => {
+                    const isOverdue = !t.is_done && t.deadline && new Date(t.deadline) < new Date()
+                    return (
+                      <div key={t.id} style={{
+                        display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',
+                        borderRadius: 10, background: t.is_done ? 'rgba(52,199,89,.04)' : isOverdue ? 'rgba(255,59,48,.04)' : 'var(--surf)',
+                        border: `1px solid ${t.is_done ? 'rgba(52,199,89,.15)' : isOverdue ? 'rgba(255,59,48,.2)' : 'var(--bor)'}`,
+                      }}>
+                        <div onClick={() => handleToggleTask(t.id, t.is_done)} style={{
+                          width: 20, height: 20, borderRadius: 6, flexShrink: 0, cursor: 'pointer',
+                          background: t.is_done ? 'var(--green)' : 'transparent',
+                          border: t.is_done ? 'none' : '2px solid var(--bor2)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        }}>
+                          {t.is_done && <svg viewBox="0 0 9 7" fill="none" stroke="white" strokeWidth="2" width="10" height="10"><polyline points="1,3.5 3.5,6 8,1" /></svg>}
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: t.is_done ? 'var(--muted)' : 'var(--text)', textDecoration: t.is_done ? 'line-through' : 'none' }}>{t.title}</div>
+                          {t.deadline && (
+                            <div style={{ fontSize: 10, color: isOverdue ? 'var(--red)' : 'var(--muted)', fontWeight: isOverdue ? 700 : 400, marginTop: 2 }}>
+                              {isOverdue ? 'Просрочена: ' : 'До: '}{new Date(t.deadline).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                          )}
+                        </div>
+                        <button onClick={() => handleDeleteTask(t.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 14 }}>×</button>
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             )}

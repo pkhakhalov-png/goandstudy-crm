@@ -23,7 +23,7 @@ export default async function AdminFunnelPage() {
     { data: activities },
   ] = await Promise.all([
     supabase.from('pipeline_stages').select('*').eq('is_active', true).order('position'),
-    supabase.from('deals').select('*').order('updated_at', { ascending: false }),
+    supabase.from('deals').select('*').is('deleted_at', null).order('updated_at', { ascending: false }),
     supabase.from('users').select('id, name').eq('role', 'salesperson').eq('is_active', true).order('name'),
     supabase.from('deal_activities').select('id, deal_id, user_id, activity_type, content, metadata, created_at').order('created_at', { ascending: false }).limit(1000),
   ])
