@@ -26,15 +26,20 @@ const thStyle = {
 const periodLabel: Record<string,string> = { monthly:'Ежемесячно', quarterly:'Ежеквартально', yearly:'Ежегодно', once:'Разово' }
 const articleLabel: Record<string,string> = { office:'Офис', salary:'ЗП', software:'ПО/Подписки', marketing:'Маркетинг', other:'Прочее' }
 
-export function SettingsClient({ salespersons, curators, fixedExpenses }: {
+export function SettingsClient({ salespersons, curators, fixedExpenses, bookings }: {
   salespersons: Salesperson[]
   curators: Curator[]
   fixedExpenses: FixedExpense[]
+  bookings: any[]
 }) {
   const [newPassword, setNewPassword] = useState<string | null>(null)
   const [newPasswordName, setNewPasswordName] = useState<string | null>(null)
   const [editingCurator, setEditingCurator] = useState<string | null>(null)
   const [editingFixed, setEditingFixed] = useState<string | null>(null)
+  const [bookingFilter, setBookingFilter] = useState('')
+  const [bookingStatusFilter, setBookingStatusFilter] = useState('')
+  const [bookingSearch, setBookingSearch] = useState('')
+  const [settingsTab, setSettingsTab] = useState<'team' | 'expenses' | 'bookings'>('team')
 
   async function handleAddSalesperson(formData: FormData) {
     const result = await addSalesperson(formData)
@@ -47,7 +52,23 @@ export function SettingsClient({ salespersons, curators, fixedExpenses }: {
   }
 
   return (
-    <div style={{ padding: '24px 28px', maxWidth: 860 }}>
+    <div style={{ padding: '24px 28px', maxWidth: 960 }}>
+
+      {/* Подразделы */}
+      <div style={{ display: 'flex', gap: 0, marginBottom: 20, background: 'rgba(255,255,255,.55)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', border: '1px solid rgba(0,0,0,.07)', borderRadius: 14, overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,.05)' }}>
+        {([['team', 'Команда'], ['expenses', 'Постоянные расходы'], ['bookings', `Записи клиентов (${bookings.length})`]] as const).map(([key, label]) => (
+          <button key={key} onClick={() => setSettingsTab(key)}
+            style={{
+              flex: 1, padding: '12px 16px', fontSize: 13, fontWeight: settingsTab === key ? 700 : 500,
+              color: settingsTab === key ? 'var(--purple)' : '#8a8796',
+              background: settingsTab === key ? 'rgba(177,94,204,.06)' : 'transparent',
+              border: 'none', borderBottom: settingsTab === key ? '2.5px solid var(--purple)' : '2.5px solid transparent',
+              cursor: 'pointer', fontFamily: 'inherit', transition: 'all .15s',
+            }}>
+            {label}
+          </button>
+        ))}
+      </div>
 
       {/* Пароль баннер */}
       {newPassword && (
@@ -61,7 +82,7 @@ export function SettingsClient({ salespersons, curators, fixedExpenses }: {
       )}
 
       {/* Продажники */}
-      <div style={cardStyle}>
+      {settingsTab === 'team' && <div style={cardStyle}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(0,0,0,.07)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ fontSize: 13, fontWeight: 700 }}>Продажники</div>
           <div style={{ fontSize: 11, color: '#8a8796' }}>{salespersons.length} чел.</div>
@@ -104,10 +125,10 @@ export function SettingsClient({ salespersons, curators, fixedExpenses }: {
             {salespersons.length === 0 && <tr><td colSpan={4} style={{ padding: '20px', textAlign: 'center', fontSize: 12, color: '#8a8796' }}>Нет продажников</td></tr>}
           </tbody>
         </table>
-      </div>
+      </div>}
 
       {/* Кураторы */}
-      <div style={cardStyle}>
+      {settingsTab === 'team' && <div style={cardStyle}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(0,0,0,.07)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ fontSize: 13, fontWeight: 700 }}>Кураторы</div>
           <div style={{ fontSize: 11, color: '#8a8796' }}>{curators.length} чел.</div>
@@ -155,10 +176,10 @@ export function SettingsClient({ salespersons, curators, fixedExpenses }: {
             {curators.length === 0 && <tr><td colSpan={3} style={{ padding: '20px', textAlign: 'center', fontSize: 12, color: '#8a8796' }}>Нет кураторов</td></tr>}
           </tbody>
         </table>
-      </div>
+      </div>}
 
       {/* Фиксированные расходы */}
-      <div style={cardStyle}>
+      {settingsTab === 'expenses' && <div style={cardStyle}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(0,0,0,.07)' }}>
           <div style={{ fontSize: 13, fontWeight: 700 }}>Фиксированные расходы</div>
           <div style={{ fontSize: 11, color: '#8a8796', marginTop: 2 }}>Справочник статей — суммы вносятся в разделе Расходы по каждому месяцу</div>
@@ -260,7 +281,116 @@ export function SettingsClient({ salespersons, curators, fixedExpenses }: {
             {fixedExpenses.length === 0 && <tr><td colSpan={5} style={{ padding: '20px', textAlign: 'center', fontSize: 12, color: '#8a8796' }}>Нет статей</td></tr>}
           </tbody>
         </table>
-      </div>
+      </div>}
+
+      {/* ═══ ЗАПИСИ КЛИЕНТОВ ═══ */}
+      {settingsTab === 'bookings' && (() => {
+        const today = new Date().toISOString().split('T')[0]
+        const thisWeekStart = new Date()
+        thisWeekStart.setDate(thisWeekStart.getDate() - thisWeekStart.getDay() + 1)
+        const weekStr = thisWeekStart.toISOString().split('T')[0]
+        const monthStr = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-01`
+
+        const statusMap: Record<string, { label: string; cls: string }> = {
+          confirmed: { label: 'Подтверждена', cls: 'ps' },
+          completed: { label: 'Проведена', cls: 'pa' },
+          cancelled: { label: 'Отменена', cls: 'po' },
+          no_show: { label: 'Не пришёл', cls: 'po' },
+        }
+
+        const todayCount = bookings.filter(b => b.booking_date === today && b.status !== 'cancelled').length
+        const weekCount = bookings.filter(b => b.booking_date >= weekStr && b.booking_date <= today && b.status !== 'cancelled').length
+        const monthBookings = bookings.filter(b => b.booking_date >= monthStr)
+        const mCompleted = monthBookings.filter(b => b.status === 'completed').length
+        const mNoShow = monthBookings.filter(b => b.status === 'no_show').length
+        const mCancelled = monthBookings.filter(b => b.status === 'cancelled').length
+        const mTotal = monthBookings.length
+        const mConv = mTotal > 0 ? Math.round(mCompleted / mTotal * 100) : 0
+
+        const filtered = bookings.filter(b => {
+          if (bookingFilter && b.salesperson_id !== bookingFilter) return false
+          if (bookingStatusFilter && b.status !== bookingStatusFilter) return false
+          if (bookingSearch && !b.client_name.toLowerCase().includes(bookingSearch.toLowerCase()) && !b.client_phone.includes(bookingSearch)) return false
+          return true
+        })
+
+        return <>
+          <div style={{ ...cardStyle }}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(0,0,0,.07)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#14121e' }}>Записи клиентов</div>
+              <div style={{ display: 'flex', gap: 12, fontSize: 11 }}>
+                <span>Сегодня: <b style={{ color: 'var(--gold)' }}>{todayCount}</b></span>
+                <span>Неделя: <b>{weekCount}</b></span>
+                <span>Месяц: <b style={{ color: 'var(--green)' }}>{mCompleted}</b> проведено, <b style={{ color: 'var(--gold)' }}>{mNoShow}</b> нп, <b style={{ color: 'var(--red)' }}>{mCancelled}</b> отм</span>
+                <span>Конверсия: <b style={{ color: mConv >= 70 ? 'var(--green)' : mConv >= 40 ? 'var(--gold)' : 'var(--red)' }}>{mConv}%</b></span>
+              </div>
+            </div>
+
+            <div style={{ padding: '10px 20px', borderBottom: '1px solid rgba(0,0,0,.05)', display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+              <select value={bookingFilter} onChange={e => setBookingFilter(e.target.value)} style={{ ...inputStyle, flex: 'none', width: 160 }}>
+                <option value="">Все продажники</option>
+                {salespersons.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+              <select value={bookingStatusFilter} onChange={e => setBookingStatusFilter(e.target.value)} style={{ ...inputStyle, flex: 'none', width: 140 }}>
+                <option value="">Все статусы</option>
+                <option value="confirmed">Подтверждена</option>
+                <option value="completed">Проведена</option>
+                <option value="no_show">Не пришёл</option>
+                <option value="cancelled">Отменена</option>
+              </select>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, ...inputStyle, flex: 'none', width: 200 }}>
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="#8a8796" strokeWidth="1.6"><circle cx="7" cy="7" r="5"/><line x1="11" y1="11" x2="14" y2="14"/></svg>
+                <input placeholder="Имя или телефон..." value={bookingSearch} onChange={e => setBookingSearch(e.target.value)}
+                  style={{ background: 'transparent', border: 'none', outline: 'none', fontSize: 12, color: '#14121e', width: '100%', fontFamily: 'inherit' }} />
+              </div>
+              <span style={{ fontSize: 11, color: '#8a8796', marginLeft: 'auto' }}>{filtered.length} записей</span>
+            </div>
+
+            <div style={{ maxHeight: 400, overflowY: 'auto' }}>
+              <table>
+                <thead>
+                  <tr>
+                    <th style={thStyle}>Дата / Время</th>
+                    <th style={thStyle}>Клиент</th>
+                    <th style={thStyle}>Телефон</th>
+                    <th style={thStyle}>Telegram</th>
+                    <th style={thStyle}>Продажник</th>
+                    <th style={thStyle}>Статус</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.slice(0, 100).map((b: any) => {
+                    const sp = salespersons.find(s => s.id === b.salesperson_id)
+                    const st = statusMap[b.status] || { label: b.status, cls: 'pw' }
+                    const isToday = b.booking_date === today
+                    return (
+                      <tr key={b.id} style={{ background: isToday ? 'rgba(255,149,0,.04)' : 'transparent' }}>
+                        <td style={{ fontSize: 12, whiteSpace: 'nowrap' }}>
+                          <span style={{ fontWeight: isToday ? 700 : 500, color: isToday ? 'var(--gold)' : 'var(--text)' }}>
+                            {new Date(b.booking_date + 'T00:00:00').toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
+                          </span>
+                          <span style={{ color: '#8a8796', marginLeft: 6 }}>{b.start_time.slice(0, 5)}</span>
+                        </td>
+                        <td style={{ fontSize: 13, fontWeight: 600 }}>{b.client_name}</td>
+                        <td><a href={'tel:' + b.client_phone} style={{ fontSize: 12, color: 'var(--purple)', textDecoration: 'none', fontWeight: 600 }}>{b.client_phone}</a></td>
+                        <td>
+                          {b.client_telegram
+                            ? <a href={'https://t.me/' + b.client_telegram.replace('@', '')} target="_blank" rel="noopener" style={{ fontSize: 12, color: 'var(--purple)', textDecoration: 'none' }}>{b.client_telegram}</a>
+                            : <span style={{ color: '#8a8796' }}>—</span>}
+                        </td>
+                        <td><span className="stag">{sp?.name ?? '—'}</span></td>
+                        <td><span className={'pill ' + st.cls}><span className="dot"></span>{st.label}</span></td>
+                      </tr>
+                    )
+                  })}
+                  {filtered.length === 0 && <tr><td colSpan={6} style={{ padding: 20, textAlign: 'center', fontSize: 12, color: '#8a8796' }}>Нет записей</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      })()}
     </div>
   )
+
 }

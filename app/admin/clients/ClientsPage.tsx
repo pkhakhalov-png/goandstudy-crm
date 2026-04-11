@@ -36,12 +36,17 @@ export function ClientsPage({ clients, salespersons, curators }: Props) {
   const [filterSalesperson, setFilterSalesperson] = useState('')
   const [filterCurator, setFilterCurator] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
+  const [filterPayment, setFilterPayment] = useState('')
+  const [drawerTab, setDrawerTab] = useState<'info' | 'payments' | 'expenses' | 'invoices'>('info')
 
   const filtered = clients.filter(c => {
-    if (search && !c.name.toLowerCase().includes(search.toLowerCase())) return false
+    if (search && !c.name.toLowerCase().includes(search.toLowerCase()) && !c.phone?.includes(search) && !c.email?.toLowerCase().includes(search.toLowerCase())) return false
     if (filterSalesperson && c.salesperson?.id !== filterSalesperson) return false
     if (filterCurator && c.curator?.id !== filterCurator) return false
     if (filterStatus && c.status !== filterStatus) return false
+    if (filterPayment === 'overdue' && !c.payments?.some((p: any) => p.status === 'overdue')) return false
+    if (filterPayment === 'soon' && !c.payments?.some((p: any) => { const d = new Date(p.plan_date); const now = new Date(); const in7 = new Date(); in7.setDate(now.getDate() + 7); return !p.is_paid && d >= now && d <= in7 })) return false
+    if (filterPayment === 'clean' && c.payments?.some((p: any) => p.status === 'overdue')) return false
     return true
   })
 
@@ -74,115 +79,190 @@ export function ClientsPage({ clients, salespersons, curators }: Props) {
       {/* Drawer */}
       <div style={{
         position: 'fixed', top: 0, right: 0, bottom: 0,
-        width: 320,
+        width: 400,
         background: 'rgba(255,255,255,.55)', backdropFilter: 'blur(20px) saturate(180%)', WebkitBackdropFilter: 'blur(20px) saturate(180%)',
         boxShadow: '-4px 0 24px rgba(0,0,0,.12)',
         zIndex: 50,
         transform: sel ? 'translateX(0)' : 'translateX(100%)',
         transition: 'transform 0.25s cubic-bezier(.4,0,.2,1)',
         display: 'flex', flexDirection: 'column',
-        overflowY: 'auto',
       }}>
-        {sel && (
-          <>
-            <div style={{
-              padding: '18px 20px 14px',
-              borderBottom: '1px solid rgba(0,0,0,.07)',
-              display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8
-            }}>
+        {sel && (() => {
+          const selExpenses = sel.expenses ?? []
+          const selInvoices = sel.invoices ?? []
+          const expTotal = selExpenses.reduce((s: number, e: any) => s + Number(e.plan_sum), 0)
+          const expPaid = selExpenses.filter((e: any) => e.is_paid).reduce((s: number, e: any) => s + Number(e.fact_sum || e.plan_sum), 0)
+          const nextPayment = selPayments.filter((p: any) => !p.is_paid).sort((a: any, b: any) => a.plan_date.localeCompare(b.plan_date))[0]
+          const statusMap: Record<string, { label: string; cls: string }> = { CONFIRMED: { label: 'Оплачен', cls: 'pa' }, NEW: { label: 'Новый', cls: 'pw' }, REJECTED: { label: 'Отклонён', cls: 'po' }, CANCELED: { label: 'Отменён', cls: 'po' }, DEADLINE_EXPIRED: { label: 'Истёк', cls: 'po' } }
+
+          return <>
+            {/* Header */}
+            <div style={{ padding: '18px 20px 14px', borderBottom: '1px solid var(--bor2)', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
               <div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: '#14121e' }}>{sel.name}</div>
-                <div style={{ fontSize: 12, color: '#8a8796', marginTop: 2 }}>
+                <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>{sel.name}</div>
+                <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
                   {sel.country}{sel.university ? ` · ${sel.university}` : ''}
                 </div>
+                {nextPayment && (
+                  <div style={{ marginTop: 8, padding: '6px 10px', borderRadius: 8, background: nextPayment.status === 'overdue' ? 'rgba(255,59,48,.08)' : 'rgba(255,149,0,.08)', border: `1px solid ${nextPayment.status === 'overdue' ? 'rgba(255,59,48,.2)' : 'rgba(255,149,0,.2)'}`, fontSize: 11, fontWeight: 600 }}>
+                    <span style={{ color: nextPayment.status === 'overdue' ? 'var(--red)' : 'var(--gold)' }}>
+                      {nextPayment.status === 'overdue' ? 'Просрочен' : 'Следующий'}: {new Date(nextPayment.plan_date).toLocaleDateString('ru-RU')} · {Number(nextPayment.plan_sum).toLocaleString('ru')} ₽
+                    </span>
+                  </div>
+                )}
               </div>
-              <button
-                onClick={() => setSelected(null)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: '#8a8796', padding: '0 4px', lineHeight: 1 }}
-              >×</button>
+              <button onClick={() => setSelected(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: 'var(--muted)', padding: '0 4px', lineHeight: 1 }}>×</button>
             </div>
 
-            <div style={{ padding: '14px 20px', flex: 1 }}>
-              {sel.phone && <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(0,0,0,.06)', fontSize: 12 }}>
-                <span style={{ color: '#8a8796' }}>Телефон</span><span style={{ fontWeight: 600 }}>{sel.phone}</span>
-              </div>}
-              {sel.email && <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(0,0,0,.06)', fontSize: 12 }}>
-                <span style={{ color: '#8a8796' }}>Email</span><span style={{ fontWeight: 600 }}>{sel.email}</span>
-              </div>}
-              {sel.telegram && <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(0,0,0,.06)', fontSize: 12 }}>
-                <span style={{ color: '#8a8796' }}>Telegram</span><span style={{ fontWeight: 600 }}>{sel.telegram}</span>
-              </div>}
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(0,0,0,.06)', fontSize: 12 }}>
-                <span style={{ color: '#8a8796' }}>Продажник</span>
-                <span style={{ fontWeight: 600, color: '#16a361' }}>{sel.salesperson?.name ?? '—'}</span>
+            {/* Mini stats */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, padding: '12px 20px', borderBottom: '1px solid var(--bor2)' }}>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{selTotalSum.toLocaleString('ru')} ₽</div>
+                <div style={{ fontSize: 9, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 600 }}>Договор</div>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(0,0,0,.06)', fontSize: 12 }}>
-                <span style={{ color: '#8a8796' }}>Куратор</span>
-                <span style={{ fontWeight: 600, color: '#B15ECC' }}>{sel.curator?.name ?? '—'}</span>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--green)' }}>{selPaidSum.toLocaleString('ru')} ₽</div>
+                <div style={{ fontSize: 9, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 600 }}>Оплачено</div>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(0,0,0,.06)', fontSize: 12 }}>
-                <span style={{ color: '#8a8796' }}>Договор</span>
-                <span style={{ fontWeight: 600 }}>{selTotalSum.toLocaleString('ru')} ₽</span>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: selDebt > 0 ? 'var(--gold)' : 'var(--green)' }}>{selDebt.toLocaleString('ru')} ₽</div>
+                <div style={{ fontSize: 9, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 600 }}>Остаток</div>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(0,0,0,.06)', fontSize: 12 }}>
-                <span style={{ color: '#8a8796' }}>Рассрочка</span>
-                <span style={{ fontWeight: 600 }}>{sel.months} мес.</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(0,0,0,.06)', fontSize: 12 }}>
-                <span style={{ color: '#8a8796' }}>Оплачено</span>
-                <span style={{ fontWeight: 600, color: '#16a361' }}>{selPaidSum.toLocaleString('ru')} ₽</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(0,0,0,.06)', fontSize: 12 }}>
-                <span style={{ color: '#8a8796' }}>Остаток</span>
-                <span style={{ fontWeight: 600, color: '#c97d00' }}>{selDebt.toLocaleString('ru')} ₽</span>
-              </div>
+            </div>
 
-              <div style={{ margin: '14px 0 2px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#8a8796', marginBottom: 5, fontWeight: 500 }}>
-                  <span>Прогресс</span><span>{selPct}%</span>
-                </div>
-                <div style={{ height: 6, background: 'rgba(0,0,0,.08)', borderRadius: 20, overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${selPct}%`, background: 'linear-gradient(90deg,#B15ECC,#d47aff)', borderRadius: 20 }} />
-                </div>
+            {/* Progress bar */}
+            <div style={{ padding: '8px 20px', borderBottom: '1px solid var(--bor2)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--muted)', marginBottom: 4, fontWeight: 600 }}>
+                <span>Прогресс оплаты</span><span style={{ color: 'var(--purple)' }}>{selPct}%</span>
               </div>
+              <div style={{ height: 5, background: 'rgba(0,0,0,.06)', borderRadius: 20, overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${selPct}%`, background: 'linear-gradient(90deg,var(--purple),#d47aff)', borderRadius: 20 }} />
+              </div>
+            </div>
 
-              <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#b8b5c4', fontWeight: 600, margin: '18px 0 10px' }}>
-                График платежей
-              </div>
-              {selPayments.map((p: any) => (
-                <div key={p.id} style={{
-                  display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px',
-                  borderRadius: 9, marginBottom: 5,
-                  border: `1px solid ${p.status==='paid'?'rgba(22,163,97,.2)':p.status==='overdue'?'rgba(220,53,69,.2)':p.status==='soon'?'rgba(201,125,0,.2)':'rgba(0,0,0,.07)'}`,
-                  background: p.status==='paid'?'rgba(22,163,97,.05)':p.status==='overdue'?'rgba(220,53,69,.05)':p.status==='soon'?'rgba(201,125,0,.05)':'#F9F8FC'
-                }}>
-                  <div style={{ fontSize: 10, color: '#8a8796', width: 14, fontWeight: 700 }}>{p.num}</div>
-                  <div style={{
-                    fontSize: 11, flex: 1,
-                    color: p.status==='overdue'?'#dc3545':p.status==='soon'?'#c97d00':'#8a8796',
-                    fontWeight: (p.status==='overdue'||p.status==='soon') ? 600 : 400
-                  }}>
-                    {new Date(p.plan_date).toLocaleDateString('ru-RU')}
-                  </div>
-                  <div style={{
-                    fontSize: 11, fontWeight: 700, fontVariantNumeric: 'tabular-nums',
-                    color: p.status==='paid'?'#16a361':p.status==='overdue'?'#dc3545':p.status==='soon'?'#c97d00':'#8a8796'
-                  }}>
-                    {Number(p.plan_sum).toLocaleString('ru')} ₽
-                  </div>
-                  <div style={{
-                    width: 16, height: 16, borderRadius: 5, flexShrink: 0,
-                    background: p.is_paid ? '#16a361' : 'transparent',
-                    border: p.is_paid ? 'none' : '1.5px solid rgba(0,0,0,.12)',
-                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center'
-                  }}>
-                    {p.is_paid && <svg viewBox="0 0 9 7" fill="none" stroke="white" strokeWidth="2" width="9" height="9"><polyline points="1,3.5 3.5,6 8,1"/></svg>}
-                  </div>
-                </div>
+            {/* Tabs */}
+            <div style={{ display: 'flex', borderBottom: '1px solid var(--bor2)', padding: '0 20px' }}>
+              {([['info', 'Инфо'], ['payments', `Платежи (${selPayments.length})`], ['expenses', `Расходы (${selExpenses.length})`], ['invoices', `Счета (${selInvoices.length})`]] as const).map(([key, label]) => (
+                <button key={key} onClick={() => setDrawerTab(key)}
+                  style={{ padding: '10px 12px', fontSize: 11, fontWeight: drawerTab === key ? 700 : 500, color: drawerTab === key ? 'var(--purple)' : 'var(--muted)', background: 'none', border: 'none', borderBottom: drawerTab === key ? '2px solid var(--purple)' : '2px solid transparent', cursor: 'pointer', fontFamily: 'inherit' }}>
+                  {label}
+                </button>
               ))}
             </div>
+
+            {/* Tab content */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '14px 20px' }}>
+
+              {/* Info tab */}
+              {drawerTab === 'info' && <>
+                {sel.phone && <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(0,0,0,.04)', fontSize: 12 }}>
+                  <span style={{ color: 'var(--muted)' }}>Телефон</span>
+                  <a href={`tel:${sel.phone}`} style={{ fontWeight: 600, color: 'var(--purple)', textDecoration: 'none' }}>{sel.phone}</a>
+                </div>}
+                {sel.email && <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(0,0,0,.04)', fontSize: 12 }}>
+                  <span style={{ color: 'var(--muted)' }}>Email</span>
+                  <a href={`mailto:${sel.email}`} style={{ fontWeight: 600, color: 'var(--purple)', textDecoration: 'none' }}>{sel.email}</a>
+                </div>}
+                {sel.telegram && <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(0,0,0,.04)', fontSize: 12 }}>
+                  <span style={{ color: 'var(--muted)' }}>Telegram</span>
+                  <a href={`https://t.me/${sel.telegram.replace('@', '')}`} target="_blank" rel="noopener" style={{ fontWeight: 600, color: 'var(--purple)', textDecoration: 'none' }}>{sel.telegram}</a>
+                </div>}
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(0,0,0,.04)', fontSize: 12 }}>
+                  <span style={{ color: 'var(--muted)' }}>Продажник</span>
+                  <span className="stag">{sel.salesperson?.name ?? '—'}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(0,0,0,.04)', fontSize: 12 }}>
+                  <span style={{ color: 'var(--muted)' }}>Куратор</span>
+                  <span className="ctag">{sel.curator?.name ?? '—'}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(0,0,0,.04)', fontSize: 12 }}>
+                  <span style={{ color: 'var(--muted)' }}>Рассрочка</span>
+                  <span style={{ fontWeight: 600 }}>{sel.months} мес.</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(0,0,0,.04)', fontSize: 12 }}>
+                  <span style={{ color: 'var(--muted)' }}>Добавлен</span>
+                  <span style={{ fontWeight: 500, color: 'var(--muted)' }}>{new Date(sel.created_at).toLocaleDateString('ru-RU')}</span>
+                </div>
+                {selExpenses.length > 0 && <>
+                  <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--muted2)', fontWeight: 700, margin: '16px 0 6px' }}>Расходы по клиенту</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: 12 }}>
+                    <span style={{ color: 'var(--muted)' }}>Всего расходов</span>
+                    <span style={{ fontWeight: 600, color: 'var(--red)' }}>{expTotal.toLocaleString('ru')} ₽</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: 12 }}>
+                    <span style={{ color: 'var(--muted)' }}>Оплачено</span>
+                    <span style={{ fontWeight: 600 }}>{expPaid.toLocaleString('ru')} ₽</span>
+                  </div>
+                </>}
+              </>}
+
+              {/* Payments tab */}
+              {drawerTab === 'payments' && <>
+                {selPayments.map((p: any) => (
+                  <div key={p.id} style={{
+                    display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
+                    borderRadius: 9, marginBottom: 5,
+                    border: `1px solid ${p.status === 'paid' ? 'rgba(22,163,97,.2)' : p.status === 'overdue' ? 'rgba(220,53,69,.2)' : p.status === 'soon' ? 'rgba(201,125,0,.2)' : 'var(--bor2)'}`,
+                    background: p.status === 'paid' ? 'rgba(22,163,97,.05)' : p.status === 'overdue' ? 'rgba(220,53,69,.05)' : p.status === 'soon' ? 'rgba(201,125,0,.05)' : 'var(--surf2)'
+                  }}>
+                    <div style={{ fontSize: 10, color: 'var(--muted)', width: 14, fontWeight: 700 }}>{p.num}</div>
+                    <div style={{ fontSize: 11, flex: 1, color: p.status === 'overdue' ? 'var(--red)' : p.status === 'soon' ? 'var(--gold)' : 'var(--muted)', fontWeight: (p.status === 'overdue' || p.status === 'soon') ? 600 : 400 }}>
+                      {new Date(p.plan_date).toLocaleDateString('ru-RU')}
+                    </div>
+                    <div style={{ fontSize: 11, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: p.status === 'paid' ? 'var(--green)' : p.status === 'overdue' ? 'var(--red)' : p.status === 'soon' ? 'var(--gold)' : 'var(--muted)' }}>
+                      {Number(p.plan_sum).toLocaleString('ru')} ₽
+                    </div>
+                    <div style={{ width: 16, height: 16, borderRadius: 5, flexShrink: 0, background: p.is_paid ? 'var(--green)' : 'transparent', border: p.is_paid ? 'none' : '1.5px solid var(--bor2)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {p.is_paid && <svg viewBox="0 0 9 7" fill="none" stroke="white" strokeWidth="2" width="9" height="9"><polyline points="1,3.5 3.5,6 8,1" /></svg>}
+                    </div>
+                  </div>
+                ))}
+                {selPayments.length === 0 && <div style={{ textAlign: 'center', color: 'var(--muted)', padding: 24, fontSize: 12 }}>Нет платежей</div>}
+              </>}
+
+              {/* Expenses tab */}
+              {drawerTab === 'expenses' && <>
+                {selExpenses.map((e: any) => (
+                  <div key={e.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', borderRadius: 9, marginBottom: 5, border: '1px solid var(--bor2)', background: 'var(--surf2)' }}>
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text)' }}>{e.article}</div>
+                      {e.plan_date && <div style={{ fontSize: 10, color: 'var(--muted)' }}>{new Date(e.plan_date).toLocaleDateString('ru-RU')}</div>}
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: e.is_paid ? 'var(--green)' : 'var(--muted)' }}>{Number(e.plan_sum).toLocaleString('ru')} ₽</div>
+                      <span className={`pill ${e.is_paid ? 'pa' : 'pw'}`} style={{ fontSize: 9 }}><span className="dot"></span>{e.is_paid ? 'Оплачен' : 'Ожидает'}</span>
+                    </div>
+                  </div>
+                ))}
+                {selExpenses.length === 0 && <div style={{ textAlign: 'center', color: 'var(--muted)', padding: 24, fontSize: 12 }}>Нет расходов</div>}
+              </>}
+
+              {/* Invoices tab */}
+              {drawerTab === 'invoices' && <>
+                {selInvoices.map((inv: any) => {
+                  const st = statusMap[inv.status] || { label: inv.status, cls: 'pw' }
+                  return (
+                    <div key={inv.id} style={{ padding: '10px 12px', borderRadius: 9, marginBottom: 5, border: '1px solid var(--bor2)', background: 'var(--surf2)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>{Number(inv.amount).toLocaleString('ru')} ₽</span>
+                        <span className={`pill ${st.cls}`} style={{ fontSize: 9 }}><span className="dot"></span>{st.label}</span>
+                      </div>
+                      <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 4 }}>{inv.description}</div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: 10, color: 'var(--muted)' }}>{new Date(inv.created_at).toLocaleDateString('ru-RU')}</span>
+                        {inv.payment_url && <a href={inv.payment_url} target="_blank" rel="noopener" style={{ fontSize: 10, color: 'var(--purple)', fontWeight: 600, textDecoration: 'none' }}>Ссылка на оплату →</a>}
+                      </div>
+                    </div>
+                  )
+                })}
+                {selInvoices.length === 0 && <div style={{ textAlign: 'center', color: 'var(--muted)', padding: 24, fontSize: 12 }}>Нет счетов</div>}
+                <Link href="/admin/invoices" style={{ display: 'block', textAlign: 'center', marginTop: 8, padding: '9px', background: 'var(--pl)', border: '1px solid var(--pb)', borderRadius: 10, fontSize: 12, fontWeight: 600, color: 'var(--purple)', textDecoration: 'none' }}>
+                  Выставить счёт →
+                </Link>
+              </>}
+            </div>
           </>
-        )}
+        })()}
       </div>
 
       {/* KPI */}
@@ -238,13 +318,21 @@ export function ClientsPage({ clients, salespersons, curators }: Props) {
               <option value="">Все кураторы</option>
               {curators.map((c:any) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
+            <button onClick={() => setFilterPayment(filterPayment === 'overdue' ? '' : 'overdue')}
+              style={{ padding: '5px 11px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer', border: `1px solid ${filterPayment === 'overdue' ? 'rgba(220,53,69,.25)' : 'var(--bor2)'}`, background: filterPayment === 'overdue' ? 'rgba(220,53,69,.08)' : 'var(--surf)', color: filterPayment === 'overdue' ? 'var(--red)' : 'var(--muted)', fontFamily: 'inherit' }}>
+              Просрочка
+            </button>
+            <button onClick={() => setFilterPayment(filterPayment === 'soon' ? '' : 'soon')}
+              style={{ padding: '5px 11px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer', border: `1px solid ${filterPayment === 'soon' ? 'rgba(201,125,0,.25)' : 'var(--bor2)'}`, background: filterPayment === 'soon' ? 'rgba(201,125,0,.08)' : 'var(--surf)', color: filterPayment === 'soon' ? 'var(--gold)' : 'var(--muted)', fontFamily: 'inherit' }}>
+              Скоро
+            </button>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,.55)', backdropFilter: 'blur(20px) saturate(180%)', WebkitBackdropFilter: 'blur(20px) saturate(180%)', border: '1px solid rgba(0,0,0,.12)', borderRadius: 9, padding: '7px 13px' }}>
               <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="#8a8796" strokeWidth="1.6"><circle cx="7" cy="7" r="5"/><line x1="11" y1="11" x2="14" y2="14"/></svg>
               <input
-                placeholder="Найти клиента..."
+                placeholder="Имя, телефон, email..."
                 value={search}
                 onChange={e=>setSearch(e.target.value)}
-                style={{ background: 'transparent', border: 'none', outline: 'none', fontSize: 13, color: '#14121e', width: 160, fontFamily: 'inherit' }}
+                style={{ background: 'transparent', border: 'none', outline: 'none', fontSize: 13, color: 'var(--text)', width: 170, fontFamily: 'inherit' }}
               />
             </div>
           </div>

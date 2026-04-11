@@ -1,0 +1,479 @@
+'use client'
+
+import { useState } from 'react'
+import Link from 'next/link'
+import { moveDeal, addDealNote, updateDeal } from '../actions'
+import { uploadDealFile, deleteDealFile } from './fileActions'
+
+interface Stage { id: string; name: string; color: string; position: number; stage_type: string }
+
+interface Props {
+  deal: any
+  stages: Stage[]
+  activities: any[]
+  salespersons: { id: string; name: string }[]
+  clientData: any
+  bookingData: any
+  files: any[]
+  messages: any[]
+  userId: string
+}
+
+const fileIcon: Record<string, string> = {
+  'application/pdf': '📄',
+  'image/png': '🖼️', 'image/jpeg': '🖼️', 'image/webp': '🖼️',
+  'application/msword': '📝', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '📝',
+  'application/vnd.ms-excel': '📊', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '📊',
+}
+
+function formatSize(bytes: number) {
+  if (bytes < 1024) return bytes + ' Б'
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' КБ'
+  return (bytes / 1024 / 1024).toFixed(1) + ' МБ'
+}
+
+const sourceLabel: Record<string, string> = { manual: 'Вручную', booking: 'Запись с сайта', website: 'Сайт', telegram: 'Telegram' }
+const activityIcon: Record<string, string> = { note: '📝', stage_change: '→', system: '⚙️', call: '📞', message: '💬', file_upload: '📎', task_done: '✅' }
+
+export function DealCard({ deal, stages, activities, salespersons, clientData, bookingData, files, messages, userId }: Props) {
+  const [tab, setTab] = useState<'main' | 'activity' | 'files' | 'messages'>('main')
+  const [noteText, setNoteText] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [uploading, setUploading] = useState(false)
+
+  const currentStage = stages.find(s => s.id === deal.stage_id)
+  const sp = salespersons.find(s => s.id === deal.salesperson_id)
+
+  async function handleMove(stageId: string) {
+    const newStage = stages.find(s => s.id === stageId)
+    const fd = new FormData()
+    fd.append('deal_id', deal.id)
+    fd.append('stage_id', stageId)
+    fd.append('old_stage_name', currentStage?.name || '')
+    fd.append('new_stage_name', newStage?.name || '')
+    await moveDeal(fd)
+  }
+
+  async function handleAddNote() {
+    if (!noteText.trim()) return
+    setSaving(true)
+    const fd = new FormData()
+    fd.append('deal_id', deal.id)
+    fd.append('content', noteText)
+    await addDealNote(fd)
+    setNoteText('')
+    setSaving(false)
+  }
+
+  async function handleSaveEdit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    setSaving(true)
+    const fd = new FormData(e.currentTarget)
+    fd.append('deal_id', deal.id)
+    await updateDeal(fd)
+    setSaving(false)
+    setEditing(false)
+  }
+
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    const fd = new FormData()
+    fd.append('deal_id', deal.id)
+    fd.append('file', file)
+    await uploadDealFile(fd)
+    setUploading(false)
+    e.target.value = ''
+  }
+
+  async function handleDeleteFile(fileId: string) {
+    const fd = new FormData()
+    fd.append('file_id', fileId)
+    fd.append('deal_id', deal.id)
+    await deleteDealFile(fd)
+  }
+
+  const tabs = [
+    { key: 'main', label: 'Основное' },
+    { key: 'activity', label: `Активность (${activities.length})` },
+    { key: 'files', label: `Файлы${files.length > 0 ? ` (${files.length})` : ''}` },
+    { key: 'messages', label: `Сообщения${messages.length > 0 ? ` (${messages.length})` : ''}` },
+  ] as const
+
+  return (
+    <div className="main" style={{ display: 'flex', flexDirection: 'column' }}>
+      {/* Top bar */}
+      <div className="topbar" style={{ gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <Link href="/admin/funnel" style={{ color: 'var(--muted)', textDecoration: 'none', fontSize: 13 }}>← Воронка</Link>
+          <span style={{ color: 'var(--bor2)' }}>/</span>
+          <span className="pt">{deal.title}</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ padding: '4px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700, color: currentStage?.color, background: currentStage?.color + '15', border: `1px solid ${currentStage?.color}30` }}>
+            {currentStage?.name}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+        {/* Left panel — deal info */}
+        <div style={{ width: 340, minWidth: 340, borderRight: '1px solid var(--bor2)', display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+
+          {/* Contact header */}
+          <div style={{ padding: '20px', borderBottom: '1px solid var(--bor2)' }}>
+            <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>{deal.contact_name}</div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+              {deal.contact_phone && (
+                <a href={`tel:${deal.contact_phone}`} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', borderRadius: 8, background: 'rgba(177,94,204,.06)', border: '1px solid rgba(177,94,204,.15)', color: 'var(--purple)', textDecoration: 'none', fontSize: 12, fontWeight: 600 }}>
+                  📞 {deal.contact_phone}
+                </a>
+              )}
+              {deal.contact_telegram && (
+                <a href={`https://t.me/${deal.contact_telegram.replace('@', '')}`} target="_blank" rel="noopener" style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', borderRadius: 8, background: 'rgba(0,136,204,.06)', border: '1px solid rgba(0,136,204,.15)', color: '#0088cc', textDecoration: 'none', fontSize: 12, fontWeight: 600 }}>
+                  TG {deal.contact_telegram}
+                </a>
+              )}
+              {deal.contact_whatsapp && (
+                <a href={`https://wa.me/${deal.contact_whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noopener" style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', borderRadius: 8, background: 'rgba(37,211,102,.06)', border: '1px solid rgba(37,211,102,.15)', color: '#25d366', textDecoration: 'none', fontSize: 12, fontWeight: 600 }}>
+                  WA {deal.contact_whatsapp}
+                </a>
+              )}
+              {deal.contact_email && (
+                <a href={`mailto:${deal.contact_email}`} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', borderRadius: 8, background: 'rgba(0,0,0,.03)', border: '1px solid var(--bor2)', color: 'var(--muted)', textDecoration: 'none', fontSize: 12, fontWeight: 600 }}>
+                  ✉️ {deal.contact_email}
+                </a>
+              )}
+            </div>
+          </div>
+
+          {/* Details */}
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--bor2)' }}>
+            <div style={{ display: 'grid', gap: 8, fontSize: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--muted)' }}>Менеджер</span>
+                <span className="stag">{sp?.name ?? '—'}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--muted)' }}>Бюджет</span>
+                <span style={{ fontWeight: 700, color: 'var(--text)', fontSize: 14 }}>{Number(deal.budget).toLocaleString('ru')} ₽</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--muted)' }}>Источник</span>
+                <span>{sourceLabel[deal.source] || deal.source}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--muted)' }}>Создана</span>
+                <span>{new Date(deal.created_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--muted)' }}>Обновлена</span>
+                <span>{new Date(deal.updated_at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+              </div>
+            </div>
+
+            {!editing && (
+              <button onClick={() => setEditing(true)} className="btn-s" style={{ width: '100%', marginTop: 12, fontSize: 11 }}>Редактировать</button>
+            )}
+
+            {editing && (
+              <form onSubmit={handleSaveEdit} style={{ marginTop: 12, display: 'grid', gap: 8 }}>
+                <input name="title" defaultValue={deal.title} placeholder="Название" style={{ padding: '7px 10px', border: '1px solid var(--bor2)', borderRadius: 8, fontSize: 12, fontFamily: 'inherit', outline: 'none', background: 'var(--bg)' }} />
+                <input name="contact_name" defaultValue={deal.contact_name} placeholder="Имя контакта" style={{ padding: '7px 10px', border: '1px solid var(--bor2)', borderRadius: 8, fontSize: 12, fontFamily: 'inherit', outline: 'none', background: 'var(--bg)' }} />
+                <input name="contact_phone" defaultValue={deal.contact_phone || ''} placeholder="Телефон" style={{ padding: '7px 10px', border: '1px solid var(--bor2)', borderRadius: 8, fontSize: 12, fontFamily: 'inherit', outline: 'none', background: 'var(--bg)' }} />
+                <input name="contact_telegram" defaultValue={deal.contact_telegram || ''} placeholder="Telegram" style={{ padding: '7px 10px', border: '1px solid var(--bor2)', borderRadius: 8, fontSize: 12, fontFamily: 'inherit', outline: 'none', background: 'var(--bg)' }} />
+                <input name="contact_whatsapp" defaultValue={deal.contact_whatsapp || ''} placeholder="WhatsApp" style={{ padding: '7px 10px', border: '1px solid var(--bor2)', borderRadius: 8, fontSize: 12, fontFamily: 'inherit', outline: 'none', background: 'var(--bg)' }} />
+                <input name="contact_email" defaultValue={deal.contact_email || ''} placeholder="Email" style={{ padding: '7px 10px', border: '1px solid var(--bor2)', borderRadius: 8, fontSize: 12, fontFamily: 'inherit', outline: 'none', background: 'var(--bg)' }} />
+                <input name="budget" type="number" defaultValue={deal.budget} placeholder="Бюджет" style={{ padding: '7px 10px', border: '1px solid var(--bor2)', borderRadius: 8, fontSize: 12, fontFamily: 'inherit', outline: 'none', background: 'var(--bg)' }} />
+                <select name="salesperson_id" defaultValue={deal.salesperson_id} className="si" style={{ padding: '7px 10px', fontSize: 12 }}>
+                  {salespersons.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button type="submit" disabled={saving} className="btn-p" style={{ flex: 1, fontSize: 11, padding: '7px' }}>{saving ? '...' : 'Сохранить'}</button>
+                  <button type="button" onClick={() => setEditing(false)} className="btn-s" style={{ fontSize: 11, padding: '7px 12px' }}>Отмена</button>
+                </div>
+              </form>
+            )}
+          </div>
+
+          {/* Linked booking */}
+          {bookingData && (
+            <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--bor2)' }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Запись на консультацию</div>
+              <div style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(255,149,0,.06)', border: '1px solid rgba(255,149,0,.15)', fontSize: 12 }}>
+                <span style={{ fontWeight: 600 }}>{new Date(bookingData.booking_date + 'T00:00:00').toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}</span>
+                <span style={{ marginLeft: 8, fontWeight: 700, color: 'var(--gold)' }}>{bookingData.start_time.slice(0, 5)}–{bookingData.end_time.slice(0, 5)}</span>
+                <span className={`pill ${bookingData.status === 'completed' ? 'pa' : bookingData.status === 'cancelled' ? 'po' : 'ps'}`} style={{ marginLeft: 8, fontSize: 9 }}>
+                  <span className="dot"></span>{bookingData.status === 'completed' ? 'Проведена' : bookingData.status === 'cancelled' ? 'Отменена' : 'Подтверждена'}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Linked client */}
+          {clientData && (
+            <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--bor2)' }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Клиент в CRM</div>
+              <div style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(52,199,89,.06)', border: '1px solid rgba(52,199,89,.15)', fontSize: 12 }}>
+                <span style={{ fontWeight: 700, color: 'var(--green)' }}>{clientData.name}</span>
+                <span style={{ marginLeft: 8, color: 'var(--muted)' }}>{clientData.country} {clientData.university ? `· ${clientData.university}` : ''}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Stage pipeline */}
+          <div style={{ padding: '16px 20px' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>Этап воронки</div>
+            <div style={{ display: 'grid', gap: 4 }}>
+              {stages.map(s => {
+                const isCurrent = s.id === deal.stage_id
+                return (
+                  <button key={s.id} onClick={() => !isCurrent && handleMove(s.id)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 8,
+                      padding: '6px 10px', borderRadius: 8, border: 'none',
+                      background: isCurrent ? s.color + '15' : 'transparent',
+                      cursor: isCurrent ? 'default' : 'pointer',
+                      fontFamily: 'inherit', textAlign: 'left',
+                      transition: 'background .15s',
+                    }}
+                    onMouseEnter={e => { if (!isCurrent) (e.currentTarget as HTMLElement).style.background = 'var(--rh)' }}
+                    onMouseLeave={e => { if (!isCurrent) (e.currentTarget as HTMLElement).style.background = 'transparent' }}>
+                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: isCurrent ? s.color : 'var(--bor2)', flexShrink: 0 }} />
+                    <span style={{ fontSize: 11, fontWeight: isCurrent ? 700 : 400, color: isCurrent ? s.color : 'var(--muted)' }}>{s.name}</span>
+                    {isCurrent && <span style={{ fontSize: 9, marginLeft: 'auto', color: s.color, fontWeight: 700 }}>текущий</span>}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Right panel — tabs content */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          {/* Tabs */}
+          <div style={{ display: 'flex', borderBottom: '1px solid var(--bor2)', padding: '0 20px', background: 'var(--surf)' }}>
+            {tabs.map(t => (
+              <button key={t.key} onClick={() => setTab(t.key)}
+                style={{
+                  padding: '12px 16px', fontSize: 12, fontWeight: tab === t.key ? 700 : 500,
+                  color: tab === t.key ? 'var(--purple)' : 'var(--muted)',
+                  background: 'none', border: 'none',
+                  borderBottom: tab === t.key ? '2px solid var(--purple)' : '2px solid transparent',
+                  cursor: 'pointer', fontFamily: 'inherit',
+                }}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Tab content */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
+
+            {/* Основное */}
+            {tab === 'main' && (
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>Информация о сделке</div>
+                <div style={{ background: 'var(--surf)', border: '1px solid var(--bor)', borderRadius: 14, padding: '18px 20px', boxShadow: 'var(--sh)', marginBottom: 16 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, fontSize: 13 }}>
+                    <div>
+                      <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 600, marginBottom: 4 }}>Название</div>
+                      <div style={{ fontWeight: 600, color: 'var(--text)' }}>{deal.title}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 600, marginBottom: 4 }}>Контакт</div>
+                      <div style={{ fontWeight: 600, color: 'var(--text)' }}>{deal.contact_name}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 600, marginBottom: 4 }}>Бюджет</div>
+                      <div style={{ fontWeight: 700, fontSize: 16, color: 'var(--purple)' }}>{Number(deal.budget).toLocaleString('ru')} ₽</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 600, marginBottom: 4 }}>Этап</div>
+                      <span style={{ padding: '4px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, color: currentStage?.color, background: currentStage?.color + '15', border: `1px solid ${currentStage?.color}30` }}>
+                        {currentStage?.name}
+                      </span>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 600, marginBottom: 4 }}>Менеджер</div>
+                      <span className="stag">{sp?.name ?? '—'}</span>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 600, marginBottom: 4 }}>Источник</div>
+                      <div>{sourceLabel[deal.source] || deal.source}</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Timeline summary */}
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>Хронология</div>
+                <div style={{ background: 'var(--surf)', border: '1px solid var(--bor)', borderRadius: 14, padding: '14px 20px', boxShadow: 'var(--sh)' }}>
+                  {activities.slice(0, 5).map((a: any) => (
+                    <div key={a.id} style={{ display: 'flex', gap: 10, padding: '8px 0', borderBottom: '1px solid rgba(0,0,0,.03)', fontSize: 12 }}>
+                      <span style={{ fontSize: 14 }}>{activityIcon[a.activity_type] || '⚙️'}</span>
+                      <div style={{ flex: 1 }}>
+                        <span style={{ fontWeight: 600, color: 'var(--text)' }}>{a.user_name}</span>
+                        <span style={{ color: 'var(--muted)', marginLeft: 6 }}>{a.content}</span>
+                      </div>
+                      <span style={{ fontSize: 10, color: 'var(--muted)', whiteSpace: 'nowrap' }}>{new Date(a.created_at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
+                  ))}
+                  {activities.length > 5 && (
+                    <button onClick={() => setTab('activity')} style={{ marginTop: 8, background: 'none', border: 'none', color: 'var(--purple)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                      Показать все ({activities.length}) →
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Активность */}
+            {tab === 'activity' && (
+              <div>
+                {/* Add note */}
+                <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+                  <input value={noteText} onChange={e => setNoteText(e.target.value)} placeholder="Добавить заметку..."
+                    onKeyDown={e => e.key === 'Enter' && handleAddNote()}
+                    style={{ flex: 1, padding: '10px 14px', border: '1px solid var(--bor2)', borderRadius: 10, fontSize: 13, fontFamily: 'inherit', outline: 'none', background: 'var(--bg)' }} />
+                  <button onClick={handleAddNote} disabled={saving || !noteText.trim()} className="btn-p" style={{ padding: '10px 20px', fontSize: 12 }}>
+                    {saving ? '...' : 'Добавить'}
+                  </button>
+                </div>
+
+                {/* Activity feed */}
+                <div style={{ display: 'grid', gap: 0 }}>
+                  {activities.map((a: any, i: number) => (
+                    <div key={a.id} style={{ display: 'flex', gap: 12, padding: '12px 0', borderBottom: i < activities.length - 1 ? '1px solid rgba(0,0,0,.04)' : 'none' }}>
+                      <div style={{
+                        width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
+                        background: a.activity_type === 'note' ? 'rgba(177,94,204,.1)' : a.activity_type === 'stage_change' ? 'rgba(0,122,255,.1)' : 'rgba(0,0,0,.04)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14,
+                      }}>
+                        {activityIcon[a.activity_type] || '⚙️'}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>{a.user_name}</span>
+                          <span style={{ fontSize: 10, color: 'var(--muted)' }}>
+                            {new Date(a.created_at).toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: 13, color: a.activity_type === 'stage_change' ? 'var(--purple)' : 'var(--text)', fontWeight: a.activity_type === 'stage_change' ? 600 : 400 }}>
+                          {a.content}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {activities.length === 0 && <div style={{ textAlign: 'center', color: 'var(--muted)', padding: 40, fontSize: 13 }}>Нет записей в активности</div>}
+                </div>
+              </div>
+            )}
+
+            {/* Файлы */}
+            {tab === 'files' && (
+              <div>
+                {/* Upload area */}
+                <label style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+                  padding: '20px', borderRadius: 14, marginBottom: 16,
+                  border: '2px dashed var(--bor2)', background: 'var(--surf2)',
+                  cursor: 'pointer', transition: 'border-color .15s',
+                }}
+                  onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--purple)')}
+                  onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--bor2)')}>
+                  <input type="file" onChange={handleFileUpload} hidden />
+                  {uploading ? (
+                    <span style={{ fontSize: 13, color: 'var(--purple)', fontWeight: 600 }}>Загрузка...</span>
+                  ) : (
+                    <>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="var(--purple)" strokeWidth="2" width="20" height="20"><path d="M12 5v14M5 12l7-7 7 7" /></svg>
+                      <span style={{ fontSize: 13, color: 'var(--muted)' }}>Нажмите для загрузки файла <span style={{ color: 'var(--purple)', fontWeight: 600 }}>(макс. 10 МБ)</span></span>
+                    </>
+                  )}
+                </label>
+
+                {/* File list */}
+                {files.length === 0 && !uploading && (
+                  <div style={{ textAlign: 'center', color: 'var(--muted)', padding: 24, fontSize: 12 }}>Файлов пока нет</div>
+                )}
+
+                <div style={{ display: 'grid', gap: 8 }}>
+                  {files.map((f: any) => (
+                    <div key={f.id} style={{
+                      display: 'flex', alignItems: 'center', gap: 12,
+                      padding: '12px 16px', borderRadius: 12,
+                      background: 'var(--surf)', border: '1px solid var(--bor)',
+                      boxShadow: '0 1px 4px rgba(0,0,0,.04)',
+                    }}>
+                      <span style={{ fontSize: 24 }}>{fileIcon[f.mime_type] || '📎'}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <a href={f.url} target="_blank" rel="noopener"
+                          style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', textDecoration: 'none', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                          onMouseEnter={e => (e.currentTarget.style.color = 'var(--purple)')}
+                          onMouseLeave={e => (e.currentTarget.style.color = 'var(--text)')}>
+                          {f.name}
+                        </a>
+                        <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>
+                          {formatSize(f.size)} · {new Date(f.created_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                          {f.source !== 'upload' && <span style={{ marginLeft: 6, padding: '1px 6px', borderRadius: 4, background: f.source === 'telegram' ? 'rgba(0,136,204,.08)' : 'rgba(37,211,102,.08)', color: f.source === 'telegram' ? '#0088cc' : '#25d366', fontSize: 9, fontWeight: 600 }}>{f.source === 'telegram' ? 'TG' : 'WA'}</span>}
+                        </div>
+                      </div>
+                      <a href={f.url} target="_blank" rel="noopener" style={{ padding: '4px 10px', borderRadius: 6, background: 'var(--pl)', color: 'var(--purple)', fontSize: 10, fontWeight: 600, textDecoration: 'none', flexShrink: 0 }}>Открыть</a>
+                      <button onClick={() => handleDeleteFile(f.id)}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: 'var(--muted)', fontSize: 14 }}
+                        title="Удалить">×</button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Сообщения */}
+            {tab === 'messages' && (
+              <div>
+                {messages.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {messages.map((m: any) => (
+                      <div key={m.id} style={{
+                        display: 'flex', flexDirection: 'column',
+                        alignItems: m.direction === 'outgoing' ? 'flex-end' : 'flex-start',
+                      }}>
+                        <div style={{
+                          maxWidth: '75%', padding: '10px 14px', borderRadius: 14,
+                          background: m.direction === 'outgoing' ? 'var(--purple)' : 'var(--surf)',
+                          color: m.direction === 'outgoing' ? '#fff' : 'var(--text)',
+                          border: m.direction === 'outgoing' ? 'none' : '1px solid var(--bor)',
+                          borderBottomRightRadius: m.direction === 'outgoing' ? 4 : 14,
+                          borderBottomLeftRadius: m.direction === 'incoming' ? 4 : 14,
+                        }}>
+                          {m.sender_name && m.direction === 'incoming' && (
+                            <div style={{ fontSize: 10, fontWeight: 700, marginBottom: 3, color: m.channel === 'telegram' ? '#0088cc' : '#25d366' }}>{m.sender_name}</div>
+                          )}
+                          <div style={{ fontSize: 13 }}>{m.content}</div>
+                          <div style={{ fontSize: 9, marginTop: 4, opacity: 0.6, textAlign: 'right' }}>
+                            {m.channel === 'telegram' ? 'TG' : 'WA'} · {new Date(m.created_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ textAlign: 'center', padding: 40 }}>
+                    <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(0,136,204,.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', fontSize: 24 }}>💬</div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', marginBottom: 6 }}>Сообщения</div>
+                    <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>Telegram и WhatsApp переписка через Wazzup</div>
+                    <div style={{ fontSize: 11, color: 'var(--muted)', background: 'var(--surf2)', padding: '12px 20px', borderRadius: 10, display: 'inline-block' }}>
+                      Подключите Wazzup для отображения переписок
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
