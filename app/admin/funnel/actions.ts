@@ -443,7 +443,11 @@ export async function sendDealMessage(formData: FormData) {
   }
 
   try {
-    const result = await sendWazzupMessage({ channelId, chatType, chatId, text })
+    // Debug: show what we're sending in error response if it fails
+    const sentParams = { channelId, chatType, chatId, textLen: text.length, channelIdLen: channelId.length, channelIdHex: Array.from(channelId).map(c => c.charCodeAt(0).toString(16)).join('') }
+    const result = await sendWazzupMessage({ channelId, chatType, chatId, text }).catch(e => {
+      throw new Error(`${e instanceof Error ? e.message : String(e)} | DEBUG: ${JSON.stringify(sentParams).slice(0, 400)}`)
+    })
 
     // Save to deal_messages immediately (webhook will also fire as echo, but this is instant)
     await supabase.from('deal_messages').insert({
