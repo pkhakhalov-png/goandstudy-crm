@@ -455,16 +455,24 @@ export async function sendDealMessage(formData: FormData) {
   try {
     const result = await sendWazzupMessage({ channelId, chatType, chatId, text })
 
-    // Upsert to deal_messages (unique external_id prevents dupe with echo webhook)
-    await supabase.from('deal_messages').upsert({
-      deal_id: dealId,
-      direction: 'outgoing',
-      channel,
-      sender_name: 'Менеджер',
-      content: text,
-      external_id: result.messageId,
-      metadata: { channelId, chatId, sentBy: user.id },
-    }, { onConflict: 'external_id', ignoreDuplicates: false })
+    // Check if webhook echo already saved this messageId, otherwise insert
+    const { data: existing } = await supabase
+      .from('deal_messages')
+      .select('id')
+      .eq('external_id', result.messageId)
+      .maybeSingle()
+
+    if (!existing) {
+      await supabase.from('deal_messages').insert({
+        deal_id: dealId,
+        direction: 'outgoing',
+        channel,
+        sender_name: 'Менеджер',
+        content: text,
+        external_id: result.messageId,
+        metadata: { channelId, chatId, sentBy: user.id },
+      })
+    }
 
     await supabase.from('deal_activities').insert({
       deal_id: dealId,
@@ -528,11 +536,11 @@ export async function sendDealFile(formData: FormData) {
     : deal.contact_telegram?.replace(/^@/, '') || deal.phone_normalized)
   if (!chatId) return { error: 'Нет идентификатора чата' }
 
-  // Upload file to Supabase Storage
+  // Upload file to Supabase Storage (path WITHOUT duplicate "deal-files" prefix)
   const admin = await createAdminClient()
   const buffer = await file.arrayBuffer()
   const safeName = file.name.replace(/[^\w.\-]/g, '_')
-  const storagePath = `deal-files/${dealId}/${Date.now()}-${safeName}`
+  const storagePath = `${dealId}/${Date.now()}-${safeName}`
 
   const { error: uploadErr } = await admin.storage
     .from('deal-files')
@@ -542,6 +550,7 @@ export async function sendDealFile(formData: FormData) {
 
   const { data: urlData } = admin.storage.from('deal-files').getPublicUrl(storagePath)
   const publicUrl = urlData.publicUrl
+  console.log('[sendDealFile] uploaded:', publicUrl, 'mime:', file.type, 'size:', file.size)
 
   // Save file record
   const { data: insertedFile } = await admin
@@ -567,16 +576,24 @@ export async function sendDealFile(formData: FormData) {
       text: caption || undefined,
     })
 
-    await supabase.from('deal_messages').upsert({
-      deal_id: dealId,
-      direction: 'outgoing',
-      channel,
-      sender_name: 'Менеджер',
-      content: caption || `[${file.type.startsWith('image/') ? 'image' : 'file'}]`,
-      file_id: insertedFile?.id ?? null,
-      external_id: result.messageId,
-      metadata: { channelId, chatId, sentBy: user.id },
-    }, { onConflict: 'external_id', ignoreDuplicates: false })
+    const { data: existingMsg } = await supabase
+      .from('deal_messages')
+      .select('id')
+      .eq('external_id', result.messageId)
+      .maybeSingle()
+
+    if (!existingMsg) {
+      await supabase.from('deal_messages').insert({
+        deal_id: dealId,
+        direction: 'outgoing',
+        channel,
+        sender_name: 'Менеджер',
+        content: caption || `[${file.type.startsWith('image/') ? 'image' : 'file'}]`,
+        file_id: insertedFile?.id ?? null,
+        external_id: result.messageId,
+        metadata: { channelId, chatId, sentBy: user.id },
+      })
+    }
 
     await supabase.from('deal_activities').insert({
       deal_id: dealId,
