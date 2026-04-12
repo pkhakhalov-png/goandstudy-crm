@@ -484,6 +484,118 @@ export async function sendDealMessage(formData: FormData) {
   }
 }
 
+export async function sendDealFile(formData: FormData) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Не авторизован' }
+
+  const dealId = formData.get('deal_id') as string
+  const channel = formData.get('channel') as 'telegram' | 'whatsapp'
+  const file = formData.get('file') as File | null
+  const caption = ((formData.get('caption') as string) || '').trim()
+
+  if (!file) return { error: 'Файл не выбран' }
+  if (!channel) return { error: 'Выберите канал' }
+
+  const channelIdRaw = channel === 'telegram' ? process.env.WAZZUP_TG_CHANNEL_ID : process.env.WAZZUP_WA_CHANNEL_ID
+  const channelId = (channelIdRaw ?? '').trim()
+  if (!channelId) return { error: `Канал ${channel} не настроен` }
+
+  // Find existing chatId from incoming messages (most reliable)
+  const { data: lastIncoming } = await supabase
+    .from('deal_messages')
+    .select('metadata')
+    .eq('deal_id', dealId)
+    .eq('channel', channel)
+    .eq('direction', 'incoming')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single()
+
+  const knownChatId = lastIncoming?.metadata?.chatId as string | undefined
+
+  const { data: deal } = await supabase
+    .from('deals')
+    .select('id, contact_phone, contact_telegram, phone_normalized')
+    .eq('id', dealId)
+    .single()
+
+  if (!deal) return { error: 'Сделка не найдена' }
+
+  const chatType: 'telegram' | 'whatsapp' = channel
+  const chatId = knownChatId ?? (channel === 'whatsapp'
+    ? deal.phone_normalized
+    : deal.contact_telegram?.replace(/^@/, '') || deal.phone_normalized)
+  if (!chatId) return { error: 'Нет идентификатора чата' }
+
+  // Upload file to Supabase Storage
+  const admin = await createAdminClient()
+  const buffer = await file.arrayBuffer()
+  const safeName = file.name.replace(/[^\w.\-]/g, '_')
+  const storagePath = `deal-files/${dealId}/${Date.now()}-${safeName}`
+
+  const { error: uploadErr } = await admin.storage
+    .from('deal-files')
+    .upload(storagePath, buffer, { contentType: file.type || 'application/octet-stream', upsert: false })
+
+  if (uploadErr) return { error: `Загрузка в Storage: ${uploadErr.message}` }
+
+  const { data: urlData } = admin.storage.from('deal-files').getPublicUrl(storagePath)
+  const publicUrl = urlData.publicUrl
+
+  // Save file record
+  const { data: insertedFile } = await admin
+    .from('deal_files')
+    .insert({
+      deal_id: dealId,
+      name: file.name,
+      url: publicUrl,
+      size: file.size,
+      mime_type: file.type || 'application/octet-stream',
+      source: 'upload',
+      uploaded_by: user.id,
+    })
+    .select('id')
+    .single()
+
+  try {
+    const result = await sendWazzupMessage({
+      channelId,
+      chatType,
+      chatId,
+      contentUri: publicUrl,
+      text: caption || undefined,
+    })
+
+    await supabase.from('deal_messages').insert({
+      deal_id: dealId,
+      direction: 'outgoing',
+      channel,
+      sender_name: 'Менеджер',
+      content: caption || `[${file.type.startsWith('image/') ? 'image' : 'file'}]`,
+      file_id: insertedFile?.id ?? null,
+      external_id: result.messageId,
+      metadata: { channelId, chatId, sentBy: user.id },
+    })
+
+    await supabase.from('deal_activities').insert({
+      deal_id: dealId,
+      user_id: user.id,
+      activity_type: 'file_upload',
+      content: `Отправлен файл: ${file.name}`,
+      metadata: { channel, direction: 'outgoing', fileName: file.name },
+    })
+
+    await supabase.from('deals').update({ updated_at: new Date().toISOString() }).eq('id', dealId)
+
+    revalidatePath(`/admin/funnel/${dealId}`)
+    revalidatePath(`/sales/funnel/${dealId}`)
+    return { success: true }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Ошибка отправки файла' }
+  }
+}
+
 export async function searchClients(query: string) {
   const supabase = await createClient()
   const { data } = await supabase.from('clients').select('id, name, phone, country').or(`name.ilike.%${query}%,phone.ilike.%${query}%`).limit(10)
