@@ -414,12 +414,17 @@ export async function sendDealMessage(formData: FormData) {
 
   if (!deal) return { error: 'Сделка не найдена' }
 
-  // Determine channelId and chatId
-  const channelId = channel === 'telegram'
+  // Determine channelId and chatId (trim to strip accidental whitespace)
+  const rawChannelId = channel === 'telegram'
     ? process.env.WAZZUP_TG_CHANNEL_ID
     : process.env.WAZZUP_WA_CHANNEL_ID
 
-  if (!channelId) return { error: `Канал ${channel} не настроен` }
+  const channelId = (rawChannelId ?? '').trim()
+
+  // Debug log — available in Vercel function logs
+  console.log('[sendDealMessage] channel:', channel, 'channelId len:', channelId.length, 'channelId:', JSON.stringify(channelId))
+
+  if (!channelId) return { error: `Канал ${channel} не настроен (env ${channel === 'telegram' ? 'WAZZUP_TG_CHANNEL_ID' : 'WAZZUP_WA_CHANNEL_ID'} пуст)` }
 
   let chatType: ChatType
   let chatId: string
