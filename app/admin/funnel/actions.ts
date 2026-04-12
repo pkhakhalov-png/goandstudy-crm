@@ -429,10 +429,11 @@ export async function sendDealMessage(formData: FormData) {
     chatType = 'whatsapp'
     chatId = deal.phone_normalized
   } else {
-    // Wazzup Telegram API (tgapi) accepts phone or @username
-    const handle = deal.contact_telegram?.replace(/^@/, '') || deal.phone_normalized
+    // Wazzup v3: for tgapi channels, chatType is "telegram"
+    // chatId = phone (without +) or @username
+    const handle = deal.phone_normalized || deal.contact_telegram?.replace(/^@/, '')
     if (!handle) return { error: 'У клиента нет Telegram или телефона' }
-    chatType = 'tgapi'
+    chatType = 'telegram'
     chatId = handle
   }
 
