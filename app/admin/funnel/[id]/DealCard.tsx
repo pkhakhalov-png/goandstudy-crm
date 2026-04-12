@@ -317,9 +317,13 @@ export function DealCard({ deal, stages, activities, salespersons, clientData, b
         </div>
       </div>
 
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+      <div style={{
+        flex: 1, display: 'flex', overflow: 'hidden',
+        paddingRight: (tab === 'messages' && aiPanelOpen) ? 452 : 0,
+        transition: 'padding-right .2s',
+      }}>
         {/* Left panel — deal info */}
-        <div style={{ width: 340, minWidth: 340, borderRight: '1px solid var(--bor2)', display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+        <div style={{ width: 280, minWidth: 280, borderRight: '1px solid var(--bor2)', display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
 
           {/* Contact header */}
           <div style={{ padding: '20px', borderBottom: '1px solid var(--bor2)' }}>
@@ -830,11 +834,11 @@ export function DealCard({ deal, stages, activities, salespersons, clientData, b
                       onChange={e => setMsgText(e.target.value)}
                       onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMsg() } }}
                       placeholder={pendingFile ? 'Подпись к файлу (необязательно)...' : 'Напишите сообщение... (Enter — отправить, Shift+Enter — новая строка)'}
-                      rows={1}
+                      rows={2}
                       style={{
-                        flex: 1, padding: '10px 12px', border: '1px solid var(--bor2)', borderRadius: 10,
-                        fontSize: 13, fontFamily: 'inherit', outline: 'none', background: 'var(--bg)',
-                        resize: 'none', minHeight: 40, maxHeight: 120,
+                        flex: 1, padding: '10px 14px', border: '1px solid var(--bor2)', borderRadius: 10,
+                        fontSize: 14, fontFamily: 'inherit', outline: 'none', background: 'var(--bg)',
+                        resize: 'vertical', minHeight: 44, maxHeight: 240, lineHeight: 1.5,
                       }}
                     />
                     <button
