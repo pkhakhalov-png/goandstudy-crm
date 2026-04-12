@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { moveDeal, addDealNote, updateDeal, createDealTask, toggleDealTask, deleteDealTask, linkDealToClient, searchClients } from '../actions'
+import { moveDeal, addDealNote, updateDeal, createDealTask, toggleDealTask, deleteDealTask, linkDealToClient, searchClients, sendDealMessage } from '../actions'
 import { uploadDealFile, deleteDealFile } from './fileActions'
 
 interface Stage { id: string; name: string; color: string; position: number; stage_type: string }
@@ -47,6 +47,24 @@ export function DealCard({ deal, stages, activities, salespersons, clientData, b
   const [clientSearch, setClientSearch] = useState('')
   const [clientResults, setClientResults] = useState<any[]>([])
   const [showClientSearch, setShowClientSearch] = useState(false)
+  const [msgText, setMsgText] = useState('')
+  const [msgChannel, setMsgChannel] = useState<'telegram' | 'whatsapp'>(deal.contact_telegram ? 'telegram' : 'whatsapp')
+  const [msgSending, setMsgSending] = useState(false)
+  const [msgError, setMsgError] = useState<string | null>(null)
+
+  async function handleSendMsg() {
+    if (!msgText.trim()) return
+    setMsgSending(true)
+    setMsgError(null)
+    const fd = new FormData()
+    fd.append('deal_id', deal.id)
+    fd.append('text', msgText)
+    fd.append('channel', msgChannel)
+    const res = await sendDealMessage(fd)
+    setMsgSending(false)
+    if (res.error) setMsgError(res.error)
+    else setMsgText('')
+  }
 
   const currentStage = stages.find(s => s.id === deal.stage_id)
   const sp = salespersons.find(s => s.id === deal.salesperson_id)
@@ -547,9 +565,9 @@ export function DealCard({ deal, stages, activities, salespersons, clientData, b
 
             {/* Сообщения */}
             {tab === 'messages' && (
-              <div>
+              <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
                 {messages.length > 0 ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1, overflowY: 'auto', paddingBottom: 12 }}>
                     {messages.map((m: any) => (
                       <div key={m.id} style={{
                         display: 'flex', flexDirection: 'column',
@@ -575,15 +593,66 @@ export function DealCard({ deal, stages, activities, salespersons, clientData, b
                     ))}
                   </div>
                 ) : (
-                  <div style={{ textAlign: 'center', padding: 40 }}>
+                  <div style={{ textAlign: 'center', padding: 40, flex: 1 }}>
                     <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(0,136,204,.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', fontSize: 24 }}>💬</div>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', marginBottom: 6 }}>Сообщения</div>
-                    <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>Telegram и WhatsApp переписка через Wazzup</div>
-                    <div style={{ fontSize: 11, color: 'var(--muted)', background: 'var(--surf2)', padding: '12px 20px', borderRadius: 10, display: 'inline-block' }}>
-                      Подключите Wazzup для отображения переписок
-                    </div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', marginBottom: 6 }}>Нет сообщений</div>
+                    <div style={{ fontSize: 12, color: 'var(--muted)' }}>Напишите первым — сообщения будут появляться здесь</div>
                   </div>
                 )}
+
+                {/* Input + send */}
+                <div style={{ borderTop: '1px solid var(--bor)', paddingTop: 10, marginTop: 'auto' }}>
+                  {msgError && (
+                    <div style={{ fontSize: 11, color: 'var(--red)', marginBottom: 6, padding: '6px 10px', background: 'rgba(220,53,69,.06)', borderRadius: 8 }}>{msgError}</div>
+                  )}
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end' }}>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <button
+                        onClick={() => setMsgChannel('telegram')}
+                        disabled={!deal.contact_telegram}
+                        title={deal.contact_telegram ? 'Отправить в Telegram' : 'У клиента нет Telegram'}
+                        style={{
+                          padding: '8px 10px', borderRadius: 8, border: '1px solid var(--bor)',
+                          background: msgChannel === 'telegram' ? 'rgba(0,136,204,.12)' : 'var(--surf)',
+                          color: msgChannel === 'telegram' ? '#0088cc' : 'var(--muted)',
+                          cursor: deal.contact_telegram ? 'pointer' : 'not-allowed',
+                          fontSize: 11, fontWeight: 700,
+                          opacity: deal.contact_telegram ? 1 : 0.4,
+                        }}>TG</button>
+                      <button
+                        onClick={() => setMsgChannel('whatsapp')}
+                        disabled={!deal.contact_phone}
+                        title={deal.contact_phone ? 'Отправить в WhatsApp' : 'У клиента нет телефона'}
+                        style={{
+                          padding: '8px 10px', borderRadius: 8, border: '1px solid var(--bor)',
+                          background: msgChannel === 'whatsapp' ? 'rgba(37,211,102,.12)' : 'var(--surf)',
+                          color: msgChannel === 'whatsapp' ? '#25d366' : 'var(--muted)',
+                          cursor: deal.contact_phone ? 'pointer' : 'not-allowed',
+                          fontSize: 11, fontWeight: 700,
+                          opacity: deal.contact_phone ? 1 : 0.4,
+                        }}>WA</button>
+                    </div>
+                    <textarea
+                      value={msgText}
+                      onChange={e => setMsgText(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMsg() } }}
+                      placeholder="Напишите сообщение... (Enter — отправить, Shift+Enter — новая строка)"
+                      rows={1}
+                      style={{
+                        flex: 1, padding: '10px 12px', border: '1px solid var(--bor2)', borderRadius: 10,
+                        fontSize: 13, fontFamily: 'inherit', outline: 'none', background: 'var(--bg)',
+                        resize: 'none', minHeight: 40, maxHeight: 120,
+                      }}
+                    />
+                    <button
+                      onClick={handleSendMsg}
+                      disabled={msgSending || !msgText.trim()}
+                      className="btn-p"
+                      style={{ padding: '10px 16px', fontSize: 12, opacity: (msgSending || !msgText.trim()) ? 0.5 : 1 }}>
+                      {msgSending ? '...' : 'Отправить'}
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
           </div>
