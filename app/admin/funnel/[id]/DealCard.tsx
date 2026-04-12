@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { moveDeal, addDealNote, updateDeal, createDealTask, toggleDealTask, deleteDealTask, linkDealToClient, searchClients, sendDealMessage } from '../actions'
+import { moveDeal, addDealNote, updateDeal, createDealTask, toggleDealTask, deleteDealTask, linkDealToClient, searchClients, sendDealMessage, sendDealFile } from '../actions'
 import { uploadDealFile, deleteDealFile } from './fileActions'
 import { createClient } from '@/lib/supabase/client'
 
@@ -76,6 +76,22 @@ export function DealCard({ deal, stages, activities, salespersons, clientData, b
   const [msgSending, setMsgSending] = useState(false)
   const [msgError, setMsgError] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const chatFileInputRef = useRef<HTMLInputElement>(null)
+
+  async function handleSendChatFile(file: File) {
+    setMsgSending(true)
+    setMsgError(null)
+    const fd = new FormData()
+    fd.append('deal_id', deal.id)
+    fd.append('channel', msgChannel)
+    fd.append('file', file)
+    if (msgText.trim()) fd.append('caption', msgText.trim())
+    const res = await sendDealFile(fd)
+    setMsgSending(false)
+    if (res.error) setMsgError(res.error)
+    else setMsgText('')
+    if (chatFileInputRef.current) chatFileInputRef.current.value = ''
+  }
 
   // Auto-scroll to last message when opening messages tab or when new message arrives
   useEffect(() => {
@@ -688,6 +704,24 @@ export function DealCard({ deal, stages, activities, salespersons, clientData, b
                           fontSize: 11, fontWeight: 700,
                           opacity: deal.contact_phone ? 1 : 0.4,
                         }}>WA</button>
+                      <button
+                        onClick={() => chatFileInputRef.current?.click()}
+                        disabled={msgSending}
+                        title="Прикрепить файл"
+                        style={{
+                          padding: '8px 10px', borderRadius: 8, border: '1px solid var(--bor)',
+                          background: 'var(--surf)', color: 'var(--muted)',
+                          cursor: 'pointer', fontSize: 14,
+                        }}>📎</button>
+                      <input
+                        ref={chatFileInputRef}
+                        type="file"
+                        style={{ display: 'none' }}
+                        onChange={e => {
+                          const f = e.target.files?.[0]
+                          if (f) handleSendChatFile(f)
+                        }}
+                      />
                     </div>
                     <textarea
                       value={msgText}

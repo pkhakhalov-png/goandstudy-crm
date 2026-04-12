@@ -189,17 +189,31 @@ async function processMessage(supabase: SupabaseAdmin, msg: WazzupMessage) {
     }
   }
 
-  // Save message
-  await supabase.from('deal_messages').insert({
-    deal_id: dealId,
-    direction: msg.isEcho ? 'outgoing' : 'incoming',
-    channel: msg.chatType === 'whatsapp' ? 'whatsapp' : 'telegram',
-    sender_name: senderName,
-    content: msg.text || (msg.type !== 'text' ? `[${msg.type}]` : ''),
-    file_id: fileId,
-    external_id: msg.messageId,
-    metadata: { channelId: msg.channelId, chatId: msg.chatId, type: msg.type },
-  })
+  // Deduplicate by external_id (avoids echo double-insert after local send)
+  const { data: existing } = await supabase
+    .from('deal_messages')
+    .select('id, file_id')
+    .eq('external_id', msg.messageId)
+    .limit(1)
+    .maybeSingle()
+
+  if (existing) {
+    // Already saved (locally or by previous webhook) — update file_id if we have one and it was missing
+    if (fileId && !existing.file_id) {
+      await supabase.from('deal_messages').update({ file_id: fileId }).eq('id', existing.id)
+    }
+  } else {
+    await supabase.from('deal_messages').insert({
+      deal_id: dealId,
+      direction: msg.isEcho ? 'outgoing' : 'incoming',
+      channel: msg.chatType === 'whatsapp' ? 'whatsapp' : 'telegram',
+      sender_name: senderName,
+      content: msg.text || (msg.type !== 'text' ? `[${msg.type}]` : ''),
+      file_id: fileId,
+      external_id: msg.messageId,
+      metadata: { channelId: msg.channelId, chatId: msg.chatId, type: msg.type },
+    })
+  }
 
   // Bump deal updated_at so it rises to the top of the kanban
   await supabase.from('deals').update({ updated_at: new Date().toISOString() }).eq('id', dealId)
