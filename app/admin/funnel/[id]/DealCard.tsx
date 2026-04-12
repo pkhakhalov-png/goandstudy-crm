@@ -1,9 +1,11 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { moveDeal, addDealNote, updateDeal, createDealTask, toggleDealTask, deleteDealTask, linkDealToClient, searchClients, sendDealMessage } from '../actions'
 import { uploadDealFile, deleteDealFile } from './fileActions'
+import { createClient } from '@/lib/supabase/client'
 
 interface Stage { id: string; name: string; color: string; position: number; stage_type: string }
 
@@ -37,7 +39,29 @@ const sourceLabel: Record<string, string> = { manual: 'Вручную', booking:
 const activityIcon: Record<string, string> = { note: '📝', stage_change: '→', system: '⚙️', call: '📞', message: '💬', file_upload: '📎', task_done: '✅' }
 
 export function DealCard({ deal, stages, activities, salespersons, clientData, bookingData, files, messages, tasks, userId }: Props) {
+  const router = useRouter()
   const [tab, setTab] = useState<'main' | 'activity' | 'files' | 'messages' | 'tasks'>('main')
+
+  // Supabase Realtime: refresh page when new message/file arrives for this deal
+  useEffect(() => {
+    const supabase = createClient()
+    const channel = supabase
+      .channel(`deal-${deal.id}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'deal_messages', filter: `deal_id=eq.${deal.id}` }, () => {
+        router.refresh()
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'deal_files', filter: `deal_id=eq.${deal.id}` }, () => {
+        router.refresh()
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'deal_activities', filter: `deal_id=eq.${deal.id}` }, () => {
+        router.refresh()
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [deal.id, router])
   const [noteText, setNoteText] = useState('')
   const [saving, setSaving] = useState(false)
   const [editing, setEditing] = useState(false)
