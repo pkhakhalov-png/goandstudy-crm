@@ -429,18 +429,27 @@ export async function sendDealMessage(formData: FormData) {
   let chatType: ChatType
   let chatId: string
 
+  // Try to find chatId from last incoming message for this channel (most reliable)
+  const { data: lastIncoming } = await supabase
+    .from('deal_messages')
+    .select('metadata')
+    .eq('deal_id', dealId)
+    .eq('channel', channel)
+    .eq('direction', 'incoming')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single()
+
+  const knownChatId = lastIncoming?.metadata?.chatId as string | undefined
+
   if (channel === 'whatsapp') {
-    if (!deal.phone_normalized) return { error: 'У клиента нет телефона' }
     chatType = 'whatsapp'
-    chatId = deal.phone_normalized
+    chatId = knownChatId || deal.phone_normalized
+    if (!chatId) return { error: 'У клиента нет телефона' }
   } else {
-    // Wazzup v3: for tgapi channels, chatType is "telegram"
-    // Prefer @username (Wazzup routes it reliably to real TG account)
-    // Fall back to phone only if no username
-    const handle = deal.contact_telegram?.replace(/^@/, '') || deal.phone_normalized
-    if (!handle) return { error: 'У клиента нет Telegram или телефона' }
     chatType = 'telegram'
-    chatId = handle
+    chatId = knownChatId || deal.contact_telegram?.replace(/^@/, '') || deal.phone_normalized
+    if (!chatId) return { error: 'У клиента нет Telegram или телефона' }
   }
 
   try {
