@@ -568,29 +568,53 @@ export function DealCard({ deal, stages, activities, salespersons, clientData, b
               <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
                 {messages.length > 0 ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1, overflowY: 'auto', paddingBottom: 12 }}>
-                    {messages.map((m: any) => (
+                    {messages.map((m: any) => {
+                      const attachedFile = m.file_id ? files.find((f: any) => f.id === m.file_id) : null
+                      const isImage = attachedFile?.mime_type?.startsWith('image/')
+                      const contentIsTag = typeof m.content === 'string' && /^\[.+\]$/.test(m.content)
+                      return (
                       <div key={m.id} style={{
                         display: 'flex', flexDirection: 'column',
                         alignItems: m.direction === 'outgoing' ? 'flex-end' : 'flex-start',
                       }}>
                         <div style={{
-                          maxWidth: '75%', padding: '10px 14px', borderRadius: 14,
+                          maxWidth: '75%', padding: attachedFile && isImage ? '6px' : '10px 14px', borderRadius: 14,
                           background: m.direction === 'outgoing' ? 'var(--purple)' : 'var(--surf)',
                           color: m.direction === 'outgoing' ? '#fff' : 'var(--text)',
                           border: m.direction === 'outgoing' ? 'none' : '1px solid var(--bor)',
                           borderBottomRightRadius: m.direction === 'outgoing' ? 4 : 14,
                           borderBottomLeftRadius: m.direction === 'incoming' ? 4 : 14,
+                          overflow: 'hidden',
                         }}>
                           {m.sender_name && m.direction === 'incoming' && (
-                            <div style={{ fontSize: 10, fontWeight: 700, marginBottom: 3, color: m.channel === 'telegram' ? '#0088cc' : '#25d366' }}>{m.sender_name}</div>
+                            <div style={{ fontSize: 10, fontWeight: 700, marginBottom: 3, padding: attachedFile && isImage ? '4px 8px 0' : 0, color: m.channel === 'telegram' ? '#0088cc' : '#25d366' }}>{m.sender_name}</div>
                           )}
-                          <div style={{ fontSize: 13 }}>{m.content}</div>
-                          <div style={{ fontSize: 9, marginTop: 4, opacity: 0.6, textAlign: 'right' }}>
+
+                          {attachedFile && isImage && (
+                            <a href={attachedFile.url} target="_blank" rel="noopener" style={{ display: 'block' }}>
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={attachedFile.url} alt="" style={{ display: 'block', maxWidth: 240, maxHeight: 240, borderRadius: 8, objectFit: 'cover' }} />
+                            </a>
+                          )}
+
+                          {attachedFile && !isImage && (
+                            <a href={attachedFile.url} target="_blank" rel="noopener" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 4px', color: m.direction === 'outgoing' ? '#fff' : 'var(--text)', textDecoration: 'none' }}>
+                              <span style={{ fontSize: 20 }}>📎</span>
+                              <span style={{ fontSize: 12, fontWeight: 600, wordBreak: 'break-all' }}>{attachedFile.name}</span>
+                            </a>
+                          )}
+
+                          {m.content && !contentIsTag && (
+                            <div style={{ fontSize: 13, padding: attachedFile && isImage ? '4px 8px 0' : 0 }}>{m.content}</div>
+                          )}
+
+                          <div style={{ fontSize: 9, marginTop: 4, opacity: 0.6, textAlign: 'right', padding: attachedFile && isImage ? '0 8px 4px' : 0 }}>
                             {m.channel === 'telegram' ? 'TG' : 'WA'} · {new Date(m.created_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
                           </div>
                         </div>
                       </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 ) : (
                   <div style={{ textAlign: 'center', padding: 40, flex: 1 }}>
