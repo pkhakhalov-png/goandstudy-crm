@@ -79,22 +79,15 @@ export function DealCard({ deal, stages, activities, salespersons, clientData, b
   const chatFileInputRef = useRef<HTMLInputElement>(null)
   const [pendingFile, setPendingFile] = useState<File | null>(null)
 
-  // AI sales assistant
-  const [aiLoading, setAiLoading] = useState(false)
-  const [aiSuggestion, setAiSuggestion] = useState<string | null>(null)
+  // AI sales assistant — streaming panel
+  const [aiPanelOpen, setAiPanelOpen] = useState(true)
+  const [aiStreaming, setAiStreaming] = useState(false)
+  const [aiText, setAiText] = useState('')
   const [aiError, setAiError] = useState<string | null>(null)
+  const aiAbortRef = useRef<AbortController | null>(null)
+  const lastAnalyzedCountRef = useRef<number>(0)
 
-  async function handleSuggestReply() {
-    setAiLoading(true)
-    setAiError(null)
-    setAiSuggestion(null)
-    const res = await suggestReply(deal.id)
-    setAiLoading(false)
-    if (res.error) setAiError(res.error)
-    else if (res.suggestion) setAiSuggestion(res.suggestion)
-  }
-
-  // Extract only the "next message" block from structured AI response
+  // Extract only "next message" block for copy/insert
   function extractNextMessage(text: string): string {
     if (!text) return ''
     const m = text.match(/💬\s*СЛЕДУЮЩЕЕ СООБЩЕНИЕ:\s*([\s\S]*?)(?=\n[⚠️💰🎁🎯]|$)/)
@@ -102,16 +95,71 @@ export function DealCard({ deal, stages, activities, salespersons, clientData, b
     return text.trim()
   }
 
+  async function runAiSuggest() {
+    // Cancel previous stream if still running
+    if (aiAbortRef.current) aiAbortRef.current.abort()
+    const controller = new AbortController()
+    aiAbortRef.current = controller
+
+    setAiStreaming(true)
+    setAiError(null)
+    setAiText('')
+
+    try {
+      const res = await fetch('/api/ai/suggest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dealId: deal.id }),
+        signal: controller.signal,
+      })
+
+      if (!res.ok || !res.body) {
+        const txt = await res.text().catch(() => 'error')
+        setAiError(txt)
+        setAiStreaming(false)
+        return
+      }
+
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let acc = ''
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        const chunk = decoder.decode(value, { stream: true })
+        acc += chunk
+        setAiText(acc)
+      }
+      setAiStreaming(false)
+    } catch (e: any) {
+      if (e?.name !== 'AbortError') setAiError(e?.message || 'Ошибка AI')
+      setAiStreaming(false)
+    }
+  }
+
+  // Auto-run when new incoming messages arrive (last message is incoming and different from last analyzed count)
+  useEffect(() => {
+    if (!aiPanelOpen) return
+    const last = messages[messages.length - 1]
+    if (!last) return
+    if (messages.length === lastAnalyzedCountRef.current) return
+    // Only auto-run if the last message is incoming — no need to analyze after we just sent one
+    if (last.direction === 'incoming') {
+      lastAnalyzedCountRef.current = messages.length
+      runAiSuggest()
+    } else {
+      lastAnalyzedCountRef.current = messages.length
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages.length, aiPanelOpen])
+
   function insertSuggestionToInput() {
-    if (aiSuggestion) setMsgText(extractNextMessage(aiSuggestion))
-    setAiSuggestion(null)
+    if (aiText) setMsgText(extractNextMessage(aiText))
   }
 
   async function copySuggestion() {
-    if (aiSuggestion) {
-      try {
-        await navigator.clipboard.writeText(extractNextMessage(aiSuggestion))
-      } catch {}
+    if (aiText) {
+      try { await navigator.clipboard.writeText(extractNextMessage(aiText)) } catch {}
     }
   }
 
@@ -653,30 +701,6 @@ export function DealCard({ deal, stages, activities, salespersons, clientData, b
             {/* Сообщения */}
             {tab === 'messages' && (
               <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 220px)', maxHeight: 'calc(100vh - 220px)' }}>
-                {/* AI Assistant bar */}
-                <div style={{ display: 'flex', gap: 8, padding: '8px 12px', borderBottom: '1px solid var(--bor2)', background: 'rgba(177,94,204,.04)' }}>
-                  <button
-                    onClick={handleSuggestReply}
-                    disabled={aiLoading || messages.length === 0}
-                    title={messages.length === 0 ? 'Начните переписку с клиентом' : 'AI-ассистент предложит ответ'}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 6,
-                      padding: '6px 12px', borderRadius: 8,
-                      background: aiLoading ? 'rgba(177,94,204,.15)' : 'var(--purple)',
-                      color: aiLoading ? 'var(--purple)' : '#fff',
-                      border: 'none', cursor: (aiLoading || messages.length === 0) ? 'not-allowed' : 'pointer',
-                      fontSize: 11, fontWeight: 700, opacity: messages.length === 0 ? 0.5 : 1,
-                    }}>
-                    {aiLoading ? (
-                      <>⏳ Думаю...</>
-                    ) : (
-                      <>💡 AI: предложить ответ</>
-                    )}
-                  </button>
-                  <div style={{ flex: 1, fontSize: 10, color: 'var(--muted)', alignSelf: 'center' }}>
-                    AI проанализирует переписку и предложит оптимальный ответ
-                  </div>
-                </div>
                 {messages.length > 0 ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1, overflowY: 'auto', paddingBottom: 12, minHeight: 0 }}>
                     {messages.map((m: any) => {
@@ -827,44 +851,122 @@ export function DealCard({ deal, stages, activities, salespersons, clientData, b
         </div>
       </div>
 
-      {/* AI Suggestion modal */}
-      {(aiSuggestion || aiError) && (
-        <div
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.4)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
-          onClick={e => { if (e.target === e.currentTarget) { setAiSuggestion(null); setAiError(null) } }}>
-          <div style={{ background: 'var(--surf)', borderRadius: 16, width: '100%', maxWidth: 600, maxHeight: '80vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,.25)' }}>
-            <div style={{ padding: '18px 24px 14px', borderBottom: '1px solid var(--bor2)', display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(177,94,204,.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>💡</div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--text)' }}>AI-ассистент предлагает</div>
-                <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>Проанализировал историю переписки и контекст сделки</div>
-              </div>
-              <button onClick={() => { setAiSuggestion(null); setAiError(null) }}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 22, color: 'var(--muted)', padding: '0 4px' }}>×</button>
-            </div>
+      {/* Floating AI terminal panel — visible only on messages tab */}
+      {tab === 'messages' && (
+        <>
+          {/* Toggle button when panel is closed */}
+          {!aiPanelOpen && (
+            <button
+              onClick={() => setAiPanelOpen(true)}
+              style={{
+                position: 'fixed', right: 20, bottom: 20, zIndex: 90,
+                width: 56, height: 56, borderRadius: '50%',
+                background: '#0d1117', color: '#7ee787',
+                border: '2px solid #30363d',
+                boxShadow: '0 8px 24px rgba(0,0,0,.3)',
+                cursor: 'pointer', fontSize: 22,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+              title="Открыть AI ассистент">💡</button>
+          )}
 
-            <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
-              {aiError ? (
-                <div style={{ fontSize: 13, color: 'var(--red)', padding: 16, background: 'rgba(220,53,69,.06)', borderRadius: 10 }}>{aiError}</div>
-              ) : (
-                <div style={{ fontSize: 14, lineHeight: 1.55, color: 'var(--text)', whiteSpace: 'pre-wrap', padding: 16, background: 'var(--bg)', border: '1px solid var(--bor2)', borderRadius: 12 }}>
-                  {aiSuggestion}
+          {/* Terminal panel */}
+          {aiPanelOpen && (
+            <div style={{
+              position: 'fixed', right: 16, top: 80, bottom: 16,
+              width: 420, maxWidth: 'calc(100vw - 32px)',
+              background: '#0d1117', color: '#c9d1d9',
+              border: '1px solid #30363d', borderRadius: 12,
+              fontFamily: '"JetBrains Mono", "SF Mono", Menlo, monospace',
+              display: 'flex', flexDirection: 'column',
+              boxShadow: '0 16px 48px rgba(0,0,0,.35)',
+              zIndex: 90, overflow: 'hidden',
+            }}>
+              {/* Title bar */}
+              <div style={{
+                padding: '10px 14px', borderBottom: '1px solid #21262d',
+                display: 'flex', alignItems: 'center', gap: 8,
+                background: '#161b22',
+              }}>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#ff5f56' }} />
+                  <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#ffbd2e' }} />
+                  <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#27c93f' }} />
+                </div>
+                <div style={{ flex: 1, fontSize: 11, color: '#8b949e', fontWeight: 700, marginLeft: 6 }}>
+                  ai-sales-assistant — claude-sonnet-4-6
+                </div>
+                <button
+                  onClick={runAiSuggest}
+                  disabled={aiStreaming}
+                  title="Перезапустить анализ"
+                  style={{
+                    background: 'none', border: '1px solid #30363d', borderRadius: 6,
+                    color: '#7ee787', padding: '3px 8px', fontSize: 10, cursor: 'pointer',
+                    fontFamily: 'inherit', opacity: aiStreaming ? 0.5 : 1,
+                  }}>↻ rerun</button>
+                <button
+                  onClick={() => setAiPanelOpen(false)}
+                  title="Свернуть"
+                  style={{
+                    background: 'none', border: 'none', color: '#8b949e', cursor: 'pointer',
+                    fontSize: 18, padding: '0 4px', lineHeight: 1,
+                  }}>−</button>
+              </div>
+
+              {/* Body */}
+              <div style={{ flex: 1, overflowY: 'auto', padding: '14px 16px', fontSize: 12, lineHeight: 1.6 }}>
+                {aiError ? (
+                  <div style={{ color: '#ff7b72' }}>
+                    <div style={{ color: '#8b949e' }}>$ ai --analyze</div>
+                    <div style={{ marginTop: 6 }}>ERROR: {aiError}</div>
+                  </div>
+                ) : !aiText && !aiStreaming ? (
+                  <div style={{ color: '#8b949e' }}>
+                    <div>$ ai --watch</div>
+                    <div style={{ marginTop: 10 }}>Жду новых сообщений от клиента...</div>
+                    <div style={{ marginTop: 4, fontSize: 10 }}>Анализ автоматически запустится при входящем.</div>
+                    <div style={{ marginTop: 10 }}>Или нажми ↻ rerun чтобы запустить сейчас.</div>
+                  </div>
+                ) : (
+                  <div>
+                    <div style={{ color: '#8b949e', marginBottom: 8 }}>$ ai --analyze deal-{deal.id.slice(0, 8)}</div>
+                    <div style={{ whiteSpace: 'pre-wrap', color: '#c9d1d9' }}>
+                      {aiText}
+                      {aiStreaming && <span className="ai-cursor" style={{ display: 'inline-block', width: 8, height: 14, background: '#7ee787', verticalAlign: 'middle', marginLeft: 2 }} />}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Action footer */}
+              {aiText && !aiStreaming && !aiError && (
+                <div style={{
+                  borderTop: '1px solid #21262d', padding: '10px 14px',
+                  background: '#161b22', display: 'flex', gap: 8,
+                }}>
+                  <button onClick={copySuggestion}
+                    style={{
+                      flex: 1, background: '#21262d', border: '1px solid #30363d',
+                      color: '#c9d1d9', padding: '8px 10px', borderRadius: 6,
+                      cursor: 'pointer', fontSize: 11, fontFamily: 'inherit', fontWeight: 600,
+                    }}>📋 Копировать</button>
+                  <button onClick={insertSuggestionToInput}
+                    style={{
+                      flex: 1, background: '#238636', border: '1px solid #2ea043',
+                      color: '#fff', padding: '8px 10px', borderRadius: 6,
+                      cursor: 'pointer', fontSize: 11, fontFamily: 'inherit', fontWeight: 700,
+                    }}>→ Вставить в чат</button>
                 </div>
               )}
-            </div>
 
-            {aiSuggestion && (
-              <div style={{ padding: '14px 24px', borderTop: '1px solid var(--bor2)', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                <button onClick={copySuggestion} className="btn-s" style={{ padding: '8px 14px', fontSize: 12 }}>
-                  Скопировать
-                </button>
-                <button onClick={insertSuggestionToInput} className="btn-p" style={{ padding: '8px 16px', fontSize: 12 }}>
-                  Вставить в поле ввода
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
+              <style>{`
+                @keyframes ai-blink { 0%, 100% { opacity: 1 } 50% { opacity: 0 } }
+                .ai-cursor { animation: ai-blink 1s step-start infinite; }
+              `}</style>
+            </div>
+          )}
+        </>
       )}
     </div>
   )
