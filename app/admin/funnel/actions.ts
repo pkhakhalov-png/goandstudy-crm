@@ -455,8 +455,8 @@ export async function sendDealMessage(formData: FormData) {
   try {
     const result = await sendWazzupMessage({ channelId, chatType, chatId, text })
 
-    // Save to deal_messages immediately (webhook will also fire as echo, but this is instant)
-    await supabase.from('deal_messages').insert({
+    // Upsert to deal_messages (unique external_id prevents dupe with echo webhook)
+    await supabase.from('deal_messages').upsert({
       deal_id: dealId,
       direction: 'outgoing',
       channel,
@@ -464,7 +464,7 @@ export async function sendDealMessage(formData: FormData) {
       content: text,
       external_id: result.messageId,
       metadata: { channelId, chatId, sentBy: user.id },
-    })
+    }, { onConflict: 'external_id', ignoreDuplicates: false })
 
     await supabase.from('deal_activities').insert({
       deal_id: dealId,
@@ -567,7 +567,7 @@ export async function sendDealFile(formData: FormData) {
       text: caption || undefined,
     })
 
-    await supabase.from('deal_messages').insert({
+    await supabase.from('deal_messages').upsert({
       deal_id: dealId,
       direction: 'outgoing',
       channel,
@@ -576,7 +576,7 @@ export async function sendDealFile(formData: FormData) {
       file_id: insertedFile?.id ?? null,
       external_id: result.messageId,
       metadata: { channelId, chatId, sentBy: user.id },
-    })
+    }, { onConflict: 'external_id', ignoreDuplicates: false })
 
     await supabase.from('deal_activities').insert({
       deal_id: dealId,
