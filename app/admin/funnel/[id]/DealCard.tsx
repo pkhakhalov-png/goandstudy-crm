@@ -155,6 +155,7 @@ export function DealCard({ deal, stages, activities, salespersons, clientData, b
 
   function insertSuggestionToInput() {
     if (aiText) setMsgText(extractNextMessage(aiText))
+    setAiPanelOpen(false)
   }
 
   async function copySuggestion() {
