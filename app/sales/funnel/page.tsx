@@ -24,42 +24,36 @@ export default async function SalesFunnelPage() {
   const [
     { data: stages },
     { data: trashedDeals },
+    { count: totalDeals },
   ] = await Promise.all([
     supabase.from('pipeline_stages').select('*').eq('is_active', true).order('position'),
-    supabase.from('deals').select('id, contact_name, contact_phone, budget, stage_id, deleted_at').eq('salesperson_id', user.id).not('deleted_at', 'is', null).order('deleted_at', { ascending: false }),
+    supabase.from('deals').select('id, contact_name, contact_phone, budget, stage_id, deleted_at').eq('salesperson_id', user.id).not('deleted_at', 'is', null).order('deleted_at', { ascending: false }).limit(50),
+    supabase.from('deals').select('*', { count: 'exact', head: true }).eq('salesperson_id', user.id).is('deleted_at', null),
   ])
 
-  const stageIds = (stages ?? []).map(s => s.id)
-
-  const [dealsResult, countsResult] = await Promise.all([
-    supabase
-      .from('deals')
-      .select('id, title, stage_id, salesperson_id, contact_name, contact_phone, contact_telegram, contact_email, contact_whatsapp, budget, source, created_at, updated_at')
-      .eq('salesperson_id', user.id)
-      .is('deleted_at', null)
-      .order('updated_at', { ascending: false })
-      .limit(dealsPerStage * stageIds.length),
-    supabase
-      .from('deals')
-      .select('stage_id')
-      .eq('salesperson_id', user.id)
-      .is('deleted_at', null),
-  ])
-
-  const rawDeals = dealsResult.data ?? []
+  const stageList = stages ?? []
+  const perStageResults = await Promise.all(
+    stageList.flatMap(s => [
+      supabase.from('deals').select('*', { count: 'exact', head: true }).eq('stage_id', s.id).eq('salesperson_id', user.id).is('deleted_at', null),
+      supabase
+        .from('deals')
+        .select('id, title, stage_id, salesperson_id, contact_name, contact_phone, contact_telegram, contact_email, contact_whatsapp, budget, source, created_at, updated_at')
+        .eq('stage_id', s.id)
+        .eq('salesperson_id', user.id)
+        .is('deleted_at', null)
+        .order('updated_at', { ascending: false })
+        .limit(dealsPerStage),
+    ])
+  )
 
   const stageCounts: Record<string, number> = {}
-  for (const d of (countsResult.data ?? [])) {
-    stageCounts[d.stage_id] = (stageCounts[d.stage_id] || 0) + 1
-  }
-
-  const stageDealsCount: Record<string, number> = {}
-  const deals = rawDeals.filter(d => {
-    stageDealsCount[d.stage_id] = (stageDealsCount[d.stage_id] || 0) + 1
-    return stageDealsCount[d.stage_id] <= dealsPerStage
+  const deals: any[] = []
+  stageList.forEach((s, i) => {
+    const countRes = perStageResults[i * 2]
+    const dealsRes = perStageResults[i * 2 + 1]
+    stageCounts[s.id] = countRes.count ?? 0
+    if (dealsRes.data) deals.push(...dealsRes.data)
   })
-
-  const totalDeals = Object.values(stageCounts).reduce((s, c) => s + c, 0)
 
   return (
     <div className="app">
@@ -67,7 +61,7 @@ export default async function SalesFunnelPage() {
       <div className="main" style={{ display: 'flex', flexDirection: 'column' }}>
         <div className="topbar">
           <div className="pt">Мои сделки</div>
-          <span style={{ fontSize: 12, color: 'var(--muted)' }}>{totalDeals} сделок</span>
+          <span style={{ fontSize: 12, color: 'var(--muted)' }}>{totalDeals ?? deals.length} сделок</span>
         </div>
         <FunnelClient
           stages={stages ?? []}

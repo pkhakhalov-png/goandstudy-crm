@@ -9,15 +9,8 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: profile } = await supabase
-    .from('users')
-    .select('name, role')
-    .eq('id', user.id)
-    .single()
-
-  if (profile?.role !== 'admin') redirect('/sales')
-
   const [
+    { data: profile },
     { data: deal },
     { data: stages },
     { data: activities },
@@ -27,16 +20,18 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
     { data: messages },
     { data: tasks },
   ] = await Promise.all([
+    supabase.from('users').select('name, role').eq('id', user.id).single(),
     supabase.from('deals').select('*').eq('id', id).single(),
-    supabase.from('pipeline_stages').select('*').eq('is_active', true).order('position'),
-    supabase.from('deal_activities').select('*').eq('deal_id', id).order('created_at', { ascending: false }),
+    supabase.from('pipeline_stages').select('id, name, color, position, stage_type').eq('is_active', true).order('position'),
+    supabase.from('deal_activities').select('id, deal_id, user_id, activity_type, content, metadata, created_at').eq('deal_id', id).order('created_at', { ascending: false }),
     supabase.from('users').select('id, name').eq('role', 'salesperson').eq('is_active', true).order('name'),
     supabase.from('users').select('id, name'),
-    supabase.from('deal_files').select('*').eq('deal_id', id).order('created_at', { ascending: false }),
-    supabase.from('deal_messages').select('*').eq('deal_id', id).order('created_at', { ascending: true }),
-    supabase.from('deal_tasks').select('*').eq('deal_id', id).order('created_at', { ascending: true }),
+    supabase.from('deal_files').select('id, deal_id, name, url, size, mime_type, source, created_at').eq('deal_id', id).order('created_at', { ascending: false }),
+    supabase.from('deal_messages').select('id, deal_id, direction, channel, sender_name, content, created_at').eq('deal_id', id).order('created_at', { ascending: true }),
+    supabase.from('deal_tasks').select('id, deal_id, title, deadline, is_done, assigned_to, completed_at, created_at').eq('deal_id', id).order('created_at', { ascending: true }),
   ])
 
+  if (profile?.role !== 'admin') redirect('/sales')
   if (!deal) redirect('/admin/funnel')
 
   const userMap = new Map((allUsers ?? []).map(u => [u.id, u.name]))
@@ -45,27 +40,15 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
     user_name: userMap.get(a.user_id) ?? 'Система',
   }))
 
-  // Get linked client data if exists
-  let clientData = null
-  if (deal.client_id) {
-    const { data } = await supabase
-      .from('clients')
-      .select('id, name, country, university, status, months')
-      .eq('id', deal.client_id)
-      .single()
-    clientData = data
-  }
-
-  // Get linked booking if exists
-  let bookingData = null
-  if (deal.booking_id) {
-    const { data } = await supabase
-      .from('bookings')
-      .select('id, booking_date, start_time, end_time, status')
-      .eq('id', deal.booking_id)
-      .single()
-    bookingData = data
-  }
+  // Fetch linked data in parallel (only if IDs exist)
+  const [clientData, bookingData] = await Promise.all([
+    deal.client_id
+      ? supabase.from('clients').select('id, name, country, university, status, months').eq('id', deal.client_id).single().then(r => r.data)
+      : null,
+    deal.booking_id
+      ? supabase.from('bookings').select('id, booking_date, start_time, end_time, status').eq('id', deal.booking_id).single().then(r => r.data)
+      : null,
+  ])
 
   return (
     <div className="app">
