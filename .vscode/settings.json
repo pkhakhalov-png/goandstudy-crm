@@ -1,0 +1,6 @@
+{
+  "workbench.statusBar.visible": true,
+  "git.enabled": true,
+  "git.decorations.enabled": true,
+  "scm.alwaysShowRepositories": true
+}

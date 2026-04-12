@@ -31,8 +31,16 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl
 
+  // Публичные маршруты (webhook'и, booking, tbank callback)
+  const isPublic =
+    pathname === '/login' ||
+    pathname.startsWith('/book') ||
+    pathname.startsWith('/api/book') ||
+    pathname.startsWith('/api/wazzup') ||
+    pathname.startsWith('/api/tbank')
+
   // Не авторизован — редирект на /login
-  if (!user && pathname !== '/login' && !pathname.startsWith('/book') && !pathname.startsWith('/api/book')) {
+  if (!user && !isPublic) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 

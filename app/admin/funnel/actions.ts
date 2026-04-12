@@ -3,6 +3,7 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { normalizePhone } from '@/lib/phone'
+import { sendWazzupMessage, type ChatType } from '@/lib/wazzup'
 
 function reval() {
   revalidatePath('/admin/funnel')
@@ -389,6 +390,82 @@ export async function linkDealToClient(formData: FormData) {
   reval()
   revalidatePath(`/admin/funnel/${dealId}`)
   return { success: true }
+}
+
+// ═══ WAZZUP SEND ═══
+
+export async function sendDealMessage(formData: FormData) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Не авторизован' }
+
+  const dealId = formData.get('deal_id') as string
+  const text = (formData.get('text') as string)?.trim()
+  const channel = formData.get('channel') as 'telegram' | 'whatsapp'
+
+  if (!text) return { error: 'Введите сообщение' }
+  if (!channel) return { error: 'Выберите канал' }
+
+  const { data: deal } = await supabase
+    .from('deals')
+    .select('id, contact_phone, contact_telegram, phone_normalized')
+    .eq('id', dealId)
+    .single()
+
+  if (!deal) return { error: 'Сделка не найдена' }
+
+  // Determine channelId and chatId
+  const channelId = channel === 'telegram'
+    ? process.env.WAZZUP_TG_CHANNEL_ID
+    : process.env.WAZZUP_WA_CHANNEL_ID
+
+  if (!channelId) return { error: `Канал ${channel} не настроен` }
+
+  let chatType: ChatType
+  let chatId: string
+
+  if (channel === 'whatsapp') {
+    if (!deal.phone_normalized) return { error: 'У клиента нет телефона' }
+    chatType = 'whatsapp'
+    chatId = deal.phone_normalized
+  } else {
+    // Wazzup Telegram API (tgapi) accepts phone or @username
+    const handle = deal.contact_telegram?.replace(/^@/, '') || deal.phone_normalized
+    if (!handle) return { error: 'У клиента нет Telegram или телефона' }
+    chatType = 'tgapi'
+    chatId = handle
+  }
+
+  try {
+    const result = await sendWazzupMessage({ channelId, chatType, chatId, text })
+
+    // Save to deal_messages immediately (webhook will also fire as echo, but this is instant)
+    await supabase.from('deal_messages').insert({
+      deal_id: dealId,
+      direction: 'outgoing',
+      channel,
+      sender_name: 'Менеджер',
+      content: text,
+      external_id: result.messageId,
+      metadata: { channelId, chatId, sentBy: user.id },
+    })
+
+    await supabase.from('deal_activities').insert({
+      deal_id: dealId,
+      user_id: user.id,
+      activity_type: 'message',
+      content: `Исходящее ${channel}: ${text.slice(0, 100)}`,
+      metadata: { channel, direction: 'outgoing' },
+    })
+
+    await supabase.from('deals').update({ updated_at: new Date().toISOString() }).eq('id', dealId)
+
+    revalidatePath(`/admin/funnel/${dealId}`)
+    revalidatePath(`/sales/funnel/${dealId}`)
+    return { success: true }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Ошибка отправки' }
+  }
 }
 
 export async function searchClients(query: string) {
