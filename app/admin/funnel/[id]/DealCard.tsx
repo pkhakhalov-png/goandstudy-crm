@@ -77,21 +77,7 @@ export function DealCard({ deal, stages, activities, salespersons, clientData, b
   const [msgError, setMsgError] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const chatFileInputRef = useRef<HTMLInputElement>(null)
-
-  async function handleSendChatFile(file: File) {
-    setMsgSending(true)
-    setMsgError(null)
-    const fd = new FormData()
-    fd.append('deal_id', deal.id)
-    fd.append('channel', msgChannel)
-    fd.append('file', file)
-    if (msgText.trim()) fd.append('caption', msgText.trim())
-    const res = await sendDealFile(fd)
-    setMsgSending(false)
-    if (res.error) setMsgError(res.error)
-    else setMsgText('')
-    if (chatFileInputRef.current) chatFileInputRef.current.value = ''
-  }
+  const [pendingFile, setPendingFile] = useState<File | null>(null)
 
   // Auto-scroll to last message when opening messages tab or when new message arrives
   useEffect(() => {
@@ -101,17 +87,34 @@ export function DealCard({ deal, stages, activities, salespersons, clientData, b
   }, [tab, messages.length])
 
   async function handleSendMsg() {
-    if (!msgText.trim()) return
+    if (!msgText.trim() && !pendingFile) return
     setMsgSending(true)
     setMsgError(null)
-    const fd = new FormData()
-    fd.append('deal_id', deal.id)
-    fd.append('text', msgText)
-    fd.append('channel', msgChannel)
-    const res = await sendDealMessage(fd)
-    setMsgSending(false)
-    if (res.error) setMsgError(res.error)
-    else setMsgText('')
+
+    if (pendingFile) {
+      // Send file (with optional caption)
+      const fd = new FormData()
+      fd.append('deal_id', deal.id)
+      fd.append('channel', msgChannel)
+      fd.append('file', pendingFile)
+      if (msgText.trim()) fd.append('caption', msgText.trim())
+      const res = await sendDealFile(fd)
+      setMsgSending(false)
+      if (res.error) { setMsgError(res.error); return }
+      setMsgText('')
+      setPendingFile(null)
+      if (chatFileInputRef.current) chatFileInputRef.current.value = ''
+    } else {
+      // Send plain text
+      const fd = new FormData()
+      fd.append('deal_id', deal.id)
+      fd.append('text', msgText)
+      fd.append('channel', msgChannel)
+      const res = await sendDealMessage(fd)
+      setMsgSending(false)
+      if (res.error) setMsgError(res.error)
+      else setMsgText('')
+    }
   }
 
   const currentStage = stages.find(s => s.id === deal.stage_id)
@@ -678,6 +681,20 @@ export function DealCard({ deal, stages, activities, salespersons, clientData, b
                   {msgError && (
                     <div style={{ fontSize: 11, color: 'var(--red)', marginBottom: 6, padding: '6px 10px', background: 'rgba(220,53,69,.06)', borderRadius: 8 }}>{msgError}</div>
                   )}
+                  {pendingFile && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, padding: '8px 12px', background: 'rgba(177,94,204,.08)', border: '1px solid rgba(177,94,204,.2)', borderRadius: 10 }}>
+                      <span style={{ fontSize: 18 }}>{pendingFile.type.startsWith('image/') ? '🖼' : '📎'}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pendingFile.name}</div>
+                        <div style={{ fontSize: 10, color: 'var(--muted)' }}>{formatSize(pendingFile.size)}</div>
+                      </div>
+                      <button
+                        onClick={() => { setPendingFile(null); if (chatFileInputRef.current) chatFileInputRef.current.value = '' }}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 18, padding: '0 4px' }}
+                        title="Убрать файл"
+                      >×</button>
+                    </div>
+                  )}
                   <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end' }}>
                     <div style={{ display: 'flex', gap: 4 }}>
                       <button
@@ -719,7 +736,7 @@ export function DealCard({ deal, stages, activities, salespersons, clientData, b
                         style={{ display: 'none' }}
                         onChange={e => {
                           const f = e.target.files?.[0]
-                          if (f) handleSendChatFile(f)
+                          if (f) setPendingFile(f)
                         }}
                       />
                     </div>
@@ -727,7 +744,7 @@ export function DealCard({ deal, stages, activities, salespersons, clientData, b
                       value={msgText}
                       onChange={e => setMsgText(e.target.value)}
                       onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMsg() } }}
-                      placeholder="Напишите сообщение... (Enter — отправить, Shift+Enter — новая строка)"
+                      placeholder={pendingFile ? 'Подпись к файлу (необязательно)...' : 'Напишите сообщение... (Enter — отправить, Shift+Enter — новая строка)'}
                       rows={1}
                       style={{
                         flex: 1, padding: '10px 12px', border: '1px solid var(--bor2)', borderRadius: 10,
@@ -737,9 +754,9 @@ export function DealCard({ deal, stages, activities, salespersons, clientData, b
                     />
                     <button
                       onClick={handleSendMsg}
-                      disabled={msgSending || !msgText.trim()}
+                      disabled={msgSending || (!msgText.trim() && !pendingFile)}
                       className="btn-p"
-                      style={{ padding: '10px 16px', fontSize: 12, opacity: (msgSending || !msgText.trim()) ? 0.5 : 1 }}>
+                      style={{ padding: '10px 16px', fontSize: 12, opacity: (msgSending || (!msgText.trim() && !pendingFile)) ? 0.5 : 1 }}>
                       {msgSending ? '...' : 'Отправить'}
                     </button>
                   </div>

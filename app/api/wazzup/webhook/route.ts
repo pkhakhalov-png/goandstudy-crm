@@ -189,17 +189,29 @@ async function processMessage(supabase: SupabaseAdmin, msg: WazzupMessage) {
     }
   }
 
-  // Upsert by external_id — unique constraint prevents duplicates from echo race
-  await supabase.from('deal_messages').upsert({
-    deal_id: dealId,
-    direction: msg.isEcho ? 'outgoing' : 'incoming',
-    channel: msg.chatType === 'whatsapp' ? 'whatsapp' : 'telegram',
-    sender_name: senderName,
-    content: msg.text || (msg.type !== 'text' ? `[${msg.type}]` : ''),
-    file_id: fileId,
-    external_id: msg.messageId,
-    metadata: { channelId: msg.channelId, chatId: msg.chatId, type: msg.type },
-  }, { onConflict: 'external_id', ignoreDuplicates: false })
+  // Dedupe by external_id
+  const { data: existing } = await supabase
+    .from('deal_messages')
+    .select('id, file_id')
+    .eq('external_id', msg.messageId)
+    .maybeSingle()
+
+  if (existing) {
+    if (fileId && !existing.file_id) {
+      await supabase.from('deal_messages').update({ file_id: fileId }).eq('id', existing.id)
+    }
+  } else {
+    await supabase.from('deal_messages').insert({
+      deal_id: dealId,
+      direction: msg.isEcho ? 'outgoing' : 'incoming',
+      channel: msg.chatType === 'whatsapp' ? 'whatsapp' : 'telegram',
+      sender_name: senderName,
+      content: msg.text || (msg.type !== 'text' ? `[${msg.type}]` : ''),
+      file_id: fileId,
+      external_id: msg.messageId,
+      metadata: { channelId: msg.channelId, chatId: msg.chatId, type: msg.type },
+    })
+  }
 
   // Bump deal updated_at so it rises to the top of the kanban
   await supabase.from('deals').update({ updated_at: new Date().toISOString() }).eq('id', dealId)
