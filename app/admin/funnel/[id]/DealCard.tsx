@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { moveDeal, addDealNote, updateDeal, createDealTask, toggleDealTask, deleteDealTask, linkDealToClient, searchClients, sendDealMessage } from '../actions'
 import { uploadDealFile, deleteDealFile } from './fileActions'
@@ -51,6 +51,14 @@ export function DealCard({ deal, stages, activities, salespersons, clientData, b
   const [msgChannel, setMsgChannel] = useState<'telegram' | 'whatsapp'>(deal.contact_telegram ? 'telegram' : 'whatsapp')
   const [msgSending, setMsgSending] = useState(false)
   const [msgError, setMsgError] = useState<string | null>(null)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // Auto-scroll to last message when opening messages tab or when new message arrives
+  useEffect(() => {
+    if (tab === 'messages') {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'instant' as ScrollBehavior, block: 'end' })
+    }
+  }, [tab, messages.length])
 
   async function handleSendMsg() {
     if (!msgText.trim()) return
@@ -565,9 +573,9 @@ export function DealCard({ deal, stages, activities, salespersons, clientData, b
 
             {/* Сообщения */}
             {tab === 'messages' && (
-              <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 220px)', maxHeight: 'calc(100vh - 220px)' }}>
                 {messages.length > 0 ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1, overflowY: 'auto', paddingBottom: 12 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1, overflowY: 'auto', paddingBottom: 12, minHeight: 0 }}>
                     {messages.map((m: any) => {
                       const attachedFile = m.file_id ? files.find((f: any) => f.id === m.file_id) : null
                       const isImage = attachedFile?.mime_type?.startsWith('image/')
@@ -615,6 +623,7 @@ export function DealCard({ deal, stages, activities, salespersons, clientData, b
                       </div>
                       )
                     })}
+                    <div ref={messagesEndRef} />
                   </div>
                 ) : (
                   <div style={{ textAlign: 'center', padding: 40, flex: 1 }}>
