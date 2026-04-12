@@ -4,6 +4,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { normalizePhone } from '@/lib/phone'
 import { sendWazzupMessage, type ChatType } from '@/lib/wazzup'
+import { suggestSalesReply } from '@/lib/ai'
 
 function reval() {
   revalidatePath('/admin/funnel')
@@ -610,6 +611,76 @@ export async function sendDealFile(formData: FormData) {
     return { success: true }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Ошибка отправки файла' }
+  }
+}
+
+// ═══ AI SALES ASSISTANT ═══
+
+export async function suggestReply(dealId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Не авторизован' }
+
+  // Load deal with stage name
+  const { data: deal } = await supabase
+    .from('deals')
+    .select('id, title, contact_name, contact_phone, contact_telegram, budget, source, created_at, stage_id, client_id')
+    .eq('id', dealId)
+    .single()
+
+  if (!deal) return { error: 'Сделка не найдена' }
+
+  const { data: stage } = await supabase
+    .from('pipeline_stages')
+    .select('name')
+    .eq('id', deal.stage_id)
+    .single()
+
+  // Load last 40 messages
+  const { data: messages } = await supabase
+    .from('deal_messages')
+    .select('direction, sender_name, content, created_at')
+    .eq('deal_id', dealId)
+    .order('created_at', { ascending: true })
+    .limit(40)
+
+  // Optional: linked client info
+  let extraContext = ''
+  if (deal.client_id) {
+    const { data: client } = await supabase
+      .from('clients')
+      .select('name, country, university, status, months')
+      .eq('id', deal.client_id)
+      .single()
+    if (client) {
+      extraContext = `Привязанный клиент: ${client.name}, страна: ${client.country || '—'}, вуз: ${client.university || '—'}, статус: ${client.status || '—'}`
+    }
+  }
+
+  try {
+    const suggestion = await suggestSalesReply(
+      {
+        title: deal.title,
+        stage_name: stage?.name,
+        contact_name: deal.contact_name,
+        contact_phone: deal.contact_phone,
+        contact_telegram: deal.contact_telegram,
+        budget: Number(deal.budget || 0),
+        source: deal.source || 'manual',
+        created_at: deal.created_at,
+      },
+      (messages ?? []).map(m => ({
+        direction: m.direction as 'incoming' | 'outgoing',
+        sender_name: m.sender_name,
+        content: m.content,
+        created_at: m.created_at,
+      })),
+      extraContext || undefined,
+    )
+
+    return { suggestion }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Ошибка AI' }
   }
 }
 
