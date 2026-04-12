@@ -40,17 +40,21 @@ function getKey() {
 }
 
 export async function sendWazzupMessage(params: SendMessageParams) {
+  const body = JSON.stringify(params)
+  console.log('[wazzup send] body:', body)
+
   const res = await fetch(`${WAZZUP_API}/message`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${getKey()}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(params),
+    body,
   })
 
   if (!res.ok) {
     const err = await res.text()
+    console.log('[wazzup send] error:', res.status, err)
     throw new Error(`Wazzup send failed: ${res.status} ${err}`)
   }
 
