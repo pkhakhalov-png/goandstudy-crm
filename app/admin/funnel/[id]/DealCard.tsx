@@ -94,15 +94,23 @@ export function DealCard({ deal, stages, activities, salespersons, clientData, b
     else if (res.suggestion) setAiSuggestion(res.suggestion)
   }
 
+  // Extract only the "next message" block from structured AI response
+  function extractNextMessage(text: string): string {
+    if (!text) return ''
+    const m = text.match(/💬\s*СЛЕДУЮЩЕЕ СООБЩЕНИЕ:\s*([\s\S]*?)(?=\n[⚠️💰🎁🎯]|$)/)
+    if (m) return m[1].trim()
+    return text.trim()
+  }
+
   function insertSuggestionToInput() {
-    if (aiSuggestion) setMsgText(aiSuggestion)
+    if (aiSuggestion) setMsgText(extractNextMessage(aiSuggestion))
     setAiSuggestion(null)
   }
 
   async function copySuggestion() {
     if (aiSuggestion) {
       try {
-        await navigator.clipboard.writeText(aiSuggestion)
+        await navigator.clipboard.writeText(extractNextMessage(aiSuggestion))
       } catch {}
     }
   }
