@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { moveDeal, addDealNote, updateDeal, createDealTask, toggleDealTask, deleteDealTask, linkDealToClient, searchClients, sendDealMessage, sendDealFile } from '../actions'
+import { moveDeal, addDealNote, updateDeal, createDealTask, toggleDealTask, deleteDealTask, linkDealToClient, searchClients, sendDealMessage, sendDealFile, suggestReply } from '../actions'
 import { uploadDealFile, deleteDealFile } from './fileActions'
 import { createClient } from '@/lib/supabase/client'
 
@@ -78,6 +78,34 @@ export function DealCard({ deal, stages, activities, salespersons, clientData, b
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const chatFileInputRef = useRef<HTMLInputElement>(null)
   const [pendingFile, setPendingFile] = useState<File | null>(null)
+
+  // AI sales assistant
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiSuggestion, setAiSuggestion] = useState<string | null>(null)
+  const [aiError, setAiError] = useState<string | null>(null)
+
+  async function handleSuggestReply() {
+    setAiLoading(true)
+    setAiError(null)
+    setAiSuggestion(null)
+    const res = await suggestReply(deal.id)
+    setAiLoading(false)
+    if (res.error) setAiError(res.error)
+    else if (res.suggestion) setAiSuggestion(res.suggestion)
+  }
+
+  function insertSuggestionToInput() {
+    if (aiSuggestion) setMsgText(aiSuggestion)
+    setAiSuggestion(null)
+  }
+
+  async function copySuggestion() {
+    if (aiSuggestion) {
+      try {
+        await navigator.clipboard.writeText(aiSuggestion)
+      } catch {}
+    }
+  }
 
   // Auto-scroll to last message when opening messages tab or when new message arrives
   useEffect(() => {
@@ -617,6 +645,30 @@ export function DealCard({ deal, stages, activities, salespersons, clientData, b
             {/* Сообщения */}
             {tab === 'messages' && (
               <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 220px)', maxHeight: 'calc(100vh - 220px)' }}>
+                {/* AI Assistant bar */}
+                <div style={{ display: 'flex', gap: 8, padding: '8px 12px', borderBottom: '1px solid var(--bor2)', background: 'rgba(177,94,204,.04)' }}>
+                  <button
+                    onClick={handleSuggestReply}
+                    disabled={aiLoading || messages.length === 0}
+                    title={messages.length === 0 ? 'Начните переписку с клиентом' : 'AI-ассистент предложит ответ'}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      padding: '6px 12px', borderRadius: 8,
+                      background: aiLoading ? 'rgba(177,94,204,.15)' : 'var(--purple)',
+                      color: aiLoading ? 'var(--purple)' : '#fff',
+                      border: 'none', cursor: (aiLoading || messages.length === 0) ? 'not-allowed' : 'pointer',
+                      fontSize: 11, fontWeight: 700, opacity: messages.length === 0 ? 0.5 : 1,
+                    }}>
+                    {aiLoading ? (
+                      <>⏳ Думаю...</>
+                    ) : (
+                      <>💡 AI: предложить ответ</>
+                    )}
+                  </button>
+                  <div style={{ flex: 1, fontSize: 10, color: 'var(--muted)', alignSelf: 'center' }}>
+                    AI проанализирует переписку и предложит оптимальный ответ
+                  </div>
+                </div>
                 {messages.length > 0 ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1, overflowY: 'auto', paddingBottom: 12, minHeight: 0 }}>
                     {messages.map((m: any) => {
@@ -766,6 +818,46 @@ export function DealCard({ deal, stages, activities, salespersons, clientData, b
           </div>
         </div>
       </div>
+
+      {/* AI Suggestion modal */}
+      {(aiSuggestion || aiError) && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.4)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+          onClick={e => { if (e.target === e.currentTarget) { setAiSuggestion(null); setAiError(null) } }}>
+          <div style={{ background: 'var(--surf)', borderRadius: 16, width: '100%', maxWidth: 600, maxHeight: '80vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,.25)' }}>
+            <div style={{ padding: '18px 24px 14px', borderBottom: '1px solid var(--bor2)', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(177,94,204,.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>💡</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--text)' }}>AI-ассистент предлагает</div>
+                <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>Проанализировал историю переписки и контекст сделки</div>
+              </div>
+              <button onClick={() => { setAiSuggestion(null); setAiError(null) }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 22, color: 'var(--muted)', padding: '0 4px' }}>×</button>
+            </div>
+
+            <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
+              {aiError ? (
+                <div style={{ fontSize: 13, color: 'var(--red)', padding: 16, background: 'rgba(220,53,69,.06)', borderRadius: 10 }}>{aiError}</div>
+              ) : (
+                <div style={{ fontSize: 14, lineHeight: 1.55, color: 'var(--text)', whiteSpace: 'pre-wrap', padding: 16, background: 'var(--bg)', border: '1px solid var(--bor2)', borderRadius: 12 }}>
+                  {aiSuggestion}
+                </div>
+              )}
+            </div>
+
+            {aiSuggestion && (
+              <div style={{ padding: '14px 24px', borderTop: '1px solid var(--bor2)', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                <button onClick={copySuggestion} className="btn-s" style={{ padding: '8px 14px', fontSize: 12 }}>
+                  Скопировать
+                </button>
+                <button onClick={insertSuggestionToInput} className="btn-p" style={{ padding: '8px 16px', fontSize: 12 }}>
+                  Вставить в поле ввода
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
