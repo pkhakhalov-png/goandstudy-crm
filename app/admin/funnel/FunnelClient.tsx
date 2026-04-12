@@ -548,7 +548,7 @@ export function FunnelClient({ stages: serverStages, deals: serverDeals, salespe
                           draggable
                           onDragStart={() => handleDragStart(deal.id)}
                           onDragOver={e => handleDragOverCard(e, idx)}
-                          onClick={() => router.push(`/admin/funnel/${deal.id}`)}
+                          onClick={() => router.push(`${isAdmin ? '/admin' : '/sales'}/funnel/${deal.id}`)}
                           style={{
                             background: 'var(--surf)', border: '1px solid var(--bor)', borderRadius: 10,
                             padding: '10px 12px', marginBottom: 6, cursor: 'grab',
