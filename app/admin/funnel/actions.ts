@@ -435,16 +435,13 @@ export async function sendDealMessage(formData: FormData) {
     chatId = deal.phone_normalized
   } else {
     // Wazzup v3: for tgapi channels, chatType is "telegram"
-    // chatId = phone (without +) or @username
-    const handle = deal.phone_normalized || deal.contact_telegram?.replace(/^@/, '')
+    // Prefer @username (Wazzup routes it reliably to real TG account)
+    // Fall back to phone only if no username
+    const handle = deal.contact_telegram?.replace(/^@/, '') || deal.phone_normalized
     if (!handle) return { error: 'У клиента нет Telegram или телефона' }
     chatType = 'telegram'
     chatId = handle
   }
-
-  // Debug info for UI
-  const channelIdHex = Array.from(channelId).map(c => c.charCodeAt(0).toString(16)).join('')
-  const debugSuffix = ` | DEBUG chId='${channelId}' len=${channelId.length} hex=${channelIdHex} chType=${chatType} chId2=${chatId}`
 
   try {
     const result = await sendWazzupMessage({ channelId, chatType, chatId, text })
@@ -474,7 +471,7 @@ export async function sendDealMessage(formData: FormData) {
     revalidatePath(`/sales/funnel/${dealId}`)
     return { success: true }
   } catch (e) {
-    return { error: (e instanceof Error ? e.message : 'Ошибка отправки') + debugSuffix }
+    return { error: e instanceof Error ? e.message : 'Ошибка отправки' }
   }
 }
 
