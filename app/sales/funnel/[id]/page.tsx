@@ -25,7 +25,7 @@ export default async function SalesDealPage({ params }: { params: Promise<{ id: 
     supabase.from('deal_activities').select('id, deal_id, user_id, activity_type, content, metadata, created_at').eq('deal_id', id).order('created_at', { ascending: false }),
     supabase.from('users').select('id, name'),
     supabase.from('deal_files').select('id, deal_id, name, url, size, mime_type, source, created_at').eq('deal_id', id).order('created_at', { ascending: false }),
-    supabase.from('deal_messages').select('id, deal_id, direction, channel, sender_name, content, created_at').eq('deal_id', id).order('created_at', { ascending: true }),
+    supabase.from('deal_messages').select('id, deal_id, direction, channel, sender_name, content, file_id, created_at').eq('deal_id', id).order('created_at', { ascending: true }),
     supabase.from('deal_tasks').select('id, deal_id, title, deadline, is_done, assigned_to, completed_at, created_at').eq('deal_id', id).order('created_at', { ascending: true }),
   ])
 
