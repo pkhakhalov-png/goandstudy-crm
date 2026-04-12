@@ -317,11 +317,7 @@ export function DealCard({ deal, stages, activities, salespersons, clientData, b
         </div>
       </div>
 
-      <div style={{
-        flex: 1, display: 'flex', overflow: 'hidden',
-        paddingRight: (tab === 'messages' && aiPanelOpen) ? 452 : 0,
-        transition: 'padding-right .2s',
-      }}>
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         {/* Left panel — deal info */}
         <div style={{ width: 280, minWidth: 280, borderRight: '1px solid var(--bor2)', display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
 
@@ -705,7 +701,7 @@ export function DealCard({ deal, stages, activities, salespersons, clientData, b
 
             {/* Сообщения */}
             {tab === 'messages' && (
-              <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 220px)', maxHeight: 'calc(100vh - 220px)' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 160px)', maxHeight: 'calc(100vh - 160px)' }}>
                 {messages.length > 0 ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1, overflowY: 'auto', paddingBottom: 12, minHeight: 0 }}>
                     {messages.map((m: any) => {
@@ -850,129 +846,110 @@ export function DealCard({ deal, stages, activities, salespersons, clientData, b
                     </button>
                   </div>
                 </div>
+
+                {/* Horizontal AI Terminal panel — always visible under chat */}
+                <div style={{
+                  marginTop: 10,
+                  background: '#0d1117', color: '#c9d1d9',
+                  border: '1px solid #30363d', borderRadius: 10,
+                  fontFamily: '"JetBrains Mono", "SF Mono", Menlo, monospace',
+                  display: 'flex', flexDirection: 'column',
+                  height: aiPanelOpen ? 260 : 36,
+                  overflow: 'hidden',
+                  transition: 'height .2s',
+                }}>
+                  {/* Title bar */}
+                  <div style={{
+                    padding: '8px 12px', borderBottom: aiPanelOpen ? '1px solid #21262d' : 'none',
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    background: '#161b22', cursor: 'pointer',
+                  }}
+                  onClick={() => setAiPanelOpen(!aiPanelOpen)}>
+                    <div style={{ display: 'flex', gap: 5 }}>
+                      <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#ff5f56' }} />
+                      <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#ffbd2e' }} />
+                      <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#27c93f' }} />
+                    </div>
+                    <div style={{ flex: 1, fontSize: 11, color: '#8b949e', fontWeight: 700, marginLeft: 4 }}>
+                      ai-sales-assistant — claude-sonnet-4-6
+                      {aiStreaming && <span style={{ marginLeft: 8, color: '#7ee787' }}>● streaming...</span>}
+                    </div>
+                    {aiPanelOpen && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); runAiSuggest() }}
+                        disabled={aiStreaming}
+                        title="Перезапустить анализ"
+                        style={{
+                          background: 'none', border: '1px solid #30363d', borderRadius: 5,
+                          color: '#7ee787', padding: '3px 8px', fontSize: 10, cursor: 'pointer',
+                          fontFamily: 'inherit', opacity: aiStreaming ? 0.5 : 1,
+                        }}>↻ rerun</button>
+                    )}
+                    <span style={{ color: '#8b949e', fontSize: 12, marginLeft: 4 }}>{aiPanelOpen ? '▾' : '▸'}</span>
+                  </div>
+
+                  {/* Body */}
+                  {aiPanelOpen && (
+                    <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+                      {/* Content area */}
+                      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 14px', fontSize: 12, lineHeight: 1.55 }}>
+                        {aiError ? (
+                          <div style={{ color: '#ff7b72' }}>
+                            <div style={{ color: '#8b949e' }}>$ ai --analyze</div>
+                            <div style={{ marginTop: 6 }}>ERROR: {aiError}</div>
+                          </div>
+                        ) : !aiText && !aiStreaming ? (
+                          <div style={{ color: '#8b949e' }}>
+                            <div>$ ai --watch</div>
+                            <div style={{ marginTop: 8 }}>Жду новых сообщений от клиента...</div>
+                            <div style={{ marginTop: 4, fontSize: 10 }}>Анализ автоматически запустится при входящем. Или нажми ↻ rerun.</div>
+                          </div>
+                        ) : (
+                          <div>
+                            <div style={{ color: '#8b949e', marginBottom: 6 }}>$ ai --analyze deal-{deal.id.slice(0, 8)}</div>
+                            <div style={{ whiteSpace: 'pre-wrap', color: '#c9d1d9' }}>
+                              {aiText}
+                              {aiStreaming && <span className="ai-cursor" style={{ display: 'inline-block', width: 7, height: 13, background: '#7ee787', verticalAlign: 'middle', marginLeft: 2 }} />}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Action buttons vertical */}
+                      {aiText && !aiStreaming && !aiError && (
+                        <div style={{
+                          borderLeft: '1px solid #21262d', padding: 10,
+                          background: '#161b22', display: 'flex', flexDirection: 'column', gap: 6,
+                          width: 150, flexShrink: 0,
+                        }}>
+                          <button onClick={copySuggestion}
+                            style={{
+                              background: '#21262d', border: '1px solid #30363d',
+                              color: '#c9d1d9', padding: '8px 10px', borderRadius: 6,
+                              cursor: 'pointer', fontSize: 11, fontFamily: 'inherit', fontWeight: 600,
+                            }}>📋 Копировать</button>
+                          <button onClick={insertSuggestionToInput}
+                            style={{
+                              background: '#238636', border: '1px solid #2ea043',
+                              color: '#fff', padding: '8px 10px', borderRadius: 6,
+                              cursor: 'pointer', fontSize: 11, fontFamily: 'inherit', fontWeight: 700,
+                            }}>→ В поле ввода</button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <style>{`
+                    @keyframes ai-blink { 0%, 100% { opacity: 1 } 50% { opacity: 0 } }
+                    .ai-cursor { animation: ai-blink 1s step-start infinite; }
+                  `}</style>
+                </div>
               </div>
             )}
           </div>
         </div>
       </div>
 
-      {/* Floating AI terminal panel — visible only on messages tab */}
-      {tab === 'messages' && (
-        <>
-          {/* Toggle button when panel is closed */}
-          {!aiPanelOpen && (
-            <button
-              onClick={() => setAiPanelOpen(true)}
-              style={{
-                position: 'fixed', right: 20, bottom: 20, zIndex: 90,
-                width: 56, height: 56, borderRadius: '50%',
-                background: '#0d1117', color: '#7ee787',
-                border: '2px solid #30363d',
-                boxShadow: '0 8px 24px rgba(0,0,0,.3)',
-                cursor: 'pointer', fontSize: 22,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}
-              title="Открыть AI ассистент">💡</button>
-          )}
-
-          {/* Terminal panel */}
-          {aiPanelOpen && (
-            <div style={{
-              position: 'fixed', right: 16, top: 80, bottom: 16,
-              width: 420, maxWidth: 'calc(100vw - 32px)',
-              background: '#0d1117', color: '#c9d1d9',
-              border: '1px solid #30363d', borderRadius: 12,
-              fontFamily: '"JetBrains Mono", "SF Mono", Menlo, monospace',
-              display: 'flex', flexDirection: 'column',
-              boxShadow: '0 16px 48px rgba(0,0,0,.35)',
-              zIndex: 90, overflow: 'hidden',
-            }}>
-              {/* Title bar */}
-              <div style={{
-                padding: '10px 14px', borderBottom: '1px solid #21262d',
-                display: 'flex', alignItems: 'center', gap: 8,
-                background: '#161b22',
-              }}>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#ff5f56' }} />
-                  <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#ffbd2e' }} />
-                  <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#27c93f' }} />
-                </div>
-                <div style={{ flex: 1, fontSize: 11, color: '#8b949e', fontWeight: 700, marginLeft: 6 }}>
-                  ai-sales-assistant — claude-sonnet-4-6
-                </div>
-                <button
-                  onClick={runAiSuggest}
-                  disabled={aiStreaming}
-                  title="Перезапустить анализ"
-                  style={{
-                    background: 'none', border: '1px solid #30363d', borderRadius: 6,
-                    color: '#7ee787', padding: '3px 8px', fontSize: 10, cursor: 'pointer',
-                    fontFamily: 'inherit', opacity: aiStreaming ? 0.5 : 1,
-                  }}>↻ rerun</button>
-                <button
-                  onClick={() => setAiPanelOpen(false)}
-                  title="Свернуть"
-                  style={{
-                    background: 'none', border: 'none', color: '#8b949e', cursor: 'pointer',
-                    fontSize: 18, padding: '0 4px', lineHeight: 1,
-                  }}>−</button>
-              </div>
-
-              {/* Body */}
-              <div style={{ flex: 1, overflowY: 'auto', padding: '14px 16px', fontSize: 12, lineHeight: 1.6 }}>
-                {aiError ? (
-                  <div style={{ color: '#ff7b72' }}>
-                    <div style={{ color: '#8b949e' }}>$ ai --analyze</div>
-                    <div style={{ marginTop: 6 }}>ERROR: {aiError}</div>
-                  </div>
-                ) : !aiText && !aiStreaming ? (
-                  <div style={{ color: '#8b949e' }}>
-                    <div>$ ai --watch</div>
-                    <div style={{ marginTop: 10 }}>Жду новых сообщений от клиента...</div>
-                    <div style={{ marginTop: 4, fontSize: 10 }}>Анализ автоматически запустится при входящем.</div>
-                    <div style={{ marginTop: 10 }}>Или нажми ↻ rerun чтобы запустить сейчас.</div>
-                  </div>
-                ) : (
-                  <div>
-                    <div style={{ color: '#8b949e', marginBottom: 8 }}>$ ai --analyze deal-{deal.id.slice(0, 8)}</div>
-                    <div style={{ whiteSpace: 'pre-wrap', color: '#c9d1d9' }}>
-                      {aiText}
-                      {aiStreaming && <span className="ai-cursor" style={{ display: 'inline-block', width: 8, height: 14, background: '#7ee787', verticalAlign: 'middle', marginLeft: 2 }} />}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Action footer */}
-              {aiText && !aiStreaming && !aiError && (
-                <div style={{
-                  borderTop: '1px solid #21262d', padding: '10px 14px',
-                  background: '#161b22', display: 'flex', gap: 8,
-                }}>
-                  <button onClick={copySuggestion}
-                    style={{
-                      flex: 1, background: '#21262d', border: '1px solid #30363d',
-                      color: '#c9d1d9', padding: '8px 10px', borderRadius: 6,
-                      cursor: 'pointer', fontSize: 11, fontFamily: 'inherit', fontWeight: 600,
-                    }}>📋 Копировать</button>
-                  <button onClick={insertSuggestionToInput}
-                    style={{
-                      flex: 1, background: '#238636', border: '1px solid #2ea043',
-                      color: '#fff', padding: '8px 10px', borderRadius: 6,
-                      cursor: 'pointer', fontSize: 11, fontFamily: 'inherit', fontWeight: 700,
-                    }}>→ Вставить в чат</button>
-                </div>
-              )}
-
-              <style>{`
-                @keyframes ai-blink { 0%, 100% { opacity: 1 } 50% { opacity: 0 } }
-                .ai-cursor { animation: ai-blink 1s step-start infinite; }
-              `}</style>
-            </div>
-          )}
-        </>
-      )}
     </div>
   )
 }
