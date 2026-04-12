@@ -10,24 +10,41 @@ interface WebhookPayload {
 
 export async function POST(req: NextRequest) {
   try {
-    const payload = (await req.json()) as WebhookPayload
+    // Log raw body to debug Wazzup payload format
+    const rawBody = await req.text()
+    console.log('[wazzup webhook] raw body:', rawBody.slice(0, 2000))
 
-    // Wazzup test ping on webhook registration
+    if (!rawBody || rawBody.trim() === '') {
+      console.log('[wazzup webhook] empty body — verification ping')
+      return NextResponse.json({ ok: true })
+    }
+
+    let payload: WebhookPayload
+    try {
+      payload = JSON.parse(rawBody) as WebhookPayload
+    } catch {
+      console.log('[wazzup webhook] not valid JSON, returning ok')
+      return NextResponse.json({ ok: true })
+    }
+
+    console.log('[wazzup webhook] parsed:', JSON.stringify(payload).slice(0, 1000))
+
     if (payload.test) return NextResponse.json({ ok: true })
 
     const messages = payload.messages ?? []
+    console.log('[wazzup webhook] messages count:', messages.length)
     if (messages.length === 0) return NextResponse.json({ ok: true })
 
     const supabase = await createAdminClient()
 
     for (const msg of messages) {
+      console.log('[wazzup webhook] processing msg:', msg.messageId, 'chatType:', msg.chatType, 'chatId:', msg.chatId, 'isEcho:', msg.isEcho)
       await processMessage(supabase, msg)
     }
 
     return NextResponse.json({ ok: true })
   } catch (err) {
-    console.error('[wazzup webhook]', err)
-    // Always return 200 so Wazzup doesn't retry on our bug
+    console.error('[wazzup webhook] error:', err)
     return NextResponse.json({ ok: false, error: String(err) })
   }
 }
