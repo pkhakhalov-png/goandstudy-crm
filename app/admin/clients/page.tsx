@@ -25,6 +25,8 @@ export default async function AdminClientsPage() {
     { data: allCurators },
     { data: salespersons },
     { data: curators },
+    { data: expenses },
+    { data: invoices },
   ] = await Promise.all([
     supabase.from('clients').select('id, name, phone, email, telegram, country, university, status, months, created_at, salesperson_id, curator_id').order('created_at', { ascending: false }),
     supabase.from('payments_view').select('id, client_id, num, plan_date, plan_sum, fact_sum, is_paid, status'),
@@ -32,13 +34,17 @@ export default async function AdminClientsPage() {
     supabase.from('curators').select('id, name'),
     supabase.from('users').select('id, name').eq('role', 'salesperson').eq('is_active', true).order('name'),
     supabase.from('curators').select('id, name').eq('is_active', true).order('name'),
+    supabase.from('expenses').select('id, client_id, article, plan_sum, fact_sum, is_paid, plan_date'),
+    supabase.from('invoices').select('id, client_id, amount, description, status, payment_url, created_at'),
   ])
 
   const clients = (rawClients ?? []).map(c => ({
     ...c,
     salesperson: allUsers?.find(u => u.id === c.salesperson_id) ?? null,
     curator: allCurators?.find(cur => cur.id === c.curator_id) ?? null,
-    payments: (payments ?? []).filter(p => p.client_id === c.id)
+    payments: (payments ?? []).filter(p => p.client_id === c.id),
+    expenses: (expenses ?? []).filter(e => e.client_id === c.id),
+    invoices: (invoices ?? []).filter(i => i.client_id === c.id),
   }))
 
   return (

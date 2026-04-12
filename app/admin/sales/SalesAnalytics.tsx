@@ -6,6 +6,7 @@ interface Props {
   salespersons: any[]
   clients: any[]
   payments: any[]
+  bookings: any[]
 }
 
 interface MonthEntry {
@@ -17,7 +18,7 @@ const MONTHS_FULL = ['Январь','Февраль','Март','Апрель','
 const MONTHS_SHORT = ['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек']
 const PLAN = 900000
 
-export function SalesAnalytics({ salespersons, clients, payments }: Props) {
+export function SalesAnalytics({ salespersons, clients, payments, bookings }: Props) {
   const now = new Date()
   const [viewMonth, setViewMonth] = useState(now.getMonth())
   const [viewYear, setViewYear] = useState(now.getFullYear())
@@ -85,6 +86,18 @@ export function SalesAnalytics({ salespersons, clients, payments }: Props) {
 
     const monthStat = getMonthStats(s.id, viewYear, viewMonth)
 
+    // Booking stats
+    const myBookings = bookings.filter((b: any) => b.salesperson_id === s.id)
+    const mStart = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-01`
+    const mEnd = new Date(viewYear, viewMonth + 1, 0).toISOString().split('T')[0]
+    const monthBookings = myBookings.filter((b: any) => b.booking_date >= mStart && b.booking_date <= mEnd)
+    const bCompleted = monthBookings.filter((b: any) => b.status === 'completed').length
+    const bNoShow = monthBookings.filter((b: any) => b.status === 'no_show').length
+    const bCancelled = monthBookings.filter((b: any) => b.status === 'cancelled').length
+    const bTotal = monthBookings.length
+    const bConversion = bTotal > 0 ? Math.round(bCompleted / bTotal * 100) : 0
+    const totalCompletedAll = myBookings.filter((b: any) => b.status === 'completed').length
+
     return {
       ...s,
       totalClients: myClients.length,
@@ -92,6 +105,7 @@ export function SalesAnalytics({ salespersons, clients, payments }: Props) {
       overdue,
       activeMonths,
       ...monthStat,
+      bCompleted, bNoShow, bCancelled, bTotal, bConversion, totalCompletedAll,
     }
   })
 
@@ -198,6 +212,23 @@ export function SalesAnalytics({ salespersons, clients, payments }: Props) {
               </div>
             </div>
 
+            {/* Консультации за месяц */}
+            {s.bTotal > 0 && (
+              <div style={{ padding: '10px 20px', borderBottom: '1px solid var(--bor)', display: 'flex', gap: 16, alignItems: 'center' }}>
+                <span style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Консультации</span>
+                <div style={{ display: 'flex', gap: 12, fontSize: 12 }}>
+                  <span style={{ fontWeight: 700, color: 'var(--green)' }}>{s.bCompleted} проведено</span>
+                  {s.bNoShow > 0 && <span style={{ fontWeight: 600, color: 'var(--gold)' }}>{s.bNoShow} не пришли</span>}
+                  {s.bCancelled > 0 && <span style={{ fontWeight: 600, color: 'var(--red)' }}>{s.bCancelled} отмены</span>}
+                </div>
+                <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 11, color: 'var(--muted)' }}>Конверсия:</span>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: s.bConversion >= 70 ? 'var(--green)' : s.bConversion >= 40 ? 'var(--gold)' : 'var(--red)' }}>{s.bConversion}%</span>
+                  <span style={{ fontSize: 10, color: 'var(--muted)' }}>· всего {s.totalCompletedAll} проведено</span>
+                </div>
+              </div>
+            )}
+
             {/* История */}
             {isOpen && (
               <div>
@@ -231,6 +262,8 @@ export function SalesAnalytics({ salespersons, clients, payments }: Props) {
                             <th>Новых клиентов</th>
                             <th>Поступило факт</th>
                             <th>% плана</th>
+                            <th>Консультации</th>
+                            <th>Конверсия</th>
                             <th>ЗП (10%)</th>
                           </tr>
                         </thead>
@@ -238,6 +271,14 @@ export function SalesAnalytics({ salespersons, clients, payments }: Props) {
                           {yearMonths.map((me: MonthEntry) => {
                             const ms = getMonthStats(s.id, year, me.month)
                             const isCurrent = me.month === viewMonth && year === viewYear
+                            const bmStart = `${year}-${String(me.month + 1).padStart(2, '0')}-01`
+                            const bmEnd = new Date(year, me.month + 1, 0).toISOString().split('T')[0]
+                            const mb = bookings.filter((b: any) => b.salesperson_id === s.id && b.booking_date >= bmStart && b.booking_date <= bmEnd)
+                            const mbDone = mb.filter((b: any) => b.status === 'completed').length
+                            const mbNoShow = mb.filter((b: any) => b.status === 'no_show').length
+                            const mbCancel = mb.filter((b: any) => b.status === 'cancelled').length
+                            const mbTotal = mb.length
+                            const mbConv = mbTotal > 0 ? Math.round(mbDone / mbTotal * 100) : 0
                             return (
                               <tr key={me.month} style={{background:isCurrent?'rgba(177,94,204,.04)':'transparent'}}>
                                 <td>
@@ -257,6 +298,20 @@ export function SalesAnalytics({ salespersons, clients, payments }: Props) {
                                   <span style={{fontSize:12,fontWeight:700,color:ms.pct>=100?'var(--green)':ms.pct>=60?'var(--gold)':'var(--red)'}}>
                                     {ms.pct}%
                                   </span>
+                                </td>
+                                <td>
+                                  {mbTotal > 0 ? (
+                                    <span style={{fontSize:11}}>
+                                      <span style={{fontWeight:700,color:'var(--green)'}}>{mbDone}</span>
+                                      {mbNoShow > 0 && <span style={{color:'var(--gold)',marginLeft:4}}>/ {mbNoShow} нп</span>}
+                                      {mbCancel > 0 && <span style={{color:'var(--red)',marginLeft:4}}>/ {mbCancel} отм</span>}
+                                    </span>
+                                  ) : <span style={{color:'var(--muted)'}}>—</span>}
+                                </td>
+                                <td>
+                                  {mbTotal > 0 ? (
+                                    <span style={{fontSize:12,fontWeight:700,color:mbConv>=70?'var(--green)':mbConv>=40?'var(--gold)':'var(--red)'}}>{mbConv}%</span>
+                                  ) : <span style={{color:'var(--muted)'}}>—</span>}
                                 </td>
                                 <td><span className="num o">{Math.round(ms.factPaid*0.1).toLocaleString('ru')} ₽</span></td>
                               </tr>
