@@ -15,6 +15,14 @@ interface SendMessageParams {
   contentUri?: string  // for file attachments
 }
 
+interface WazzupAuthor {
+  id?: string
+  name?: string
+  username?: string
+  phone?: string
+  avatarUri?: string
+}
+
 interface WazzupMessage {
   messageId: string
   channelId: string
@@ -31,6 +39,13 @@ interface WazzupMessage {
     username?: string
     phone?: string
   }
+  // For group chats — info about the actual sender (contact is the group)
+  author?: WazzupAuthor
+  sender?: WazzupAuthor
+  from?: WazzupAuthor
+  authorName?: string
+  // Catch-all for unknown fields so we can log them
+  [key: string]: any
 }
 
 function getKey() {
