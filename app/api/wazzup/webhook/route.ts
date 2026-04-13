@@ -56,57 +56,103 @@ export async function GET() {
 
 type SupabaseAdmin = Awaited<ReturnType<typeof createAdminClient>>
 
+// Detect group chats: Telegram groups have chatId starting with "-" (like -1001234567890)
+// Or chatId that doesn't look like a phone number
+function isGroupChat(chatId: string): boolean {
+  if (!chatId) return false
+  if (chatId.startsWith('-')) return true
+  // Phone numbers are 10-15 digits. Group IDs usually don't fit this.
+  const digits = chatId.replace(/\D/g, '')
+  if (digits.length >= 10 && digits.length <= 15 && /^\d+$/.test(chatId)) return false
+  return true
+}
+
 async function processMessage(supabase: SupabaseAdmin, msg: WazzupMessage) {
-  // chatId: for WA = "79146666266", for TG = username or "id_12345"
-  // Normalize phone from chatId or contact.phone
   const isTg = msg.chatType === 'telegram' || msg.chatType === 'tgapi'
-  const rawPhone = msg.contact?.phone || (msg.chatType === 'whatsapp' ? msg.chatId : (msg.chatType === 'tgapi' ? msg.chatId : null))
+  const isGroup = isGroupChat(msg.chatId)
+  const rawPhone = isGroup ? null : (msg.contact?.phone || (msg.chatType === 'whatsapp' ? msg.chatId : (msg.chatType === 'tgapi' ? msg.chatId : null)))
   const normalizedPhone = normalizePhone(rawPhone)
   const senderName = msg.contact?.name || msg.contact?.username || rawPhone || msg.chatId
   const channelLabel = msg.chatType === 'whatsapp' ? 'whatsapp' : 'telegram'
 
-  // Find deal by phone_normalized (fast indexed lookup)
   let dealId: string | null = null
 
-  if (normalizedPhone) {
+  // STEP 1: Look up existing deal by Wazzup chatId in metadata (most reliable — works for both group and individual)
+  // We stored chatId in deal_messages.metadata.chatId when we previously received a message from this chat
+  const { data: prevMsg } = await supabase
+    .from('deal_messages')
+    .select('deal_id')
+    .eq('metadata->>chatId', msg.chatId)
+    .not('deal_id', 'is', null)
+    .limit(1)
+    .maybeSingle()
+
+  if (prevMsg?.deal_id) {
+    // Make sure that deal is not deleted
+    const { data: dealExists } = await supabase
+      .from('deals')
+      .select('id')
+      .eq('id', prevMsg.deal_id)
+      .is('deleted_at', null)
+      .maybeSingle()
+    if (dealExists) dealId = dealExists.id
+  }
+
+  // STEP 2: For individual (non-group) chats, fallback to phone-based lookup
+  if (!dealId && !isGroup && normalizedPhone) {
     const { data: existingDeal } = await supabase
       .from('deals')
       .select('id')
       .eq('phone_normalized', normalizedPhone)
       .is('deleted_at', null)
       .limit(1)
-      .single()
+      .maybeSingle()
     if (existingDeal) dealId = existingDeal.id
   }
 
-  // For telegram messages by username, try matching contact_telegram
-  if (!dealId && isTg && msg.contact?.username) {
+  if (!dealId && !isGroup && isTg && msg.contact?.username) {
     const { data: existingDeal } = await supabase
       .from('deals')
       .select('id')
       .or(`contact_telegram.eq.${msg.contact.username},contact_telegram.eq.@${msg.contact.username}`)
       .is('deleted_at', null)
       .limit(1)
-      .single()
+      .maybeSingle()
     if (existingDeal) dealId = existingDeal.id
   }
 
-  // No deal found — create new one in first active stage (only for incoming, not echo)
+  // STEP 3: No deal found — create new one (only for incoming)
   if (!dealId && !msg.isEcho) {
-    const { data: firstStage } = await supabase
-      .from('pipeline_stages')
-      .select('id')
-      .eq('is_active', true)
-      .order('position', { ascending: true })
-      .limit(1)
-      .single()
+    // Pick stage: for groups try to find one with "групп" in name, fallback to first active stage
+    let chosenStage = null
+    if (isGroup) {
+      const { data: groupStage } = await supabase
+        .from('pipeline_stages')
+        .select('id, position')
+        .eq('is_active', true)
+        .ilike('name', '%групп%')
+        .order('position', { ascending: true })
+        .limit(1)
+        .maybeSingle()
+      if (groupStage) chosenStage = groupStage
+    }
+    if (!chosenStage) {
+      const { data: firstStage } = await supabase
+        .from('pipeline_stages')
+        .select('id, position')
+        .eq('is_active', true)
+        .order('position', { ascending: true })
+        .limit(1)
+        .maybeSingle()
+      chosenStage = firstStage
+    }
 
-    if (!firstStage) {
+    if (!chosenStage) {
       console.error('[wazzup] no active pipeline stage found')
       return
     }
 
-    // Round-robin assign to a salesperson
+    // Round-robin assign
     const { data: salespersons } = await supabase
       .from('users')
       .select('id, round_robin_count')
@@ -117,18 +163,22 @@ async function processMessage(supabase: SupabaseAdmin, msg: WazzupMessage) {
 
     const assignedId = salespersons?.[0]?.id ?? null
 
+    // For group chats, use group name as contact, clear phone fields
+    const groupName = isGroup ? (msg.contact?.name || `Группа ${msg.chatId}`) : null
+
     const { data: newDeal } = await supabase
       .from('deals')
       .insert({
-        title: `Сообщение от ${senderName}`,
-        stage_id: firstStage.id,
+        title: isGroup ? `Группа: ${groupName}` : `Сообщение от ${senderName}`,
+        stage_id: chosenStage.id,
         salesperson_id: assignedId,
-        contact_name: senderName,
-        contact_phone: rawPhone,
-        phone_normalized: normalizedPhone,
-        contact_telegram: isTg ? msg.contact?.username || null : null,
-        contact_whatsapp: msg.chatType === 'whatsapp' ? rawPhone : null,
-        source: channelLabel,
+        contact_name: isGroup ? groupName : senderName,
+        contact_phone: isGroup ? null : rawPhone,
+        phone_normalized: isGroup ? null : normalizedPhone,
+        contact_telegram: isGroup ? null : (isTg ? msg.contact?.username || null : null),
+        contact_whatsapp: isGroup ? null : (msg.chatType === 'whatsapp' ? rawPhone : null),
+        source: isGroup ? `${channelLabel}_group` : channelLabel,
+        custom_fields: isGroup ? { wazzup_chat_id: msg.chatId, is_group: true } : {},
       })
       .select('id')
       .single()
@@ -146,7 +196,9 @@ async function processMessage(supabase: SupabaseAdmin, msg: WazzupMessage) {
       await supabase.from('deal_activities').insert({
         deal_id: dealId,
         activity_type: 'system',
-        content: `Сделка создана из ${channelLabel === 'whatsapp' ? 'WhatsApp' : 'Telegram'}`,
+        content: isGroup
+          ? `Групповой чат создан из ${channelLabel === 'whatsapp' ? 'WhatsApp' : 'Telegram'}`
+          : `Сделка создана из ${channelLabel === 'whatsapp' ? 'WhatsApp' : 'Telegram'}`,
       })
     }
   }

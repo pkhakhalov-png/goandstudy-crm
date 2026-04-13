@@ -323,7 +323,29 @@ export function DealCard({ deal, stages, activities, salespersons, clientData, b
 
           {/* Contact header */}
           <div style={{ padding: '20px', borderBottom: '1px solid var(--bor2)' }}>
+            {deal.custom_fields?.is_group && (
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 8px', background: 'rgba(177,94,204,.1)', color: 'var(--purple)', fontSize: 10, fontWeight: 700, borderRadius: 6, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.03em' }}>
+                👥 Групповой чат
+              </div>
+            )}
             <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>{deal.contact_name}</div>
+            {deal.custom_fields?.is_group && (() => {
+              const participants = Array.from(new Set(
+                (messages as any[])
+                  .filter(m => m.direction === 'incoming' && m.sender_name)
+                  .map(m => m.sender_name)
+              ))
+              return participants.length > 0 ? (
+                <div style={{ marginTop: 8, fontSize: 11 }}>
+                  <div style={{ color: 'var(--muted)', marginBottom: 4, fontWeight: 600 }}>Участники ({participants.length})</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                    {participants.map((p, i) => (
+                      <span key={i} style={{ padding: '3px 8px', borderRadius: 6, background: 'rgba(0,136,204,.08)', color: '#0088cc', fontWeight: 600, fontSize: 10 }}>{p}</span>
+                    ))}
+                  </div>
+                </div>
+              ) : null
+            })()}
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
               {deal.contact_phone && (
                 <a href={`tel:${deal.contact_phone}`} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', borderRadius: 8, background: 'rgba(177,94,204,.06)', border: '1px solid rgba(177,94,204,.15)', color: 'var(--purple)', textDecoration: 'none', fontSize: 12, fontWeight: 600 }}>
