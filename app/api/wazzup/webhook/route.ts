@@ -56,15 +56,18 @@ export async function GET() {
 
 type SupabaseAdmin = Awaited<ReturnType<typeof createAdminClient>>
 
-// Detect group chats: Telegram groups have chatId starting with "-" (like -1001234567890)
-// Or chatId that doesn't look like a phone number
-function isGroupChat(chatId: string): boolean {
-  if (!chatId) return false
-  if (chatId.startsWith('-')) return true
-  // Phone numbers are 10-15 digits. Group IDs usually don't fit this.
-  const digits = chatId.replace(/\D/g, '')
-  if (digits.length >= 10 && digits.length <= 15 && /^\d+$/.test(chatId)) return false
-  return true
+// Detect group chats:
+// 1. chatId starts with "-" (Telegram supergroup IDs like -1001234567890)
+// 2. OR Telegram message without contact.username (individuals always have username,
+//    groups don't — Wazzup tgapi only puts the group name in contact.name)
+function isGroupChat(msg: WazzupMessage): boolean {
+  if (msg.chatId?.startsWith('-')) return true
+  const isTg = msg.chatType === 'telegram' || msg.chatType === 'tgapi'
+  if (isTg && msg.contact && !msg.contact.username && !msg.contact.phone) {
+    // Individuals on TG have either username or phone in contact; groups have neither
+    return true
+  }
+  return false
 }
 
 // Try to find the real author from various possible Wazzup payload shapes
@@ -88,7 +91,7 @@ function extractAuthor(msg: WazzupMessage): { name: string | null; id: string | 
 
 async function processMessage(supabase: SupabaseAdmin, msg: WazzupMessage) {
   const isTg = msg.chatType === 'telegram' || msg.chatType === 'tgapi'
-  const isGroup = isGroupChat(msg.chatId)
+  const isGroup = isGroupChat(msg)
   const rawPhone = isGroup ? null : (msg.contact?.phone || (msg.chatType === 'whatsapp' ? msg.chatId : (msg.chatType === 'tgapi' ? msg.chatId : null)))
   const normalizedPhone = normalizePhone(rawPhone)
 
@@ -291,11 +294,7 @@ async function processMessage(supabase: SupabaseAdmin, msg: WazzupMessage) {
         channelId: msg.channelId,
         chatId: msg.chatId,
         type: msg.type,
-        // TEMP: save raw payload for ALL messages to diagnose group detection
-        raw: msg,
-        allKeys: Object.keys(msg),
-        extractedAuthor: author,
-        detectedAsGroup: isGroup,
+        isGroup,
       },
     })
   }
