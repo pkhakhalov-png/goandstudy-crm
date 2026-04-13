@@ -36,6 +36,24 @@ function formatSize(bytes: number) {
 }
 
 const sourceLabel: Record<string, string> = { manual: 'Вручную', booking: 'Запись с сайта', website: 'Сайт', telegram: 'Telegram' }
+
+// Telegram-like sender colors (8 colors). Deterministic by name hash.
+const SENDER_COLORS = [
+  '#E17076', // red
+  '#7BC862', // green
+  '#65AADD', // blue
+  '#EE7AAE', // pink
+  '#A695E7', // purple
+  '#FAA774', // orange
+  '#6EC9CB', // teal
+  '#E5BC60', // yellow
+]
+function colorForSender(name: string | null | undefined): string {
+  if (!name) return SENDER_COLORS[0]
+  let hash = 0
+  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0
+  return SENDER_COLORS[hash % SENDER_COLORS.length]
+}
 const activityIcon: Record<string, string> = { note: '📝', stage_change: '→', system: '⚙️', call: '📞', message: '💬', file_upload: '📎', task_done: '✅' }
 
 export function DealCard({ deal, stages, activities, salespersons, clientData, bookingData, files, messages, tasks, userId }: Props) {
@@ -339,9 +357,20 @@ export function DealCard({ deal, stages, activities, salespersons, clientData, b
                 <div style={{ marginTop: 8, fontSize: 11 }}>
                   <div style={{ color: 'var(--muted)', marginBottom: 4, fontWeight: 600 }}>Участники ({participants.length})</div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                    {participants.map((p, i) => (
-                      <span key={i} style={{ padding: '3px 8px', borderRadius: 6, background: 'rgba(0,136,204,.08)', color: '#0088cc', fontWeight: 600, fontSize: 10 }}>{p}</span>
-                    ))}
+                    {participants.map((p, i) => {
+                      const color = colorForSender(p as string)
+                      return (
+                        <span key={i} style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 4,
+                          padding: '3px 8px', borderRadius: 6,
+                          background: color + '15', color: color,
+                          fontWeight: 600, fontSize: 10,
+                        }}>
+                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: color }} />
+                          {p as string}
+                        </span>
+                      )
+                    })}
                   </div>
                 </div>
               ) : null
@@ -742,10 +771,25 @@ export function DealCard({ deal, stages, activities, salespersons, clientData, b
                           border: m.direction === 'outgoing' ? 'none' : '1px solid var(--bor)',
                           borderBottomRightRadius: m.direction === 'outgoing' ? 4 : 14,
                           borderBottomLeftRadius: m.direction === 'incoming' ? 4 : 14,
+                          borderLeft: m.direction === 'incoming' && m.sender_name ? `3px solid ${colorForSender(m.sender_name)}` : undefined,
                           overflow: 'hidden',
                         }}>
                           {m.sender_name && m.direction === 'incoming' && (
-                            <div style={{ fontSize: 10, fontWeight: 700, marginBottom: 3, padding: attachedFile && isImage ? '4px 8px 0' : 0, color: m.channel === 'telegram' ? '#0088cc' : '#25d366' }}>{m.sender_name}</div>
+                            <div style={{
+                              display: 'flex', alignItems: 'center', gap: 6,
+                              fontSize: 11, fontWeight: 700, marginBottom: 4,
+                              padding: attachedFile && isImage ? '4px 8px 0' : 0,
+                              color: colorForSender(m.sender_name),
+                            }}>
+                              <div style={{
+                                width: 18, height: 18, borderRadius: '50%',
+                                background: colorForSender(m.sender_name),
+                                color: '#fff', fontSize: 9, fontWeight: 800,
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                flexShrink: 0,
+                              }}>{(m.sender_name as string).split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()}</div>
+                              <span>{m.sender_name}</span>
+                            </div>
                           )}
 
                           {attachedFile && isImage && (
