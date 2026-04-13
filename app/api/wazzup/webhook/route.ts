@@ -100,20 +100,7 @@ async function processMessage(supabase: SupabaseAdmin, msg: WazzupMessage) {
 
   const groupTitle = isGroup ? (msg.contact?.name || `Группа ${msg.chatId}`) : null
 
-  // Debug: log full msg payload for groups to discover field structure
-  if (isGroup) {
-    console.log('[wazzup group msg]', JSON.stringify({
-      chatId: msg.chatId,
-      contactName: msg.contact?.name,
-      contactUsername: msg.contact?.username,
-      author: msg.author,
-      sender: msg.sender,
-      from: msg.from,
-      authorName: msg.authorName,
-      extractedAuthor: author,
-      allKeys: Object.keys(msg),
-    }))
-  }
+  // nothing — raw payload is saved into deal_messages.metadata below
 
   const channelLabel = msg.chatType === 'whatsapp' ? 'whatsapp' : 'telegram'
 
@@ -300,7 +287,12 @@ async function processMessage(supabase: SupabaseAdmin, msg: WazzupMessage) {
       content: msg.text || (msg.type !== 'text' ? `[${msg.type}]` : ''),
       file_id: fileId,
       external_id: msg.messageId,
-      metadata: { channelId: msg.channelId, chatId: msg.chatId, type: msg.type },
+      metadata: {
+        channelId: msg.channelId,
+        chatId: msg.chatId,
+        type: msg.type,
+        ...(isGroup ? { raw: msg, extractedAuthor: author, allKeys: Object.keys(msg) } : {}),
+      },
     })
   }
 
