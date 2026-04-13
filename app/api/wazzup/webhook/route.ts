@@ -56,18 +56,11 @@ export async function GET() {
 
 type SupabaseAdmin = Awaited<ReturnType<typeof createAdminClient>>
 
-// Detect group chats:
-// 1. chatId starts with "-" (Telegram supergroup IDs like -1001234567890)
-// 2. OR Telegram message without contact.username (individuals always have username,
-//    groups don't — Wazzup tgapi only puts the group name in contact.name)
+// Detect group chats — STRICT: only Telegram supergroup IDs start with "-"
+// (e.g. "-1001234567890"). Everything else is treated as individual chat,
+// because Telegram users can have no username AND no visible phone.
 function isGroupChat(msg: WazzupMessage): boolean {
-  if (msg.chatId?.startsWith('-')) return true
-  const isTg = msg.chatType === 'telegram' || msg.chatType === 'tgapi'
-  if (isTg && msg.contact && !msg.contact.username && !msg.contact.phone) {
-    // Individuals on TG have either username or phone in contact; groups have neither
-    return true
-  }
-  return false
+  return !!msg.chatId?.startsWith('-')
 }
 
 // Try to find the real author from various possible Wazzup payload shapes
