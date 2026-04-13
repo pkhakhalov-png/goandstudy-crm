@@ -291,7 +291,11 @@ async function processMessage(supabase: SupabaseAdmin, msg: WazzupMessage) {
         channelId: msg.channelId,
         chatId: msg.chatId,
         type: msg.type,
-        ...(isGroup ? { raw: msg, extractedAuthor: author, allKeys: Object.keys(msg) } : {}),
+        // TEMP: save raw payload for ALL messages to diagnose group detection
+        raw: msg,
+        allKeys: Object.keys(msg),
+        extractedAuthor: author,
+        detectedAsGroup: isGroup,
       },
     })
   }
