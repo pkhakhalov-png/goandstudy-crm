@@ -37,6 +37,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/book') ||
     pathname.startsWith('/api/book') ||
     pathname.startsWith('/api/wazzup') ||
+    pathname.startsWith('/api/telegram') ||
     pathname.startsWith('/api/tbank')
 
   // Не авторизован — редирект на /login
