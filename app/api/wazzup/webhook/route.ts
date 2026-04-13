@@ -67,12 +67,54 @@ function isGroupChat(chatId: string): boolean {
   return true
 }
 
+// Try to find the real author from various possible Wazzup payload shapes
+function extractAuthor(msg: WazzupMessage): { name: string | null; id: string | null } {
+  // Priority order — try author, sender, from, authorName
+  const candidates = [
+    msg.author,
+    msg.sender,
+    msg.from,
+    (msg as any).authorData,
+  ]
+  for (const c of candidates) {
+    if (c && typeof c === 'object') {
+      const name = c.name || c.username || c.phone
+      if (name) return { name, id: c.id || c.username || c.phone || null }
+    }
+  }
+  if (msg.authorName) return { name: msg.authorName, id: null }
+  return { name: null, id: null }
+}
+
 async function processMessage(supabase: SupabaseAdmin, msg: WazzupMessage) {
   const isTg = msg.chatType === 'telegram' || msg.chatType === 'tgapi'
   const isGroup = isGroupChat(msg.chatId)
   const rawPhone = isGroup ? null : (msg.contact?.phone || (msg.chatType === 'whatsapp' ? msg.chatId : (msg.chatType === 'tgapi' ? msg.chatId : null)))
   const normalizedPhone = normalizePhone(rawPhone)
-  const senderName = msg.contact?.name || msg.contact?.username || rawPhone || msg.chatId
+
+  // For groups, prefer real author from dedicated fields, fallback to contact
+  const author = extractAuthor(msg)
+  const senderName = isGroup
+    ? (author.name || msg.contact?.name || msg.chatId)  // group: try real author first
+    : (msg.contact?.name || msg.contact?.username || rawPhone || msg.chatId)
+
+  const groupTitle = isGroup ? (msg.contact?.name || `Группа ${msg.chatId}`) : null
+
+  // Debug: log full msg payload for groups to discover field structure
+  if (isGroup) {
+    console.log('[wazzup group msg]', JSON.stringify({
+      chatId: msg.chatId,
+      contactName: msg.contact?.name,
+      contactUsername: msg.contact?.username,
+      author: msg.author,
+      sender: msg.sender,
+      from: msg.from,
+      authorName: msg.authorName,
+      extractedAuthor: author,
+      allKeys: Object.keys(msg),
+    }))
+  }
+
   const channelLabel = msg.chatType === 'whatsapp' ? 'whatsapp' : 'telegram'
 
   let dealId: string | null = null
@@ -163,16 +205,13 @@ async function processMessage(supabase: SupabaseAdmin, msg: WazzupMessage) {
 
     const assignedId = salespersons?.[0]?.id ?? null
 
-    // For group chats, use group name as contact, clear phone fields
-    const groupName = isGroup ? (msg.contact?.name || `Группа ${msg.chatId}`) : null
-
     const { data: newDeal } = await supabase
       .from('deals')
       .insert({
-        title: isGroup ? `Группа: ${groupName}` : `Сообщение от ${senderName}`,
+        title: isGroup ? `Группа: ${groupTitle}` : `Сообщение от ${senderName}`,
         stage_id: chosenStage.id,
         salesperson_id: assignedId,
-        contact_name: isGroup ? groupName : senderName,
+        contact_name: isGroup ? (groupTitle as string) : senderName,
         contact_phone: isGroup ? null : rawPhone,
         phone_normalized: isGroup ? null : normalizedPhone,
         contact_telegram: isGroup ? null : (isTg ? msg.contact?.username || null : null),
