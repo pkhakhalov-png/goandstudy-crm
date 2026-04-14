@@ -35,15 +35,17 @@ export async function updateClientTotal(clientId: number, newTotal: number) {
   // Pull all payments for the client
   const { data: payments } = await supabase
     .from('payments')
-    .select('id, plan_sum, is_paid, plan_date')
+    .select('id, plan_sum, fact_sum, is_paid, plan_date')
     .eq('client_id', clientId)
     .order('plan_date', { ascending: true })
 
   if (!payments || payments.length === 0) return { error: 'У клиента нет платежей' }
 
+  // Use real-world amounts when a payment is marked paid — fact_sum has priority
+  // over plan_sum so the remainder to distribute reflects what actually came in.
   const paidSum = payments
     .filter(p => p.is_paid)
-    .reduce((s, p) => s + Number(p.plan_sum), 0)
+    .reduce((s, p) => s + Number(p.fact_sum ?? p.plan_sum), 0)
 
   const remaining = newTotal - paidSum
   if (remaining < 0) return { error: `Новая сумма меньше уже оплаченного (${paidSum} ₽)` }

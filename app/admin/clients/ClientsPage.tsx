@@ -59,13 +59,15 @@ export function ClientsPage({ clients, salespersons, curators }: Props) {
 
   const totalClients = clients.length
   const totalPlan = clients.reduce((s,c) => s + (c.payments?.reduce((ps:number,p:any)=>ps+Number(p.plan_sum),0)??0), 0)
-  const totalPaid = clients.reduce((s,c) => s + (c.payments?.filter((p:any)=>p.is_paid).reduce((ps:number,p:any)=>ps+Number(p.plan_sum),0)??0), 0)
+  const totalPaid = clients.reduce((s,c) => s + (c.payments?.filter((p:any)=>p.is_paid).reduce((ps:number,p:any)=>ps+Number(p.fact_sum ?? p.plan_sum),0)??0), 0)
   const totalOverdue = clients.reduce((s,c) => s + (c.payments?.filter((p:any)=>p.status==='overdue').reduce((ps:number,p:any)=>ps+Number(p.plan_sum),0)??0), 0)
   const paidPct = totalPlan>0 ? Math.round(totalPaid/totalPlan*100) : 0
 
   const sel = selected
   const selPayments = sel?.payments ?? []
-  const selPaidSum = selPayments.filter((p:any)=>p.is_paid).reduce((s:number,p:any)=>s+Number(p.plan_sum),0)
+  // Paid uses fact_sum when available (actual money received), so the remaining
+  // is correctly based on what was really paid, not what was planned.
+  const selPaidSum = selPayments.filter((p:any)=>p.is_paid).reduce((s:number,p:any)=>s+Number(p.fact_sum ?? p.plan_sum),0)
   const selTotalSum = selPayments.reduce((s:number,p:any)=>s+Number(p.plan_sum),0)
   const selDebt = selTotalSum - selPaidSum
   const selPct = selPayments.length>0 ? Math.round(selPayments.filter((p:any)=>p.is_paid).length/selPayments.length*100) : 0
@@ -450,7 +452,7 @@ export function ClientsPage({ clients, salespersons, curators }: Props) {
             <tbody>
               {filtered.map((c: any) => {
                 const pays = c.payments ?? []
-                const paidS = pays.filter((p:any)=>p.is_paid).reduce((s:number,p:any)=>s+Number(p.plan_sum),0)
+                const paidS = pays.filter((p:any)=>p.is_paid).reduce((s:number,p:any)=>s+Number(p.fact_sum ?? p.plan_sum),0)
                 const totalS = pays.reduce((s:number,p:any)=>s+Number(p.plan_sum),0)
                 const debt = totalS - paidS
                 const pct = pays.length>0 ? Math.round(pays.filter((p:any)=>p.is_paid).length/pays.length*100) : 0
