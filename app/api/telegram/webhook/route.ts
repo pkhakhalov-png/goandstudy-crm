@@ -52,30 +52,58 @@ async function processTelegramMessage(
   // Resolve / create deal
   let dealId: string | null = null
 
-  // Lookup by chatId (works for both group and individual)
-  const { data: prevMsg } = await supabase
-    .from('deal_messages')
-    .select('deal_id')
-    .eq('metadata->>tgChatId', chatIdStr)
-    .not('deal_id', 'is', null)
+  // Lookup existing deal by chat id — check both legacy keys (tgChatId from TG bot,
+  // chatId from Wazzup) so the two webhooks don't create parallel deals for the same group.
+  const { data: dealByCustom } = await supabase
+    .from('deals')
+    .select('id')
+    .or(
+      `custom_fields->>group_chat_id.eq.${chatIdStr},custom_fields->>tg_chat_id.eq.${chatIdStr},custom_fields->>wazzup_chat_id.eq.${chatIdStr}`,
+    )
+    .is('deleted_at', null)
     .limit(1)
     .maybeSingle()
 
-  if (prevMsg?.deal_id) {
-    const { data: dealExists } = await supabase
-      .from('deals')
-      .select('id')
-      .eq('id', prevMsg.deal_id)
-      .is('deleted_at', null)
+  if (dealByCustom) {
+    dealId = dealByCustom.id
+  } else {
+    const { data: prevMsg } = await supabase
+      .from('deal_messages')
+      .select('deal_id')
+      .or(`metadata->>tgChatId.eq.${chatIdStr},metadata->>chatId.eq.${chatIdStr}`)
+      .not('deal_id', 'is', null)
+      .limit(1)
       .maybeSingle()
-    if (dealExists) dealId = dealExists.id
+    if (prevMsg?.deal_id) {
+      const { data: dealExists } = await supabase
+        .from('deals')
+        .select('id')
+        .eq('id', prevMsg.deal_id)
+        .is('deleted_at', null)
+        .maybeSingle()
+      if (dealExists) dealId = dealExists.id
+    }
   }
 
   // Create new deal if not found
   if (!dealId) {
-    // Pick stage: groups → "Группы" stage if exists, else first active
+    // Pick stage: groups whose title starts with "Релокац" → "Релокац" stage;
+    // other groups → "Группы" stage; fallback to first active.
     let chosenStage = null
-    if (isGroup) {
+    const titleForRouting = msg.chat.title || ''
+    const isRelocation = isGroup && /^релокац/i.test(titleForRouting.trim())
+    if (isRelocation) {
+      const { data: relocStage } = await supabase
+        .from('pipeline_stages')
+        .select('id')
+        .eq('is_active', true)
+        .ilike('name', 'релокац%')
+        .order('position', { ascending: true })
+        .limit(1)
+        .maybeSingle()
+      chosenStage = relocStage
+    }
+    if (!chosenStage && isGroup) {
       const { data: groupStage } = await supabase
         .from('pipeline_stages')
         .select('id')
@@ -118,7 +146,7 @@ async function processTelegramMessage(
       ? (msg.chat.title || 'Группа')
       : senderName
 
-    const { data: newDeal } = await supabase
+    const { data: newDeal, error: insertErr } = await supabase
       .from('deals')
       .insert({
         title: dealTitle,
@@ -128,6 +156,7 @@ async function processTelegramMessage(
         contact_telegram: !isGroup && msg.from?.username ? `@${msg.from.username}` : null,
         source: isGroup ? 'telegram_group_bot' : 'telegram_bot',
         custom_fields: {
+          group_chat_id: chatIdStr,
           tg_chat_id: msg.chat.id,
           tg_chat_type: msg.chat.type,
           tg_chat_title: msg.chat.title,
@@ -136,6 +165,19 @@ async function processTelegramMessage(
       })
       .select('id')
       .single()
+
+    // If a parallel webhook just created the same group deal, the unique index on
+    // group_chat_id raises a conflict — re-fetch the existing row instead of duplicating.
+    if (insertErr && isGroup) {
+      const { data: raceDeal } = await supabase
+        .from('deals')
+        .select('id')
+        .eq('custom_fields->>group_chat_id', chatIdStr)
+        .is('deleted_at', null)
+        .limit(1)
+        .maybeSingle()
+      if (raceDeal) dealId = raceDeal.id
+    }
 
     if (newDeal) {
       dealId = newDeal.id
