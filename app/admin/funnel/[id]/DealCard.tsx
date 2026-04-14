@@ -90,7 +90,11 @@ export function DealCard({ deal, stages, activities, salespersons, clientData, b
   const [clientResults, setClientResults] = useState<any[]>([])
   const [showClientSearch, setShowClientSearch] = useState(false)
   const [msgText, setMsgText] = useState('')
-  const [msgChannel, setMsgChannel] = useState<'telegram' | 'whatsapp'>(deal.contact_telegram ? 'telegram' : 'whatsapp')
+  const [msgChannel, setMsgChannel] = useState<'telegram' | 'whatsapp'>(
+    (deal.contact_telegram || deal.source === 'telegram_group_bot' || deal.custom_fields?.is_group)
+      ? 'telegram'
+      : 'whatsapp'
+  )
   const [msgSending, setMsgSending] = useState(false)
   const [msgError, setMsgError] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
