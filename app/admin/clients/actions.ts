@@ -17,12 +17,63 @@ export async function updatePaymentSum(paymentId: number, newSum: number) {
   if (authErr) return { error: authErr }
   if (!(newSum >= 0)) return { error: 'Сумма должна быть ≥ 0' }
 
-  const { error } = await supabase
+  // Look up the edited payment and its client
+  const { data: edited } = await supabase
     .from('payments')
-    .update({ plan_sum: newSum })
+    .select('id, client_id, plan_sum')
     .eq('id', paymentId)
+    .single()
+  if (!edited) return { error: 'Платёж не найден' }
 
-  if (error) return { error: error.message }
+  // Fetch all payments for this client — keep the contract total fixed and
+  // redistribute the delta across the OTHER unpaid payments proportionally.
+  const { data: all } = await supabase
+    .from('payments')
+    .select('id, plan_sum, fact_sum, is_paid, plan_date')
+    .eq('client_id', edited.client_id)
+    .order('plan_date', { ascending: true })
+  if (!all || all.length === 0) return { error: 'Нет платежей у клиента' }
+
+  const totalBefore = all.reduce((s, p) => s + Number(p.plan_sum), 0)
+  const otherUnpaid = all.filter(p => p.id !== paymentId && !p.is_paid)
+  const otherPaidSum = all
+    .filter(p => p.id !== paymentId && p.is_paid)
+    .reduce((s, p) => s + Number(p.plan_sum), 0)
+
+  // Sum that must be covered by the other unpaid payments to keep total fixed
+  const remainingForUnpaid = totalBefore - newSum - otherPaidSum
+
+  if (otherUnpaid.length === 0) {
+    // Nothing to rebalance into — just update the edited one
+    const { error } = await supabase.from('payments').update({ plan_sum: newSum }).eq('id', paymentId)
+    if (error) return { error: error.message }
+    revalidatePath('/admin/clients')
+    return { success: true }
+  }
+
+  if (remainingForUnpaid < 0) {
+    return { error: `Новое значение превышает доступный остаток (других неоплаченных ${otherUnpaid.length}, им нечего распределить)` }
+  }
+
+  const per = Math.round((remainingForUnpaid / otherUnpaid.length) * 100) / 100
+  const last = Math.round((remainingForUnpaid - per * (otherUnpaid.length - 1)) * 100) / 100
+
+  // Update the edited payment first
+  {
+    const { error } = await supabase.from('payments').update({ plan_sum: newSum }).eq('id', paymentId)
+    if (error) return { error: error.message }
+  }
+
+  // Redistribute into the other unpaid ones
+  for (let i = 0; i < otherUnpaid.length; i++) {
+    const sum = i === otherUnpaid.length - 1 ? last : per
+    const { error } = await supabase
+      .from('payments')
+      .update({ plan_sum: sum })
+      .eq('id', otherUnpaid[i].id)
+    if (error) return { error: error.message }
+  }
+
   revalidatePath('/admin/clients')
   return { success: true }
 }
