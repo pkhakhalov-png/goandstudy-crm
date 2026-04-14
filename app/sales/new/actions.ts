@@ -29,7 +29,7 @@ export async function createClientSales(formData: FormData): Promise<void> {
 
   if (error) {
     console.error('[sales/new] create_client_with_payments failed:', error)
-    throw new Error(`Не удалось создать клиента: ${error.message}`)
+    redirect(`/sales/new?error=${encodeURIComponent(error.message || 'Ошибка создания клиента')}`)
   }
 
   redirect('/sales')
