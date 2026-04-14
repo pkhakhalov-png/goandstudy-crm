@@ -70,7 +70,8 @@ export async function sendWazzupMessage(params: SendMessageParams) {
   if (!res.ok) {
     const err = await res.text()
     console.log('[wazzup send] error:', res.status, err)
-    throw new Error(`Wazzup send failed: ${res.status} ${err}`)
+    // Include the sent body in the error so we can see exactly what was rejected
+    throw new Error(`Wazzup send failed: ${res.status} ${err} | sent: ${body}`)
   }
 
   return res.json() as Promise<{ messageId: string }>
