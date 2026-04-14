@@ -3,7 +3,7 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { normalizePhone } from '@/lib/phone'
-import { sendWazzupMessage, type ChatType } from '@/lib/wazzup'
+import { sendWazzupMessage, getTgapiChannelId, type ChatType } from '@/lib/wazzup'
 import { suggestSalesReply } from '@/lib/ai'
 
 function reval() {
@@ -417,17 +417,20 @@ export async function sendDealMessage(formData: FormData) {
 
   const isGroupDeal = deal.source === 'telegram_group_bot' || deal.custom_fields?.is_group === true
 
-  // Determine channelId and chatId (trim to strip accidental whitespace)
-  const rawChannelId = channel === 'telegram'
-    ? process.env.WAZZUP_TG_CHANNEL_ID
-    : process.env.WAZZUP_WA_CHANNEL_ID
-
-  const channelId = (rawChannelId ?? '').trim()
-
-  // Debug log — available in Vercel function logs
-  console.log('[sendDealMessage] channel:', channel, 'channelId len:', channelId.length, 'channelId:', JSON.stringify(channelId))
-
-  if (!channelId) return { error: `Канал ${channel} не настроен (env ${channel === 'telegram' ? 'WAZZUP_TG_CHANNEL_ID' : 'WAZZUP_WA_CHANNEL_ID'} пуст)` }
+  // For Telegram, always use the tgapi (real account) channel — the bot channel
+  // (WAZZUP_TG_CHANNEL_ID) is reserved for incoming group messages only.
+  // For WhatsApp, keep the configured channel.
+  let channelId: string
+  if (channel === 'telegram') {
+    try {
+      channelId = await getTgapiChannelId()
+    } catch (e) {
+      return { error: e instanceof Error ? e.message : 'Не удалось получить tgapi-канал' }
+    }
+  } else {
+    channelId = (process.env.WAZZUP_WA_CHANNEL_ID ?? '').trim()
+    if (!channelId) return { error: 'Канал whatsapp не настроен (env WAZZUP_WA_CHANNEL_ID пуст)' }
+  }
 
   let chatType: ChatType
   let chatId: string
