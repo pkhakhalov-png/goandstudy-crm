@@ -38,7 +38,8 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/api/book') ||
     pathname.startsWith('/api/wazzup') ||
     pathname.startsWith('/api/telegram') ||
-    pathname.startsWith('/api/tbank')
+    pathname.startsWith('/api/tbank') ||
+    pathname.startsWith('/api/debug')
 
   // Не авторизован — редирект на /login
   if (!user && !isPublic) {
