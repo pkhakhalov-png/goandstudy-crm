@@ -453,9 +453,11 @@ export async function sendDealMessage(formData: FormData) {
     chatId = knownChatId || deal.phone_normalized
     if (!chatId) return { error: 'У клиента нет телефона' }
   } else {
-    // All Telegram outgoing — group or personal — goes through Wazzup tgapi
-    // (real user account), so messages appear from the manager, not the bot.
-    chatType = 'tgapi'
+    // Wazzup send API expects chatType='telegram' for sending from a tgapi
+    // (personal-account) channel — 'tgapi' is the channel transport, not the
+    // send-side chat type. Channel selection already routes through the tgapi
+    // channelId, so the message comes from the real account, not the bot.
+    chatType = 'telegram'
     const groupChatId = isGroupDeal
       ? (deal.custom_fields?.group_chat_id ?? deal.custom_fields?.tg_chat_id ?? deal.custom_fields?.wazzup_chat_id)
       : null
