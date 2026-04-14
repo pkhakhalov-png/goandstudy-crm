@@ -22,7 +22,7 @@ export async function createClient_action(formData: FormData): Promise<void> {
   const firstPayDate = formData.get('first_pay_date') as string
 
   // Создаём клиента с платежами
-  const { data: newClient, error } = await supabase.rpc('create_client_with_payments', {
+  const { error } = await supabase.rpc('create_client_with_payments', {
     p_name: formData.get('name') as string,
     p_phone: formData.get('phone') as string,
     p_email: (formData.get('email') as string) || null,
@@ -38,53 +38,9 @@ export async function createClient_action(formData: FormData): Promise<void> {
   })
 
   if (error) {
-    console.error(error)
-    redirect('/admin/clients')
+    console.error('[admin/clients/new] create_client_with_payments failed:', error)
+    throw new Error(`Не удалось создать клиента: ${error.message}`)
   }
-
-  const clientId = newClient?.id
-  if (!clientId) {
-    redirect('/admin/clients')
-  }
-
-  // Автоматически создаём расходы
-
-  // 1. Куратор — 2 платежа по 25 000 ₽
-  const secondPayDate = new Date(firstPayDate)
-  secondPayDate.setMonth(secondPayDate.getMonth() + 1)
-
-  await supabase.from('expenses').insert([
-    {
-      client_id: clientId,
-      article: 'curator',
-      who: null,
-      plan_date: firstPayDate,
-      plan_sum: 25000,
-      is_paid: false,
-      status: 'pending',
-      note: 'Куратор — этап 1',
-    },
-    {
-      client_id: clientId,
-      article: 'curator',
-      who: null,
-      plan_date: secondPayDate.toISOString().split('T')[0],
-      plan_sum: 25000,
-      is_paid: false,
-      status: 'pending',
-      note: 'Куратор — этап 2',
-    },
-    {
-      client_id: clientId,
-      article: 'salesperson',
-      who: null,
-      plan_date: firstPayDate,
-      plan_sum: Math.round(totalAmount * 0.1),
-      is_paid: false,
-      status: 'pending',
-      note: `ЗП продажника — 10% от ${totalAmount.toLocaleString('ru')} ₽`,
-    },
-  ])
 
   redirect('/admin/clients')
 }
