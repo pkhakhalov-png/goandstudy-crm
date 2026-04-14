@@ -159,12 +159,30 @@ async function processMessage(supabase: SupabaseAdmin, msg: WazzupMessage) {
     if (existingDeal) dealId = existingDeal.id
   }
 
+  // STEP 2.5: Name-based fallback for TG chats — the same Telegram chat can
+  // arrive under different chatId formats from Wazzup tgapi vs the direct
+  // Telegram Bot API. If an existing group deal has the same contact_name
+  // (the chat title), reuse it instead of creating a duplicate.
+  if (!dealId && isTg && msg.contact?.name) {
+    const { data: existingByName } = await supabase
+      .from('deals')
+      .select('id')
+      .eq('contact_name', msg.contact.name)
+      .contains('custom_fields', { is_group: true })
+      .is('deleted_at', null)
+      .limit(1)
+      .maybeSingle()
+    if (existingByName) dealId = existingByName.id
+  }
+
   // STEP 3: No deal found — create new one (only for incoming)
   if (!dealId && !msg.isEcho) {
-    // Pick stage: groups whose title starts with "Релокац" → "Релокац" stage;
-    // other groups → "Группы" stage; fallback to first active.
+    // Pick stage: ANY chat (group or personal) whose title/name starts with
+    // "Релокац" → "Релокац" stage; other groups → "Группы" stage; fallback
+    // to first active.
     let chosenStage = null
-    const isRelocation = isGroup && /^релокац/i.test((groupTitle || '').trim())
+    const titleForRouting = (groupTitle || senderName || '').toString().trim()
+    const isRelocation = /^релокац/i.test(titleForRouting)
     if (isRelocation) {
       const { data: relocStage } = await supabase
         .from('pipeline_stages')
