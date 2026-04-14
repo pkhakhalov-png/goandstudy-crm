@@ -848,18 +848,24 @@ export function DealCard({ deal, stages, activities, salespersons, clientData, b
                   )}
                   <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end' }}>
                     <div style={{ display: 'flex', gap: 4 }}>
-                      <button
-                        onClick={() => setMsgChannel('telegram')}
-                        disabled={!deal.contact_telegram}
-                        title={deal.contact_telegram ? 'Отправить в Telegram' : 'У клиента нет Telegram'}
-                        style={{
-                          padding: '8px 10px', borderRadius: 8, border: '1px solid var(--bor)',
-                          background: msgChannel === 'telegram' ? 'rgba(0,136,204,.12)' : 'var(--surf)',
-                          color: msgChannel === 'telegram' ? '#0088cc' : 'var(--muted)',
-                          cursor: deal.contact_telegram ? 'pointer' : 'not-allowed',
-                          fontSize: 11, fontWeight: 700,
-                          opacity: deal.contact_telegram ? 1 : 0.4,
-                        }}>TG</button>
+                      {(() => {
+                        const isGroupDeal = deal.source === 'telegram_group_bot' || deal.custom_fields?.is_group === true
+                        const tgEnabled = !!deal.contact_telegram || isGroupDeal
+                        return (
+                          <button
+                            onClick={() => setMsgChannel('telegram')}
+                            disabled={!tgEnabled}
+                            title={tgEnabled ? (isGroupDeal ? 'Отправить в Telegram-группу' : 'Отправить в Telegram') : 'У клиента нет Telegram'}
+                            style={{
+                              padding: '8px 10px', borderRadius: 8, border: '1px solid var(--bor)',
+                              background: msgChannel === 'telegram' ? 'rgba(0,136,204,.12)' : 'var(--surf)',
+                              color: msgChannel === 'telegram' ? '#0088cc' : 'var(--muted)',
+                              cursor: tgEnabled ? 'pointer' : 'not-allowed',
+                              fontSize: 11, fontWeight: 700,
+                              opacity: tgEnabled ? 1 : 0.4,
+                            }}>TG</button>
+                        )
+                      })()}
                       <button
                         onClick={() => setMsgChannel('whatsapp')}
                         disabled={!deal.contact_phone}
