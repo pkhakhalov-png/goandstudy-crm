@@ -102,25 +102,38 @@ async function processMessage(supabase: SupabaseAdmin, msg: WazzupMessage) {
 
   let dealId: string | null = null
 
-  // STEP 1: Look up existing deal by Wazzup chatId in metadata (most reliable — works for both group and individual)
-  // We stored chatId in deal_messages.metadata.chatId when we previously received a message from this chat
-  const { data: prevMsg } = await supabase
-    .from('deal_messages')
-    .select('deal_id')
-    .eq('metadata->>chatId', msg.chatId)
-    .not('deal_id', 'is', null)
+  // STEP 1: Look up existing deal by chat id. Check both deals.custom_fields and
+  // deal_messages.metadata under all known key names (group_chat_id, tg_chat_id,
+  // wazzup_chat_id, tgChatId, chatId) so the Wazzup and TG bot webhooks share state.
+  const { data: dealByCustom } = await supabase
+    .from('deals')
+    .select('id')
+    .or(
+      `custom_fields->>group_chat_id.eq.${msg.chatId},custom_fields->>wazzup_chat_id.eq.${msg.chatId},custom_fields->>tg_chat_id.eq.${msg.chatId}`,
+    )
+    .is('deleted_at', null)
     .limit(1)
     .maybeSingle()
 
-  if (prevMsg?.deal_id) {
-    // Make sure that deal is not deleted
-    const { data: dealExists } = await supabase
-      .from('deals')
-      .select('id')
-      .eq('id', prevMsg.deal_id)
-      .is('deleted_at', null)
+  if (dealByCustom) {
+    dealId = dealByCustom.id
+  } else {
+    const { data: prevMsg } = await supabase
+      .from('deal_messages')
+      .select('deal_id')
+      .or(`metadata->>chatId.eq.${msg.chatId},metadata->>tgChatId.eq.${msg.chatId}`)
+      .not('deal_id', 'is', null)
+      .limit(1)
       .maybeSingle()
-    if (dealExists) dealId = dealExists.id
+    if (prevMsg?.deal_id) {
+      const { data: dealExists } = await supabase
+        .from('deals')
+        .select('id')
+        .eq('id', prevMsg.deal_id)
+        .is('deleted_at', null)
+        .maybeSingle()
+      if (dealExists) dealId = dealExists.id
+    }
   }
 
   // STEP 2: For individual (non-group) chats, fallback to phone-based lookup
@@ -148,9 +161,22 @@ async function processMessage(supabase: SupabaseAdmin, msg: WazzupMessage) {
 
   // STEP 3: No deal found — create new one (only for incoming)
   if (!dealId && !msg.isEcho) {
-    // Pick stage: for groups try to find one with "групп" in name, fallback to first active stage
+    // Pick stage: groups whose title starts with "Релокац" → "Релокац" stage;
+    // other groups → "Группы" stage; fallback to first active.
     let chosenStage = null
-    if (isGroup) {
+    const isRelocation = isGroup && /^релокац/i.test((groupTitle || '').trim())
+    if (isRelocation) {
+      const { data: relocStage } = await supabase
+        .from('pipeline_stages')
+        .select('id, position')
+        .eq('is_active', true)
+        .ilike('name', 'релокац%')
+        .order('position', { ascending: true })
+        .limit(1)
+        .maybeSingle()
+      if (relocStage) chosenStage = relocStage
+    }
+    if (!chosenStage && isGroup) {
       const { data: groupStage } = await supabase
         .from('pipeline_stages')
         .select('id, position')
@@ -200,7 +226,9 @@ async function processMessage(supabase: SupabaseAdmin, msg: WazzupMessage) {
         contact_telegram: isGroup ? null : (isTg ? msg.contact?.username || null : null),
         contact_whatsapp: isGroup ? null : (msg.chatType === 'whatsapp' ? rawPhone : null),
         source: isGroup ? `${channelLabel}_group` : channelLabel,
-        custom_fields: isGroup ? { wazzup_chat_id: msg.chatId, is_group: true } : {},
+        custom_fields: isGroup
+          ? { group_chat_id: msg.chatId, wazzup_chat_id: msg.chatId, is_group: true }
+          : {},
       })
       .select('id')
       .single()
