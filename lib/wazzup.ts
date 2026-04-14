@@ -98,8 +98,9 @@ export async function getTgapiChannelId(): Promise<string> {
   if (fromEnv) return fromEnv
   if (cachedTgapiChannelId) return cachedTgapiChannelId
   const channels = await getWazzupChannels()
-  const tgapi = channels.find(c => c.transport === 'tgapi' && c.state !== 'disabled')
-  if (!tgapi) throw new Error('Не найден активный tgapi-канал в Wazzup. Подключи личный TG-аккаунт в Wazzup или задай WAZZUP_TGAPI_CHANNEL_ID.')
+  // Only pick a channel that's actually working — skip blocked/disabled/init states.
+  const tgapi = channels.find(c => c.transport === 'tgapi' && c.state === 'active')
+  if (!tgapi) throw new Error('Не найден активный tgapi-канал в Wazzup (нужен state=active). Подключи личный TG-аккаунт в Wazzup или задай WAZZUP_TGAPI_CHANNEL_ID.')
   cachedTgapiChannelId = tgapi.channelId
   return cachedTgapiChannelId
 }
