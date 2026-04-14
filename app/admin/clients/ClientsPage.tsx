@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
 import Link from 'next/link'
+import { assignCurator } from './actions'
 
 interface Props {
   clients: any[]
@@ -32,6 +33,8 @@ function getPaymentStatus(client: any) {
 
 export function ClientsPage({ clients, salespersons, curators }: Props) {
   const [selected, setSelected] = useState<any>(null)
+  const [, startTransition] = useTransition()
+  const [assigningCurator, setAssigningCurator] = useState(false)
   const [search, setSearch] = useState('')
   const [filterSalesperson, setFilterSalesperson] = useState('')
   const [filterCurator, setFilterCurator] = useState('')
@@ -171,9 +174,37 @@ export function ClientsPage({ clients, salespersons, curators }: Props) {
                   <span style={{ color: 'var(--muted)' }}>Продажник</span>
                   <span className="stag">{sel.salesperson?.name ?? '—'}</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(0,0,0,.04)', fontSize: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid rgba(0,0,0,.04)', fontSize: 12 }}>
                   <span style={{ color: 'var(--muted)' }}>Куратор</span>
-                  <span className="ctag">{sel.curator?.name ?? '—'}</span>
+                  {sel.curator?.name ? (
+                    <span className="ctag">{sel.curator.name}</span>
+                  ) : (
+                    <select
+                      defaultValue=""
+                      disabled={assigningCurator}
+                      onChange={(e) => {
+                        const curatorId = e.target.value
+                        if (!curatorId) return
+                        setAssigningCurator(true)
+                        startTransition(async () => {
+                          const res = await assignCurator(sel.id, curatorId)
+                          setAssigningCurator(false)
+                          if (res?.error) {
+                            alert(res.error)
+                            return
+                          }
+                          const picked = curators.find((c: any) => c.id === curatorId)
+                          if (picked) setSelected({ ...sel, curator: picked, curator_id: picked.id })
+                        })
+                      }}
+                      style={{ fontSize: 12, padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(0,0,0,.12)', background: '#fff', color: 'var(--text)', cursor: 'pointer' }}
+                    >
+                      <option value="">Назначить…</option>
+                      {curators.map((c: any) => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                  )}
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(0,0,0,.04)', fontSize: 12 }}>
                   <span style={{ color: 'var(--muted)' }}>Рассрочка</span>
