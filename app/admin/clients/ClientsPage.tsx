@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
-import { assignCurator } from './actions'
+import { assignCurator, updatePaymentSum, updateClientTotal } from './actions'
 
 interface Props {
   clients: any[]
@@ -35,6 +35,10 @@ export function ClientsPage({ clients, salespersons, curators }: Props) {
   const [selected, setSelected] = useState<any>(null)
   const [, startTransition] = useTransition()
   const [assigningCurator, setAssigningCurator] = useState(false)
+  const [editingPaymentId, setEditingPaymentId] = useState<number | null>(null)
+  const [paymentDraft, setPaymentDraft] = useState<string>('')
+  const [editingTotal, setEditingTotal] = useState(false)
+  const [totalDraft, setTotalDraft] = useState<string>('')
   const [search, setSearch] = useState('')
   const [filterSalesperson, setFilterSalesperson] = useState('')
   const [filterCurator, setFilterCurator] = useState('')
@@ -120,7 +124,37 @@ export function ClientsPage({ clients, salespersons, curators }: Props) {
             {/* Mini stats */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, padding: '12px 20px', borderBottom: '1px solid var(--bor2)' }}>
               <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{selTotalSum.toLocaleString('ru')} ₽</div>
+                {editingTotal ? (
+                  <div style={{ display: 'flex', gap: 4, justifyContent: 'center', alignItems: 'center' }}>
+                    <input
+                      type="number"
+                      value={totalDraft}
+                      onChange={e => setTotalDraft(e.target.value)}
+                      autoFocus
+                      onKeyDown={e => { if (e.key === 'Escape') setEditingTotal(false) }}
+                      style={{ width: 90, fontSize: 13, fontWeight: 700, padding: '2px 6px', border: '1px solid var(--purple)', borderRadius: 6, textAlign: 'center', outline: 'none' }}
+                    />
+                    <button
+                      onClick={() => {
+                        const v = Number(totalDraft)
+                        if (!(v >= 0)) { setEditingTotal(false); return }
+                        startTransition(async () => {
+                          const res = await updateClientTotal(sel.id, v)
+                          setEditingTotal(false)
+                          if (res?.error) alert(res.error)
+                        })
+                      }}
+                      style={{ fontSize: 11, padding: '2px 6px', borderRadius: 5, border: 'none', background: 'var(--purple)', color: '#fff', cursor: 'pointer' }}
+                    >✓</button>
+                    <button onClick={() => setEditingTotal(false)} style={{ fontSize: 11, padding: '2px 6px', borderRadius: 5, border: '1px solid var(--bor2)', background: 'var(--surf)', cursor: 'pointer' }}>×</button>
+                  </div>
+                ) : (
+                  <div
+                    onClick={() => { setTotalDraft(String(selTotalSum)); setEditingTotal(true) }}
+                    style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', cursor: 'pointer' }}
+                    title="Клик — редактировать сумму договора"
+                  >{selTotalSum.toLocaleString('ru')} ₽</div>
+                )}
                 <div style={{ fontSize: 9, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 600 }}>Договор</div>
               </div>
               <div style={{ textAlign: 'center' }}>
@@ -240,9 +274,39 @@ export function ClientsPage({ clients, salespersons, curators }: Props) {
                     <div style={{ fontSize: 11, flex: 1, color: p.status === 'overdue' ? 'var(--red)' : p.status === 'soon' ? 'var(--gold)' : 'var(--muted)', fontWeight: (p.status === 'overdue' || p.status === 'soon') ? 600 : 400 }}>
                       {new Date(p.plan_date).toLocaleDateString('ru-RU')}
                     </div>
-                    <div style={{ fontSize: 11, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: p.status === 'paid' ? 'var(--green)' : p.status === 'overdue' ? 'var(--red)' : p.status === 'soon' ? 'var(--gold)' : 'var(--muted)' }}>
-                      {Number(p.plan_sum).toLocaleString('ru')} ₽
-                    </div>
+                    {editingPaymentId === p.id ? (
+                      <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                        <input
+                          type="number"
+                          value={paymentDraft}
+                          autoFocus
+                          onChange={e => setPaymentDraft(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Escape') setEditingPaymentId(null) }}
+                          style={{ width: 80, fontSize: 11, padding: '2px 6px', border: '1px solid var(--purple)', borderRadius: 5, outline: 'none', textAlign: 'right' }}
+                        />
+                        <button
+                          onClick={() => {
+                            const v = Number(paymentDraft)
+                            if (!(v >= 0)) { setEditingPaymentId(null); return }
+                            startTransition(async () => {
+                              const res = await updatePaymentSum(p.id, v)
+                              setEditingPaymentId(null)
+                              if (res?.error) alert(res.error)
+                            })
+                          }}
+                          style={{ fontSize: 10, padding: '2px 5px', borderRadius: 4, border: 'none', background: 'var(--purple)', color: '#fff', cursor: 'pointer' }}
+                        >✓</button>
+                        <button onClick={() => setEditingPaymentId(null)} style={{ fontSize: 10, padding: '2px 5px', borderRadius: 4, border: '1px solid var(--bor2)', background: 'var(--surf)', cursor: 'pointer' }}>×</button>
+                      </div>
+                    ) : (
+                      <div
+                        onClick={() => { setPaymentDraft(String(p.plan_sum)); setEditingPaymentId(p.id) }}
+                        style={{ fontSize: 11, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: p.status === 'paid' ? 'var(--green)' : p.status === 'overdue' ? 'var(--red)' : p.status === 'soon' ? 'var(--gold)' : 'var(--muted)', cursor: 'pointer' }}
+                        title="Клик — редактировать сумму платежа"
+                      >
+                        {Number(p.plan_sum).toLocaleString('ru')} ₽
+                      </div>
+                    )}
                     <div style={{ width: 16, height: 16, borderRadius: 5, flexShrink: 0, background: p.is_paid ? 'var(--green)' : 'transparent', border: p.is_paid ? 'none' : '1.5px solid var(--bor2)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
                       {p.is_paid && <svg viewBox="0 0 9 7" fill="none" stroke="white" strokeWidth="2" width="9" height="9"><polyline points="1,3.5 3.5,6 8,1" /></svg>}
                     </div>
