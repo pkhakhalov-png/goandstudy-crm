@@ -93,10 +93,12 @@ export async function getWazzupChannels() {
 // Cache tgapi channel id in module memory — channels list rarely changes.
 let cachedTgapiChannelId: string | null = null
 export async function getTgapiChannelId(): Promise<string> {
+  const fromEnv = (process.env.WAZZUP_TGAPI_CHANNEL_ID ?? '').trim()
+  if (fromEnv) return fromEnv
   if (cachedTgapiChannelId) return cachedTgapiChannelId
   const channels = await getWazzupChannels()
   const tgapi = channels.find(c => c.transport === 'tgapi' && c.state !== 'disabled')
-  if (!tgapi) throw new Error('Не найден активный tgapi-канал в Wazzup. Подключи личный TG-аккаунт в Wazzup.')
+  if (!tgapi) throw new Error('Не найден активный tgapi-канал в Wazzup. Подключи личный TG-аккаунт в Wazzup или задай WAZZUP_TGAPI_CHANNEL_ID.')
   cachedTgapiChannelId = tgapi.channelId
   return cachedTgapiChannelId
 }
