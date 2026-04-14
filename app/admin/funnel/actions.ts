@@ -4,6 +4,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { normalizePhone } from '@/lib/phone'
 import { sendWazzupMessage, getTgapiChannelId, type ChatType } from '@/lib/wazzup'
+import { sendTelegramMessage } from '@/lib/telegram'
 import { suggestSalesReply } from '@/lib/ai'
 
 function reval() {
@@ -417,9 +418,57 @@ export async function sendDealMessage(formData: FormData) {
 
   const isGroupDeal = deal.source === 'telegram_group_bot' || deal.custom_fields?.is_group === true
 
-  // For Telegram, always use the tgapi (real account) channel — the bot channel
-  // (WAZZUP_TG_CHANNEL_ID) is reserved for incoming group messages only.
-  // For WhatsApp, keep the configured channel.
+  // Telegram group deals go through the direct Bot API — Wazzup tgapi cannot
+  // deliver to Telegram groups/supergroups without explicit Wazzup support
+  // activation. The message will appear as coming from the bot, which is the
+  // accepted trade-off. Personal TG chats still go through Wazzup tgapi so
+  // they come from the real account.
+  if (channel === 'telegram' && isGroupDeal) {
+    const groupChatId = deal.custom_fields?.group_chat_id
+      ?? deal.custom_fields?.tg_chat_id
+      ?? deal.custom_fields?.wazzup_chat_id
+    if (!groupChatId) return { error: 'Не найден chat_id группы в custom_fields' }
+
+    try {
+      const tgRes = await sendTelegramMessage(groupChatId, text) as { result?: { message_id?: number } }
+      const messageId = `tg_${groupChatId}_${tgRes?.result?.message_id ?? Date.now()}`
+
+      const { data: existing } = await supabase
+        .from('deal_messages')
+        .select('id')
+        .eq('external_id', messageId)
+        .maybeSingle()
+
+      if (!existing) {
+        await supabase.from('deal_messages').insert({
+          deal_id: dealId,
+          direction: 'outgoing',
+          channel: 'telegram',
+          sender_name: 'Менеджер',
+          content: text,
+          external_id: messageId,
+          metadata: { tgChatId: String(groupChatId), sentBy: user.id, viaBotApi: true },
+        })
+      }
+
+      await supabase.from('deal_activities').insert({
+        deal_id: dealId,
+        user_id: user.id,
+        activity_type: 'message',
+        content: `Исходящее telegram (group): ${text.slice(0, 100)}`,
+        metadata: { channel: 'telegram', direction: 'outgoing' },
+      })
+
+      await supabase.from('deals').update({ updated_at: new Date().toISOString() }).eq('id', dealId)
+      revalidatePath(`/admin/funnel/${dealId}`)
+      revalidatePath(`/sales/funnel/${dealId}`)
+      return { success: true }
+    } catch (e) {
+      return { error: e instanceof Error ? e.message : 'Ошибка отправки в TG-группу' }
+    }
+  }
+
+  // Personal TG → Wazzup tgapi (real account). WA → Wazzup wa channel.
   let channelId: string
   if (channel === 'telegram') {
     try {
