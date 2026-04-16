@@ -17,14 +17,23 @@ export default async function SalesCabinetPage() {
 
   if (profile?.role === 'admin') redirect('/admin/clients')
 
+  const now = new Date()
+  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+
   const [
     { data: rawClients },
     { data: payments },
     { data: allCurators },
+    { data: allSalespersons },
+    { data: allClients },
+    { data: salesPlans },
   ] = await Promise.all([
     supabase.from('clients').select('id, name, phone, email, telegram, country, university, status, months, created_at, salesperson_id, curator_id').eq('salesperson_id', user.id).order('created_at', { ascending: false }),
     supabase.from('payments_view').select('id, client_id, num, plan_date, plan_sum, fact_sum, fact_date, is_paid, status, comment'),
     supabase.from('curators').select('id, name'),
+    supabase.from('users').select('id, name, is_active').eq('role', 'salesperson').eq('is_active', true),
+    supabase.from('clients').select('id, salesperson_id'),
+    supabase.from('sales_plans').select('salesperson_id, plan_amount').eq('month', currentMonth),
   ])
 
   const clientIds = (rawClients ?? []).map(c => c.id)
@@ -67,6 +76,51 @@ export default async function SalesCabinetPage() {
           </div>
         </div>
         <SalesPage clients={clients} expenses={expenses ?? []} />
+
+        {/* Leaderboard — department progress (competition) */}
+        {(allSalespersons ?? []).length > 1 && (() => {
+          const cBySp: Record<string, number[]> = {}
+          ;(allClients ?? []).forEach((c: any) => { if (c.salesperson_id) { if (!cBySp[c.salesperson_id]) cBySp[c.salesperson_id] = []; cBySp[c.salesperson_id].push(c.id) } })
+          const board = (allSalespersons ?? []).map((sp: any) => {
+            const cIds = cBySp[sp.id] || []
+            const fact = (payments ?? []).filter((p: any) => p.is_paid && p.fact_date && cIds.includes(p.client_id) && p.fact_date.startsWith(currentMonth)).reduce((s: number, p: any) => s + Number(p.fact_sum ?? p.plan_sum), 0)
+            const plan = (salesPlans ?? []).find((p: any) => p.salesperson_id === sp.id)
+            const planAmt = plan ? Number(plan.plan_amount) : 0
+            const pct = planAmt > 0 ? Math.round(fact / planAmt * 100) : 0
+            return { ...sp, fact, planAmt, pct }
+          }).sort((a: any, b: any) => b.fact - a.fact)
+          const totalFact = board.reduce((s: number, sp: any) => s + sp.fact, 0)
+          const deptPlan = (salesPlans ?? []).find((p: any) => !p.salesperson_id)
+          const deptAmt = deptPlan ? Number(deptPlan.plan_amount) : 0
+          const deptPct = deptAmt > 0 ? Math.round(totalFact / deptAmt * 100) : 0
+
+          return (
+            <div style={{ padding: '20px 24px', borderTop: '1px solid var(--bor2)' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--muted)', marginBottom: 10 }}>Лидерборд отдела — {currentMonth}</div>
+              {deptAmt > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, padding: '10px 14px', background: 'var(--surf)', border: '1px solid var(--bor2)', borderRadius: 10 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ height: 6, background: 'var(--bor)', borderRadius: 3 }}>
+                      <div style={{ height: '100%', width: `${Math.min(deptPct, 100)}%`, background: deptPct >= 80 ? 'var(--green)' : deptPct >= 50 ? 'var(--gold)' : 'var(--red)', borderRadius: 3 }} />
+                    </div>
+                  </div>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: deptPct >= 80 ? 'var(--green)' : deptPct >= 50 ? 'var(--gold)' : 'var(--red)' }}>{deptPct}% отдел</span>
+                </div>
+              )}
+              {board.map((sp: any, idx: number) => (
+                <div key={sp.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', borderRadius: 10, marginBottom: 4, background: sp.id === user.id ? 'rgba(22,163,97,.06)' : 'transparent', border: sp.id === user.id ? '1px solid rgba(22,163,97,.2)' : '1px solid transparent' }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, width: 24, color: idx === 0 ? 'var(--gold)' : 'var(--muted)' }}>{idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : idx + 1}</span>
+                  <span style={{ flex: 1, fontSize: 13, fontWeight: sp.id === user.id ? 700 : 500 }}>{sp.name}{sp.id === user.id ? ' (вы)' : ''}</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--green)' }}>{Math.round(sp.fact).toLocaleString('ru')} ₽</span>
+                  <div style={{ width: 80, height: 6, background: 'var(--bor)', borderRadius: 3 }}>
+                    <div style={{ height: '100%', width: `${Math.min(sp.pct, 100)}%`, background: sp.pct >= 80 ? 'var(--green)' : sp.pct >= 50 ? 'var(--gold)' : 'var(--red)', borderRadius: 3 }} />
+                  </div>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: sp.pct >= 80 ? 'var(--green)' : sp.pct >= 50 ? 'var(--gold)' : 'var(--red)', width: 35 }}>{sp.pct}%</span>
+                </div>
+              ))}
+            </div>
+          )
+        })()}
       </div>
     </div>
   )
