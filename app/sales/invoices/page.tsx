@@ -15,6 +15,7 @@ export default async function SalesInvoicesPage() {
     .single()
 
   if (profile?.role === 'admin') redirect('/admin/invoices')
+  if (profile?.role === 'rop') redirect('/rop')
 
   const initials = (profile?.name || user.email || 'ПП')
     .split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)
