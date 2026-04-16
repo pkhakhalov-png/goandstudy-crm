@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { RopSidebar } from '../RopSidebar'
 import { AnalyticsDashboard } from './AnalyticsDashboard'
@@ -11,16 +11,17 @@ export default async function AnalyticsPage() {
   const { data: profile } = await supabase.from('users').select('name, role').eq('id', user.id).single()
   if (profile?.role !== 'rop' && profile?.role !== 'admin') redirect('/sales')
 
+  const admin = await createAdminClient()
   const [
     { data: salespersons },
     { data: deals },
     { data: stages },
     { data: activities },
   ] = await Promise.all([
-    supabase.from('users').select('id, name, is_active').eq('role', 'salesperson').order('name'),
-    supabase.from('deals').select('id, title, stage_id, salesperson_id, source, lost_reason, created_at, closed_at, deleted_at').is('deleted_at', null),
-    supabase.from('pipeline_stages').select('id, name, stage_type').eq('is_active', true).order('position'),
-    supabase.from('deal_activities').select('id, deal_id, activity_type, content, metadata, created_at').eq('activity_type', 'stage_change'),
+    admin.from('users').select('id, name, is_active').eq('role', 'salesperson').order('name'),
+    admin.from('deals').select('id, title, stage_id, salesperson_id, source, lost_reason, created_at, closed_at, deleted_at').is('deleted_at', null),
+    admin.from('pipeline_stages').select('id, name, stage_type').eq('is_active', true).order('position'),
+    admin.from('deal_activities').select('id, deal_id, activity_type, content, metadata, created_at').eq('activity_type', 'stage_change'),
   ])
 
   const initials = (profile?.name || user.email || 'РП').split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)

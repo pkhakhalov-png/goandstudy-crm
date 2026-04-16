@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { RopSidebar } from '../RopSidebar'
 import { ConversionDashboard } from './ConversionDashboard'
@@ -11,6 +11,7 @@ export default async function ConversionsPage() {
   const { data: profile } = await supabase.from('users').select('name, role').eq('id', user.id).single()
   if (profile?.role !== 'rop' && profile?.role !== 'admin') redirect('/sales')
 
+  const admin = await createAdminClient()
   const [
     { data: salespersons },
     { data: deals },
@@ -19,12 +20,12 @@ export default async function ConversionsPage() {
     { data: activities },
     { data: settings },
   ] = await Promise.all([
-    supabase.from('users').select('id, name, is_active').eq('role', 'salesperson').order('name'),
-    supabase.from('deals').select('id, title, stage_id, salesperson_id, source, budget, created_at, updated_at, closed_at, lost_reason, deleted_at').is('deleted_at', null),
-    supabase.from('pipeline_stages').select('id, name, position, stage_type, color, weight').eq('is_active', true).order('position'),
-    supabase.from('deal_messages').select('id, deal_id, direction, created_at'),
-    supabase.from('deal_activities').select('id, deal_id, activity_type, content, metadata, created_at').eq('activity_type', 'stage_change'),
-    supabase.from('rop_settings').select('key, value'),
+    admin.from('users').select('id, name, is_active').eq('role', 'salesperson').order('name'),
+    admin.from('deals').select('id, title, stage_id, salesperson_id, source, budget, created_at, updated_at, closed_at, lost_reason, deleted_at').is('deleted_at', null),
+    admin.from('pipeline_stages').select('id, name, position, stage_type, color, weight').eq('is_active', true).order('position'),
+    admin.from('deal_messages').select('id, deal_id, direction, created_at'),
+    admin.from('deal_activities').select('id, deal_id, activity_type, content, metadata, created_at').eq('activity_type', 'stage_change'),
+    admin.from('rop_settings').select('key, value'),
   ])
 
   const initials = (profile?.name || user.email || 'РП').split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)
