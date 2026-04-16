@@ -16,6 +16,7 @@ export default async function SalesCabinetPage() {
     .single()
 
   if (profile?.role === 'admin') redirect('/admin/clients')
+  if (profile?.role === 'rop') redirect('/rop')
 
   const now = new Date()
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`

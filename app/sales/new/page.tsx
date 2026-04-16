@@ -50,6 +50,7 @@ export default async function NewClientPage({ searchParams }: { searchParams: Pr
     .single()
 
   if (profile?.role === 'admin') redirect('/admin/clients')
+  if (profile?.role === 'rop') redirect('/rop')
 
   const { data: curators } = await supabase.from('curators').select('id, name')
 

@@ -30,6 +30,7 @@ export default async function SalesDealPage({ params }: { params: Promise<{ id: 
   ])
 
   if (profile?.role === 'admin') redirect(`/admin/funnel/${id}`)
+  if (profile?.role === 'rop') redirect('/rop')
   if (!deal || deal.salesperson_id !== user.id) redirect('/sales/funnel')
 
   const initials = (profile?.name || user.email || 'ПП')
