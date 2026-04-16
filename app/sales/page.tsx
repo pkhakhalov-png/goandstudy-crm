@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { SalesPage } from './SalesPage'
@@ -32,9 +32,9 @@ export default async function SalesCabinetPage() {
     supabase.from('clients').select('id, name, phone, email, telegram, country, university, status, months, created_at, salesperson_id, curator_id').eq('salesperson_id', user.id).order('created_at', { ascending: false }),
     supabase.from('payments_view').select('id, client_id, num, plan_date, plan_sum, fact_sum, fact_date, is_paid, status, comment'),
     supabase.from('curators').select('id, name'),
-    supabase.from('users').select('id, name, is_active').eq('role', 'salesperson').eq('is_active', true),
-    supabase.from('clients').select('id, salesperson_id'),
-    supabase.from('sales_plans').select('salesperson_id, plan_amount').eq('month', currentMonth),
+    (await createAdminClient()).from('users').select('id, name, is_active').eq('role', 'salesperson').eq('is_active', true),
+    (await createAdminClient()).from('clients').select('id, salesperson_id'),
+    (await createAdminClient()).from('sales_plans').select('salesperson_id, plan_amount').eq('month', currentMonth),
   ])
 
   const clientIds = (rawClients ?? []).map(c => c.id)
