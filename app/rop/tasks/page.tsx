@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { RopSidebar } from '../RopSidebar'
 import { OverdueTasksDashboard } from './OverdueTasksDashboard'
@@ -11,14 +11,15 @@ export default async function TasksPage() {
   const { data: profile } = await supabase.from('users').select('name, role').eq('id', user.id).single()
   if (profile?.role !== 'rop' && profile?.role !== 'admin') redirect('/sales')
 
+  const admin = await createAdminClient()
   const [
     { data: tasks },
     { data: deals },
     { data: salespersons },
   ] = await Promise.all([
-    supabase.from('deal_tasks').select('id, deal_id, title, deadline, is_done, assigned_to, task_type, created_at').eq('is_done', false),
-    supabase.from('deals').select('id, title, salesperson_id, deleted_at').is('deleted_at', null),
-    supabase.from('users').select('id, name, is_active').eq('role', 'salesperson').order('name'),
+    admin.from('deal_tasks').select('id, deal_id, title, deadline, is_done, assigned_to, task_type, created_at').eq('is_done', false),
+    admin.from('deals').select('id, title, salesperson_id, deleted_at').is('deleted_at', null),
+    admin.from('users').select('id, name, is_active').eq('role', 'salesperson').order('name'),
   ])
 
   const initials = (profile?.name || user.email || 'РП').split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)

@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { RopSidebar } from '../RopSidebar'
 
@@ -19,14 +19,15 @@ export default async function HistoryPage() {
   const { data: profile } = await supabase.from('users').select('name, role').eq('id', user.id).single()
   if (profile?.role !== 'rop' && profile?.role !== 'admin') redirect('/sales')
 
-  const { data: logs } = await supabase
+  const admin = await createAdminClient()
+  const { data: logs } = await admin
     .from('rop_actions_log')
     .select('id, rop_id, action_type, deal_id, salesperson_id, metadata, created_at')
     .order('created_at', { ascending: false })
     .limit(100)
 
-  const { data: allUsers } = await supabase.from('users').select('id, name')
-  const { data: deals } = await supabase.from('deals').select('id, title')
+  const { data: allUsers } = await admin.from('users').select('id, name')
+  const { data: deals } = await admin.from('deals').select('id, title')
   const userMap = Object.fromEntries((allUsers ?? []).map(u => [u.id, u.name]))
   const dealMap = Object.fromEntries((deals ?? []).map(d => [d.id, d.title]))
 

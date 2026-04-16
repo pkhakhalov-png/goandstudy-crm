@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { RopSidebar } from './RopSidebar'
 import { RopDashboard } from './RopDashboard'
@@ -19,6 +19,8 @@ export default async function RopPage() {
   const now = new Date()
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
 
+  const admin = await createAdminClient()
+
   const [
     { data: salespersons },
     { data: salesPlans },
@@ -30,15 +32,15 @@ export default async function RopPage() {
     { data: tasks },
     { data: settings },
   ] = await Promise.all([
-    supabase.from('users').select('id, name, is_active').eq('role', 'salesperson').order('name'),
-    supabase.from('sales_plans').select('*').eq('month', currentMonth),
-    supabase.from('clients').select('id, salesperson_id, status'),
-    supabase.from('payments').select('id, client_id, plan_sum, fact_sum, fact_date, is_paid, status, plan_date'),
-    supabase.from('deals').select('id, title, stage_id, salesperson_id, source, budget, is_critical, custom_fields, created_at, updated_at, deleted_at').is('deleted_at', null),
-    supabase.from('pipeline_stages').select('id, name, position, stage_type, color, weight').eq('is_active', true).order('position'),
-    supabase.from('deal_messages').select('id, deal_id, direction, created_at').order('created_at', { ascending: false }),
-    supabase.from('deal_tasks').select('id, deal_id, title, deadline, is_done, assigned_to, task_type').eq('is_done', false),
-    supabase.from('rop_settings').select('key, value'),
+    admin.from('users').select('id, name, is_active').eq('role', 'salesperson').order('name'),
+    admin.from('sales_plans').select('*').eq('month', currentMonth),
+    admin.from('clients').select('id, salesperson_id, status'),
+    admin.from('payments').select('id, client_id, plan_sum, fact_sum, fact_date, is_paid, status, plan_date'),
+    admin.from('deals').select('id, title, stage_id, salesperson_id, source, budget, is_critical, custom_fields, created_at, updated_at, deleted_at').is('deleted_at', null),
+    admin.from('pipeline_stages').select('id, name, position, stage_type, color, weight').eq('is_active', true).order('position'),
+    admin.from('deal_messages').select('id, deal_id, direction, created_at').order('created_at', { ascending: false }),
+    admin.from('deal_tasks').select('id, deal_id, title, deadline, is_done, assigned_to, task_type').eq('is_done', false),
+    admin.from('rop_settings').select('key, value'),
   ])
 
   const initials = (profile?.name || user.email || 'РП')
