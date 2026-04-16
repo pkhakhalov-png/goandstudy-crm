@@ -142,3 +142,18 @@ export async function updateRopSetting(key: string, value: unknown) {
   reval()
   return { success: true }
 }
+
+export async function updateStageWeight(stageId: string, weight: number) {
+  const { supabase, error: authErr } = await assertRop()
+  if (authErr) return { error: authErr }
+  if (weight < 0 || weight > 1) return { error: 'Вес должен быть от 0 до 1' }
+
+  const { error } = await supabase
+    .from('pipeline_stages')
+    .update({ weight })
+    .eq('id', stageId)
+
+  if (error) return { error: error.message }
+  reval()
+  return { success: true }
+}

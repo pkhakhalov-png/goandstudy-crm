@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { updateRopSetting } from '../actions'
+import { updateRopSetting, updateStageWeight } from '../actions'
 
 interface Props {
   settings: any[]
@@ -107,9 +107,8 @@ export function RopSettings({ settings, stages }: Props) {
                 const v = Number(e.target.value)
                 if (v >= 0 && v <= 1) {
                   startTransition(async () => {
-                    const { createClient: cc } = await import('@/lib/supabase/server')
-                    const sb = await cc()
-                    await sb.from('pipeline_stages').update({ weight: v }).eq('id', s.id)
+                    const res = await updateStageWeight(s.id, v)
+                    if (res?.error) alert(res.error)
                   })
                 }
               }}
