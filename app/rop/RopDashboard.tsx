@@ -60,8 +60,10 @@ export function RopDashboard({ salespersons, salesPlans, clients, payments, deal
   const totalFact = salespersons.reduce((s, sp) => s + getFactForSp(sp.id), 0)
   // DEBUG: remove after confirming data flow
   const debugClients = clients.length
-  const debugPayments = payments.filter((p: any) => p.is_paid).length
+  const debugPaymentsTotal = payments.length
+  const debugPaymentsPaid = payments.filter((p: any) => p.is_paid).length
   const debugSp = salespersons.length
+  const debugSample = payments[0] ? JSON.stringify({ is_paid: payments[0].is_paid, fact_date: payments[0].fact_date, plan_date: payments[0].plan_date, client_id: payments[0].client_id }) : 'empty'
   const deptPlan = salesPlans.find((p: any) => !p.salesperson_id)
   const deptPlanAmt = deptPlan ? Number(deptPlan.plan_amount) : 0
 
@@ -241,8 +243,8 @@ export function RopDashboard({ salespersons, salesPlans, clients, payments, deal
       </div>
 
       {/* DEBUG */}
-      <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 8 }}>
-        v2 | clients: {debugClients} | paid: {debugPayments} | sp: {debugSp} | fact: {totalFact}
+      <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 8, wordBreak: 'break-all' }}>
+        v3 | clients: {debugClients} | payments: {debugPaymentsTotal} | paid: {debugPaymentsPaid} | sp: {debugSp} | fact: {totalFact} | sample: {debugSample}
       </div>
 
       {/* ═══ CRITICAL PANEL ═══ */}
