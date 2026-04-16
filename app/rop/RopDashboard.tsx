@@ -59,8 +59,10 @@ export function RopDashboard({ salespersons, salesPlans, clients, payments, deal
   }
 
   const totalFact = salespersons.reduce((s, sp) => s + getFactForSp(sp.id), 0)
-  const deptPlan = salesPlans.find((p: any) => !p.salesperson_id)
-  const deptPlanAmt = deptPlan ? Number(deptPlan.plan_amount) : 0
+  // Department plan = sum of individual salesperson plans
+  const deptPlanAmt = salesPlans
+    .filter((p: any) => p.salesperson_id)
+    .reduce((s: number, p: any) => s + Number(p.plan_amount), 0)
 
   // ═══ Pipeline weighted value ═══
   const stageMap = Object.fromEntries(stages.map((s: any) => [s.id, s]))
@@ -262,21 +264,9 @@ export function RopDashboard({ salespersons, salesPlans, clients, payments, deal
           <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--green)', marginTop: 4 }}>{fmt(totalFact)} ₽</div>
         </div>
         <div style={cardStyle}>
-          <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 600 }}>
-            План отдела
-            {!editPlanId || editPlanId !== '__dept__' ? (
-              <span onClick={() => { setEditPlanId('__dept__'); setPlanDraft(String(deptPlanAmt)) }} style={{ marginLeft: 6, cursor: 'pointer', color: 'var(--purple)' }}>✎</span>
-            ) : null}
-          </div>
-          {editPlanId === '__dept__' ? (
-            <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
-              <input type="number" value={planDraft} onChange={e => setPlanDraft(e.target.value)} autoFocus style={{ width: 100, fontSize: 14, padding: '2px 6px', border: '1px solid var(--purple)', borderRadius: 6 }} />
-              <button onClick={() => handleSavePlan(null)} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 5, border: 'none', background: 'var(--purple)', color: '#fff', cursor: 'pointer' }}>✓</button>
-              <button onClick={() => setEditPlanId(null)} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 5, border: '1px solid var(--bor2)', background: 'var(--surf)', cursor: 'pointer' }}>×</button>
-            </div>
-          ) : (
-            <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text)', marginTop: 4 }}>{fmt(deptPlanAmt)} ₽</div>
-          )}
+          <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 600 }}>План отдела</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text)', marginTop: 4 }}>{fmt(deptPlanAmt)} ₽</div>
+          <div style={{ fontSize: 9, color: 'var(--muted)', marginTop: 2 }}>сумма планов менеджеров</div>
         </div>
         <div style={cardStyle}>
           <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 600 }}>Прогноз</div>
