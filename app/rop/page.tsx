@@ -21,11 +21,13 @@ export default async function RopPage() {
 
   const admin = await createAdminClient()
 
+  const paymentsRes = await admin.from('payments').select('id, client_id, plan_sum, fact_sum, fact_date, is_paid, plan_date')
+  const paymentsError = paymentsRes.error ? paymentsRes.error.message : null
+
   const [
     { data: salespersons },
     { data: salesPlans },
     { data: clients },
-    { data: payments },
     { data: deals },
     { data: stages },
     { data: messages },
@@ -35,13 +37,14 @@ export default async function RopPage() {
     admin.from('users').select('id, name, is_active').eq('role', 'salesperson').order('name'),
     admin.from('sales_plans').select('*').eq('month', currentMonth),
     admin.from('clients').select('id, salesperson_id, status'),
-    admin.from('payments').select('id, client_id, plan_sum, fact_sum, fact_date, is_paid, status, plan_date'),
     admin.from('deals').select('id, title, stage_id, salesperson_id, source, budget, is_critical, custom_fields, created_at, updated_at, deleted_at').is('deleted_at', null),
     admin.from('pipeline_stages').select('id, name, position, stage_type, color, weight').eq('is_active', true).order('position'),
     admin.from('deal_messages').select('id, deal_id, direction, created_at').order('created_at', { ascending: false }),
     admin.from('deal_tasks').select('id, deal_id, title, deadline, is_done, assigned_to, task_type').eq('is_done', false),
     admin.from('rop_settings').select('key, value'),
   ])
+
+  const payments = paymentsRes.data
 
   const initials = (profile?.name || user.email || 'РП')
     .split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)
@@ -73,6 +76,7 @@ export default async function RopPage() {
             tasks={tasks ?? []}
             settings={settings ?? []}
             currentMonth={currentMonth}
+            paymentsError={paymentsError}
           />
         </div>
       </div>

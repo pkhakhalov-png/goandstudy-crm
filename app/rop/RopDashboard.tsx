@@ -14,6 +14,7 @@ interface Props {
   tasks: any[]
   settings: any[]
   currentMonth: string
+  paymentsError?: string | null
 }
 
 const MONTHS_RU = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь']
@@ -25,7 +26,7 @@ function getSetting(settings: any[], key: string, fallback: any = null) {
 
 function fmt(n: number) { return Math.round(n).toLocaleString('ru') }
 
-export function RopDashboard({ salespersons, salesPlans, clients, payments, deals, stages, messages, tasks, settings, currentMonth }: Props) {
+export function RopDashboard({ salespersons, salesPlans, clients, payments, deals, stages, messages, tasks, settings, currentMonth, paymentsError }: Props) {
   const [month, setMonth] = useState(currentMonth)
   const [editPlanId, setEditPlanId] = useState<string | null>(null)
   const [planDraft, setPlanDraft] = useState('')
@@ -244,7 +245,7 @@ export function RopDashboard({ salespersons, salesPlans, clients, payments, deal
 
       {/* DEBUG */}
       <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 8, wordBreak: 'break-all' }}>
-        v3 | clients: {debugClients} | payments: {debugPaymentsTotal} | paid: {debugPaymentsPaid} | sp: {debugSp} | fact: {totalFact} | sample: {debugSample}
+        v4 | clients: {debugClients} | payments: {debugPaymentsTotal} | paid: {debugPaymentsPaid} | sp: {debugSp} | fact: {totalFact} | err: {paymentsError || 'none'} | sample: {debugSample}
       </div>
 
       {/* ═══ CRITICAL PANEL ═══ */}
