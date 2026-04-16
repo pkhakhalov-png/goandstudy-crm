@@ -83,7 +83,7 @@ export default async function SalesCabinetPage() {
           ;(allClients ?? []).forEach((c: any) => { if (c.salesperson_id) { if (!cBySp[c.salesperson_id]) cBySp[c.salesperson_id] = []; cBySp[c.salesperson_id].push(c.id) } })
           const board = (allSalespersons ?? []).map((sp: any) => {
             const cIds = cBySp[sp.id] || []
-            const fact = (payments ?? []).filter((p: any) => p.is_paid && p.fact_date && cIds.includes(p.client_id) && p.fact_date.startsWith(currentMonth)).reduce((s: number, p: any) => s + Number(p.fact_sum ?? p.plan_sum), 0)
+            const fact = (payments ?? []).filter((p: any) => p.is_paid && cIds.includes(p.client_id) && (p.fact_date || p.plan_date || '').startsWith(currentMonth)).reduce((s: number, p: any) => s + Number(p.fact_sum ?? p.plan_sum), 0)
             const plan = (salesPlans ?? []).find((p: any) => p.salesperson_id === sp.id)
             const planAmt = plan ? Number(plan.plan_amount) : 0
             const pct = planAmt > 0 ? Math.round(fact / planAmt * 100) : 0

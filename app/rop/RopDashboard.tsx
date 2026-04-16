@@ -53,7 +53,7 @@ export function RopDashboard({ salespersons, salesPlans, clients, payments, deal
   function getFactForSp(spId: string): number {
     const cIds = clientBySp[spId] || []
     return payments
-      .filter(p => p.is_paid && p.fact_date && cIds.includes(p.client_id) && p.fact_date.startsWith(month))
+      .filter(p => p.is_paid && cIds.includes(p.client_id) && (p.fact_date || p.plan_date || '').startsWith(month))
       .reduce((s: number, p: any) => s + Number(p.fact_sum ?? p.plan_sum), 0)
   }
 
