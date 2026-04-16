@@ -78,7 +78,7 @@ export default async function SalesCabinetPage() {
         </div>
         {/* Leaderboard — department progress (competition) */}
         <SalesPage clients={clients} expenses={expenses ?? []} />
-        {(allSalespersons ?? []).length > 1 && (() => {
+        {(allSalespersons ?? []).length > 0 && (() => {
           const cBySp: Record<string, number[]> = {}
           ;(allClients ?? []).forEach((c: any) => { if (c.salesperson_id) { if (!cBySp[c.salesperson_id]) cBySp[c.salesperson_id] = []; cBySp[c.salesperson_id].push(c.id) } })
           const board = (allSalespersons ?? []).map((sp: any) => {
