@@ -6,7 +6,7 @@ import { logout } from '@/app/login/actions'
 import { WelcomeOverlay } from '@/components/WelcomeOverlay'
 
 interface Props {
-  activePage: 'clients' | 'payments' | 'expenses' | 'invoices' | 'calendar' | 'funnel' | 'home' | 'sales' | 'settings'
+  activePage: 'clients' | 'payments' | 'expenses' | 'invoices' | 'calendar' | 'funnel' | 'home' | 'sales' | 'curators' | 'settings'
   userName: string
   userEmail: string
 }
@@ -92,6 +92,12 @@ export function Sidebar({ activePage, userName, userEmail }: Props) {
               <line x1="2" y1="14" x2="14" y2="14"/>
             </svg>
             Продажники
+          </Link>
+          <Link href="/admin/curators" onClick={()=>setOpen(false)} className={`ni${activePage==='curators'?' active':''}`}>
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
+              <circle cx="8" cy="5" r="3"/><path d="M2 14c0-3.3 2.7-6 6-6s6 2.7 6 6"/>
+            </svg>
+            Кураторы
           </Link>
           <div className="ns">Система</div>
           <Link href="/admin" onClick={()=>setOpen(false)} className={`ni${activePage==='home'?' active':''}`}>
