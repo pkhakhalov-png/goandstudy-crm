@@ -218,7 +218,7 @@ export function BookingClient({ availableSlots }: Props) {
   const consultantCard = (note?: string) => (
     <div className="consultant-card" style={{ position: 'absolute', right: -220, top: 0, width: 200 }}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="https://i.ibb.co/wZBkPXrY/consultant.jpg" alt="" style={{ width: 64, height: 64, borderRadius: '50%', objectFit: 'cover', display: 'block', margin: '0 auto 8px' }} />
+      <img src="https://i.ibb.co/LDFD47xJ/2024-11-07-160706.jpg" alt="" style={{ width: 64, height: 64, borderRadius: '50%', objectFit: 'cover', display: 'block', margin: '0 auto 8px' }} />
       <div style={{ background: 'rgba(255,237,204,.7)', borderRadius: 14, padding: '14px 16px' }}>
         <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>Анна Юсипова</div>
         <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>Консультант</div>
