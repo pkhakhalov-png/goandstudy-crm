@@ -1,6 +1,7 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { CuratorSidebar } from '../CuratorSidebar'
+import { TemplatesList } from './TemplatesList'
 
 export default async function CuratorTemplatesPage() {
   const supabase = await createClient()
@@ -10,6 +11,13 @@ export default async function CuratorTemplatesPage() {
   const { data: profile } = await supabase.from('users').select('name, role').eq('id', user.id).single()
   if (profile?.role !== 'curator' && profile?.role !== 'admin' && profile?.role !== 'rop') redirect('/login')
 
+  const admin = await createAdminClient()
+  const { data: templates } = await admin
+    .from('curator_templates')
+    .select('*')
+    .eq('is_active', true)
+    .order('category')
+
   const initials = (profile?.name || user.email || 'КР')
     .split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)
 
@@ -17,11 +25,13 @@ export default async function CuratorTemplatesPage() {
     <div className="app">
       <CuratorSidebar userName={profile?.name || ''} userEmail={user.email || ''} initials={initials} activePage="templates" />
       <div className="main">
-        <div className="topbar"><div className="pt">Шаблоны</div></div>
-        <div style={{ padding: '40px 24px', textAlign: 'center' }}>
-          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--muted)' }}>Библиотека шаблонов</div>
-          <div style={{ fontSize: 14, color: 'var(--muted)', marginTop: 8 }}>В разработке</div>
+        <div className="topbar">
+          <div className="pt">Шаблоны</div>
+          <div className="tbr">
+            <span style={{ fontSize: 12, color: 'var(--muted)' }}>{(templates ?? []).length} шаблонов</span>
+          </div>
         </div>
+        <TemplatesList templates={templates ?? []} />
       </div>
     </div>
   )

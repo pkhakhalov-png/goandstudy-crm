@@ -6,6 +6,7 @@ import {
   buildSenderName,
   downloadTelegramFile,
 } from '@/lib/telegram'
+import { normalizePhone } from '@/lib/phone'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -307,4 +308,120 @@ async function processTelegramMessage(
       metadata: { channel: 'telegram', direction: 'incoming', sender: senderName },
     })
   }
+
+  // ═══ Mirror to client_tg_messages (curator portal) ═══
+  if (isGroup && !isEdited) {
+    await mirrorToClientChat(supabase, msg, senderName, content)
+  }
+}
+
+/**
+ * Link TG group to client by matching phone numbers in group title,
+ * then mirror messages to client_tg_messages for curator portal.
+ */
+async function mirrorToClientChat(
+  supabase: SupabaseAdmin,
+  msg: TelegramMessage,
+  senderName: string,
+  content: string,
+) {
+  const chatId = msg.chat.id
+
+  // 1. Check if already linked to a client
+  const { data: linkedClient } = await supabase
+    .from('clients')
+    .select('id')
+    .eq('tg_group_chat_id', chatId)
+    .limit(1)
+    .maybeSingle()
+
+  let clientId: number | null = linkedClient?.id ?? null
+
+  // 2. If not linked — try to match by phone in group title
+  if (!clientId && msg.chat.title) {
+    const title = msg.chat.title
+    // Extract all digit sequences that look like phone numbers (7+ digits)
+    const phoneMatches = title.match(/[\d\s\-\(\)\+]{7,}/g)
+    if (phoneMatches) {
+      for (const raw of phoneMatches) {
+        const normalized = normalizePhone(raw)
+        if (normalized && normalized.length >= 10) {
+          const { data: match } = await supabase
+            .from('clients')
+            .select('id')
+            .eq('phone_normalized', normalized)
+            .limit(1)
+            .maybeSingle()
+          if (match) {
+            clientId = match.id
+            // Link the group to this client
+            await supabase.from('clients').update({
+              tg_group_chat_id: chatId,
+              tg_group_title: title,
+            }).eq('id', clientId)
+            console.log(`[telegram] Linked group "${title}" to client ${clientId}`)
+            break
+          }
+        }
+      }
+    }
+  }
+
+  if (!clientId) return
+
+  // 3. Handle file for client_tg_files (separate from deal_files)
+  let clientFileId: string | null = null
+  const mediaFileId = msg.photo?.[msg.photo.length - 1]?.file_id
+    || msg.document?.file_id || msg.voice?.file_id
+    || msg.video?.file_id || msg.audio?.file_id || null
+
+  if (mediaFileId) {
+    const mediaName = msg.document?.file_name || `file_${msg.message_id}`
+    const mediaMime = msg.document?.mime_type || (msg.photo ? 'image/jpeg' : 'application/octet-stream')
+    try {
+      const { buffer } = await downloadTelegramFile(mediaFileId)
+      const path = `client-${clientId}/${Date.now()}-${mediaName}`
+      const { error: uploadErr } = await supabase.storage
+        .from('deal-files')
+        .upload(path, buffer, { contentType: mediaMime, upsert: false })
+      if (!uploadErr) {
+        const { data: urlData } = supabase.storage.from('deal-files').getPublicUrl(path)
+        const { data: inserted } = await supabase
+          .from('client_tg_files')
+          .insert({
+            client_id: clientId,
+            name: mediaName,
+            mime_type: mediaMime,
+            size: buffer.byteLength,
+            url: urlData.publicUrl,
+            source: 'telegram',
+            uploaded_by: senderName,
+          })
+          .select('id')
+          .single()
+        if (inserted) clientFileId = inserted.id
+      }
+    } catch (e) {
+      console.error('[telegram] client file save failed:', e)
+    }
+  }
+
+  // 4. Insert message into client_tg_messages
+  await supabase.from('client_tg_messages').insert({
+    client_id: clientId,
+    tg_message_id: msg.message_id,
+    tg_chat_id: chatId,
+    direction: 'incoming',
+    sender_tg_id: msg.from?.id || null,
+    sender_name: senderName,
+    sender_role: msg.from?.is_bot ? 'bot' : 'client',
+    content: content || null,
+    reply_to_tg_id: msg.reply_to_message?.message_id || null,
+    file_id: clientFileId,
+    metadata: {
+      tg_username: msg.from?.username,
+      chat_title: msg.chat.title,
+    },
+    sent_at: new Date(msg.date * 1000).toISOString(),
+  })
 }

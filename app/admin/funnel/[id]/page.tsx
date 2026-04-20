@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { Sidebar } from '../../Sidebar'
 import { DealCard } from './DealCard'
@@ -40,6 +40,20 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
     user_name: userMap.get(a.user_id) ?? 'Система',
   }))
 
+  // Fetch curators and groups for onboarding modal
+  const [
+    { data: curators },
+    { data: groupDeals },
+  ] = await Promise.all([
+    createAdminClient().then(a => a.from('curators').select('id, name').eq('is_active', true).order('name')),
+    createAdminClient().then(a => a.from('deals').select('id, title, custom_fields').not('custom_fields->>group_chat_id', 'is', null).is('deleted_at', null)),
+  ])
+
+  const availableGroups = (groupDeals ?? []).map(d => ({
+    chat_id: d.custom_fields?.group_chat_id || d.custom_fields?.tg_chat_id,
+    title: d.custom_fields?.tg_chat_title || d.title,
+  })).filter(g => g.chat_id)
+
   // Fetch linked data in parallel (only if IDs exist)
   const [clientData, bookingData] = await Promise.all([
     deal.client_id
@@ -64,6 +78,8 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
         messages={messages ?? []}
         tasks={tasks ?? []}
         userId={user.id}
+        curators={curators ?? []}
+        availableGroups={availableGroups}
       />
     </div>
   )

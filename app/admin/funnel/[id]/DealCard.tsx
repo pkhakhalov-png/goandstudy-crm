@@ -20,6 +20,8 @@ interface Props {
   messages: any[]
   tasks: any[]
   userId: string
+  curators: { id: string; name: string }[]
+  availableGroups: { chat_id: string; title: string }[]
 }
 
 const fileIcon: Record<string, string> = {
@@ -56,7 +58,7 @@ function colorForSender(name: string | null | undefined): string {
 }
 const activityIcon: Record<string, string> = { note: '📝', stage_change: '→', system: '⚙️', call: '📞', message: '💬', file_upload: '📎', task_done: '✅' }
 
-export function DealCard({ deal, stages, activities, salespersons, clientData, bookingData, files, messages, tasks, userId }: Props) {
+export function DealCard({ deal, stages, activities, salespersons, clientData, bookingData, files, messages, tasks, userId, curators, availableGroups }: Props) {
   const router = useRouter()
   const [tab, setTab] = useState<'main' | 'activity' | 'files' | 'messages' | 'tasks'>('main')
 
@@ -89,6 +91,15 @@ export function DealCard({ deal, stages, activities, salespersons, clientData, b
   const [clientSearch, setClientSearch] = useState('')
   const [clientResults, setClientResults] = useState<any[]>([])
   const [showClientSearch, setShowClientSearch] = useState(false)
+  // Onboarding modal state
+  const [onboardingModal, setOnboardingModal] = useState<{ stageId: string; stageName: string } | null>(null)
+  const [obCuratorId, setObCuratorId] = useState('')
+  const [obTotalAmount, setObTotalAmount] = useState('')
+  const [obMonths, setObMonths] = useState('6')
+  const [obFirstPayDate, setObFirstPayDate] = useState(new Date().toISOString().split('T')[0])
+  const [obGroupChatId, setObGroupChatId] = useState('')
+  const [obSaving, setObSaving] = useState(false)
+
   const [msgText, setMsgText] = useState('')
   const [msgChannel, setMsgChannel] = useState<'telegram' | 'whatsapp'>(
     (deal.contact_telegram || deal.source === 'telegram_group_bot' || deal.custom_fields?.is_group)
@@ -227,14 +238,42 @@ export function DealCard({ deal, stages, activities, salespersons, clientData, b
   const currentStage = stages.find(s => s.id === deal.stage_id)
   const sp = salespersons.find(s => s.id === deal.salesperson_id)
 
+  const ONBOARDING_STAGES = ['Первичная продажа', 'Оплата услуг']
+
   async function handleMove(stageId: string) {
     const newStage = stages.find(s => s.id === stageId)
+    // If moving to payment stage and no client yet — show onboarding modal
+    if (newStage && ONBOARDING_STAGES.includes(newStage.name)) {
+      setOnboardingModal({ stageId, stageName: newStage.name })
+      return
+    }
     const fd = new FormData()
     fd.append('deal_id', deal.id)
     fd.append('stage_id', stageId)
     fd.append('old_stage_name', currentStage?.name || '')
     fd.append('new_stage_name', newStage?.name || '')
     await moveDeal(fd)
+  }
+
+  async function handleOnboardingSubmit() {
+    if (!obCuratorId || !obTotalAmount || !obMonths) return
+    setObSaving(true)
+
+    // 1. Move deal to the stage (this auto-creates client)
+    const fd = new FormData()
+    fd.append('deal_id', deal.id)
+    fd.append('stage_id', onboardingModal!.stageId)
+    fd.append('old_stage_name', currentStage?.name || '')
+    fd.append('new_stage_name', onboardingModal!.stageName)
+    // Pass onboarding data
+    fd.append('curator_id', obCuratorId)
+    fd.append('total_amount', obTotalAmount)
+    fd.append('months', obMonths)
+    fd.append('first_pay_date', obFirstPayDate)
+    if (obGroupChatId) fd.append('group_chat_id', obGroupChatId)
+    await moveDeal(fd)
+    setObSaving(false)
+    setOnboardingModal(null)
   }
 
   async function handleAddNote() {
@@ -1026,6 +1065,78 @@ export function DealCard({ deal, stages, activities, salespersons, clientData, b
         </div>
       </div>
 
+      {/* ═══ Onboarding Modal ═══ */}
+      {onboardingModal && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 100,
+          background: 'rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }} onClick={() => setOnboardingModal(null)}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: 'var(--surf)', borderRadius: 16, padding: '24px 28px',
+            width: 420, maxHeight: '80vh', overflowY: 'auto',
+            boxShadow: '0 20px 60px rgba(0,0,0,.3)',
+          }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>Оформление клиента</div>
+            <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 20 }}>
+              Перенос на этап «{onboardingModal.stageName}»
+            </div>
+
+            <div style={{ display: 'grid', gap: 14 }}>
+              {/* Curator */}
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', marginBottom: 4, display: 'block' }}>Куратор *</label>
+                <select value={obCuratorId} onChange={e => setObCuratorId(e.target.value)}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--bor2)', fontSize: 13, fontFamily: 'inherit', background: 'var(--bg)' }}>
+                  <option value="">Выберите куратора...</option>
+                  {curators.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+
+              {/* Total amount */}
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', marginBottom: 4, display: 'block' }}>Сумма договора (₽) *</label>
+                <input type="number" value={obTotalAmount} onChange={e => setObTotalAmount(e.target.value)} placeholder="150000"
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--bor2)', fontSize: 13, fontFamily: 'inherit', background: 'var(--bg)' }} />
+              </div>
+
+              {/* Months */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', marginBottom: 4, display: 'block' }}>Месяцев *</label>
+                  <input type="number" value={obMonths} onChange={e => setObMonths(e.target.value)} min="1" max="24"
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--bor2)', fontSize: 13, fontFamily: 'inherit', background: 'var(--bg)' }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', marginBottom: 4, display: 'block' }}>Первый платёж</label>
+                  <input type="date" value={obFirstPayDate} onChange={e => setObFirstPayDate(e.target.value)}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--bor2)', fontSize: 13, fontFamily: 'inherit', background: 'var(--bg)' }} />
+                </div>
+              </div>
+
+              {/* TG Group */}
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', marginBottom: 4, display: 'block' }}>TG группа</label>
+                <select value={obGroupChatId} onChange={e => setObGroupChatId(e.target.value)}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--bor2)', fontSize: 13, fontFamily: 'inherit', background: 'var(--bg)' }}>
+                  <option value="">Не привязывать</option>
+                  {availableGroups.map(g => <option key={g.chat_id} value={g.chat_id}>{g.title}</option>)}
+                </select>
+              </div>
+            </div>
+
+            {/* Buttons */}
+            <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
+              <button onClick={handleOnboardingSubmit} disabled={obSaving || !obCuratorId || !obTotalAmount}
+                className="btn-p" style={{ flex: 1, padding: '10px', fontSize: 13, opacity: (!obCuratorId || !obTotalAmount) ? 0.5 : 1 }}>
+                {obSaving ? 'Оформляем...' : 'Оформить'}
+              </button>
+              <button onClick={() => setOnboardingModal(null)} className="btn-s" style={{ padding: '10px 20px', fontSize: 13 }}>
+                Отмена
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

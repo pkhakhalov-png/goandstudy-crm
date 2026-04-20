@@ -38,14 +38,21 @@ export async function moveDeal(formData: FormData) {
     metadata: { from_stage: oldStageName, to_stage: newStageName },
   })
 
-  // Auto-link to client when reaching "Договор" stage
+  // Auto-link to client when reaching payment stages
   if (newStageName === 'Договор' || newStageName === 'Первичная продажа' || newStageName === 'Оплата услуг') {
     try {
-      const { data: deal } = await supabase.from('deals').select('contact_name, contact_phone, contact_telegram, contact_email, salesperson_id, client_id').eq('id', dealId).single()
-      if (deal && !deal.client_id) {
+      const { data: deal } = await supabase.from('deals').select('contact_name, contact_phone, contact_telegram, contact_email, salesperson_id, client_id, budget').eq('id', dealId).single()
+      if (deal) {
         const normalized = normalizePhone(deal.contact_phone)
         const admin = await createAdminClient()
-        let clientId: number | null = null
+        let clientId: number | null = deal.client_id ? Number(deal.client_id) : null
+
+        // Onboarding data from modal
+        const curatorId = formData.get('curator_id') as string || null
+        const totalAmount = Number(formData.get('total_amount')) || Number(deal.budget) || 0
+        const months = Number(formData.get('months')) || 6
+        const firstPayDate = (formData.get('first_pay_date') as string) || new Date().toISOString().split('T')[0]
+        const groupChatId = formData.get('group_chat_id') as string || null
 
         if (normalized) {
           const { data: existingClient } = await admin.from('clients').select('id').eq('phone_normalized', normalized).limit(1).single()
@@ -53,24 +60,117 @@ export async function moveDeal(formData: FormData) {
         }
 
         if (!clientId) {
-          const { data: newClient } = await admin.from('clients').insert({
-            name: deal.contact_name,
-            phone: deal.contact_phone,
-            telegram: deal.contact_telegram || null,
-            email: deal.contact_email || null,
-            salesperson_id: deal.salesperson_id,
-            status: 'active',
-            phone_normalized: normalized,
-          }).select('id').single()
-          if (newClient) clientId = newClient.id
+          // No existing client — create new one
+          if (totalAmount > 0 && months > 0) {
+            const { error: rpcErr } = await admin.rpc('create_client_with_payments', {
+              p_name: deal.contact_name,
+              p_phone: deal.contact_phone,
+              p_email: deal.contact_email || null,
+              p_telegram: deal.contact_telegram || null,
+              p_country: null,
+              p_university: null,
+              p_total_amount: totalAmount,
+              p_months: months,
+              p_first_pay_date: firstPayDate,
+              p_curator_id: curatorId,
+              p_salesperson_id: deal.salesperson_id,
+              p_notes: null,
+            })
+            if (rpcErr) console.error('[moveDeal] RPC error:', rpcErr.message)
+
+            const { data: created } = await admin.from('clients')
+              .select('id')
+              .eq('name', deal.contact_name)
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .single()
+            if (created) clientId = created.id
+
+            if (clientId && normalized) {
+              await admin.from('clients').update({ phone_normalized: normalized }).eq('id', clientId).is('phone_normalized', null)
+            }
+          } else {
+            const { data: newClient } = await admin.from('clients').insert({
+              name: deal.contact_name,
+              phone: deal.contact_phone,
+              telegram: deal.contact_telegram || null,
+              email: deal.contact_email || null,
+              salesperson_id: deal.salesperson_id,
+              status: 'active',
+              phone_normalized: normalized,
+            }).select('id').single()
+            if (newClient) clientId = newClient.id
+          }
+        } else if (totalAmount > 0 && months > 0) {
+          // Client exists but may be missing payments — check and create
+          const { data: existingPayments } = await admin.from('payments').select('id').eq('client_id', clientId).limit(1)
+          if (!existingPayments || existingPayments.length === 0) {
+            // Create payments for existing client
+            const perMonth = Math.round((totalAmount / months) * 100) / 100
+            const lastMonth = Math.round((totalAmount - perMonth * (months - 1)) * 100) / 100
+            const paymentRows = []
+            for (let i = 0; i < months; i++) {
+              const date = new Date(firstPayDate)
+              date.setMonth(date.getMonth() + i)
+              paymentRows.push({
+                client_id: clientId,
+                num: i + 1,
+                plan_date: date.toISOString().split('T')[0],
+                plan_sum: i === months - 1 ? lastMonth : perMonth,
+                fact_sum: 0,
+                is_paid: false,
+              })
+            }
+            await admin.from('payments').insert(paymentRows)
+
+            // Update client months and first_payment_date
+            await admin.from('clients').update({
+              months,
+              first_payment_date: firstPayDate,
+            }).eq('id', clientId)
+
+            // Create expenses (same as RPC does)
+            const { data: existingExpenses } = await admin.from('expenses').select('id').eq('client_id', clientId!).limit(1)
+            if (!existingExpenses || existingExpenses.length === 0) {
+              const expenseRows = [
+                { client_id: clientId, article: 'curator', plan_date: firstPayDate, plan_sum: 25000, note: 'Куратор — этап 1' },
+                { client_id: clientId, article: 'curator', plan_date: (() => { const d = new Date(firstPayDate); d.setMonth(d.getMonth() + 1); return d.toISOString().split('T')[0] })(), plan_sum: 25000, note: 'Куратор — этап 2' },
+                { client_id: clientId, article: 'salesperson', plan_date: firstPayDate, plan_sum: Math.round(totalAmount * 0.1), note: 'ЗП продажника — 10% от ' + totalAmount.toLocaleString('ru') + ' ₽' },
+              ]
+              await admin.from('expenses').insert(expenseRows)
+            }
+          }
         }
 
         if (clientId) {
           await admin.from('deals').update({ client_id: clientId }).eq('id', dealId)
-          await admin.from('deal_activities').insert({ deal_id: dealId, user_id: user.id, activity_type: 'system', content: 'Клиент привязан автоматически' })
+
+          // Set curator and initial stage if provided
+          if (curatorId) {
+            await admin.from('clients').update({
+              curator_id: curatorId,
+              curator_assigned_at: new Date().toISOString(),
+              current_stage_code: 'strategy_session',
+            }).eq('id', clientId)
+          }
+
+          // Link TG group
+          if (groupChatId) {
+            const groupTitle = formData.get('group_title') as string || null
+            // Find title from deal's custom_fields
+            const { data: groupDeal } = await admin.from('deals').select('custom_fields').eq('custom_fields->>group_chat_id', groupChatId).limit(1).maybeSingle()
+            await admin.from('clients').update({
+              tg_group_chat_id: Number(groupChatId),
+              tg_group_title: groupTitle || groupDeal?.custom_fields?.tg_chat_title || 'Группа',
+            }).eq('id', clientId)
+          }
+
+          await admin.from('deal_activities').insert({ deal_id: dealId, user_id: user.id, activity_type: 'system', content: 'Клиент оформлен' })
         }
       }
-    } catch {}
+    } catch (e) {
+      console.error('[moveDeal] onboarding error:', e)
+    }
   }
 
   reval()
