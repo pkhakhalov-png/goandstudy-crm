@@ -12,6 +12,9 @@ export async function createBooking(formData: FormData) {
   const clientName = (formData.get('client_name') as string)?.trim()
   const clientPhone = (formData.get('client_phone') as string)?.trim()
   const clientTelegram = (formData.get('client_telegram') as string)?.trim() || null
+  const quizDataRaw = formData.get('quiz_data') as string || '{}'
+  let quizData: Record<string, any> = {}
+  try { quizData = JSON.parse(quizDataRaw) } catch {}
 
   if (!date || !startTime || !endTime) return { error: 'Выберите дату и время' }
   if (!clientName) return { error: 'Укажите имя' }
@@ -176,6 +179,19 @@ export async function createBooking(formData: FormData) {
           phone_normalized: normalizedPhone,
           source: 'booking',
           booking_id: insertedBooking?.id || null,
+          custom_fields: {
+            quiz_age: quizData.age,
+            quiz_status: quizData.status,
+            quiz_budget: quizData.budget,
+            quiz_about: quizData.about,
+            quiz_degree: quizData.degree,
+            quiz_format: quizData.format,
+            quiz_country: quizData.country,
+            quiz_year: quizData.year,
+            quiz_stage: quizData.stage,
+            quiz_result: quizData.result,
+            quiz_consultation_format: quizData.consultation_format,
+          },
         })
       }
     }

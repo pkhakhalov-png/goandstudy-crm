@@ -563,6 +563,43 @@ export function DealCard({ deal, stages, activities, salespersons, clientData, b
               })}
             </div>
           </div>
+
+          {/* Quiz data */}
+          {deal.custom_fields && Object.keys(deal.custom_fields).some(k => k.startsWith('quiz_')) && (
+            <div style={{ padding: '16px 20px', borderTop: '1px solid var(--bor2)' }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>Данные из Анкеты</div>
+              <div style={{ display: 'grid', gap: 6, fontSize: 12 }}>
+                {[
+                  ['Возраст', deal.custom_fields.quiz_age],
+                  ['Статус', deal.custom_fields.quiz_status],
+                  ['Бюджет', deal.custom_fields.quiz_budget],
+                  ['Степень', deal.custom_fields.quiz_degree],
+                  ['Формат', deal.custom_fields.quiz_format],
+                  ['Страна', deal.custom_fields.quiz_country],
+                  ['Год', deal.custom_fields.quiz_year],
+                  ['Этап', Array.isArray(deal.custom_fields.quiz_stage) ? deal.custom_fields.quiz_stage.join(', ') : deal.custom_fields.quiz_stage],
+                  ['Формат конс.', deal.custom_fields.quiz_consultation_format],
+                ].filter(([, v]) => v).map(([label, val]) => (
+                  <div key={label as string} style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                    <span style={{ color: 'var(--muted)', flexShrink: 0 }}>{label}</span>
+                    <span style={{ fontWeight: 500, color: 'var(--text)', textAlign: 'right' }}>{val}</span>
+                  </div>
+                ))}
+                {deal.custom_fields.quiz_about && (
+                  <div style={{ marginTop: 4 }}>
+                    <div style={{ color: 'var(--muted)', marginBottom: 2 }}>О себе</div>
+                    <div style={{ fontSize: 11, color: 'var(--text)', padding: '6px 8px', background: 'var(--bg)', borderRadius: 6, lineHeight: 1.5 }}>{deal.custom_fields.quiz_about}</div>
+                  </div>
+                )}
+                {deal.custom_fields.quiz_result && (
+                  <div style={{ marginTop: 4 }}>
+                    <div style={{ color: 'var(--muted)', marginBottom: 2 }}>Ожидаемый результат</div>
+                    <div style={{ fontSize: 11, color: 'var(--text)', padding: '6px 8px', background: 'var(--bg)', borderRadius: 6, lineHeight: 1.5 }}>{deal.custom_fields.quiz_result}</div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Right panel — tabs content */}
