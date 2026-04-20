@@ -100,6 +100,10 @@ export function DealCard({ deal, stages, activities, salespersons, clientData, b
   const [obGroupChatId, setObGroupChatId] = useState('')
   const [obSaving, setObSaving] = useState(false)
 
+  const [consultNotes, setConsultNotes] = useState(deal.custom_fields?.consultation_notes || '')
+  const [consultSaving, setConsultSaving] = useState(false)
+  const [consultSaved, setConsultSaved] = useState(false)
+
   const [msgText, setMsgText] = useState('')
   const [msgChannel, setMsgChannel] = useState<'telegram' | 'whatsapp'>(
     (deal.contact_telegram || deal.source === 'telegram_group_bot' || deal.custom_fields?.is_group)
@@ -619,6 +623,56 @@ export function DealCard({ deal, stages, activities, salespersons, clientData, b
               </div>
             </div>
           )}
+
+          {/* Consultation notes */}
+          <div style={{ padding: '16px 20px', borderTop: '1px solid var(--bor2)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Итог консультации</div>
+              {consultSaved && <span style={{ fontSize: 10, color: 'var(--green)', fontWeight: 600 }}>Сохранено</span>}
+            </div>
+            <textarea
+              value={consultNotes}
+              onChange={e => { setConsultNotes(e.target.value); setConsultSaved(false) }}
+              placeholder="Запишите ключевую информацию о клиенте после консультации: цели, потребности, возражения, договорённости..."
+              rows={4}
+              style={{
+                width: '100%', padding: '10px 12px', borderRadius: 10,
+                border: '1px solid var(--bor2)', fontSize: 12, fontFamily: 'inherit',
+                outline: 'none', background: 'var(--bg)', resize: 'vertical',
+                minHeight: 80, lineHeight: 1.5, color: 'var(--text)',
+                boxSizing: 'border-box',
+              }}
+            />
+            <button
+              onClick={async () => {
+                setConsultSaving(true)
+                const fd = new FormData()
+                fd.append('deal_id', deal.id)
+                fd.append('consultation_notes', consultNotes)
+                await addDealNote(fd)
+                // Also save to custom_fields
+                const updateFd = new FormData()
+                updateFd.append('deal_id', deal.id)
+                updateFd.append('title', deal.title)
+                updateFd.append('contact_name', deal.contact_name)
+                updateFd.append('contact_phone', deal.contact_phone || '')
+                updateFd.append('contact_telegram', deal.contact_telegram || '')
+                updateFd.append('contact_whatsapp', deal.contact_whatsapp || '')
+                updateFd.append('contact_email', deal.contact_email || '')
+                updateFd.append('budget', String(deal.budget || 0))
+                updateFd.append('salesperson_id', deal.salesperson_id || '')
+                updateFd.append('consultation_notes', consultNotes)
+                await updateDeal(updateFd)
+                setConsultSaving(false)
+                setConsultSaved(true)
+                setTimeout(() => setConsultSaved(false), 3000)
+              }}
+              disabled={consultSaving}
+              className="btn-p"
+              style={{ width: '100%', marginTop: 8, fontSize: 11, padding: '8px' }}>
+              {consultSaving ? 'Сохраняем...' : 'Сохранить'}
+            </button>
+          </div>
         </div>
 
         {/* Right panel — tabs content */}

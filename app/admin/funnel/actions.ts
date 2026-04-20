@@ -305,6 +305,13 @@ export async function updateDeal(formData: FormData) {
     if (val !== null) updates[f] = f === 'budget' ? Number(val) : (val as string).trim() || null
   })
 
+  // Save consultation_notes to custom_fields
+  const consultationNotes = formData.get('consultation_notes') as string | null
+  if (consultationNotes !== null) {
+    const { data: currentDeal } = await supabase.from('deals').select('custom_fields').eq('id', dealId).single()
+    updates.custom_fields = { ...(currentDeal?.custom_fields || {}), consultation_notes: consultationNotes }
+  }
+
   const { error } = await supabase.from('deals').update(updates).eq('id', dealId)
   if (error) return { error: error.message }
 
