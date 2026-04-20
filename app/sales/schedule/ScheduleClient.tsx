@@ -29,6 +29,7 @@ interface Props {
   slots: { day_of_week: number; start_time: string }[]
   bookings: any[]
   allStats: { id: string; status: string; booking_date: string }[]
+  userId: string
 }
 
 const statusLabel: Record<string, string> = { confirmed: 'Подтверждена', completed: 'Проведена', cancelled: 'Отменена', no_show: 'Не пришёл' }
@@ -36,7 +37,16 @@ const statusCls: Record<string, string> = { confirmed: 'ps', completed: 'pa', ca
 
 const MONTH_NAMES = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь']
 
-export function ScheduleClient({ slots: initialSlots, bookings, allStats }: Props) {
+export function ScheduleClient({ slots: initialSlots, bookings, allStats, userId }: Props) {
+  const [linkCopied, setLinkCopied] = useState(false)
+
+  function copyBookingLink() {
+    const url = `${window.location.origin}/book/${userId}`
+    navigator.clipboard.writeText(url).then(() => {
+      setLinkCopied(true)
+      setTimeout(() => setLinkCopied(false), 3000)
+    })
+  }
   const [activeSlots, setActiveSlots] = useState<Set<string>>(() => {
     const set = new Set<string>()
     initialSlots.forEach(s => {
@@ -154,6 +164,30 @@ export function ScheduleClient({ slots: initialSlots, bookings, allStats }: Prop
 
   return (
     <>
+      {/* Personal booking link */}
+      <div style={{ padding: '0 24px', marginBottom: 14 }}>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px',
+          background: 'rgba(177,94,204,.06)', border: '1px solid rgba(177,94,204,.15)',
+          borderRadius: 12,
+        }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>Моя ссылка для записи</div>
+            <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>Отправьте клиенту — он запишется именно к вам</div>
+          </div>
+          <button onClick={copyBookingLink}
+            style={{
+              padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+              background: linkCopied ? 'rgba(22,163,97,.1)' : 'var(--purple)',
+              color: linkCopied ? 'var(--green)' : '#fff',
+              border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+              transition: 'all .15s',
+            }}>
+            {linkCopied ? 'Скопировано!' : 'Копировать ссылку'}
+          </button>
+        </div>
+      </div>
+
       {/* KPI row 1 — оперативные */}
       <div className="kw">
         <div className="kg k4">

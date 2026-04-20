@@ -16,6 +16,8 @@ export async function createBooking(formData: FormData) {
   let quizData: Record<string, any> = {}
   try { quizData = JSON.parse(quizDataRaw) } catch {}
 
+  const fixedManagerId = (formData.get('manager_id') as string)?.trim() || null
+
   if (!date || !startTime || !endTime) return { error: 'Выберите дату и время' }
   if (!clientName) return { error: 'Укажите имя' }
   if (!clientPhone) return { error: 'Укажите телефон' }
@@ -100,12 +102,19 @@ export async function createBooking(formData: FormData) {
     return { error: 'Все менеджеры заняты на это время, выберите другое' }
   }
 
-  // 4. Round-robin: pick the one with lowest count
-  const freeUsers = activeUsers
-    .filter(u => freeIds.includes(u.id))
-    .sort((a, b) => a.round_robin_count - b.round_robin_count)
+  // 4. Pick salesperson: fixed manager or round-robin
+  let assignedUser: { id: string; round_robin_count: number }
 
-  const assignedUser = freeUsers[0]
+  if (fixedManagerId && freeIds.includes(fixedManagerId)) {
+    assignedUser = activeUsers.find(u => u.id === fixedManagerId)!
+  } else {
+    const freeUsers = activeUsers
+      .filter(u => freeIds.includes(u.id))
+      .sort((a, b) => a.round_robin_count - b.round_robin_count)
+    assignedUser = freeUsers[0]
+  }
+
+  if (!assignedUser) return { error: 'Менеджер недоступен на это время' }
 
   // 5. Create booking
   const { data: insertedBooking, error: bookErr } = await supabase.from('bookings').insert({

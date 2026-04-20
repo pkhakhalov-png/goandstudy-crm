@@ -38,7 +38,7 @@ export default async function SalesSchedulePage() {
           <div className="pt">Расписание</div>
           <span style={{ fontSize: 12, color: 'var(--muted)' }}>Слоты для записи клиентов</span>
         </div>
-        <ScheduleClient slots={slots ?? []} bookings={bookings ?? []} allStats={allStats ?? []} />
+        <ScheduleClient slots={slots ?? []} bookings={bookings ?? []} allStats={allStats ?? []} userId={user.id} />
       </div>
     </div>
   )

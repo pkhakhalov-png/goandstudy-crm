@@ -7,7 +7,7 @@ const MONTHS = ['Январь', 'Февраль', 'Март', 'Апрель', '�
 const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
 
 interface AvailableSlot { date: string; start_time: string; end_time: string; count: number }
-interface Props { availableSlots: AvailableSlot[] }
+interface Props { availableSlots: AvailableSlot[]; managerId?: string; managerName?: string }
 
 function endTime(start: string) {
   const [h, m] = start.split(':').map(Number)
@@ -44,7 +44,7 @@ const inputStyle: React.CSSProperties = {
   color: 'var(--text)', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box',
 }
 
-export function BookingClient({ availableSlots }: Props) {
+export function BookingClient({ availableSlots, managerId, managerName }: Props) {
   const [step, setStep] = useState(0)
   const [answers, setAnswers] = useState<Record<string, any>>({})
   const [loading, setLoading] = useState(false)
@@ -153,6 +153,7 @@ export function BookingClient({ availableSlots }: Props) {
       finalAnswers.stage = finalAnswers.stage.map((v: string) => v === 'Свой вариант' ? `Свой вариант: ${customVariant}` : v)
     }
     fd.append('quiz_data', JSON.stringify(finalAnswers))
+    if (managerId) fd.append('manager_id', managerId)
     const res = await createBooking(fd)
     setLoading(false)
     if (res.error) setError(res.error)
