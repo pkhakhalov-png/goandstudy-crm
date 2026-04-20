@@ -445,9 +445,28 @@ export function DealCard({ deal, stages, activities, salespersons, clientData, b
           {/* Details */}
           <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--bor2)' }}>
             <div style={{ display: 'grid', gap: 8, fontSize: 12 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ color: 'var(--muted)' }}>Менеджер</span>
-                <span className="stag">{sp?.name ?? '—'}</span>
+                <select
+                  value={deal.salesperson_id || ''}
+                  onChange={async (e) => {
+                    const newId = e.target.value
+                    if (!newId || newId === deal.salesperson_id) return
+                    const fd = new FormData()
+                    fd.append('deal_id', deal.id)
+                    fd.append('salesperson_id', newId)
+                    fd.append('contact_name', deal.contact_name)
+                    fd.append('contact_phone', deal.contact_phone || '')
+                    fd.append('contact_telegram', deal.contact_telegram || '')
+                    fd.append('contact_whatsapp', deal.contact_whatsapp || '')
+                    fd.append('contact_email', deal.contact_email || '')
+                    fd.append('budget', String(deal.budget || 0))
+                    fd.append('title', deal.title)
+                    await updateDeal(fd)
+                  }}
+                  style={{ fontSize: 12, padding: '3px 8px', borderRadius: 6, border: '1px solid var(--bor2)', background: 'var(--surf)', color: 'var(--text)', cursor: 'pointer', fontFamily: 'inherit', maxWidth: 140 }}>
+                  {salespersons.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: 'var(--muted)' }}>Бюджет</span>

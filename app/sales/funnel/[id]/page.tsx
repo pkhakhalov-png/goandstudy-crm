@@ -41,9 +41,11 @@ export default async function SalesDealPage({ params }: { params: Promise<{ id: 
 
   const admin = await createAdminClient()
   const [
+    { data: allSalespersons },
     { data: curators },
     { data: groupDeals },
   ] = await Promise.all([
+    admin.from('users').select('id, name').eq('role', 'salesperson').eq('is_active', true).order('name'),
     admin.from('curators').select('id, name').eq('is_active', true).order('name'),
     admin.from('deals').select('id, title, custom_fields').not('custom_fields->>group_chat_id', 'is', null).is('deleted_at', null),
   ])
@@ -68,7 +70,7 @@ export default async function SalesDealPage({ params }: { params: Promise<{ id: 
         deal={deal}
         stages={stages ?? []}
         activities={enrichedActivities}
-        salespersons={[{ id: user.id, name: profile?.name || '' }]}
+        salespersons={allSalespersons ?? [{ id: user.id, name: profile?.name || '' }]}
         clientData={clientData}
         bookingData={bookingData}
         files={files ?? []}
