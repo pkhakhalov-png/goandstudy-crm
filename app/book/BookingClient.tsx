@@ -147,92 +147,92 @@ export function BookingClient({ availableSlots }: Props) {
         </div>
 
         {/* Step 1: Date */}
-        {step >= 1 && (
-          <div style={{ ...cardStyle, opacity: step === 1 ? 1 : 0.6 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
-                {step === 1 ? 'Выберите дату' : selectedDate ? new Date(selectedDate + 'T00:00:00').toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }) : ''}
-              </span>
-              {step > 1 && <button onClick={() => { setStep(1); setSelectedTime(null) }} style={{ fontSize: 12, color: 'var(--purple)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit' }}>Изменить</button>}
+        {step === 1 ? (
+          <div style={cardStyle}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>Выберите дату</div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <button onClick={() => shiftMonth(-1)} style={{ width: 36, height: 36, border: '1px solid var(--bor2)', borderRadius: 10, background: 'var(--surf)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" width="14" height="14"><polyline points="10,4 6,8 10,12" /></svg>
+              </button>
+              <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{MONTHS[viewMonth]} {viewYear}</span>
+              <button onClick={() => shiftMonth(1)} style={{ width: 36, height: 36, border: '1px solid var(--bor2)', borderRadius: 10, background: 'var(--surf)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" width="14" height="14"><polyline points="6,4 10,8 6,12" /></svg>
+              </button>
             </div>
-
-            {step === 1 && <>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, marginTop: 8 }}>
-                <button onClick={() => shiftMonth(-1)} style={{ width: 36, height: 36, border: '1px solid var(--bor2)', borderRadius: 10, background: 'var(--surf)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" width="14" height="14"><polyline points="10,4 6,8 10,12" /></svg>
-                </button>
-                <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{MONTHS[viewMonth]} {viewYear}</span>
-                <button onClick={() => shiftMonth(1)} style={{ width: 36, height: 36, border: '1px solid var(--bor2)', borderRadius: 10, background: 'var(--surf)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" width="14" height="14"><polyline points="6,4 10,8 6,12" /></svg>
-                </button>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
-                {WEEKDAYS.map(d => (
-                  <div key={d} style={{ textAlign: 'center', fontSize: 11, fontWeight: 700, color: 'var(--muted)', padding: '6px 0' }}>{d}</div>
-                ))}
-                {weeks.flat().map((day, i) => {
-                  if (day === null) return <div key={i} />
-                  const dateStr = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-                  const hasSlots = datesWithSlots.has(dateStr)
-                  const isPast = dateStr < todayStr
-                  const isToday = dateStr === todayStr
-                  const isSel = dateStr === selectedDate
-
-                  return (
-                    <button key={i} disabled={!hasSlots || isPast}
-                      onClick={() => { setSelectedDate(dateStr); setStep(2); setSelectedTime(null) }}
-                      style={{
-                        width: '100%', aspectRatio: '1', borderRadius: 12, border: 'none',
-                        background: isSel ? 'var(--purple)' : hasSlots && !isPast ? 'rgba(177,94,204,.08)' : 'transparent',
-                        color: isSel ? '#fff' : isPast || !hasSlots ? 'var(--muted2)' : 'var(--text)',
-                        fontWeight: isToday || isSel ? 800 : 500, fontSize: 14,
-                        cursor: hasSlots && !isPast ? 'pointer' : 'default',
-                        fontFamily: 'inherit', position: 'relative',
-                      }}>
-                      {day}
-                      {hasSlots && !isPast && !isSel && <div style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--purple)', margin: '2px auto 0' }} />}
-                    </button>
-                  )
-                })}
-              </div>
-            </>}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
+              {WEEKDAYS.map(d => (
+                <div key={d} style={{ textAlign: 'center', fontSize: 11, fontWeight: 700, color: 'var(--muted)', padding: '6px 0' }}>{d}</div>
+              ))}
+              {weeks.flat().map((day, i) => {
+                if (day === null) return <div key={i} />
+                const dateStr = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+                const hasSlots = datesWithSlots.has(dateStr)
+                const isPast = dateStr < todayStr
+                const isToday = dateStr === todayStr
+                const isSel = dateStr === selectedDate
+                return (
+                  <button key={i} disabled={!hasSlots || isPast}
+                    onClick={() => { setSelectedDate(dateStr); setStep(2); setSelectedTime(null) }}
+                    style={{
+                      width: '100%', aspectRatio: '1', borderRadius: 12, border: 'none',
+                      background: isSel ? 'var(--purple)' : hasSlots && !isPast ? 'rgba(177,94,204,.08)' : 'transparent',
+                      color: isSel ? '#fff' : isPast || !hasSlots ? 'var(--muted2)' : 'var(--text)',
+                      fontWeight: isToday || isSel ? 800 : 500, fontSize: 14,
+                      cursor: hasSlots && !isPast ? 'pointer' : 'default',
+                      fontFamily: 'inherit', position: 'relative',
+                    }}>
+                    {day}
+                    {hasSlots && !isPast && !isSel && <div style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--purple)', margin: '2px auto 0' }} />}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        ) : (
+          <div style={{ ...cardStyle, padding: '14px 20px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
+                {selectedDate ? new Date(selectedDate + 'T00:00:00').toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }) : ''}
+              </span>
+              <button onClick={() => { setStep(1); setSelectedTime(null) }} style={{ fontSize: 13, color: 'var(--purple)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit', padding: '4px 0' }}>Изменить</button>
+            </div>
           </div>
         )}
 
         {/* Step 2: Time */}
-        {step >= 2 && (
-          <div style={{ ...cardStyle, opacity: step === 2 ? 1 : 0.6 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
-                {step === 2 ? 'Выберите время' : `${selectedTime}–${selectedTime ? endTime(selectedTime) : ''}`}
-              </span>
-              {step > 2 && <button onClick={() => setStep(2)} style={{ fontSize: 12, color: 'var(--purple)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit' }}>Изменить</button>}
+        {step === 2 ? (
+          <div style={cardStyle}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>Выберите время</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+              {dateSlots.map(slot => {
+                const time = slot.start_time.slice(0, 5)
+                const isSel = time === selectedTime
+                return (
+                  <button key={time}
+                    onClick={() => { setSelectedTime(time); setStep(3) }}
+                    style={{
+                      padding: '14px 8px', borderRadius: 12, fontSize: 16, fontWeight: 700,
+                      border: isSel ? '2px solid var(--purple)' : '1px solid var(--bor2)',
+                      background: isSel ? 'var(--pl)' : 'var(--surf)',
+                      color: isSel ? 'var(--purple)' : 'var(--text)',
+                      cursor: 'pointer', fontFamily: 'inherit',
+                    }}>
+                    {time}
+                  </button>
+                )
+              })}
             </div>
-
-            {step === 2 && (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginTop: 8 }}>
-                {dateSlots.map(slot => {
-                  const time = slot.start_time.slice(0, 5)
-                  const isSel = time === selectedTime
-                  return (
-                    <button key={time}
-                      onClick={() => { setSelectedTime(time); setStep(3) }}
-                      style={{
-                        padding: '14px 8px', borderRadius: 12, fontSize: 16, fontWeight: 700,
-                        border: isSel ? '2px solid var(--purple)' : '1px solid var(--bor2)',
-                        background: isSel ? 'var(--pl)' : 'var(--surf)',
-                        color: isSel ? 'var(--purple)' : 'var(--text)',
-                        cursor: 'pointer', fontFamily: 'inherit',
-                      }}>
-                      {time}
-                    </button>
-                  )
-                })}
-              </div>
-            )}
           </div>
-        )}
+        ) : step > 2 ? (
+          <div style={{ ...cardStyle, padding: '14px 20px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
+                {selectedTime}–{selectedTime ? endTime(selectedTime) : ''}
+              </span>
+              <button onClick={() => setStep(2)} style={{ fontSize: 13, color: 'var(--purple)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit', padding: '4px 0' }}>Изменить</button>
+            </div>
+          </div>
+        ) : null}
 
         {/* Step 3: Contact form */}
         {step === 3 && (
