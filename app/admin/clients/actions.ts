@@ -1,6 +1,6 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 
 async function assertAdmin() {
@@ -145,7 +145,11 @@ export async function assignCurator(clientId: number, curatorId: string) {
 
   const { error: updateErr } = await supabase
     .from('clients')
-    .update({ curator_id: curator.id })
+    .update({
+      curator_id: curator.id,
+      curator_assigned_at: new Date().toISOString(),
+      current_stage_code: 'strategy_session',
+    })
     .eq('id', clientId)
     .is('curator_id', null)
 
@@ -160,5 +164,73 @@ export async function assignCurator(clientId: number, curatorId: string) {
 
   revalidatePath('/admin/clients')
   revalidatePath('/admin/expenses')
+  revalidatePath('/curator')
+  revalidatePath('/curator/clients')
+  return { success: true }
+}
+
+export async function getAvailableGroups() {
+  const { error: authErr } = await assertAdmin()
+  if (authErr) return []
+
+  const admin = await createAdminClient()
+
+  // Get all group chats from deals
+  const { data: deals } = await admin
+    .from('deals')
+    .select('id, title, custom_fields')
+    .not('custom_fields->>group_chat_id', 'is', null)
+    .is('deleted_at', null)
+
+  // Get already linked client groups
+  const { data: linkedClients } = await admin
+    .from('clients')
+    .select('tg_group_chat_id')
+    .not('tg_group_chat_id', 'is', null)
+
+  const linkedSet = new Set((linkedClients ?? []).map(c => String(c.tg_group_chat_id)))
+
+  return (deals ?? []).map(d => ({
+    chat_id: d.custom_fields?.group_chat_id || d.custom_fields?.tg_chat_id,
+    title: d.custom_fields?.tg_chat_title || d.title,
+    deal_id: d.id,
+    already_linked: linkedSet.has(String(d.custom_fields?.group_chat_id || d.custom_fields?.tg_chat_id)),
+  })).filter(g => g.chat_id)
+}
+
+export async function linkClientGroup(clientId: number, chatId: string, chatTitle: string) {
+  const { supabase, error: authErr } = await assertAdmin()
+  if (authErr) return { error: authErr }
+
+  const { error } = await supabase
+    .from('clients')
+    .update({
+      tg_group_chat_id: Number(chatId),
+      tg_group_title: chatTitle,
+    })
+    .eq('id', clientId)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/admin/clients')
+  revalidatePath('/curator/clients')
+  revalidatePath(`/curator/clients/${clientId}`)
+  return { success: true }
+}
+
+export async function unlinkClientGroup(clientId: number) {
+  const { supabase, error: authErr } = await assertAdmin()
+  if (authErr) return { error: authErr }
+
+  const { error } = await supabase
+    .from('clients')
+    .update({ tg_group_chat_id: null, tg_group_title: null })
+    .eq('id', clientId)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/admin/clients')
+  revalidatePath('/curator/clients')
+  revalidatePath(`/curator/clients/${clientId}`)
   return { success: true }
 }

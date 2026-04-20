@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
-import { assignCurator, updatePaymentSum, updateClientTotal } from './actions'
+import { assignCurator, updatePaymentSum, updateClientTotal, getAvailableGroups, linkClientGroup, unlinkClientGroup } from './actions'
 
 interface Props {
   clients: any[]
@@ -35,6 +35,9 @@ export function ClientsPage({ clients, salespersons, curators }: Props) {
   const [selected, setSelected] = useState<any>(null)
   const [, startTransition] = useTransition()
   const [assigningCurator, setAssigningCurator] = useState(false)
+  const [groups, setGroups] = useState<any[]>([])
+  const [groupsLoaded, setGroupsLoaded] = useState(false)
+  const [linkingGroup, setLinkingGroup] = useState(false)
   const [editingPaymentId, setEditingPaymentId] = useState<number | null>(null)
   const [paymentDraft, setPaymentDraft] = useState<string>('')
   const [editingTotal, setEditingTotal] = useState(false)
@@ -239,6 +242,60 @@ export function ClientsPage({ clients, salespersons, curators }: Props) {
                       {curators.map((c: any) => (
                         <option key={c.id} value={c.id}>{c.name}</option>
                       ))}
+                    </select>
+                  )}
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid rgba(0,0,0,.04)', fontSize: 12 }}>
+                  <span style={{ color: 'var(--muted)' }}>TG группа</span>
+                  {sel.tg_group_title ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontWeight: 600, color: '#0088cc', fontSize: 11 }}>{sel.tg_group_title}</span>
+                      <button
+                        onClick={() => {
+                          setLinkingGroup(true)
+                          startTransition(async () => {
+                            await unlinkClientGroup(sel.id)
+                            setSelected({ ...sel, tg_group_chat_id: null, tg_group_title: null })
+                            setLinkingGroup(false)
+                          })
+                        }}
+                        disabled={linkingGroup}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 12 }}
+                        title="Отвязать">×</button>
+                    </div>
+                  ) : (
+                    <select
+                      defaultValue=""
+                      disabled={linkingGroup}
+                      onClick={async () => {
+                        if (!groupsLoaded) {
+                          const g = await getAvailableGroups()
+                          setGroups(g)
+                          setGroupsLoaded(true)
+                        }
+                      }}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        if (!val) return
+                        const [chatId, ...titleParts] = val.split('|')
+                        const title = titleParts.join('|')
+                        setLinkingGroup(true)
+                        startTransition(async () => {
+                          const res = await linkClientGroup(sel.id, chatId, title)
+                          setLinkingGroup(false)
+                          if (res?.error) { alert(res.error); return }
+                          setSelected({ ...sel, tg_group_chat_id: Number(chatId), tg_group_title: title })
+                        })
+                      }}
+                      style={{ fontSize: 12, padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(0,0,0,.12)', background: '#fff', color: 'var(--text)', cursor: 'pointer', maxWidth: 160 }}
+                    >
+                      <option value="">Привязать…</option>
+                      {groups.filter(g => !g.already_linked).map((g: any) => (
+                        <option key={g.chat_id} value={`${g.chat_id}|${g.title}`}>{g.title}</option>
+                      ))}
+                      {groupsLoaded && groups.filter(g => !g.already_linked).length === 0 && (
+                        <option disabled>Нет доступных групп</option>
+                      )}
                     </select>
                   )}
                 </div>

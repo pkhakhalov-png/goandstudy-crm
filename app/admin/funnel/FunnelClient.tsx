@@ -28,16 +28,27 @@ interface Props {
   userId: string
   trashedDeals: TrashedDeal[]
   stageCounts: Record<string, number>
+  curators?: { id: string; name: string }[]
+  availableGroups?: { chat_id: string; title: string }[]
 }
 
 const sourceLabel: Record<string, string> = { manual: 'Вручную', booking: 'Запись', website: 'Сайт', telegram: 'Telegram' }
 
-export function FunnelClient({ stages: serverStages, deals: serverDeals, salespersons, isAdmin, userId, trashedDeals, stageCounts }: Props) {
+export function FunnelClient({ stages: serverStages, deals: serverDeals, salespersons, isAdmin, userId, trashedDeals, stageCounts, curators = [], availableGroups = [] }: Props) {
   const router = useRouter()
   const [showNewDeal, setShowNewDeal] = useState(false)
   const [filterSalesperson, setFilterSalesperson] = useState('')
   const [search, setSearch] = useState('')
   const [saving, setSaving] = useState(false)
+
+  // Onboarding modal
+  const [onboardingModal, setOnboardingModal] = useState<{ dealId: string; stageId: string; stageName: string; oldStageName: string } | null>(null)
+  const [obCuratorId, setObCuratorId] = useState('')
+  const [obTotalAmount, setObTotalAmount] = useState('')
+  const [obMonths, setObMonths] = useState('6')
+  const [obFirstPayDate, setObFirstPayDate] = useState(new Date().toISOString().split('T')[0])
+  const [obGroupChatId, setObGroupChatId] = useState('')
+  const [obSaving, setObSaving] = useState(false)
 
   // Extra deals loaded via pagination
   const [extraDeals, setExtraDeals] = useState<Deal[]>([])
@@ -181,6 +192,8 @@ export function FunnelClient({ stages: serverStages, deals: serverDeals, salespe
     setDragOverIndex(e.clientY < midY ? index : index + 1)
   }
 
+  const ONBOARDING_STAGES = ['Первичная продажа', 'Оплата услуг']
+
   async function handleDrop(stageId: string) {
     if (!dragDealId) return
     const deal = localDeals.find(d => d.id === dragDealId)
@@ -193,6 +206,20 @@ export function FunnelClient({ stages: serverStages, deals: serverDeals, salespe
     const oldStage = localStages.find(s => s.id === deal.stage_id)
     const newStage = localStages.find(s => s.id === stageId)
 
+    // If dropping on payment stage — show onboarding modal
+    if (newStage && ONBOARDING_STAGES.includes(newStage.name)) {
+      resetDrag()
+      setOnboardingModal({
+        dealId: movedDealId,
+        stageId,
+        stageName: newStage.name,
+        oldStageName: oldStage?.name || '',
+      })
+      // Pre-fill budget from deal
+      setObTotalAmount(String(deal.budget || ''))
+      return
+    }
+
     // Optimistic — instant
     setMoveOverrides(prev => new Map(prev).set(movedDealId, stageId))
     resetDrag()
@@ -204,6 +231,33 @@ export function FunnelClient({ stages: serverStages, deals: serverDeals, salespe
     fd.append('old_stage_name', oldStage?.name || '')
     fd.append('new_stage_name', newStage?.name || '')
     moveDeal(fd)
+  }
+
+  async function handleOnboardingSubmit() {
+    if (!onboardingModal || !obCuratorId || !obTotalAmount) return
+    setObSaving(true)
+
+    // Optimistic
+    setMoveOverrides(prev => new Map(prev).set(onboardingModal.dealId, onboardingModal.stageId))
+
+    const fd = new FormData()
+    fd.append('deal_id', onboardingModal.dealId)
+    fd.append('stage_id', onboardingModal.stageId)
+    fd.append('old_stage_name', onboardingModal.oldStageName)
+    fd.append('new_stage_name', onboardingModal.stageName)
+    fd.append('curator_id', obCuratorId)
+    fd.append('total_amount', obTotalAmount)
+    fd.append('months', obMonths)
+    fd.append('first_pay_date', obFirstPayDate)
+    if (obGroupChatId) fd.append('group_chat_id', obGroupChatId)
+    await moveDeal(fd)
+
+    setObSaving(false)
+    setOnboardingModal(null)
+    setObCuratorId('')
+    setObTotalAmount('')
+    setObMonths('6')
+    setObGroupChatId('')
   }
 
   function resetDrag() {
@@ -773,6 +827,74 @@ export function FunnelClient({ stages: serverStages, deals: serverDeals, salespe
         .stage-delete-btn:hover { opacity: 1 !important; color: var(--red) !important; }
         .stage-divider:hover .stage-divider-btn { opacity: 1 !important; transform: scale(1) !important; }
       `}</style>
+
+      {/* ═══ Onboarding Modal ═══ */}
+      {onboardingModal && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 100,
+          background: 'rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }} onClick={() => setOnboardingModal(null)}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: 'var(--surf)', borderRadius: 16, padding: '24px 28px',
+            width: 420, maxHeight: '80vh', overflowY: 'auto',
+            boxShadow: '0 20px 60px rgba(0,0,0,.3)',
+          }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>Оформление клиента</div>
+            <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 20 }}>
+              Перенос на этап «{onboardingModal.stageName}»
+            </div>
+
+            <div style={{ display: 'grid', gap: 14 }}>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', marginBottom: 4, display: 'block' }}>Куратор *</label>
+                <select value={obCuratorId} onChange={e => setObCuratorId(e.target.value)}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--bor2)', fontSize: 13, fontFamily: 'inherit', background: 'var(--bg)' }}>
+                  <option value="">Выберите куратора...</option>
+                  {curators.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', marginBottom: 4, display: 'block' }}>Сумма договора (₽) *</label>
+                <input type="number" value={obTotalAmount} onChange={e => setObTotalAmount(e.target.value)} placeholder="150000"
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--bor2)', fontSize: 13, fontFamily: 'inherit', background: 'var(--bg)' }} />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', marginBottom: 4, display: 'block' }}>Месяцев *</label>
+                  <input type="number" value={obMonths} onChange={e => setObMonths(e.target.value)} min="1" max="24"
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--bor2)', fontSize: 13, fontFamily: 'inherit', background: 'var(--bg)' }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', marginBottom: 4, display: 'block' }}>Первый платёж</label>
+                  <input type="date" value={obFirstPayDate} onChange={e => setObFirstPayDate(e.target.value)}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--bor2)', fontSize: 13, fontFamily: 'inherit', background: 'var(--bg)' }} />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', marginBottom: 4, display: 'block' }}>TG группа</label>
+                <select value={obGroupChatId} onChange={e => setObGroupChatId(e.target.value)}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--bor2)', fontSize: 13, fontFamily: 'inherit', background: 'var(--bg)' }}>
+                  <option value="">Не привязывать</option>
+                  {availableGroups.map(g => <option key={g.chat_id} value={g.chat_id}>{g.title}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
+              <button onClick={handleOnboardingSubmit} disabled={obSaving || !obCuratorId || !obTotalAmount}
+                className="btn-p" style={{ flex: 1, padding: '10px', fontSize: 13, opacity: (!obCuratorId || !obTotalAmount) ? 0.5 : 1 }}>
+                {obSaving ? 'Оформляем...' : 'Оформить'}
+              </button>
+              <button onClick={() => setOnboardingModal(null)} className="btn-s" style={{ padding: '10px 20px', fontSize: 13 }}>
+                Отмена
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }

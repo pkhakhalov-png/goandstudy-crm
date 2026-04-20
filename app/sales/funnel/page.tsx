@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { SalesSidebar } from '../SalesSidebar'
 import { FunnelClient } from '../../admin/funnel/FunnelClient'
@@ -21,16 +21,26 @@ export default async function SalesFunnelPage() {
     .split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)
 
   const dealsPerStage = 50
+  const admin = await createAdminClient()
 
   const [
     { data: stages },
     { data: trashedDeals },
     { count: totalDeals },
+    { data: curators },
+    { data: groupDeals },
   ] = await Promise.all([
     supabase.from('pipeline_stages').select('*').eq('is_active', true).order('position'),
     supabase.from('deals').select('id, contact_name, contact_phone, budget, stage_id, deleted_at').eq('salesperson_id', user.id).not('deleted_at', 'is', null).order('deleted_at', { ascending: false }).limit(50),
     supabase.from('deals').select('*', { count: 'exact', head: true }).eq('salesperson_id', user.id).is('deleted_at', null),
+    admin.from('curators').select('id, name').eq('is_active', true).order('name'),
+    admin.from('deals').select('id, title, custom_fields').not('custom_fields->>group_chat_id', 'is', null).is('deleted_at', null),
   ])
+
+  const availableGroups = (groupDeals ?? []).map(d => ({
+    chat_id: d.custom_fields?.group_chat_id || d.custom_fields?.tg_chat_id,
+    title: d.custom_fields?.tg_chat_title || d.title,
+  })).filter(g => g.chat_id)
 
   const stageList = stages ?? []
   const perStageResults = await Promise.all(
@@ -72,6 +82,8 @@ export default async function SalesFunnelPage() {
           userId={user.id}
           trashedDeals={trashedDeals ?? []}
           stageCounts={stageCounts}
+          curators={curators ?? []}
+          availableGroups={availableGroups}
         />
       </div>
     </div>

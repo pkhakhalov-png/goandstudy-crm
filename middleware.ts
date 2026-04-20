@@ -58,8 +58,23 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/admin', request.url))
     } else if (profile?.role === 'rop') {
       return NextResponse.redirect(new URL('/rop', request.url))
+    } else if (profile?.role === 'curator') {
+      return NextResponse.redirect(new URL('/curator', request.url))
     } else {
       return NextResponse.redirect(new URL('/sales', request.url))
+    }
+  }
+
+  // Curator blocked from admin/sales/rop sections
+  if (user && (pathname.startsWith('/admin') || pathname.startsWith('/sales') || pathname.startsWith('/rop'))) {
+    const { data: profile } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
+    if (profile?.role === 'curator') {
+      return NextResponse.redirect(new URL('/curator', request.url))
     }
   }
 
