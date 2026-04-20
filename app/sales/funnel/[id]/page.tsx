@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { SalesSidebar } from '../../SalesSidebar'
 import { DealCard } from '../../../admin/funnel/[id]/DealCard'
@@ -39,6 +39,19 @@ export default async function SalesDealPage({ params }: { params: Promise<{ id: 
   const userMap = new Map((allUsers ?? []).map(u => [u.id, u.name]))
   const enrichedActivities = (activities ?? []).map(a => ({ ...a, user_name: userMap.get(a.user_id) ?? 'Система' }))
 
+  const admin = await createAdminClient()
+  const [
+    { data: curators },
+    { data: groupDeals },
+  ] = await Promise.all([
+    admin.from('curators').select('id, name').eq('is_active', true).order('name'),
+    admin.from('deals').select('id, title, custom_fields').not('custom_fields->>group_chat_id', 'is', null).is('deleted_at', null),
+  ])
+  const availableGroups = (groupDeals ?? []).map(d => ({
+    chat_id: d.custom_fields?.group_chat_id || d.custom_fields?.tg_chat_id,
+    title: d.custom_fields?.tg_chat_title || d.title,
+  })).filter(g => g.chat_id)
+
   const [clientData, bookingData] = await Promise.all([
     deal.client_id
       ? supabase.from('clients').select('id, name, country, university, status, months').eq('id', deal.client_id).single().then(r => r.data)
@@ -62,6 +75,8 @@ export default async function SalesDealPage({ params }: { params: Promise<{ id: 
         messages={messages ?? []}
         tasks={tasks ?? []}
         userId={user.id}
+        curators={curators ?? []}
+        availableGroups={availableGroups}
       />
     </div>
   )
