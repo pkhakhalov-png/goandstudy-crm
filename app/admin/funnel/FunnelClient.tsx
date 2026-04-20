@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { moveDeal, createDeal, updateStage, addStage, removeStage, softDeleteDeal, restoreDeal, permanentDeleteDeal, findDuplicates, mergeDeals, loadMoreDeals, searchClients } from './actions'
+import { moveDeal, createDeal, updateStage, addStage, removeStage, softDeleteDeal, restoreDeal, permanentDeleteDeal, emptyTrash, findDuplicates, mergeDeals, loadMoreDeals, searchClients } from './actions'
 
 const COLORS = ['#FF9500', '#FF453A', '#FF375F', '#AF52DE', '#B15ECC', '#5856D6', '#007AFF', '#5AC8FA', '#34C759', '#30D158', '#FF9F0A', '#8E8E93']
 
@@ -735,7 +735,20 @@ export function FunnelClient({ stages: serverStages, deals: serverDeals, salespe
 
           {/* Trash panel */}
           {showTrash && (
-            <div style={{ background: 'var(--surf)', borderTop: '1px solid var(--bor2)', maxHeight: 260, overflowY: 'auto' }}>
+            <div style={{ background: 'var(--surf)', borderTop: '1px solid var(--bor2)', maxHeight: 300, overflowY: 'auto' }}>
+              {trashedDeals.length > 1 && (
+                <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '8px 18px', borderBottom: '1px solid var(--bor2)' }}>
+                  <button onClick={async () => {
+                    if (!confirm(`Удалить все ${trashedDeals.length} сделок из корзины навсегда?`)) return
+                    await emptyTrash()
+                  }}
+                    style={{ background: 'none', border: '1px solid rgba(220,53,69,.2)', borderRadius: 6, padding: '4px 12px', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: 'var(--red)', transition: 'background .15s' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(220,53,69,.06)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
+                    Очистить корзину
+                  </button>
+                </div>
+              )}
               {trashedDeals.map(d => {
                 const stage = localStages.find(s => s.id === d.stage_id)
                 return (

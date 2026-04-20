@@ -354,6 +354,22 @@ export async function permanentDeleteDeal(formData: FormData) {
   return { success: true }
 }
 
+export async function emptyTrash() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Не авторизован' }
+
+  await supabase.from('deals').delete().not('deleted_at', 'is', null)
+  reval()
+  return { success: true }
+}
+
+export async function autoCleanTrash() {
+  const supabase = await createAdminClient()
+  const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString()
+  await supabase.from('deals').delete().not('deleted_at', 'is', null).lt('deleted_at', weekAgo)
+}
+
 // ═══ BULK ACTIONS ═══
 
 export async function bulkMoveDeals(formData: FormData) {

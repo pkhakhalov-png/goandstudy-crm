@@ -2,6 +2,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { Sidebar } from '../Sidebar'
 import { FunnelClient } from './FunnelClient'
+import { autoCleanTrash } from './actions'
 
 export default async function AdminFunnelPage() {
   const supabase = await createClient()
@@ -15,6 +16,9 @@ export default async function AdminFunnelPage() {
     .single()
 
   if (profile?.role !== 'admin') redirect('/sales')
+
+  // Auto-clean trash older than 7 days
+  autoCleanTrash().catch(() => {})
 
   const dealsPerStage = 50
 
