@@ -857,7 +857,7 @@ export async function suggestReply(dealId: string) {
 
 export async function searchClients(query: string) {
   const supabase = await createClient()
-  const { data } = await supabase.from('clients').select('id, name, phone, country').or(`name.ilike.%${query}%,phone.ilike.%${query}%`).limit(10)
+  const { data } = await supabase.from('clients').select('id, name, phone, country, curator_id, tg_group_chat_id, tg_group_title, status').or(`name.ilike.%${query}%,phone.ilike.%${query}%`).limit(10)
   return data ?? []
 }
 
