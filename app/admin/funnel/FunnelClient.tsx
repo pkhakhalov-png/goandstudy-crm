@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { moveDeal, createDeal, updateStage, addStage, removeStage, softDeleteDeal, restoreDeal, permanentDeleteDeal, findDuplicates, mergeDeals, loadMoreDeals } from './actions'
+import { moveDeal, createDeal, updateStage, addStage, removeStage, softDeleteDeal, restoreDeal, permanentDeleteDeal, findDuplicates, mergeDeals, loadMoreDeals, searchClients } from './actions'
 
 const COLORS = ['#FF9500', '#FF453A', '#FF375F', '#AF52DE', '#B15ECC', '#5856D6', '#007AFF', '#5AC8FA', '#34C759', '#30D158', '#FF9F0A', '#8E8E93']
 
@@ -49,6 +49,8 @@ export function FunnelClient({ stages: serverStages, deals: serverDeals, salespe
   const [obFirstPayDate, setObFirstPayDate] = useState(new Date().toISOString().split('T')[0])
   const [obGroupChatId, setObGroupChatId] = useState('')
   const [obSaving, setObSaving] = useState(false)
+  const [obExistingClient, setObExistingClient] = useState<any>(null)
+  const [obCheckedClient, setObCheckedClient] = useState(false)
 
   // Extra deals loaded via pagination
   const [extraDeals, setExtraDeals] = useState<Deal[]>([])
@@ -217,6 +219,17 @@ export function FunnelClient({ stages: serverStages, deals: serverDeals, salespe
       })
       // Pre-fill budget from deal
       setObTotalAmount(String(deal.budget || ''))
+      // Check for existing client by phone
+      setObExistingClient(null)
+      setObCheckedClient(false)
+      if (deal.contact_phone) {
+        searchClients(deal.contact_phone).then(results => {
+          if (results.length > 0) setObExistingClient(results[0])
+          setObCheckedClient(true)
+        })
+      } else {
+        setObCheckedClient(true)
+      }
       return
     }
 
@@ -844,35 +857,54 @@ export function FunnelClient({ stages: serverStages, deals: serverDeals, salespe
               Перенос на этап «{onboardingModal.stageName}»
             </div>
 
+            {/* Existing client found */}
+            {obExistingClient && (
+              <div style={{ padding: '12px 16px', background: 'rgba(52,199,89,.06)', border: '1px solid rgba(52,199,89,.2)', borderRadius: 12, marginBottom: 16 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--green)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Клиент найден в базе</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>{obExistingClient.name}</div>
+                <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
+                  {obExistingClient.phone}{obExistingClient.country ? ` · ${obExistingClient.country}` : ''}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6 }}>Платежи и расходы уже существуют. Можно только назначить куратора и TG группу.</div>
+              </div>
+            )}
+
             <div style={{ display: 'grid', gap: 14 }}>
+              {/* Curator — always shown */}
               <div>
-                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', marginBottom: 4, display: 'block' }}>Куратор *</label>
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', marginBottom: 4, display: 'block' }}>Куратор</label>
                 <select value={obCuratorId} onChange={e => setObCuratorId(e.target.value)}
                   style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--bor2)', fontSize: 13, fontFamily: 'inherit', background: 'var(--bg)' }}>
-                  <option value="">Выберите куратора...</option>
+                  <option value="">Без куратора</option>
                   {curators.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
 
-              <div>
-                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', marginBottom: 4, display: 'block' }}>Сумма договора (₽) *</label>
-                <input type="number" value={obTotalAmount} onChange={e => setObTotalAmount(e.target.value)} placeholder="150000"
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--bor2)', fontSize: 13, fontFamily: 'inherit', background: 'var(--bg)' }} />
-              </div>
+              {/* Payment fields — only for NEW clients */}
+              {!obExistingClient && (
+                <>
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', marginBottom: 4, display: 'block' }}>Сумма договора (₽) *</label>
+                    <input type="number" value={obTotalAmount} onChange={e => setObTotalAmount(e.target.value)} placeholder="150000"
+                      style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--bor2)', fontSize: 13, fontFamily: 'inherit', background: 'var(--bg)' }} />
+                  </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                <div>
-                  <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', marginBottom: 4, display: 'block' }}>Месяцев *</label>
-                  <input type="number" value={obMonths} onChange={e => setObMonths(e.target.value)} min="1" max="24"
-                    style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--bor2)', fontSize: 13, fontFamily: 'inherit', background: 'var(--bg)' }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', marginBottom: 4, display: 'block' }}>Первый платёж</label>
-                  <input type="date" value={obFirstPayDate} onChange={e => setObFirstPayDate(e.target.value)}
-                    style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--bor2)', fontSize: 13, fontFamily: 'inherit', background: 'var(--bg)' }} />
-                </div>
-              </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    <div>
+                      <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', marginBottom: 4, display: 'block' }}>Месяцев *</label>
+                      <input type="number" value={obMonths} onChange={e => setObMonths(e.target.value)} min="1" max="24"
+                        style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--bor2)', fontSize: 13, fontFamily: 'inherit', background: 'var(--bg)' }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', marginBottom: 4, display: 'block' }}>Первый платёж</label>
+                      <input type="date" value={obFirstPayDate} onChange={e => setObFirstPayDate(e.target.value)}
+                        style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--bor2)', fontSize: 13, fontFamily: 'inherit', background: 'var(--bg)' }} />
+                    </div>
+                  </div>
+                </>
+              )}
 
+              {/* TG group — always shown */}
               <div>
                 <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', marginBottom: 4, display: 'block' }}>TG группа</label>
                 <select value={obGroupChatId} onChange={e => setObGroupChatId(e.target.value)}
@@ -884,9 +916,9 @@ export function FunnelClient({ stages: serverStages, deals: serverDeals, salespe
             </div>
 
             <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
-              <button onClick={handleOnboardingSubmit} disabled={obSaving || !obCuratorId || !obTotalAmount}
-                className="btn-p" style={{ flex: 1, padding: '10px', fontSize: 13, opacity: (!obCuratorId || !obTotalAmount) ? 0.5 : 1 }}>
-                {obSaving ? 'Оформляем...' : 'Оформить'}
+              <button onClick={handleOnboardingSubmit} disabled={obSaving || (!obExistingClient && !obTotalAmount)}
+                className="btn-p" style={{ flex: 1, padding: '10px', fontSize: 13, opacity: (!obExistingClient && !obTotalAmount) ? 0.5 : 1 }}>
+                {obSaving ? 'Оформляем...' : obExistingClient ? 'Привязать и перенести' : 'Оформить'}
               </button>
               <button onClick={() => setOnboardingModal(null)} className="btn-s" style={{ padding: '10px 20px', fontSize: 13 }}>
                 Отмена
