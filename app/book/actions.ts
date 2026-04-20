@@ -116,7 +116,16 @@ export async function createBooking(formData: FormData) {
 
   if (!assignedUser) return { error: 'Менеджер недоступен на это время' }
 
-  // 5. Create booking
+  // 5. Delete any cancelled bookings for this slot so unique constraint doesn't block
+  await supabase
+    .from('bookings')
+    .delete()
+    .eq('salesperson_id', assignedUser.id)
+    .eq('booking_date', date)
+    .eq('start_time', st)
+    .eq('status', 'cancelled')
+
+  // 6. Create booking
   const { data: insertedBooking, error: bookErr } = await supabase.from('bookings').insert({
     salesperson_id: assignedUser.id,
     booking_date: date,
