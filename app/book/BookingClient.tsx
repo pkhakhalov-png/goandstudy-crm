@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { createBooking } from './actions'
+import { createBooking, createLowBudgetDeal } from './actions'
 
 const MONTHS = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь']
 const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
@@ -94,8 +94,14 @@ export function BookingClient({ availableSlots }: Props) {
     setAnswer(id, value)
     const q = QUIZ_STEPS[step] as any
 
-    // Budget €2,500 → redirect to TG
+    // Budget €2,500 → create deal with round-robin, then redirect to TG/WA
     if (q.lowBudgetRedirect && value === '€2,500') {
+      const fd = new FormData()
+      fd.append('client_name', answers.client_name || '')
+      fd.append('client_phone', answers.client_phone || '')
+      fd.append('client_telegram', answers.client_telegram || '')
+      fd.append('quiz_data', JSON.stringify({ ...answers, [id]: value }))
+      createLowBudgetDeal(fd)
       setTgRedirect(true)
       return
     }

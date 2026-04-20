@@ -201,3 +201,88 @@ export async function createBooking(formData: FormData) {
 
   return { success: true, bookingId: insertedBooking?.id }
 }
+
+export async function createLowBudgetDeal(formData: FormData) {
+  const supabase = await createAdminClient()
+
+  const clientName = (formData.get('client_name') as string)?.trim()
+  const clientPhone = (formData.get('client_phone') as string)?.trim()
+  const clientTelegram = (formData.get('client_telegram') as string)?.trim() || null
+  const channel = (formData.get('channel') as string) || 'telegram'
+  const quizDataRaw = formData.get('quiz_data') as string || '{}'
+  let quizData: Record<string, any> = {}
+  try { quizData = JSON.parse(quizDataRaw) } catch {}
+
+  if (!clientName || !clientPhone) return { error: 'Нет данных' }
+
+  const normalizedPhone = normalizePhone(clientPhone)
+
+  // Check for existing deal
+  if (normalizedPhone) {
+    const { data: existing } = await supabase
+      .from('deals')
+      .select('id')
+      .eq('phone_normalized', normalizedPhone)
+      .is('deleted_at', null)
+      .limit(1)
+      .maybeSingle()
+    if (existing) return { success: true }
+  }
+
+  // Round-robin salesperson
+  const { data: salespersons } = await supabase
+    .from('users')
+    .select('id, round_robin_count')
+    .eq('role', 'salesperson')
+    .eq('is_active', true)
+    .order('round_robin_count', { ascending: true })
+    .limit(1)
+
+  const assignedId = salespersons?.[0]?.id ?? null
+
+  const { data: firstStage } = await supabase
+    .from('pipeline_stages')
+    .select('id')
+    .eq('is_active', true)
+    .order('position', { ascending: true })
+    .limit(1)
+    .single()
+
+  if (!firstStage) return { error: 'Нет этапов воронки' }
+
+  await supabase.from('deals').insert({
+    title: `Заявка от ${clientName}`,
+    stage_id: firstStage.id,
+    salesperson_id: assignedId,
+    contact_name: clientName,
+    contact_phone: clientPhone,
+    contact_telegram: clientTelegram,
+    phone_normalized: normalizedPhone,
+    source: 'website',
+    custom_fields: {
+      quiz_age: quizData.age,
+      quiz_status: quizData.status,
+      quiz_budget: quizData.budget,
+      quiz_about: quizData.about,
+      quiz_degree: quizData.degree,
+      quiz_format: quizData.format,
+      quiz_country: quizData.country,
+      quiz_year: quizData.year,
+      quiz_stage: quizData.stage,
+      quiz_result: quizData.result,
+      quiz_consultation_format: quizData.consultation_format,
+      redirect_channel: channel,
+      low_budget: true,
+    },
+  })
+
+  // Increment round-robin
+  if (assignedId && salespersons?.[0]) {
+    await supabase
+      .from('users')
+      .update({ round_robin_count: salespersons[0].round_robin_count + 1 })
+      .eq('id', assignedId)
+  }
+
+  return { success: true }
+}
