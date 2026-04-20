@@ -242,7 +242,8 @@ export function FunnelClient({ stages: serverStages, deals: serverDeals, salespe
   }
 
   async function handleOnboardingSubmit() {
-    if (!onboardingModal || !obCuratorId || !obTotalAmount) return
+    if (!onboardingModal) return
+    if (obMode === 'new' && !obTotalAmount) return
     setObSaving(true)
 
     // Optimistic
