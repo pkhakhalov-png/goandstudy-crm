@@ -51,7 +51,7 @@ export function FunnelClient({ stages: serverStages, deals: serverDeals, salespe
   const [obGroupSearch, setObGroupSearch] = useState('')
   const [obSaving, setObSaving] = useState(false)
   const [obExistingClient, setObExistingClient] = useState<any>(null)
-  const [obCheckedClient, setObCheckedClient] = useState(false)
+  const [obMode, setObMode] = useState<'ask' | 'new' | 'existing'>('ask')
 
   // Extra deals loaded via pagination
   const [extraDeals, setExtraDeals] = useState<Deal[]>([])
@@ -220,17 +220,11 @@ export function FunnelClient({ stages: serverStages, deals: serverDeals, salespe
       })
       // Pre-fill budget from deal
       setObTotalAmount(String(deal.budget || ''))
-      // Check for existing client by phone
       setObExistingClient(null)
-      setObCheckedClient(false)
-      if (deal.contact_phone) {
-        searchClients(deal.contact_phone).then(results => {
-          if (results.length > 0) setObExistingClient(results[0])
-          setObCheckedClient(true)
-        })
-      } else {
-        setObCheckedClient(true)
-      }
+      setObMode('ask')
+      setObGroupSearch('')
+      setObGroupChatId('')
+      setObCuratorId('')
       return
     }
 
@@ -858,90 +852,53 @@ export function FunnelClient({ stages: serverStages, deals: serverDeals, salespe
               Перенос на этап «{onboardingModal.stageName}»
             </div>
 
-            {/* ═══ MODE: Existing client fully set up ═══ */}
-            {obExistingClient && obExistingClient.curator_id && obExistingClient.tg_group_chat_id ? (
+            {/* ═══ STEP 1: Ask mode ═══ */}
+            {obMode === 'ask' && (
               <>
-                <div style={{ padding: '14px 16px', background: 'rgba(52,199,89,.06)', border: '1px solid rgba(52,199,89,.2)', borderRadius: 12, marginBottom: 16 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--green)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Клиент уже оформлен</div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>{obExistingClient.name}</div>
-                  <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
-                    {obExistingClient.phone}{obExistingClient.country ? ` · ${obExistingClient.country}` : ''}
+                <div style={{ display: 'grid', gap: 10 }}>
+                  <button onClick={() => setObMode('new')}
+                    style={{ padding: '16px 20px', borderRadius: 12, border: '1px solid var(--bor2)', background: 'var(--bg)', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(177,94,204,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 16 }}>+</div>
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>Новый клиент</div>
+                      <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>Создать клиента, платежи, назначить куратора</div>
+                    </div>
+                  </button>
+                  <button onClick={() => setObMode('existing')}
+                    style={{ padding: '16px 20px', borderRadius: 12, border: '1px solid var(--bor2)', background: 'var(--bg)', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(22,163,97,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 16, color: 'var(--green)' }}>&#8594;</div>
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>Уже оформлен</div>
+                      <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>Просто перенести на этап без создания</div>
+                    </div>
+                  </button>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'center', marginTop: 16 }}>
+                  <button onClick={() => setOnboardingModal(null)} className="btn-s" style={{ padding: '10px 20px', fontSize: 13 }}>Отмена</button>
+                </div>
+              </>
+            )}
+
+            {/* ═══ MODE: Just transfer ═══ */}
+            {obMode === 'existing' && (
+              <>
+                <div style={{ padding: '14px 16px', background: 'rgba(22,163,97,.06)', border: '1px solid rgba(22,163,97,.2)', borderRadius: 12, marginBottom: 16 }}>
+                  <div style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.5 }}>
+                    Клиент уже оформлен — просто переносим сделку на этап «{onboardingModal.stageName}» без создания нового клиента.
                   </div>
-                  {obExistingClient.tg_group_title && (
-                    <div style={{ fontSize: 11, color: '#0088cc', marginTop: 4 }}>TG: {obExistingClient.tg_group_title}</div>
-                  )}
-                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6 }}>Куратор, платежи и группа уже настроены. Просто переносим на этап.</div>
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button onClick={handleOnboardingSubmit} disabled={obSaving}
                     className="btn-p" style={{ flex: 1, padding: '10px', fontSize: 13 }}>
                     {obSaving ? 'Переносим...' : 'Перенести'}
                   </button>
-                  <button onClick={() => setOnboardingModal(null)} className="btn-s" style={{ padding: '10px 20px', fontSize: 13 }}>Отмена</button>
+                  <button onClick={() => setObMode('ask')} className="btn-s" style={{ padding: '10px 20px', fontSize: 13 }}>Назад</button>
                 </div>
               </>
+            )}
 
-            ) : obExistingClient ? (
-              /* ═══ MODE: Existing client, needs curator/group ═══ */
-              <>
-                <div style={{ padding: '12px 16px', background: 'rgba(201,125,0,.06)', border: '1px solid rgba(201,125,0,.2)', borderRadius: 12, marginBottom: 16 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Клиент найден в базе</div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>{obExistingClient.name}</div>
-                  <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
-                    {obExistingClient.phone}{obExistingClient.country ? ` · ${obExistingClient.country}` : ''}
-                  </div>
-                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6 }}>Платежи уже существуют. Назначьте куратора и TG группу.</div>
-                </div>
-
-                <div style={{ display: 'grid', gap: 14 }}>
-                  {!obExistingClient.curator_id && (
-                    <div>
-                      <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', marginBottom: 4, display: 'block' }}>Куратор</label>
-                      <select value={obCuratorId} onChange={e => setObCuratorId(e.target.value)}
-                        style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--bor2)', fontSize: 13, fontFamily: 'inherit', background: 'var(--bg)' }}>
-                        <option value="">Без куратора</option>
-                        {curators.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                      </select>
-                    </div>
-                  )}
-
-                  {!obExistingClient.tg_group_chat_id && (
-                    <div>
-                      <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', marginBottom: 4, display: 'block' }}>TG группа</label>
-                      <input value={obGroupSearch} onChange={e => setObGroupSearch(e.target.value)} placeholder="Поиск по названию группы..."
-                        style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--bor2)', fontSize: 13, fontFamily: 'inherit', background: 'var(--bg)', marginBottom: 6 }} />
-                      {obGroupSearch.length >= 2 && (
-                        <div style={{ maxHeight: 150, overflowY: 'auto', display: 'grid', gap: 4 }}>
-                          {availableGroups.filter(g => g.title.toLowerCase().includes(obGroupSearch.toLowerCase())).map(g => (
-                            <button key={g.chat_id} onClick={() => { setObGroupChatId(g.chat_id); setObGroupSearch(g.title) }}
-                              style={{
-                                padding: '8px 10px', borderRadius: 8, border: 'none', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12,
-                                background: obGroupChatId === g.chat_id ? 'rgba(177,94,204,.1)' : 'var(--bg)',
-                                fontWeight: obGroupChatId === g.chat_id ? 600 : 400, color: 'var(--text)',
-                              }}>
-                              {g.title}
-                            </button>
-                          ))}
-                          {availableGroups.filter(g => g.title.toLowerCase().includes(obGroupSearch.toLowerCase())).length === 0 && (
-                            <div style={{ fontSize: 11, color: 'var(--muted)', padding: 8 }}>Ничего не найдено</div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
-                  <button onClick={handleOnboardingSubmit} disabled={obSaving}
-                    className="btn-p" style={{ flex: 1, padding: '10px', fontSize: 13 }}>
-                    {obSaving ? 'Оформляем...' : 'Привязать и перенести'}
-                  </button>
-                  <button onClick={() => setOnboardingModal(null)} className="btn-s" style={{ padding: '10px 20px', fontSize: 13 }}>Отмена</button>
-                </div>
-              </>
-
-            ) : (
-              /* ═══ MODE: New client ═══ */
+            {/* ═══ MODE: New client form ═══ */}
+            {obMode === 'new' && (
               <>
                 <div style={{ display: 'grid', gap: 14 }}>
                   <div>
@@ -952,13 +909,11 @@ export function FunnelClient({ stages: serverStages, deals: serverDeals, salespe
                       {curators.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
                   </div>
-
                   <div>
                     <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', marginBottom: 4, display: 'block' }}>Сумма договора (₽) *</label>
                     <input type="number" value={obTotalAmount} onChange={e => setObTotalAmount(e.target.value)} placeholder="150000"
                       style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--bor2)', fontSize: 13, fontFamily: 'inherit', background: 'var(--bg)' }} />
                   </div>
-
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                     <div>
                       <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', marginBottom: 4, display: 'block' }}>Месяцев *</label>
@@ -971,7 +926,6 @@ export function FunnelClient({ stages: serverStages, deals: serverDeals, salespe
                         style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--bor2)', fontSize: 13, fontFamily: 'inherit', background: 'var(--bg)' }} />
                     </div>
                   </div>
-
                   <div>
                     <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', marginBottom: 4, display: 'block' }}>TG группа</label>
                     <input value={obGroupSearch} onChange={e => setObGroupSearch(e.target.value)} placeholder="Поиск по названию группы..."
@@ -992,13 +946,12 @@ export function FunnelClient({ stages: serverStages, deals: serverDeals, salespe
                     )}
                   </div>
                 </div>
-
                 <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
                   <button onClick={handleOnboardingSubmit} disabled={obSaving || !obTotalAmount}
                     className="btn-p" style={{ flex: 1, padding: '10px', fontSize: 13, opacity: !obTotalAmount ? 0.5 : 1 }}>
                     {obSaving ? 'Оформляем...' : 'Оформить'}
                   </button>
-                  <button onClick={() => setOnboardingModal(null)} className="btn-s" style={{ padding: '10px 20px', fontSize: 13 }}>Отмена</button>
+                  <button onClick={() => setObMode('ask')} className="btn-s" style={{ padding: '10px 20px', fontSize: 13 }}>Назад</button>
                 </div>
               </>
             )}
