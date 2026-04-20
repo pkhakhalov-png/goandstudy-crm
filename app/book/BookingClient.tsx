@@ -148,10 +148,10 @@ export function BookingClient({ availableSlots }: Props) {
 
         {/* Step 1: Date */}
         {step >= 1 && (
-          <div style={{ ...cardStyle, opacity: step === 1 ? 1 : 0.5, pointerEvents: step === 1 ? 'auto' : 'none' }}>
+          <div style={{ ...cardStyle, opacity: step === 1 ? 1 : 0.6 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
               <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
-                {step === 1 ? 'Выберите дату' : new Date(selectedDate + 'T00:00:00').toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}
+                {step === 1 ? 'Выберите дату' : selectedDate ? new Date(selectedDate + 'T00:00:00').toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }) : ''}
               </span>
               {step > 1 && <button onClick={() => { setStep(1); setSelectedTime(null) }} style={{ fontSize: 12, color: 'var(--purple)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit' }}>Изменить</button>}
             </div>
@@ -202,7 +202,7 @@ export function BookingClient({ availableSlots }: Props) {
 
         {/* Step 2: Time */}
         {step >= 2 && (
-          <div style={{ ...cardStyle, opacity: step === 2 ? 1 : 0.5, pointerEvents: step === 2 ? 'auto' : 'none' }}>
+          <div style={{ ...cardStyle, opacity: step === 2 ? 1 : 0.6 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
               <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
                 {step === 2 ? 'Выберите время' : `${selectedTime}–${selectedTime ? endTime(selectedTime) : ''}`}
