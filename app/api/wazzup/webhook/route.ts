@@ -341,6 +341,44 @@ async function processMessage(supabase: SupabaseAdmin, msg: WazzupMessage) {
   // Bump deal updated_at so it rises to the top of the kanban
   await supabase.from('deals').update({ updated_at: new Date().toISOString() }).eq('id', dealId)
 
+  // Auto-create task "Клиент написал — необходимо ответить" for incoming messages
+  if (!msg.isEcho && !existing) {
+    // Get deal's salesperson
+    const { data: deal } = await supabase.from('deals').select('salesperson_id, contact_name').eq('id', dealId).single()
+    if (deal?.salesperson_id) {
+      // Check if there's already an open "reply" task for this deal
+      const { data: existingTask } = await supabase
+        .from('deal_tasks')
+        .select('id')
+        .eq('deal_id', dealId)
+        .eq('task_type', 'reply')
+        .eq('is_done', false)
+        .limit(1)
+        .maybeSingle()
+
+      if (!existingTask) {
+        await supabase.from('deal_tasks').insert({
+          deal_id: dealId,
+          assigned_to: deal.salesperson_id,
+          title: `Клиент написал — необходимо ответить (${deal.contact_name || senderName})`,
+          task_type: 'reply',
+          deadline: new Date(Date.now() + 30 * 60 * 1000).toISOString(), // 30 min deadline
+          is_done: false,
+        })
+      }
+    }
+  }
+
+  // Auto-close reply task when manager responds
+  if (msg.isEcho) {
+    await supabase
+      .from('deal_tasks')
+      .update({ is_done: true, completed_at: new Date().toISOString() })
+      .eq('deal_id', dealId)
+      .eq('task_type', 'reply')
+      .eq('is_done', false)
+  }
+
   // Log activity
   await supabase.from('deal_activities').insert({
     deal_id: dealId,

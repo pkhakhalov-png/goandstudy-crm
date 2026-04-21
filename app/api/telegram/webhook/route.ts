@@ -307,6 +307,32 @@ async function processTelegramMessage(
       content: `${isEdited ? 'Изменено' : 'Входящее'} TG (${senderName}): ${content.slice(0, 100)}`,
       metadata: { channel: 'telegram', direction: 'incoming', sender: senderName },
     })
+
+    // Auto-create task for incoming messages
+    if (!isEdited) {
+      const { data: deal } = await supabase.from('deals').select('salesperson_id, contact_name').eq('id', dealId).single()
+      if (deal?.salesperson_id) {
+        const { data: existingTask } = await supabase
+          .from('deal_tasks')
+          .select('id')
+          .eq('deal_id', dealId)
+          .eq('task_type', 'reply')
+          .eq('is_done', false)
+          .limit(1)
+          .maybeSingle()
+
+        if (!existingTask) {
+          await supabase.from('deal_tasks').insert({
+            deal_id: dealId,
+            assigned_to: deal.salesperson_id,
+            title: `Клиент написал — необходимо ответить (${deal.contact_name || senderName})`,
+            task_type: 'reply',
+            deadline: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+            is_done: false,
+          })
+        }
+      }
+    }
   }
 
   // ═══ Mirror to client_tg_messages (curator portal) ═══
