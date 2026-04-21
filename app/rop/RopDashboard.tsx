@@ -61,8 +61,9 @@ export function RopDashboard({ salespersons, salesPlans, clients, payments, deal
   }
 
   const totalFact = salespersons.reduce((s, sp) => s + getFactForSp(sp.id), 0)
-  // Department plan = sum of individual salesperson plans
-  const deptPlanAmt = salesPlans
+  // Department plan = sum of individual salesperson plans (filtered by selected month)
+  const monthPlans = salesPlans.filter((p: any) => p.month === month)
+  const deptPlanAmt = monthPlans
     .filter((p: any) => p.salesperson_id)
     .reduce((s: number, p: any) => s + Number(p.plan_amount), 0)
 
@@ -87,7 +88,7 @@ export function RopDashboard({ salespersons, salesPlans, clients, payments, deal
   const slaMinutes = getSetting(settings, 'sla_response_minutes', 30)
 
   function calcScore(spId: string) {
-    const plan = salesPlans.find((p: any) => p.salesperson_id === spId)
+    const plan = monthPlans.find((p: any) => p.salesperson_id === spId)
     const planAmt = plan ? Number(plan.plan_amount) : 0
     const fact = getFactForSp(spId)
     const salesPct = planAmt > 0 ? Math.min(fact / planAmt, 1.5) : 0

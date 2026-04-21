@@ -35,8 +35,8 @@ export default async function RopPage() {
     { data: settings },
   ] = await Promise.all([
     admin.from('users').select('id, name, is_active').eq('role', 'salesperson').order('name'),
-    admin.from('sales_plans').select('*').eq('month', currentMonth),
-    admin.from('clients').select('id, salesperson_id, status'),
+    admin.from('sales_plans').select('*'),
+    admin.from('clients').select('id, name, salesperson_id, status'),
     admin.from('deals').select('id, title, stage_id, salesperson_id, source, budget, is_critical, custom_fields, created_at, updated_at, deleted_at').is('deleted_at', null),
     admin.from('pipeline_stages').select('id, name, position, stage_type, color, weight').eq('is_active', true).order('position'),
     admin.from('deal_messages').select('id, deal_id, direction, created_at').order('created_at', { ascending: false }),
