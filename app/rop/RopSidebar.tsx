@@ -25,6 +25,7 @@ const navItems = [
   { key: 'stuck', href: '/rop/stuck', label: 'Застрявшие', icon: 'M8 1v6M4.9 4.9L8 8M1 8h6' },
   { key: 'analytics', href: '/rop/analytics', label: 'Аналитика', icon: 'M2 14V8l3-4 3 2 3-5 3 4v9' },
   { key: 'tasks', href: '/rop/tasks', label: 'Задачи', icon: 'M4 7l3 3 5-5M3 2h10a2 2 0 012 2v8a2 2 0 01-2 2H3a2 2 0 01-2-2V4a2 2 0 012-2z' },
+  { key: 'funnel', href: '/rop/funnel', label: 'Воронка', icon: 'M2 3h12l-3 5v4l-2 1.5V8L2 3z' },
   { key: 'deals', href: '/rop/deals', label: 'Сделки', icon: 'M2 3h12v10H2zM5 7h6M5 10h4' },
   { key: 'settings', href: '/rop/settings', label: 'Настройки', icon: 'M8 10a2 2 0 100-4 2 2 0 000 4zM12.5 8a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z' },
   { key: 'history', href: '/rop/history', label: 'История', icon: 'M8 4v4l2 2M3 8a5 5 0 1010 0A5 5 0 003 8z' },

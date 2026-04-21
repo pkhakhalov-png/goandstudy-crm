@@ -31,7 +31,7 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
     supabase.from('deal_tasks').select('id, deal_id, title, deadline, is_done, assigned_to, completed_at, created_at').eq('deal_id', id).order('created_at', { ascending: true }),
   ])
 
-  if (profile?.role !== 'admin') redirect('/sales')
+  if (profile?.role !== 'admin' && profile?.role !== 'rop') redirect('/sales')
   if (!deal) redirect('/admin/funnel')
 
   const userMap = new Map((allUsers ?? []).map(u => [u.id, u.name]))

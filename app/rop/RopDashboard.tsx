@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import Link from 'next/link'
 import { upsertSalesPlan } from './actions'
 
 interface Props {
@@ -244,15 +245,20 @@ export function RopDashboard({ salespersons, salesPlans, clients, payments, deal
         <div style={cardStyle}>
           <div style={sectionTitle}>Критично ({criticalItems.length})</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 200, overflowY: 'auto' }}>
-            {criticalItems.slice(0, 10).map((item, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 10, background: `${item.color}11`, border: `1px solid ${item.color}33` }}>
-                <div style={{ width: 8, height: 8, borderRadius: '50%', background: item.color, flexShrink: 0 }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.sublabel}</div>
-                  <div style={{ fontSize: 10, color: item.color }}>{item.label}</div>
-                </div>
-              </div>
-            ))}
+            {criticalItems.slice(0, 10).map((item, i) => {
+              const Wrapper = item.dealId ? Link : 'div'
+              const linkProps = item.dealId ? { href: `/admin/funnel/${item.dealId}` } : {}
+              return (
+                <Wrapper key={i} {...linkProps as any} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 10, background: `${item.color}11`, border: `1px solid ${item.color}33`, textDecoration: 'none', cursor: item.dealId ? 'pointer' : 'default' }}>
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: item.color, flexShrink: 0 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.sublabel}</div>
+                    <div style={{ fontSize: 10, color: item.color }}>{item.label}</div>
+                  </div>
+                  {item.dealId && <svg viewBox="0 0 16 16" fill="none" stroke="var(--muted)" strokeWidth="1.5" width="12" height="12" style={{ flexShrink: 0 }}><path d="M6 3h7v7M13 3L6 10" /></svg>}
+                </Wrapper>
+              )
+            })}
           </div>
         </div>
       )}
