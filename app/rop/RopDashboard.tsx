@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import React, { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { upsertSalesPlan } from './actions'
 
@@ -31,6 +31,7 @@ export function RopDashboard({ salespersons, salesPlans, clients, payments, deal
   const [month, setMonth] = useState(currentMonth)
   const [editPlanId, setEditPlanId] = useState<string | null>(null)
   const [planDraft, setPlanDraft] = useState('')
+  const [expandedSpId, setExpandedSpId] = useState<string | null>(null)
   const [, startTransition] = useTransition()
 
   const [y, m] = month.split('-').map(Number)
@@ -303,12 +304,17 @@ export function RopDashboard({ salespersons, salesPlans, clients, payments, deal
             {leaderboard.map((sp, idx) => {
               const pct = sp.planAmt > 0 ? Math.round(sp.fact / sp.planAmt * 100) : 0
               return (
-                <tr key={sp.id} style={{ borderTop: '1px solid var(--bor2)' }}>
+                <React.Fragment key={sp.id}>
+                <tr style={{ borderTop: '1px solid var(--bor2)' }}>
                   <td style={{ padding: '10px 8px', fontWeight: 700, color: idx === 0 ? 'var(--gold)' : 'var(--muted)' }}>
                     {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : idx + 1}
                   </td>
                   <td style={{ padding: '10px 8px', fontWeight: 600 }}>{sp.name}</td>
-                  <td style={{ padding: '10px 8px', textAlign: 'right', fontWeight: 700, color: 'var(--green)' }}>{fmt(sp.fact)} ₽</td>
+                  <td style={{ padding: '10px 8px', textAlign: 'right', fontWeight: 700, color: 'var(--green)', cursor: 'pointer' }}
+                    onClick={() => setExpandedSpId(expandedSpId === sp.id ? null : sp.id)}>
+                    {fmt(sp.fact)} ₽
+                    <span style={{ fontSize: 9, color: 'var(--muted)', marginLeft: 4 }}>{expandedSpId === sp.id ? '▲' : '▼'}</span>
+                  </td>
                   <td style={{ padding: '10px 8px', textAlign: 'right', color: 'var(--muted)' }}>
                     {editPlanId === sp.id ? (
                       <span style={{ display: 'inline-flex', gap: 4 }}>
@@ -334,6 +340,57 @@ export function RopDashboard({ salespersons, salesPlans, clients, payments, deal
                     </span>
                   </td>
                 </tr>
+                {expandedSpId === sp.id && (() => {
+                  const spClientIds = new Set(clients.filter((c: any) => c.salesperson_id === sp.id).map((c: any) => c.id))
+                  const paidPayments = payments
+                    .filter((p: any) => p.is_paid && spClientIds.has(p.client_id) && (p.fact_date || p.plan_date || '').startsWith(month))
+                    .sort((a: any, b: any) => (b.fact_sum ?? b.plan_sum) - (a.fact_sum ?? a.plan_sum))
+                  // Group by client
+                  const byClient: Record<number, { name: string; total: number; payments: any[] }> = {}
+                  paidPayments.forEach((p: any) => {
+                    if (!byClient[p.client_id]) {
+                      const cl = clients.find((c: any) => c.id === p.client_id)
+                      byClient[p.client_id] = { name: cl?.name || `Клиент #${p.client_id}`, total: 0, payments: [] }
+                    }
+                    byClient[p.client_id].total += Number(p.fact_sum ?? p.plan_sum)
+                    byClient[p.client_id].payments.push(p)
+                  })
+                  const clientList = Object.entries(byClient).sort((a, b) => b[1].total - a[1].total)
+
+                  return (
+                    <tr>
+                      <td colSpan={6} style={{ padding: '0 8px 12px 40px', background: 'rgba(22,163,97,.03)' }}>
+                        {clientList.length === 0 ? (
+                          <div style={{ fontSize: 11, color: 'var(--muted)', padding: '8px 0' }}>Нет оплат за этот месяц</div>
+                        ) : (
+                          <div style={{ display: 'grid', gap: 4, paddingTop: 6 }}>
+                            {clientList.map(([cid, data]) => {
+                              const deal = deals.find((d: any) => d.client_id === Number(cid) || d.contact_name === data.name)
+                              return (
+                                <div key={cid} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 10px', borderRadius: 8, background: 'var(--surf)', border: '1px solid var(--bor)' }}>
+                                  <div style={{ flex: 1 }}>
+                                    {deal ? (
+                                      <Link href={`/rop/funnel/${deal.id}`} style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', textDecoration: 'none' }}>
+                                        {data.name}
+                                      </Link>
+                                    ) : (
+                                      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{data.name}</span>
+                                    )}
+                                    <div style={{ fontSize: 10, color: 'var(--muted)' }}>
+                                      {data.payments.length} платеж{data.payments.length === 1 ? '' : data.payments.length < 5 ? 'а' : 'ей'}
+                                    </div>
+                                  </div>
+                                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--green)' }}>{fmt(data.total)} ₽</span>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })()}
+                </React.Fragment>
               )
             })}
           </tbody>
