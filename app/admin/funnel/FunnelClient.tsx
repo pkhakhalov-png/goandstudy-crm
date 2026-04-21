@@ -30,11 +30,12 @@ interface Props {
   stageCounts: Record<string, number>
   curators?: { id: string; name: string }[]
   availableGroups?: { chat_id: string; title: string }[]
+  basePath?: string
 }
 
 const sourceLabel: Record<string, string> = { manual: 'Вручную', booking: 'Запись', website: 'Сайт', telegram: 'Telegram' }
 
-export function FunnelClient({ stages: serverStages, deals: serverDeals, salespersons, isAdmin, userId, trashedDeals, stageCounts, curators = [], availableGroups = [] }: Props) {
+export function FunnelClient({ stages: serverStages, deals: serverDeals, salespersons, isAdmin, userId, trashedDeals, stageCounts, curators = [], availableGroups = [], basePath = '/admin/funnel' }: Props) {
   const router = useRouter()
   const [showNewDeal, setShowNewDeal] = useState(false)
   const [filterSalesperson, setFilterSalesperson] = useState('')
@@ -611,7 +612,7 @@ export function FunnelClient({ stages: serverStages, deals: serverDeals, salespe
                           draggable
                           onDragStart={() => handleDragStart(deal.id)}
                           onDragOver={e => handleDragOverCard(e, idx)}
-                          onClick={() => router.push(`${isAdmin ? '/admin' : '/sales'}/funnel/${deal.id}`)}
+                          onClick={() => router.push(`${basePath}/${deal.id}`)}
                           style={{
                             background: 'var(--surf)', border: '1px solid var(--bor)', borderRadius: 10,
                             padding: '10px 12px', marginBottom: 6, cursor: 'grab',

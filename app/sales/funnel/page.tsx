@@ -84,6 +84,7 @@ export default async function SalesFunnelPage() {
           stageCounts={stageCounts}
           curators={curators ?? []}
           availableGroups={availableGroups}
+          basePath="/sales/funnel"
         />
       </div>
     </div>

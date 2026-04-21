@@ -82,7 +82,7 @@ export function DealsListView({ deals, stages, salespersons, messages, filters }
             return (
               <tr key={d.id} style={{ borderTop: '1px solid var(--bor2)', background: d.is_critical ? 'rgba(220,53,69,.04)' : d.unreplied ? 'rgba(201,125,0,.04)' : undefined }}>
                 <td style={{ padding: '10px 8px' }}>
-                  <Link href={`/admin/funnel/${d.id}`} style={{ fontWeight: 600, color: 'var(--purple)', textDecoration: 'none' }}>{d.title}</Link>
+                  <Link href={`/rop/funnel/${d.id}`} style={{ fontWeight: 600, color: 'var(--purple)', textDecoration: 'none' }}>{d.title}</Link>
                   {d.is_critical && <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--red)' }}>КРИТИЧНО</span>}
                 </td>
                 <td style={{ padding: '10px 8px' }}>{manager?.name || '—'}</td>

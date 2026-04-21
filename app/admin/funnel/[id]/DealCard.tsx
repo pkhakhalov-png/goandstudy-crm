@@ -22,6 +22,7 @@ interface Props {
   userId: string
   curators: { id: string; name: string }[]
   availableGroups: { chat_id: string; title: string }[]
+  backUrl?: string
 }
 
 const fileIcon: Record<string, string> = {
@@ -58,7 +59,7 @@ function colorForSender(name: string | null | undefined): string {
 }
 const activityIcon: Record<string, string> = { note: '📝', stage_change: '→', system: '⚙️', call: '📞', message: '💬', file_upload: '📎', task_done: '✅' }
 
-export function DealCard({ deal, stages, activities, salespersons, clientData, bookingData, files, messages, tasks, userId, curators, availableGroups }: Props) {
+export function DealCard({ deal, stages, activities, salespersons, clientData, bookingData, files, messages, tasks, userId, curators, availableGroups, backUrl = '/admin/funnel' }: Props) {
   const router = useRouter()
   const [tab, setTab] = useState<'main' | 'activity' | 'files' | 'messages' | 'tasks'>('main')
 
@@ -372,7 +373,7 @@ export function DealCard({ deal, stages, activities, salespersons, clientData, b
       {/* Top bar */}
       <div className="topbar" style={{ gap: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <Link href="/admin/funnel" style={{ color: 'var(--muted)', textDecoration: 'none', fontSize: 13 }}>← Воронка</Link>
+          <Link href={backUrl} style={{ color: 'var(--muted)', textDecoration: 'none', fontSize: 13 }}>← Воронка</Link>
           <span style={{ color: 'var(--bor2)' }}>/</span>
           <span className="pt">{deal.title}</span>
         </div>

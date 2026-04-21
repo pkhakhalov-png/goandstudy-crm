@@ -72,6 +72,7 @@ export default async function RopFunnelPage() {
           stageCounts={stageCounts}
           curators={curators ?? []}
           availableGroups={availableGroups}
+          basePath="/rop/funnel"
         />
       </div>
     </div>

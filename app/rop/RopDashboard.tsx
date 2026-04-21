@@ -247,7 +247,7 @@ export function RopDashboard({ salespersons, salesPlans, clients, payments, deal
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 200, overflowY: 'auto' }}>
             {criticalItems.slice(0, 10).map((item, i) => {
               const Wrapper = item.dealId ? Link : 'div'
-              const linkProps = item.dealId ? { href: `/admin/funnel/${item.dealId}` } : {}
+              const linkProps = item.dealId ? { href: `/rop/funnel/${item.dealId}` } : {}
               return (
                 <Wrapper key={i} {...linkProps as any} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 10, background: `${item.color}11`, border: `1px solid ${item.color}33`, textDecoration: 'none', cursor: item.dealId ? 'pointer' : 'default' }}>
                   <div style={{ width: 8, height: 8, borderRadius: '50%', background: item.color, flexShrink: 0 }} />
