@@ -1,6 +1,6 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 
 export async function markPaymentPaidSales(formData: FormData): Promise<void> {
@@ -37,4 +37,22 @@ export async function unmarkPaymentPaidSales(formData: FormData): Promise<void> 
     .eq('id', formData.get('payment_id') as string)
 
   revalidatePath('/sales')
+}
+
+export async function completeTask(formData: FormData) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Не авторизован' }
+
+  const taskId = formData.get('task_id') as string
+  const admin = await createAdminClient()
+
+  await admin.from('deal_tasks').update({
+    is_done: true,
+    completed_at: new Date().toISOString(),
+  }).eq('id', taskId)
+
+  revalidatePath('/sales')
+  revalidatePath('/rop')
+  return { success: true }
 }
