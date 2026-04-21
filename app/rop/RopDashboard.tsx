@@ -399,66 +399,89 @@ export function RopDashboard({ salespersons, salesPlans, clients, payments, deal
       </div>
 
       {/* ═══ FUNNEL BY MANAGER ═══ */}
-      <div style={cardStyle}>
-        <div style={sectionTitle}>Воронка по менеджерам</div>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
-            <thead>
-              <tr style={{ textAlign: 'center', color: 'var(--muted)', fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                <th style={{ padding: '6px 8px', textAlign: 'left', minWidth: 100 }}>Менеджер</th>
-                <th style={{ padding: '6px 6px', fontWeight: 700, color: 'var(--text)' }}>Всего</th>
-                {stages.map((s: any) => (
-                  <th key={s.id} style={{ padding: '6px 4px', whiteSpace: 'nowrap' }}>
-                    <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: s.color, marginRight: 3, verticalAlign: 'middle' }} />
-                    {s.name.length > 12 ? s.name.slice(0, 12) + '…' : s.name}
-                  </th>
-                ))}
-                <th style={{ padding: '6px 6px', fontWeight: 700, color: 'var(--green)' }}>Продажи</th>
-              </tr>
-            </thead>
-            <tbody>
-              {salespersons.filter((sp: any) => sp.is_active).map((sp: any) => {
-                const spDeals = deals.filter((d: any) => d.salesperson_id === sp.id)
-                const successStages = stages.filter((s: any) => s.stage_type === 'success').map((s: any) => s.id)
-                const salesCount = spDeals.filter((d: any) => successStages.includes(d.stage_id)).length
-                return (
-                  <tr key={sp.id} style={{ borderTop: '1px solid var(--bor2)' }}>
-                    <td style={{ padding: '8px 8px', fontWeight: 600, fontSize: 12 }}>{sp.name}</td>
-                    <td style={{ padding: '8px 6px', textAlign: 'center', fontWeight: 700, fontSize: 13 }}>{spDeals.length}</td>
-                    {stages.map((s: any) => {
-                      const count = spDeals.filter((d: any) => d.stage_id === s.id).length
+      {(() => {
+        // Exclude "Группы" from stats, merge "Новые заявки" + "Релокац" into one
+        const excludeNames = ['Группы']
+        const mergeIntoNew = ['Релокац']
+        const newLeadsName = 'Новые заявки'
+
+        const visibleStages = stages.filter((s: any) => !excludeNames.includes(s.name) && !mergeIntoNew.includes(s.name))
+        const excludeIds = stages.filter((s: any) => excludeNames.includes(s.name)).map((s: any) => s.id)
+        const mergeIds = stages.filter((s: any) => mergeIntoNew.includes(s.name) || s.name === newLeadsName).map((s: any) => s.id)
+        const newLeadsStage = stages.find((s: any) => s.name === newLeadsName)
+
+        // Filter deals excluding "Группы"
+        const funnelDeals = deals.filter((d: any) => !excludeIds.includes(d.stage_id))
+        const paymentStages = stages.filter((s: any) => s.stage_type === 'success').map((s: any) => s.id)
+
+        function countForStage(spDeals: any[], stageId: string) {
+          if (stageId === newLeadsStage?.id) {
+            return spDeals.filter((d: any) => mergeIds.includes(d.stage_id)).length
+          }
+          return spDeals.filter((d: any) => d.stage_id === stageId).length
+        }
+
+        return (
+          <div style={cardStyle}>
+            <div style={sectionTitle}>Воронка по менеджерам</div>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+                <thead>
+                  <tr style={{ textAlign: 'center', color: 'var(--muted)', fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    <th style={{ padding: '6px 8px', textAlign: 'left', minWidth: 100 }}>Менеджер</th>
+                    <th style={{ padding: '6px 6px', fontWeight: 700, color: 'var(--text)' }}>Всего</th>
+                    {visibleStages.filter((s: any) => s.stage_type !== 'success').map((s: any) => (
+                      <th key={s.id} style={{ padding: '6px 4px', whiteSpace: 'nowrap' }}>
+                        <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: s.color, marginRight: 3, verticalAlign: 'middle' }} />
+                        {s.name.length > 14 ? s.name.slice(0, 14) + '…' : s.name}
+                      </th>
+                    ))}
+                    <th style={{ padding: '6px 6px', fontWeight: 700, color: 'var(--green)' }}>Оплата</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {salespersons.filter((sp: any) => sp.is_active).map((sp: any) => {
+                    const spDeals = funnelDeals.filter((d: any) => d.salesperson_id === sp.id)
+                    const paidCount = spDeals.filter((d: any) => paymentStages.includes(d.stage_id)).length
+                    return (
+                      <tr key={sp.id} style={{ borderTop: '1px solid var(--bor2)' }}>
+                        <td style={{ padding: '8px 8px', fontWeight: 600, fontSize: 12 }}>{sp.name}</td>
+                        <td style={{ padding: '8px 6px', textAlign: 'center', fontWeight: 700, fontSize: 13 }}>{spDeals.length}</td>
+                        {visibleStages.filter((s: any) => s.stage_type !== 'success').map((s: any) => {
+                          const count = countForStage(spDeals, s.id)
+                          return (
+                            <td key={s.id} style={{ padding: '8px 4px', textAlign: 'center', color: count > 0 ? 'var(--text)' : 'var(--muted2)', fontWeight: count > 0 ? 600 : 400 }}>
+                              {count || '—'}
+                            </td>
+                          )
+                        })}
+                        <td style={{ padding: '8px 6px', textAlign: 'center', fontWeight: 700, color: paidCount > 0 ? 'var(--green)' : 'var(--muted)', fontSize: 13 }}>
+                          {paidCount}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                  <tr style={{ borderTop: '2px solid var(--bor2)', background: 'rgba(177,94,204,.03)' }}>
+                    <td style={{ padding: '8px 8px', fontWeight: 800, fontSize: 12 }}>Итого</td>
+                    <td style={{ padding: '8px 6px', textAlign: 'center', fontWeight: 800, fontSize: 13 }}>{funnelDeals.length}</td>
+                    {visibleStages.filter((s: any) => s.stage_type !== 'success').map((s: any) => {
+                      const count = countForStage(funnelDeals, s.id)
                       return (
-                        <td key={s.id} style={{ padding: '8px 4px', textAlign: 'center', color: count > 0 ? 'var(--text)' : 'var(--muted2)', fontWeight: count > 0 ? 600 : 400 }}>
+                        <td key={s.id} style={{ padding: '8px 4px', textAlign: 'center', fontWeight: 700, color: count > 0 ? 'var(--text)' : 'var(--muted2)' }}>
                           {count || '—'}
                         </td>
                       )
                     })}
-                    <td style={{ padding: '8px 6px', textAlign: 'center', fontWeight: 700, color: salesCount > 0 ? 'var(--green)' : 'var(--muted)', fontSize: 13 }}>
-                      {salesCount}
+                    <td style={{ padding: '8px 6px', textAlign: 'center', fontWeight: 800, fontSize: 13, color: 'var(--green)' }}>
+                      {funnelDeals.filter((d: any) => paymentStages.includes(d.stage_id)).length}
                     </td>
                   </tr>
-                )
-              })}
-              {/* ИТОГО */}
-              <tr style={{ borderTop: '2px solid var(--bor2)', background: 'rgba(177,94,204,.03)' }}>
-                <td style={{ padding: '8px 8px', fontWeight: 800, fontSize: 12 }}>Итого</td>
-                <td style={{ padding: '8px 6px', textAlign: 'center', fontWeight: 800, fontSize: 13 }}>{deals.length}</td>
-                {stages.map((s: any) => {
-                  const count = deals.filter((d: any) => d.stage_id === s.id).length
-                  return (
-                    <td key={s.id} style={{ padding: '8px 4px', textAlign: 'center', fontWeight: 700, color: count > 0 ? 'var(--text)' : 'var(--muted2)' }}>
-                      {count || '—'}
-                    </td>
-                  )
-                })}
-                <td style={{ padding: '8px 6px', textAlign: 'center', fontWeight: 800, fontSize: 13, color: 'var(--green)' }}>
-                  {deals.filter((d: any) => stages.filter((s: any) => s.stage_type === 'success').map((s: any) => s.id).includes(d.stage_id)).length}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* ═══ RECOMMENDATIONS ═══ */}
       {recommendations.length > 0 && (
