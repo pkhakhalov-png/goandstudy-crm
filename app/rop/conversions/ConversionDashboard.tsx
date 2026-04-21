@@ -24,15 +24,38 @@ export function ConversionDashboard({ salespersons, deals, stages, messages, act
   const cardStyle: React.CSSProperties = { background: 'var(--surf)', border: '1px solid var(--bor2)', borderRadius: 14, padding: '16px 20px', marginBottom: 16 }
   const sectionTitle: React.CSSProperties = { fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--muted)', marginBottom: 12 }
 
+  // ═══ Exclude Группы, merge Новые заявки + Релокац ═══
+  const excludeNames = ['Группы']
+  const mergeIntoNew = ['Релокац']
+  const paymentNames = ['Первичная продажа', 'Оплата услуг']
+  const excludeIds = new Set(stages.filter(s => excludeNames.includes(s.name)).map(s => s.id))
+  const mergeIds = new Set(stages.filter(s => mergeIntoNew.includes(s.name)).map(s => s.id))
+  const paymentIds = new Set(stages.filter(s => paymentNames.includes(s.name)).map(s => s.id))
+  const newLeadsStage = stages.find(s => s.name === 'Новые заявки')
+
+  // Filtered deals (no groups)
+  const filteredDeals = deals.filter(d => !excludeIds.has(d.stage_id))
+
+  // Visible stages for funnel chart (no groups, no reloc, no payment stages)
+  const visibleStages = stages.filter(s => !excludeNames.includes(s.name) && !mergeIntoNew.includes(s.name) && !paymentNames.includes(s.name) && s.stage_type !== 'lost' && s.stage_type !== 'paused')
+
   // ═══ Stage-to-stage funnel ═══
-  const activeStages = stages.filter(s => s.stage_type === 'active')
-  const stageCounts = activeStages.map(s => ({
-    ...s,
-    count: deals.filter(d => {
-      const ds = stageMap[d.stage_id]
-      return ds && ds.position >= s.position && ds.stage_type !== 'lost' && ds.stage_type !== 'paused'
-    }).length
-  }))
+  const stageCounts = visibleStages.map(s => {
+    let count: number
+    if (s.id === newLeadsStage?.id) {
+      // Merge: count deals in Новые заявки + Релокац + any stage after them
+      count = filteredDeals.filter(d => {
+        const ds = stageMap[d.stage_id]
+        return ds && (mergeIds.has(d.stage_id) || ds.position >= s.position) && ds.stage_type !== 'lost' && ds.stage_type !== 'paused'
+      }).length
+    } else {
+      count = filteredDeals.filter(d => {
+        const ds = stageMap[d.stage_id]
+        return ds && ds.position >= s.position && ds.stage_type !== 'lost' && ds.stage_type !== 'paused'
+      }).length
+    }
+    return { ...s, count }
+  })
 
   const maxCount = Math.max(...stageCounts.map(s => s.count), 1)
 
@@ -43,21 +66,20 @@ export function ConversionDashboard({ salespersons, deals, stages, messages, act
     return { ...s, dropoff, conversion }
   })
 
-  // Average conversion across stages
   const convRates = stageDropoffs.filter(s => s.conversion !== null).map(s => s.conversion!)
   const avgConv = convRates.length > 0 ? convRates.reduce((a, b) => a + b, 0) / convRates.length : 0
 
-  // ═══ Overall conversion: leads → success → paid ═══
-  const totalDeals = deals.length
-  const successDeals = deals.filter(d => stageMap[d.stage_id]?.stage_type === 'success').length
+  // ═══ Overall conversion: leads → оплата ═══
+  const totalDeals = filteredDeals.length
+  const successDeals = filteredDeals.filter(d => paymentIds.has(d.stage_id)).length
   const overallConv = totalDeals > 0 ? Math.round(successDeals / totalDeals * 100) : 0
 
   // ═══ Per-manager conversion ═══
   const perManager = salespersons
     .filter(sp => sp.is_active)
     .map(sp => {
-      const spDeals = deals.filter(d => d.salesperson_id === sp.id)
-      const spSuccess = spDeals.filter(d => stageMap[d.stage_id]?.stage_type === 'success')
+      const spDeals = filteredDeals.filter(d => d.salesperson_id === sp.id)
+      const spSuccess = spDeals.filter(d => paymentIds.has(d.stage_id))
       const conv = spDeals.length > 0 ? Math.round(spSuccess.length / spDeals.length * 100) : 0
       return { ...sp, total: spDeals.length, success: spSuccess.length, conv }
     })
@@ -147,7 +169,7 @@ export function ConversionDashboard({ salespersons, deals, stages, messages, act
           <div style={{ fontSize: 22, fontWeight: 800, marginTop: 4 }}>{totalDeals}</div>
         </div>
         <div style={cardStyle}>
-          <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 600 }}>Закрытых (успех)</div>
+          <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 600 }}>Оплата</div>
           <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--green)', marginTop: 4 }}>{successDeals}</div>
         </div>
         <div style={cardStyle}>
@@ -164,7 +186,7 @@ export function ConversionDashboard({ salespersons, deals, stages, messages, act
             <tr style={{ textAlign: 'left', color: 'var(--muted)', fontSize: 10, textTransform: 'uppercase' }}>
               <th style={{ padding: '6px 8px' }}>Менеджер</th>
               <th style={{ padding: '6px 8px', textAlign: 'right' }}>Сделки</th>
-              <th style={{ padding: '6px 8px', textAlign: 'right' }}>Успех</th>
+              <th style={{ padding: '6px 8px', textAlign: 'right' }}>Оплата</th>
               <th style={{ padding: '6px 8px', textAlign: 'right' }}>Конверсия</th>
             </tr>
           </thead>
