@@ -59,8 +59,12 @@ export function ConversionDashboard({ salespersons, deals, stages, messages, act
 
   const maxCount = Math.max(...stageCounts.map(s => s.count), 1)
 
-  const stageDropoffs = stageCounts.map((s, i) => {
-    const next = stageCounts[i + 1]
+  // Add "Оплата" as final stage
+  const paymentCount = filteredDeals.filter(d => paymentIds.has(d.stage_id)).length
+  const allStageCounts = [...stageCounts, { id: 'payment', name: 'Оплата', color: '#34C759', count: paymentCount, position: 999, stage_type: 'success' }]
+
+  const stageDropoffs = allStageCounts.map((s, i) => {
+    const next = allStageCounts[i + 1]
     const dropoff = next && s.count > 0 ? Math.round((1 - next.count / s.count) * 100) : null
     const conversion = next && s.count > 0 ? Math.round(next.count / s.count * 100) : null
     return { ...s, dropoff, conversion }
