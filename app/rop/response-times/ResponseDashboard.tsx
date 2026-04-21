@@ -1,5 +1,7 @@
 'use client'
 
+import Link from 'next/link'
+
 interface Props {
   salespersons: any[]
   messages: any[]
@@ -146,7 +148,9 @@ export function ResponseDashboard({ salespersons, messages, deals, stages, setti
             <tbody>
               {unreplied.map(u => (
                 <tr key={u.dealId} style={{ borderTop: '1px solid var(--bor2)', background: 'rgba(220,53,69,.04)' }}>
-                  <td style={{ padding: '10px 8px', fontWeight: 600 }}>{u.dealTitle}</td>
+                  <td style={{ padding: '10px 8px', fontWeight: 600 }}>
+                    <Link href={`/rop/funnel/${u.dealId}`} style={{ color: 'var(--text)', textDecoration: 'none' }}>{u.dealTitle}</Link>
+                  </td>
                   <td style={{ padding: '10px 8px' }}>{u.spName}</td>
                   <td style={{ padding: '10px 8px', textAlign: 'right', color: 'var(--red)', fontWeight: 700 }}>
                     {formatDuration(u.waitingMin)}

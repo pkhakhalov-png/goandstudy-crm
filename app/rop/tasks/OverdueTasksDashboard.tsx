@@ -1,5 +1,7 @@
 'use client'
 
+import Link from 'next/link'
+
 interface Props {
   tasks: any[]
   deals: any[]
@@ -92,7 +94,9 @@ export function OverdueTasksDashboard({ tasks, deals, salespersons }: Props) {
               {overdueTasks.map(t => (
                 <tr key={t.id} style={{ borderTop: '1px solid var(--bor2)', background: 'rgba(220,53,69,.06)' }}>
                   <td style={{ padding: '10px 8px', fontWeight: 600 }}>{t.title}</td>
-                  <td style={{ padding: '10px 8px' }}>{t.dealTitle}</td>
+                  <td style={{ padding: '10px 8px' }}>
+                    <Link href={`/rop/funnel/${t.deal_id}`} style={{ color: 'var(--text)', textDecoration: 'none' }}>{t.dealTitle}</Link>
+                  </td>
                   <td style={{ padding: '10px 8px' }}>{t.spName}</td>
                   <td style={{ padding: '10px 8px', textAlign: 'right', fontSize: 11, color: 'var(--muted)' }}>{fmtDate(t.deadline)}</td>
                   <td style={{ padding: '10px 8px', textAlign: 'right', fontWeight: 700, color: 'var(--red)' }}>{t.daysOverdue}</td>
@@ -153,7 +157,9 @@ export function OverdueTasksDashboard({ tasks, deals, salespersons }: Props) {
                         background: t.isOverdue ? 'rgba(220,53,69,.06)' : undefined,
                       }}>
                         <td style={{ padding: '8px 8px', fontWeight: 600, color: t.isOverdue ? 'var(--red)' : 'var(--text)' }}>{t.title}</td>
-                        <td style={{ padding: '8px 8px', fontSize: 11, color: 'var(--muted)' }}>{t.dealTitle}</td>
+                        <td style={{ padding: '8px 8px', fontSize: 11 }}>
+                          <Link href={`/rop/funnel/${t.deal_id}`} style={{ color: 'var(--muted)', textDecoration: 'none' }}>{t.dealTitle}</Link>
+                        </td>
                         <td style={{ padding: '8px 8px', textAlign: 'right', fontSize: 11, color: t.isOverdue ? 'var(--red)' : 'var(--muted)' }}>
                           {fmtDate(t.deadline)}
                           {t.isOverdue && <span style={{ marginLeft: 6, fontWeight: 700 }}>(-{t.daysOverdue}д)</span>}

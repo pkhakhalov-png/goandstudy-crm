@@ -1,5 +1,7 @@
 'use client'
 
+import Link from 'next/link'
+
 interface Props {
   salespersons: any[]
   deals: any[]
@@ -71,7 +73,9 @@ export function StuckDashboard({ salespersons, deals, stages, settings }: Props)
                   borderTop: '1px solid var(--bor2)',
                   background: d.daysSince > 7 ? 'rgba(220,53,69,.06)' : d.daysSince > 3 ? 'rgba(201,125,0,.06)' : undefined,
                 }}>
-                  <td style={{ padding: '10px 8px', fontWeight: 600 }}>{d.title}</td>
+                  <td style={{ padding: '10px 8px', fontWeight: 600 }}>
+                    <Link href={`/rop/funnel/${d.id}`} style={{ color: 'var(--text)', textDecoration: 'none' }}>{d.title}</Link>
+                  </td>
                   <td style={{ padding: '10px 8px' }}>{d.stageName}</td>
                   <td style={{ padding: '10px 8px' }}>{d.spName}</td>
                   <td style={{
