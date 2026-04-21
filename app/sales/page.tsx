@@ -37,6 +37,21 @@ export default async function SalesCabinetPage() {
     (await createAdminClient()).from('sales_plans').select('salesperson_id, plan_amount').eq('month', currentMonth),
   ])
 
+  // Load urgent tasks for this salesperson
+  const { data: urgentTasks } = await (await createAdminClient())
+    .from('deal_tasks')
+    .select('id, deal_id, title, deadline, task_type, is_done')
+    .eq('assigned_to', user.id)
+    .eq('is_done', false)
+    .order('deadline', { ascending: true })
+
+  // Get deal titles for tasks
+  const taskDealIds = [...new Set((urgentTasks ?? []).map(t => t.deal_id))]
+  const { data: taskDeals } = taskDealIds.length > 0
+    ? await (await createAdminClient()).from('deals').select('id, title, contact_name').in('id', taskDealIds)
+    : { data: [] }
+  const dealMap = Object.fromEntries((taskDeals ?? []).map(d => [d.id, d]))
+
   const clientIds = (rawClients ?? []).map(c => c.id)
 
   const { data: expenses } = clientIds.length > 0
@@ -77,6 +92,42 @@ export default async function SalesCabinetPage() {
           </div>
         </div>
         {/* Leaderboard — department progress (competition) */}
+        {/* Urgent tasks */}
+        {(urgentTasks ?? []).length > 0 && (
+          <div style={{ padding: '12px 24px 0' }}>
+            <div style={{
+              background: 'rgba(220,53,69,.04)', border: '1px solid rgba(220,53,69,.15)',
+              borderRadius: 14, padding: '14px 18px',
+            }}>
+              <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--red)', marginBottom: 10 }}>
+                Задачи ({(urgentTasks ?? []).length})
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {(urgentTasks ?? []).slice(0, 8).map(t => {
+                  const deal = dealMap[t.deal_id]
+                  const isOverdue = t.deadline && new Date(t.deadline) < new Date()
+                  return (
+                    <a key={t.id} href={`/sales/funnel/${t.deal_id}`} style={{
+                      display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
+                      borderRadius: 10, textDecoration: 'none',
+                      background: isOverdue ? 'rgba(220,53,69,.06)' : 'rgba(201,125,0,.06)',
+                      border: `1px solid ${isOverdue ? 'rgba(220,53,69,.15)' : 'rgba(201,125,0,.15)'}`,
+                    }}>
+                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: isOverdue ? 'var(--red)' : 'var(--gold)', flexShrink: 0 }} />
+                      <div style={{ flex: 1, fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{t.title}</div>
+                      {t.deadline && (
+                        <div style={{ fontSize: 10, color: isOverdue ? 'var(--red)' : 'var(--gold)', fontWeight: 600, flexShrink: 0 }}>
+                          {isOverdue ? 'Просрочена' : new Date(t.deadline).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                      )}
+                    </a>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
         <SalesPage clients={clients} expenses={expenses ?? []} />
         {(allSalespersons ?? []).length > 0 && (() => {
           const cBySp: Record<string, number[]> = {}
