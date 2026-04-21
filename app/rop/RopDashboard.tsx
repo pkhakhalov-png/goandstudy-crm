@@ -405,14 +405,15 @@ export function RopDashboard({ salespersons, salesPlans, clients, payments, deal
         const mergeIntoNew = ['Релокац']
         const newLeadsName = 'Новые заявки'
 
-        const visibleStages = stages.filter((s: any) => !excludeNames.includes(s.name) && !mergeIntoNew.includes(s.name))
+        const paymentNames = ['Первичная продажа', 'Оплата услуг']
+        const visibleStages = stages.filter((s: any) => !excludeNames.includes(s.name) && !mergeIntoNew.includes(s.name) && !paymentNames.includes(s.name))
         const excludeIds = stages.filter((s: any) => excludeNames.includes(s.name)).map((s: any) => s.id)
         const mergeIds = stages.filter((s: any) => mergeIntoNew.includes(s.name) || s.name === newLeadsName).map((s: any) => s.id)
         const newLeadsStage = stages.find((s: any) => s.name === newLeadsName)
 
-        // Filter deals excluding "Группы"
-        const funnelDeals = deals.filter((d: any) => !excludeIds.includes(d.stage_id))
-        const paymentStages = stages.filter((s: any) => s.stage_type === 'success').map((s: any) => s.id)
+        // Filter deals excluding "Группы" + filter by selected month
+        const funnelDeals = deals.filter((d: any) => !excludeIds.includes(d.stage_id) && (d.created_at || '').startsWith(month))
+        const paymentStages = stages.filter((s: any) => paymentNames.includes(s.name)).map((s: any) => s.id)
 
         function countForStage(spDeals: any[], stageId: string) {
           if (stageId === newLeadsStage?.id) {
@@ -430,7 +431,7 @@ export function RopDashboard({ salespersons, salesPlans, clients, payments, deal
                   <tr style={{ textAlign: 'center', color: 'var(--muted)', fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                     <th style={{ padding: '6px 8px', textAlign: 'left', minWidth: 100 }}>Менеджер</th>
                     <th style={{ padding: '6px 6px', fontWeight: 700, color: 'var(--text)' }}>Всего</th>
-                    {visibleStages.filter((s: any) => s.stage_type !== 'success').map((s: any) => (
+                    {visibleStages.map((s: any) => (
                       <th key={s.id} style={{ padding: '6px 4px', whiteSpace: 'nowrap' }}>
                         <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: s.color, marginRight: 3, verticalAlign: 'middle' }} />
                         {s.name.length > 14 ? s.name.slice(0, 14) + '…' : s.name}
@@ -447,7 +448,7 @@ export function RopDashboard({ salespersons, salesPlans, clients, payments, deal
                       <tr key={sp.id} style={{ borderTop: '1px solid var(--bor2)' }}>
                         <td style={{ padding: '8px 8px', fontWeight: 600, fontSize: 12 }}>{sp.name}</td>
                         <td style={{ padding: '8px 6px', textAlign: 'center', fontWeight: 700, fontSize: 13 }}>{spDeals.length}</td>
-                        {visibleStages.filter((s: any) => s.stage_type !== 'success').map((s: any) => {
+                        {visibleStages.map((s: any) => {
                           const count = countForStage(spDeals, s.id)
                           return (
                             <td key={s.id} style={{ padding: '8px 4px', textAlign: 'center', color: count > 0 ? 'var(--text)' : 'var(--muted2)', fontWeight: count > 0 ? 600 : 400 }}>
@@ -464,7 +465,7 @@ export function RopDashboard({ salespersons, salesPlans, clients, payments, deal
                   <tr style={{ borderTop: '2px solid var(--bor2)', background: 'rgba(177,94,204,.03)' }}>
                     <td style={{ padding: '8px 8px', fontWeight: 800, fontSize: 12 }}>Итого</td>
                     <td style={{ padding: '8px 6px', textAlign: 'center', fontWeight: 800, fontSize: 13 }}>{funnelDeals.length}</td>
-                    {visibleStages.filter((s: any) => s.stage_type !== 'success').map((s: any) => {
+                    {visibleStages.map((s: any) => {
                       const count = countForStage(funnelDeals, s.id)
                       return (
                         <td key={s.id} style={{ padding: '8px 4px', textAlign: 'center', fontWeight: 700, color: count > 0 ? 'var(--text)' : 'var(--muted2)' }}>
