@@ -19,6 +19,8 @@ type Search = {
   q?: string
   country?: string
   school?: string
+  levels?: string
+  intakes?: string
   sort?: string
   page?: string
 }
@@ -32,6 +34,8 @@ export default async function UniversitiesPage({
   const q = params.q?.trim() || ''
   const country = params.country?.trim().toLowerCase() || ''
   const schoolFilter = params.school?.trim() || ''
+  const levels = (params.levels || '').split(',').map(s => s.trim()).filter(Boolean)
+  const intakeYears = (params.intakes || '').split(',').map(s => s.trim()).filter(Boolean)
   const sort = (params.sort as SortKey) || 'name_asc'
   const page = Math.max(1, parseInt(params.page || '1', 10) || 1)
 
@@ -45,12 +49,13 @@ export default async function UniversitiesPage({
 
   const offset = (page - 1) * PAGE_SIZE
 
+  // !inner нужен, чтобы фильтровать по school.country_code (у programs.country_code почти везде null)
   let query = parser
     .from('programs')
     .select(
       `
-      id, name, tuition, application_fee, country_code, raw_data, school_id,
-      school:schools(id, name, logo_url, country_code, city, institution_type)
+      id, name, tuition, application_fee, raw_data, school_id,
+      school:schools!inner(id, name, logo_url, country_code, city, institution_type)
       `,
       { count: 'exact' }
     )
@@ -61,9 +66,21 @@ export default async function UniversitiesPage({
   else if (sort === 'recent') query = query.order('updated_at', { ascending: false })
   else query = query.order('name')
 
-  if (country) query = query.eq('country_code', country)
+  // Страна — фильтр по embedded school (inner join)
+  if (country) query = query.eq('school.country_code', country)
   if (schoolFilter) query = query.eq('school_id', Number(schoolFilter))
   if (q) query = query.ilike('name', `%${q}%`)
+  // Уровень программы — через JSONB path
+  if (levels.length > 0) {
+    query = query.in('raw_data->attributes->>level', levels)
+  }
+  // Intake год — startsWith по JSONB пути; multi-год собираем через .or
+  if (intakeYears.length > 0) {
+    const orExpr = intakeYears
+      .map(y => `raw_data->attributes->earliest_intake->>start_date.like.${y}%`)
+      .join(',')
+    query = query.or(orExpr)
+  }
 
   const [{ data: programs, count }, { data: schoolsList }, { data: countryRows }] = await Promise.all([
     query,
@@ -113,7 +130,7 @@ export default async function UniversitiesPage({
             countryCodes={countryCodes}
             countryLabels={COUNTRY_LABEL}
             schools={schoolsList ?? []}
-            initial={{ q, country, school: schoolFilter, sort }}
+            initial={{ q, country, school: schoolFilter, levels, intakeYears, sort }}
           />
 
           {(programs ?? []).length === 0 ? (
@@ -148,6 +165,8 @@ export default async function UniversitiesPage({
                   q={q}
                   country={country}
                   school={schoolFilter}
+                  levels={levels}
+                  intakeYears={intakeYears}
                   sort={sort}
                 />
               )}
@@ -160,15 +179,19 @@ export default async function UniversitiesPage({
 }
 
 function Pagination({
-  currentPage, totalPages, q, country, school, sort,
+  currentPage, totalPages, q, country, school, levels, intakeYears, sort,
 }: {
-  currentPage: number; totalPages: number; q: string; country: string; school: string; sort: string
+  currentPage: number; totalPages: number;
+  q: string; country: string; school: string;
+  levels: string[]; intakeYears: string[]; sort: string
 }) {
   function href(p: number) {
     const qs = new URLSearchParams()
     if (q) qs.set('q', q)
     if (country) qs.set('country', country)
     if (school) qs.set('school', school)
+    if (levels.length > 0) qs.set('levels', levels.join(','))
+    if (intakeYears.length > 0) qs.set('intakes', intakeYears.join(','))
     if (sort && sort !== 'name_asc') qs.set('sort', sort)
     if (p > 1) qs.set('page', String(p))
     const s = qs.toString()
