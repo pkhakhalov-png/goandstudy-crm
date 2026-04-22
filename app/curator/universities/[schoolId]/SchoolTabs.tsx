@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { AddToShortlistButton } from './AddToShortlistButton'
 
 interface Props {
@@ -621,7 +622,13 @@ function ProgramRow({
   return (
     <div style={cardStyle}>
       <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap' }}>
-        <div style={{ flex: '1 1 260px', minWidth: 0 }}>
+        <Link
+          href={`/curator/programs/${program.id}`}
+          style={{
+            flex: '1 1 260px', minWidth: 0,
+            textDecoration: 'none', color: 'inherit',
+          }}
+        >
           <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', lineHeight: 1.3 }}>
             {program.name}
           </div>
@@ -630,7 +637,7 @@ function ProgramRow({
               {levelText}
             </div>
           )}
-        </div>
+        </Link>
         <AddToShortlistButton
           schoolId={schoolId}
           programId={program.id}
@@ -649,24 +656,36 @@ function ProgramRow({
         <MetaCell k="Взнос" v={appFee != null ? `${fmt(appFee)} ${currency || ''}` : '—'} />
       </div>
 
-      {desc && (
-        <div style={{ marginTop: 12 }}>
-          <button
-            type="button"
-            onClick={() => setShowDesc(v => !v)}
-            style={{
-              background: 'none', border: 'none', padding: 0,
-              color: 'var(--purple)', fontSize: 12, fontWeight: 600,
-              cursor: 'pointer', fontFamily: 'inherit',
-            }}
-          >
-            {showDesc ? 'Скрыть детали' : 'Детали программы'}
-          </button>
-          {showDesc && (
-            <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text)', lineHeight: 1.6 }}>
-              {desc.slice(0, 900)}{desc.length > 900 ? '…' : ''}
-            </div>
-          )}
+      <div style={{ marginTop: 12, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+        <Link
+          href={`/curator/programs/${program.id}`}
+          style={{
+            fontSize: 12, fontWeight: 600, color: 'var(--purple)',
+            textDecoration: 'none',
+          }}
+        >
+          Подробнее →
+        </Link>
+        {desc && (
+          <>
+            <span style={{ color: 'var(--bor2)' }}>•</span>
+            <button
+              type="button"
+              onClick={() => setShowDesc(v => !v)}
+              style={{
+                background: 'none', border: 'none', padding: 0,
+                color: 'var(--muted)', fontSize: 12, fontWeight: 600,
+                cursor: 'pointer', fontFamily: 'inherit',
+              }}
+            >
+              {showDesc ? 'Скрыть превью' : 'Краткое описание'}
+            </button>
+          </>
+        )}
+      </div>
+      {showDesc && desc && (
+        <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text)', lineHeight: 1.6 }}>
+          {desc.slice(0, 600)}{desc.length > 600 ? '…' : ''}
         </div>
       )}
     </div>

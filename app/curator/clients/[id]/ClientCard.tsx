@@ -792,9 +792,12 @@ function ShortlistRow({ row, clientId }: { row: any; clientId: number }) {
           >
             {row.school_name}
           </Link>
-          <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
+          <Link
+            href={`/curator/programs/${row.program_id}`}
+            style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4, display: 'block', textDecoration: 'none' }}
+          >
             {row.program_name}
-          </div>
+          </Link>
           <div style={{ display: 'flex', gap: 10, marginTop: 8, fontSize: 11, color: 'var(--muted)' }}>
             {country && <span>📍 {country}</span>}
             {row.tuition != null && (

@@ -110,8 +110,11 @@ export function ProgramCardInteractive({ program, myClients }: Props) {
         </div>
       </Link>
 
-      {/* Program level + name */}
-      <div style={{ flex: 1 }}>
+      {/* Program level + name (link to program detail) */}
+      <Link
+        href={`/curator/programs/${program.id}`}
+        style={{ flex: 1, textDecoration: 'none', color: 'inherit' }}
+      >
         {levelText && (
           <div style={{
             fontSize: 10, fontWeight: 700, color: 'var(--purple)',
@@ -129,7 +132,7 @@ export function ProgramCardInteractive({ program, myClients }: Props) {
         }}>
           {program.name}
         </div>
-      </div>
+      </Link>
 
       {/* Metrics */}
       <div style={{ display: 'grid', gap: 4, fontSize: 11, color: 'var(--muted)' }}>
