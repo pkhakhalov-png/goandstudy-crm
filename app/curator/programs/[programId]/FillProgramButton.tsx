@@ -37,10 +37,28 @@ export function FillProgramButton({ programId, hasData }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ programId }),
       })
-      const data = await res.json()
-      if (!res.ok || !data.ok) {
-        throw new Error(data.error || `HTTP ${res.status}`)
+      const ct = res.headers.get('content-type') || ''
+      const isJson = ct.includes('application/json')
+
+      if (!res.ok) {
+        if (res.status === 504 || res.status === 408) {
+          throw new Error('Превышено время ожидания. Попробуй ещё раз — иногда ИИ ищет дольше.')
+        }
+        if (isJson) {
+          const data = await res.json().catch(() => ({}))
+          throw new Error(data.error || `HTTP ${res.status}`)
+        }
+        const text = await res.text().catch(() => '')
+        throw new Error(`HTTP ${res.status}${text ? `: ${text.slice(0, 120)}` : ''}`)
       }
+
+      if (!isJson) {
+        throw new Error('Сервер вернул не JSON — возможно прокси обрезало ответ.')
+      }
+
+      const data = await res.json()
+      if (!data.ok) throw new Error(data.error || 'ИИ не смог заполнить')
+
       setToast('Готово — информация заполнена')
       router.refresh()
     } catch (e: unknown) {
@@ -51,7 +69,9 @@ export function FillProgramButton({ programId, hasData }: Props) {
   }
 
   const label = busy
-    ? `🤖 ИИ ищет… ${elapsed}s`
+    ? elapsed > 60
+      ? `🤖 Ещё ищу… ${elapsed}s (до 2-3 мин)`
+      : `🤖 ИИ ищет… ${elapsed}s`
     : hasData
       ? '🔄 Обновить через ИИ'
       : '🤖 Заполнить через ИИ'

@@ -6,7 +6,8 @@ import { revalidatePath } from 'next/cache'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
-export const maxDuration = 60
+// Vercel Pro допускает до 300 сек. Web-поиск + Sonnet легко выходит за 60 сек.
+export const maxDuration = 300
 
 const SAVE_TOOL = {
   name: 'save_program_info',
@@ -136,7 +137,8 @@ export async function POST(req: NextRequest) {
       model: 'claude-sonnet-4-6',
       max_tokens: 4096,
       tools: [
-        { type: 'web_search_20250305', name: 'web_search', max_uses: 5 },
+        // max_uses=3 даёт достаточно инфы, но экономит ~15-30 сек относительно 5
+        { type: 'web_search_20250305', name: 'web_search', max_uses: 3 },
         SAVE_TOOL,
       ] as any,
       messages: [{ role: 'user', content: userMessage }],
