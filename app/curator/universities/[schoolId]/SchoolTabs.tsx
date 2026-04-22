@@ -78,8 +78,20 @@ export function SchoolTabs({ school, programs, myClients }: Props) {
 /* ─── Overview ─── */
 
 function OverviewTab({ school, raw }: { school: any; raw: any }) {
-  const about = raw.about || school.description
+  const about = school.about || raw.about || school.description
   const topDisc = Array.isArray(school.top_disciplines) ? school.top_disciplines : []
+  const programLevelCounts = school.program_level_counts || raw.program_level_counts
+  const applicationFeeRange = school.application_fee_range || raw.application_fee_range
+  const avgProgramLength = school.avg_program_length || raw.avg_program_length
+  const costOfLivingDetails = school.cost_of_living_details || raw.cost_of_living_details
+  const currency = raw.currency_of_fees?.code || school.currency_of_fees?.code || school.currency || ''
+  const intakesSummary = school.intakes_summary || raw.intakes_summary
+  const institutionType = school.institution_type || raw.institution_type
+  const foundedIn = school.founded_in || raw.founded_in
+  const dliNumber = school.dli_number || raw.dli_number
+  const pgwpCount = school.pgwp_programs_count
+  const processingTime = school.processing_time || raw.processing_time
+  const videoLink = school.video_link || raw.video_link
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 16 }} className="overview-grid">
@@ -88,12 +100,35 @@ function OverviewTab({ school, raw }: { school: any; raw: any }) {
           .overview-grid { grid-template-columns: 1fr !important; }
         }
       `}</style>
-      <div style={cardStyle}>
-        <div style={sectionTitle}>О вузе</div>
-        {about ? (
-          <AboutBlock html={about} />
-        ) : (
-          <div style={{ color: 'var(--muted)', fontSize: 13 }}>Описание не добавлено.</div>
+      <div style={{ display: 'grid', gap: 12 }}>
+        <div style={cardStyle}>
+          <div style={sectionTitle}>О вузе</div>
+          {about ? (
+            <AboutBlock html={about} />
+          ) : (
+            <div style={{ color: 'var(--muted)', fontSize: 13 }}>Описание не добавлено.</div>
+          )}
+        </div>
+
+        {videoLink && (
+          <div style={cardStyle}>
+            <div style={sectionTitle}>Видео-тур</div>
+            <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0, borderRadius: 10, overflow: 'hidden', background: '#000' }}>
+              <iframe
+                src={videoLink}
+                title="Video tour"
+                style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 0 }}
+                allowFullScreen
+              />
+            </div>
+          </div>
+        )}
+
+        {programLevelCounts && typeof programLevelCounts === 'object' && (
+          <div style={cardStyle}>
+            <div style={sectionTitle}>Программы по уровням</div>
+            <ProgramLevelCounts counts={programLevelCounts} />
+          </div>
         )}
       </div>
 
@@ -101,21 +136,48 @@ function OverviewTab({ school, raw }: { school: any; raw: any }) {
         <div style={cardStyle}>
           <div style={sectionTitle}>Основное</div>
           <InfoRow k="School ID" v={`#${school.id}`} />
-          {raw.founded_in && <InfoRow k="Основан" v={String(raw.founded_in)} />}
-          {raw.institution_type && <InfoRow k="Тип" v={raw.institution_type} />}
+          {foundedIn && <InfoRow k="Основан" v={String(foundedIn)} />}
+          {institutionType && <InfoRow k="Тип" v={String(institutionType)} />}
+          {dliNumber && <InfoRow k="DLI Number" v={String(dliNumber)} />}
+          {school.school_group_id && <InfoRow k="Группа" v={`#${school.school_group_id}`} />}
+        </div>
+
+        <div style={cardStyle}>
+          <div style={sectionTitle}>Стоимость</div>
           {school.avg_tuition != null && (
-            <InfoRow k="Средняя цена" v={`${Math.round(Number(school.avg_tuition)).toLocaleString('ru')} ${raw.currency_of_fees?.code || ''}/год`} />
+            <InfoRow k="Средняя цена" v={`${Math.round(Number(school.avg_tuition)).toLocaleString('ru')} ${currency}/год`} />
+          )}
+          {applicationFeeRange && (
+            <InfoRow k="Взнос за заявку" v={formatFeeRange(applicationFeeRange, currency)} />
           )}
           {school.cost_of_living != null && (
-            <InfoRow k="Стоимость жизни" v={`${Math.round(Number(school.cost_of_living)).toLocaleString('ru')} ${raw.currency_of_fees?.code || ''}/год`} />
+            <InfoRow k="Жизнь" v={`${Math.round(Number(school.cost_of_living)).toLocaleString('ru')} ${currency}/год`} />
           )}
-          {raw.avg_program_length?.undergraduate && (
-            <InfoRow k="Длина бакалавриата" v={`${Math.round(Number(raw.avg_program_length.undergraduate))} мес`} />
-          )}
-          {raw.avg_program_length?.graduate && (
-            <InfoRow k="Длина магистратуры" v={`${Math.round(Number(raw.avg_program_length.graduate))} мес`} />
+          {costOfLivingDetails && typeof costOfLivingDetails === 'object' && (
+            <CostOfLivingDetails details={costOfLivingDetails} currency={currency} />
           )}
         </div>
+
+        {(avgProgramLength || processingTime) && (
+          <div style={cardStyle}>
+            <div style={sectionTitle}>Длительность и сроки</div>
+            {avgProgramLength?.undergraduate && (
+              <InfoRow k="Бакалавриат" v={`${Math.round(Number(avgProgramLength.undergraduate))} мес`} />
+            )}
+            {avgProgramLength?.graduate && (
+              <InfoRow k="Магистратура" v={`${Math.round(Number(avgProgramLength.graduate))} мес`} />
+            )}
+            {processingTime && <InfoRow k="Обработка документов" v={formatProcessingTime(processingTime)} />}
+          </div>
+        )}
+
+        {(pgwpCount != null || intakesSummary) && (
+          <div style={cardStyle}>
+            <div style={sectionTitle}>Приёмная кампания</div>
+            {pgwpCount != null && <InfoRow k="Программ с PGWP" v={String(pgwpCount)} />}
+            {intakesSummary && <InfoRow k="Intake" v={formatIntakesSummary(intakesSummary)} />}
+          </div>
+        )}
 
         {topDisc.length > 0 && (
           <div style={cardStyle}>
@@ -124,6 +186,90 @@ function OverviewTab({ school, raw }: { school: any; raw: any }) {
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+function formatFeeRange(v: any, currency: string): string {
+  if (typeof v === 'string' || typeof v === 'number') return `${Math.round(Number(v) || 0).toLocaleString('ru')} ${currency}`
+  if (v.min != null && v.max != null) return `${Math.round(Number(v.min)).toLocaleString('ru')} – ${Math.round(Number(v.max)).toLocaleString('ru')} ${currency}`
+  if (v.min != null) return `от ${Math.round(Number(v.min)).toLocaleString('ru')} ${currency}`
+  if (v.max != null) return `до ${Math.round(Number(v.max)).toLocaleString('ru')} ${currency}`
+  return '—'
+}
+
+function formatProcessingTime(v: any): string {
+  const n = Number(v)
+  if (!Number.isFinite(n)) return String(v)
+  // Значения в секундах? Если очень большое — в днях.
+  if (n > 86400 * 2) return `${Math.round(n / 86400)} дн`
+  return `${n}`
+}
+
+function formatIntakesSummary(v: any): string {
+  if (typeof v === 'string') return v
+  if (Array.isArray(v)) return v.slice(0, 3).join(', ')
+  if (v.months && Array.isArray(v.months)) return v.months.slice(0, 3).join(', ')
+  return JSON.stringify(v).slice(0, 60)
+}
+
+function CostOfLivingDetails({ details, currency }: { details: any; currency: string }) {
+  const entries = Object.entries(details).slice(0, 5)
+  return (
+    <>
+      {entries.map(([key, val]) => (
+        <InfoRow
+          key={key}
+          k={key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
+          v={`${Math.round(Number(val) || 0).toLocaleString('ru')} ${currency}`}
+        />
+      ))}
+    </>
+  )
+}
+
+function ProgramLevelCounts({ counts }: { counts: Record<string, number> | any }) {
+  const entries: [string, number][] = Object.entries(counts)
+    .map(([k, v]) => [k, Number(v) || 0] as [string, number])
+    .filter(([, v]) => v > 0)
+    .sort((a, b) => b[1] - a[1])
+  if (entries.length === 0) return <div style={{ color: 'var(--muted)', fontSize: 13 }}>Нет данных</div>
+  const max = Math.max(...entries.map(([, v]) => v), 1)
+
+  const LABEL: Record<string, string> = {
+    bachelors: 'Бакалавриат',
+    bachelor: 'Бакалавриат',
+    masters_degree: 'Магистратура',
+    masters: 'Магистратура',
+    phd: 'PhD',
+    doctoral: 'Докторантура',
+    certificate: 'Сертификат',
+    diploma: 'Диплом',
+    english: 'ESL',
+    pathway: 'Pathway',
+    vocational: 'Профессиональное',
+  }
+
+  return (
+    <div style={{ display: 'grid', gap: 8 }}>
+      {entries.map(([k, v]) => (
+        <div key={k}>
+          <div style={{
+            display: 'flex', justifyContent: 'space-between', fontSize: 11,
+            marginBottom: 3, gap: 8,
+          }}>
+            <span style={{ color: 'var(--text)', fontWeight: 600 }}>{LABEL[k.toLowerCase()] || k}</span>
+            <span style={{ color: 'var(--muted)', fontWeight: 600 }}>{v}</span>
+          </div>
+          <div style={{ height: 6, background: 'var(--bor)', borderRadius: 20, overflow: 'hidden' }}>
+            <div style={{
+              height: '100%', width: `${(v / max) * 100}%`,
+              background: 'linear-gradient(90deg, var(--purple), #d47aff)',
+              borderRadius: 20,
+            }} />
+          </div>
+        </div>
+      ))}
     </div>
   )
 }

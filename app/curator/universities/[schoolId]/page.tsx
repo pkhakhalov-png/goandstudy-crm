@@ -99,15 +99,25 @@ export default async function SchoolPage({
             <div style={{ flex: 1, minWidth: 0 }}>
               <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, lineHeight: 1.2 }}>{school.name}</h1>
               <div style={{ marginTop: 8, fontSize: 13, color: 'var(--muted)', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                <span>📍 {countryLabel}{school.city ? `, ${school.city}` : ''}</span>
+                <span>📍 {countryLabel}{school.province ? `, ${school.province}` : ''}{school.city ? `, ${school.city}` : ''}</span>
                 {school.address && <span>{school.address}</span>}
-                {raw.postal_code && <span>{raw.postal_code}</span>}
+                {(school.postal_code || raw.postal_code) && <span>{school.postal_code || raw.postal_code}</span>}
               </div>
-              {raw.institution_type && (
-                <div style={{ marginTop: 10 }}>
-                  <span className="ctag">{raw.institution_type}</span>
-                </div>
-              )}
+              <div style={{ marginTop: 10, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {(school.institution_type || raw.institution_type) && (
+                  <span className="ctag">{school.institution_type || raw.institution_type}</span>
+                )}
+                {(school.founded_in || raw.founded_in) && (
+                  <span className="ctag" style={{ background: 'rgba(22,163,97,.08)', color: 'var(--green)', borderColor: 'rgba(22,163,97,.2)' }}>
+                    Основан в {school.founded_in || raw.founded_in}
+                  </span>
+                )}
+                {school.pgwp_programs_count != null && school.pgwp_programs_count > 0 && (
+                  <span className="ctag" style={{ background: 'rgba(0,136,204,.08)', color: '#0088cc', borderColor: 'rgba(0,136,204,.2)' }}>
+                    PGWP × {school.pgwp_programs_count}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
