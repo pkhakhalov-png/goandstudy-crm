@@ -68,13 +68,11 @@ export function FillProgramButton({ programId, hasData }: Props) {
     }
   }
 
-  const label = busy
-    ? elapsed > 60
-      ? `🤖 Ещё ищу… ${elapsed}s (до 2-3 мин)`
-      : `🤖 ИИ ищет… ${elapsed}s`
-    : hasData
-      ? '🔄 Обновить через ИИ'
-      : '🤖 Заполнить через ИИ'
+  const text = busy
+    ? elapsed > 60 ? `Ещё ищу… ${elapsed}s (до 2-3 мин)` : `ИИ ищет… ${elapsed}s`
+    : hasData ? 'Обновить через ИИ' : 'Заполнить через ИИ'
+
+  const icon = hasData ? <IconRefresh /> : <IconSpark />
 
   return (
     <>
@@ -85,12 +83,16 @@ export function FillProgramButton({ programId, hasData }: Props) {
         className={hasData ? 'btn-s' : 'btn-p'}
         style={{
           fontSize: 12,
-          padding: '9px 16px',
+          padding: '9px 14px',
           whiteSpace: 'nowrap',
           opacity: busy ? 0.8 : 1,
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 6,
         }}
       >
-        {label}
+        {busy ? <Spinner /> : icon}
+        {text}
       </button>
 
       {error && (
@@ -116,5 +118,32 @@ export function FillProgramButton({ programId, hasData }: Props) {
         </div>
       )}
     </>
+  )
+}
+
+function IconSpark() {
+  return (
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8" />
+    </svg>
+  )
+}
+
+function IconRefresh() {
+  return (
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="23 4 23 10 17 10" />
+      <polyline points="1 20 1 14 7 14" />
+      <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
+    </svg>
+  )
+}
+
+function Spinner() {
+  return (
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+      <circle cx="12" cy="12" r="9" opacity="0.25" />
+      <path d="M21 12a9 9 0 00-9-9" style={{ transformOrigin: 'center', animation: 'spin 0.9s linear infinite' }} />
+    </svg>
   )
 }

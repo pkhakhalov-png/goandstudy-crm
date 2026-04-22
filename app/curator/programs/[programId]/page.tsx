@@ -256,7 +256,7 @@ export default async function ProgramPage({
               background: 'rgba(177,94,204,.04)', border: '1px dashed rgba(177,94,204,.3)',
             }}>
               <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>
-                🤖 Детали программы ещё не заполнены
+                Детали программы ещё не заполнены
               </div>
               <div style={{ fontSize: 12, color: 'var(--muted)' }}>
                 Нажми «Заполнить через ИИ» выше — агент найдёт требования, цены и сроки с официального сайта вуза (15-30 сек).
@@ -264,7 +264,7 @@ export default async function ProgramPage({
             </div>
           )}
 
-          {/* Двух-колоночная раскладка */}
+          {/* Двух-колоночная раскладка: описание слева-широко, сводка справа */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 16 }} className="prog-grid">
             <style>{`
               @media (max-width: 900px) {
@@ -272,7 +272,7 @@ export default async function ProgramPage({
               }
             `}</style>
 
-            {/* LEFT — описание / сводка / admission / pgwp */}
+            {/* LEFT — описание / admission / pgwp */}
             <div style={{ display: 'grid', gap: 12 }}>
               {description && (
                 <div style={cardStyle}>
@@ -283,9 +283,19 @@ export default async function ProgramPage({
                 </div>
               )}
 
+              {curatorData && <AdmissionRequirements data={curatorData} />}
+              {curatorData?.pgwp_text && (
+                <PGWPCard text={curatorData.pgwp_text} eligible={curatorData.pgwp_eligible} />
+              )}
+            </div>
+
+            {/* RIGHT — сводка + инфо + возможности + источники */}
+            <div style={{ display: 'grid', gap: 12, alignContent: 'start' }}>
               <SummaryBig
                 levelText={levelText}
                 lengthText={curatorData?.program_length_text || length}
+                intakeText={curatorData?.earliest_intake_label || (intake ? fmtDate(intake) : null)}
+                deadlineText={curatorData?.deadline_label || (deadline ? fmtDate(deadline) : null)}
                 costOfLiving={curatorData?.cost_of_living_label
                   || (school.cost_of_living != null ? `${fmt(school.cost_of_living)} ${currency} / год` : null)}
                 grossTuition={curatorData?.gross_tuition_label
@@ -296,21 +306,10 @@ export default async function ProgramPage({
                 rawOtherFees={otherFees}
               />
 
-              {curatorData && <AdmissionRequirements data={curatorData} />}
-              {curatorData?.pgwp_text && (
-                <PGWPCard text={curatorData.pgwp_text} eligible={curatorData.pgwp_eligible} />
-              )}
-            </div>
-
-            {/* RIGHT — инфо / возможности / источники */}
-            <div style={{ display: 'grid', gap: 12, alignContent: 'start' }}>
               <div style={cardStyle}>
                 <div style={sectionTitle}>Информация</div>
                 <div className="ir"><span className="ik">Program ID</span><span className="iv">#{program.id}</span></div>
                 {attr.short_name && <div className="ir"><span className="ik">Short name</span><span className="iv">{attr.short_name}</span></div>}
-                {levelText && <div className="ir"><span className="ik">Уровень</span><span className="iv">{levelText}</span></div>}
-                {intake && <div className="ir"><span className="ik">Earliest intake</span><span className="iv">{fmtDate(intake)}</span></div>}
-                {deadline && <div className="ir"><span className="ik">Deadline</span><span className="iv">{fmtDate(deadline)}</span></div>}
                 {language && <div className="ir"><span className="ik">Язык</span><span className="iv">{language}</span></div>}
                 {delivery && <div className="ir"><span className="ik">Формат</span><span className="iv">{deliveryLabel(delivery)}</span></div>}
               </div>
@@ -410,11 +409,14 @@ function relativeTime(iso: string): string {
 /* ─── Сводка (ApplyBoard-style: крупные цифры, иконки слева) ─── */
 
 function SummaryBig({
-  levelText, lengthText, costOfLiving, grossTuition, applicationFee,
+  levelText, lengthText, intakeText, deadlineText,
+  costOfLiving, grossTuition, applicationFee,
   otherFees, rawOtherFees,
 }: {
   levelText?: string | null
   lengthText?: string | null
+  intakeText?: string | null
+  deadlineText?: string | null
   costOfLiving?: string | null
   grossTuition?: string | null
   applicationFee?: string | null
@@ -423,7 +425,9 @@ function SummaryBig({
 }) {
   const rows: { icon: React.ReactNode; value: string; label: string }[] = []
   if (levelText) rows.push({ icon: <IconDegree />, value: levelText, label: 'Program Level' })
-  if (lengthText) rows.push({ icon: <IconCalendar />, value: lengthText, label: 'Program Length' })
+  if (lengthText) rows.push({ icon: <IconHourglass />, value: lengthText, label: 'Program Length' })
+  if (intakeText) rows.push({ icon: <IconCalendar />, value: intakeText, label: 'Earliest Intake' })
+  if (deadlineText) rows.push({ icon: <IconClock />, value: deadlineText, label: 'Application Deadline' })
   if (costOfLiving) rows.push({ icon: <IconHouse />, value: costOfLiving, label: 'Cost of Living' })
   if (grossTuition) rows.push({ icon: <IconSchool />, value: grossTuition, label: 'Gross Tuition' })
   if (applicationFee) rows.push({ icon: <IconFee />, value: applicationFee, label: 'Application Fee' })
@@ -441,12 +445,14 @@ function SummaryBig({
   return (
     <div style={cardStyle}>
       <div style={sectionTitle}>Сводка программы</div>
-      <div style={{ display: 'grid', gap: 20 }}>
+      <div style={{ display: 'grid', gap: 14 }}>
         {rows.map((r, i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{
-              width: 56, height: 56, borderRadius: 12,
-              background: 'var(--pl)', color: 'var(--purple)',
+              width: 40, height: 40, borderRadius: 10,
+              background: 'var(--surf2)',
+              border: '1px solid var(--bor)',
+              color: 'var(--text)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               flexShrink: 0,
             }}>
@@ -454,27 +460,27 @@ function SummaryBig({
             </div>
             <div style={{ minWidth: 0 }}>
               <div style={{
-                fontSize: 20, fontWeight: 700, color: 'var(--text)',
-                lineHeight: 1.2, letterSpacing: '-0.01em',
+                fontSize: 15, fontWeight: 700, color: 'var(--text)',
+                lineHeight: 1.25, letterSpacing: '-0.01em',
               }}>
                 {r.value}
               </div>
-              <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 4 }}>{r.label}</div>
+              <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{r.label}</div>
             </div>
           </div>
         ))}
       </div>
 
       {fees.length > 0 && (
-        <div style={{ marginTop: 24, paddingTop: 18, borderTop: '1px solid var(--bor)' }}>
-          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 12 }}>
+        <div style={{ marginTop: 18, paddingTop: 14, borderTop: '1px solid var(--bor)' }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 10 }}>
             Other Fees
           </div>
-          <div style={{ display: 'grid', gap: 10 }}>
+          <div style={{ display: 'grid', gap: 8 }}>
             {fees.map((f, i) => (
               <div key={i} style={{
                 display: 'flex', justifyContent: 'space-between',
-                gap: 12, fontSize: 14, alignItems: 'baseline',
+                gap: 10, fontSize: 12, alignItems: 'baseline',
               }}>
                 <span style={{ color: 'var(--muted)' }}>
                   {f.label}{f.note ? ` (${f.note})` : ''}
@@ -495,17 +501,19 @@ function SummaryBig({
 
 /* ─── SVG иконки для Summary ─── */
 
+const SVG = (d: string, extra?: React.ReactNode) => (
+  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d={d} />
+    {extra}
+  </svg>
+)
+
 function IconDegree() {
-  return (
-    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M6 3h10a2 2 0 012 2v14l-3-2-4 3-4-3-3 2V5a2 2 0 012-2z" />
-      <circle cx="15" cy="9" r="2" />
-    </svg>
-  )
+  return SVG('M6 3h10a2 2 0 012 2v14l-3-2-4 3-4-3-3 2V5a2 2 0 012-2z', <circle cx="15" cy="9" r="2" />)
 }
 function IconCalendar() {
   return (
-    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <rect x="3" y="5" width="18" height="16" rx="2" />
       <line x1="3" y1="10" x2="21" y2="10" />
       <line x1="8" y1="3" x2="8" y2="7" />
@@ -513,9 +521,26 @@ function IconCalendar() {
     </svg>
   )
 }
+function IconClock() {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9" />
+      <polyline points="12 7 12 12 15 14" />
+    </svg>
+  )
+}
+function IconHourglass() {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 3h12M6 21h12" />
+      <path d="M7 3v4c0 2.5 2.5 4 5 5 2.5 1 5 2.5 5 5v4" />
+      <path d="M17 3v4c0 2.5-2.5 4-5 5-2.5 1-5 2.5-5 5v4" />
+    </svg>
+  )
+}
 function IconHouse() {
   return (
-    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M4 11l8-7 8 7" />
       <path d="M6 10v10h12V10" />
       <text x="12" y="17" fontSize="7" fontWeight="700" textAnchor="middle" fill="currentColor" stroke="none">$</text>
@@ -524,7 +549,7 @@ function IconHouse() {
 }
 function IconSchool() {
   return (
-    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M5 9l7-5 7 5v10H5z" />
       <path d="M9 19v-5h6v5" />
       <circle cx="17" cy="17" r="3" strokeWidth="1.6" />
@@ -534,7 +559,7 @@ function IconSchool() {
 }
 function IconFee() {
   return (
-    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M3 13l2-9h14l2 9" />
       <path d="M3 13h18l-2 7H5z" />
       <circle cx="12" cy="16" r="2.5" />
@@ -655,7 +680,7 @@ function PGWPCard({ text, eligible }: { text: string; eligible?: boolean | null 
 function SourceList({ urls }: { urls: string[] }) {
   return (
     <div style={{ ...cardStyle, marginBottom: 16 }}>
-      <div style={sectionTitle}>Источники (ИИ)</div>
+      <div style={sectionTitle}>Источники</div>
       <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, lineHeight: 1.8 }}>
         {urls.slice(0, 8).map((u, i) => (
           <li key={i} style={{ color: 'var(--text)' }}>

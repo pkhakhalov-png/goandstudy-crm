@@ -20,6 +20,14 @@ const SAVE_TOOL = {
         type: ['string', 'null'],
         description: 'Длительность программы человекочитаемо, напр. "1 year master\'s degree"',
       },
+      earliest_intake_label: {
+        type: ['string', 'null'],
+        description: 'Ближайшая дата старта, напр. "September 2026" или "Fall 2026"',
+      },
+      deadline_label: {
+        type: ['string', 'null'],
+        description: 'Дедлайн подачи заявок, напр. "July 1, 2026" или "Rolling admissions"',
+      },
       gross_tuition_label: {
         type: ['string', 'null'],
         description: 'Стоимость обучения с валютой, напр. "£19,950.00 GBP / First Year"',
@@ -118,6 +126,8 @@ export async function POST(req: NextRequest) {
 
 Через web_search найди на официальном сайте вуза (или в надёжных источниках вроде ApplyBoard, вузовских порталов) следующие данные и один раз вызови tool save_program_info:
 - Длительность программы (напр. "1 year master's degree")
+- Earliest intake — ближайшая дата старта (напр. "September 2026")
+- Deadline — дедлайн подачи заявок (напр. "July 1, 2026" или "Rolling")
 - Gross Tuition — стоимость обучения с валютой
 - Cost of Living — стоимость жизни в год
 - Application Fee (может быть "Free")
@@ -161,6 +171,8 @@ export async function POST(req: NextRequest) {
     const payload = {
       program_id: programId,
       program_length_text: input.program_length_text ?? null,
+      earliest_intake_label: input.earliest_intake_label ?? null,
+      deadline_label: input.deadline_label ?? null,
       gross_tuition_label: input.gross_tuition_label ?? null,
       cost_of_living_label: input.cost_of_living_label ?? null,
       application_fee_label: input.application_fee_label ?? null,
