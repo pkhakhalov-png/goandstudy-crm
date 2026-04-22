@@ -250,58 +250,30 @@ export default async function ProgramPage({
             </div>
           </div>
 
-          {/* ИИ-данные */}
-          {curatorData && (
-            <>
-              <CuratorDataSummary data={curatorData} levelText={levelText} />
-              <AdmissionRequirements data={curatorData} />
-              {curatorData.pgwp_text && <PGWPCard text={curatorData.pgwp_text} eligible={curatorData.pgwp_eligible} />}
-              {Array.isArray(curatorData.source_urls) && curatorData.source_urls.length > 0 && (
-                <SourceList urls={curatorData.source_urls as string[]} />
-              )}
-            </>
-          )}
           {!curatorData && (
             <div style={{
-              ...cardStyle, textAlign: 'center', padding: 32, marginBottom: 16,
+              ...cardStyle, textAlign: 'center', padding: 24, marginBottom: 16,
               background: 'rgba(177,94,204,.04)', border: '1px dashed rgba(177,94,204,.3)',
             }}>
-              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', marginBottom: 6 }}>
-                🤖 Информация ещё не заполнена
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>
+                🤖 Детали программы ещё не заполнены
               </div>
               <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-                Нажми «Заполнить через ИИ» выше — агент найдёт требования, цены и сроки с официального сайта вуза. Занимает 15-30 сек.
+                Нажми «Заполнить через ИИ» выше — агент найдёт требования, цены и сроки с официального сайта вуза (15-30 сек).
               </div>
             </div>
           )}
 
-          {/* Два колоночный блок: метрики + доп. инфа */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 16 }} className="prog-grid">
+          {/* Двух-колоночная раскладка */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 16 }} className="prog-grid">
             <style>{`
               @media (max-width: 900px) {
                 .prog-grid { grid-template-columns: 1fr !important; }
               }
             `}</style>
 
+            {/* LEFT — описание / сводка / admission / pgwp */}
             <div style={{ display: 'grid', gap: 12 }}>
-              {/* Ключевые метрики */}
-              <div style={cardStyle}>
-                <div style={sectionTitle}>Ключевые параметры</div>
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-                  gap: 14,
-                }}>
-                  <Metric label="Earliest intake" value={fmtDate(intake)} />
-                  <Metric label="Deadline" value={fmtDate(deadline)} />
-                  <Metric label="Стоимость" value={`${fmt(tuition)} ${currency}`} big />
-                  <Metric label="Взнос" value={`${fmt(appFee)} ${currency}`} />
-                  {length && <Metric label="Длительность" value={length} />}
-                  {attr.length_breakdown && <Metric label="Формат длины" value={attr.length_breakdown} />}
-                </div>
-              </div>
-
-              {/* Описание */}
               {description && (
                 <div style={cardStyle}>
                   <div style={sectionTitle}>Описание программы</div>
@@ -311,52 +283,49 @@ export default async function ProgramPage({
                 </div>
               )}
 
-              {/* Прочие сборы */}
-              {otherFees.length > 0 && (
-                <div style={cardStyle}>
-                  <div style={sectionTitle}>Прочие сборы</div>
-                  <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, lineHeight: 1.7, color: 'var(--text)' }}>
-                    {otherFees.map((fee, i) => (
-                      <li key={i}>{fee}</li>
-                    ))}
-                  </ul>
-                </div>
+              <SummaryBig
+                levelText={levelText}
+                lengthText={curatorData?.program_length_text || length}
+                costOfLiving={curatorData?.cost_of_living_label
+                  || (school.cost_of_living != null ? `${fmt(school.cost_of_living)} ${currency} / год` : null)}
+                grossTuition={curatorData?.gross_tuition_label
+                  || (tuition != null ? `${fmt(tuition)} ${currency} / год` : null)}
+                applicationFee={curatorData?.application_fee_label
+                  || (appFee != null ? `${fmt(appFee)} ${currency}` : null)}
+                otherFees={curatorData?.other_fees || null}
+                rawOtherFees={otherFees}
+              />
+
+              {curatorData && <AdmissionRequirements data={curatorData} />}
+              {curatorData?.pgwp_text && (
+                <PGWPCard text={curatorData.pgwp_text} eligible={curatorData.pgwp_eligible} />
               )}
             </div>
 
+            {/* RIGHT — инфо / возможности / источники */}
             <div style={{ display: 'grid', gap: 12, alignContent: 'start' }}>
               <div style={cardStyle}>
                 <div style={sectionTitle}>Информация</div>
                 <div className="ir"><span className="ik">Program ID</span><span className="iv">#{program.id}</span></div>
                 {attr.short_name && <div className="ir"><span className="ik">Short name</span><span className="iv">{attr.short_name}</span></div>}
                 {levelText && <div className="ir"><span className="ik">Уровень</span><span className="iv">{levelText}</span></div>}
+                {intake && <div className="ir"><span className="ik">Earliest intake</span><span className="iv">{fmtDate(intake)}</span></div>}
+                {deadline && <div className="ir"><span className="ik">Deadline</span><span className="iv">{fmtDate(deadline)}</span></div>}
                 {language && <div className="ir"><span className="ik">Язык</span><span className="iv">{language}</span></div>}
                 {delivery && <div className="ir"><span className="ik">Формат</span><span className="iv">{deliveryLabel(delivery)}</span></div>}
               </div>
 
               <div style={cardStyle}>
-                <div style={sectionTitle}>Финансы</div>
-                {tuition != null && (
-                  <div className="ir"><span className="ik">Обучение</span><span className="iv">{fmt(tuition)} {currency}</span></div>
-                )}
-                {appFee != null && (
-                  <div className="ir"><span className="ik">Подача заявки</span><span className="iv">{fmt(appFee)} {currency}</span></div>
-                )}
-                {school.cost_of_living != null && (
-                  <div className="ir"><span className="ik">Жизнь (вуз)</span><span className="iv">{fmt(school.cost_of_living)} {currency}/год</span></div>
-                )}
-                {school.avg_tuition != null && (
-                  <div className="ir"><span className="ik">Средняя цена в вузе</span><span className="iv">{fmt(school.avg_tuition)} {currency}/год</span></div>
-                )}
-              </div>
-
-              <div style={cardStyle}>
                 <div style={sectionTitle}>Возможности</div>
-                <FeatureLine on={!!(attr.pgwp_participating || attr.pgwp_visible)} label="Право на рабочую визу (PGWP)" />
+                <FeatureLine on={!!(attr.pgwp_participating || attr.pgwp_visible || curatorData?.pgwp_eligible)} label="Право на рабочую визу (PGWP)" />
                 <FeatureLine on={coopLen > 0} label={`Co-op / стажировка${coopLen > 0 ? ` (${coopLen} мес)` : ''}`} />
                 <FeatureLine on={!!attr.bypass_eligibility} label="Условный оффер (Conditional)" />
                 <FeatureLine on={!!attr.ab_app_creation_enabled} label="Можно подать через ApplyBoard" />
               </div>
+
+              {Array.isArray(curatorData?.source_urls) && curatorData!.source_urls.length > 0 && (
+                <SourceList urls={curatorData!.source_urls as string[]} />
+              )}
             </div>
           </div>
         </div>
@@ -438,59 +407,138 @@ function relativeTime(iso: string): string {
   return new Date(iso).toLocaleDateString('ru', { day: 'numeric', month: 'short' })
 }
 
-/* ─── ИИ-данные ─── */
+/* ─── Сводка (ApplyBoard-style: крупные цифры, иконки слева) ─── */
 
-function CuratorDataSummary({ data, levelText }: { data: any; levelText?: string }) {
-  const rows: { icon: string; value: string; label: string }[] = []
-  if (levelText) rows.push({ icon: '🎓', value: levelText, label: 'Program Level' })
-  if (data.program_length_text) rows.push({ icon: '🗓', value: data.program_length_text, label: 'Program Length' })
-  if (data.cost_of_living_label) rows.push({ icon: '🏠', value: data.cost_of_living_label, label: 'Cost of Living' })
-  if (data.gross_tuition_label) rows.push({ icon: '💵', value: data.gross_tuition_label, label: 'Gross Tuition' })
-  if (data.application_fee_label) rows.push({ icon: '📝', value: data.application_fee_label, label: 'Application Fee' })
+function SummaryBig({
+  levelText, lengthText, costOfLiving, grossTuition, applicationFee,
+  otherFees, rawOtherFees,
+}: {
+  levelText?: string | null
+  lengthText?: string | null
+  costOfLiving?: string | null
+  grossTuition?: string | null
+  applicationFee?: string | null
+  otherFees?: any[] | null
+  rawOtherFees?: string[]
+}) {
+  const rows: { icon: React.ReactNode; value: string; label: string }[] = []
+  if (levelText) rows.push({ icon: <IconDegree />, value: levelText, label: 'Program Level' })
+  if (lengthText) rows.push({ icon: <IconCalendar />, value: lengthText, label: 'Program Length' })
+  if (costOfLiving) rows.push({ icon: <IconHouse />, value: costOfLiving, label: 'Cost of Living' })
+  if (grossTuition) rows.push({ icon: <IconSchool />, value: grossTuition, label: 'Gross Tuition' })
+  if (applicationFee) rows.push({ icon: <IconFee />, value: applicationFee, label: 'Application Fee' })
 
-  const otherFees: any[] = Array.isArray(data.other_fees) ? data.other_fees : []
+  const fees = Array.isArray(otherFees) && otherFees.length > 0
+    ? otherFees.map(f => ({
+        label: f?.label || '—',
+        amount: f?.amount != null ? `${f.amount}${f.currency ? ` ${f.currency}` : ''}` : '',
+        note: f?.note || null,
+      }))
+    : (rawOtherFees || []).map(s => ({ label: s, amount: '', note: null }))
 
-  if (rows.length === 0 && otherFees.length === 0) return null
+  if (rows.length === 0 && fees.length === 0) return null
 
   return (
-    <div style={{ ...cardStyle, marginBottom: 16 }}>
-      <div style={sectionTitle}>Сводка программы (ИИ)</div>
-      <div style={{ display: 'grid', gap: 14 }}>
+    <div style={cardStyle}>
+      <div style={sectionTitle}>Сводка программы</div>
+      <div style={{ display: 'grid', gap: 20 }}>
         {rows.map((r, i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
             <div style={{
-              width: 40, height: 40, borderRadius: 10,
+              width: 56, height: 56, borderRadius: 12,
               background: 'var(--pl)', color: 'var(--purple)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 18, flexShrink: 0,
+              flexShrink: 0,
             }}>
               {r.icon}
             </div>
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>{r.value}</div>
-              <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 1 }}>{r.label}</div>
+              <div style={{
+                fontSize: 20, fontWeight: 700, color: 'var(--text)',
+                lineHeight: 1.2, letterSpacing: '-0.01em',
+              }}>
+                {r.value}
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 4 }}>{r.label}</div>
             </div>
           </div>
         ))}
       </div>
 
-      {otherFees.length > 0 && (
-        <div style={{ marginTop: 18, paddingTop: 14, borderTop: '1px solid var(--bor)' }}>
-          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>Other Fees</div>
-          <div style={{ display: 'grid', gap: 6 }}>
-            {otherFees.map((f, i) => {
-              const amt = f?.amount != null ? `${f.amount}${f.currency ? ` ${f.currency}` : ''}` : ''
-              return (
-                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 13 }}>
-                  <span style={{ color: 'var(--muted)' }}>{f?.label || '—'}{f?.note ? ` (${f.note})` : ''}</span>
-                  {amt && <span style={{ fontWeight: 700, color: 'var(--text)', whiteSpace: 'nowrap' }}>{amt}</span>}
-                </div>
-              )
-            })}
+      {fees.length > 0 && (
+        <div style={{ marginTop: 24, paddingTop: 18, borderTop: '1px solid var(--bor)' }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 12 }}>
+            Other Fees
+          </div>
+          <div style={{ display: 'grid', gap: 10 }}>
+            {fees.map((f, i) => (
+              <div key={i} style={{
+                display: 'flex', justifyContent: 'space-between',
+                gap: 12, fontSize: 14, alignItems: 'baseline',
+              }}>
+                <span style={{ color: 'var(--muted)' }}>
+                  {f.label}{f.note ? ` (${f.note})` : ''}
+                </span>
+                {f.amount && (
+                  <span style={{ fontWeight: 700, color: 'var(--text)', whiteSpace: 'nowrap' }}>
+                    {f.amount}
+                  </span>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       )}
     </div>
+  )
+}
+
+/* ─── SVG иконки для Summary ─── */
+
+function IconDegree() {
+  return (
+    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 3h10a2 2 0 012 2v14l-3-2-4 3-4-3-3 2V5a2 2 0 012-2z" />
+      <circle cx="15" cy="9" r="2" />
+    </svg>
+  )
+}
+function IconCalendar() {
+  return (
+    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="5" width="18" height="16" rx="2" />
+      <line x1="3" y1="10" x2="21" y2="10" />
+      <line x1="8" y1="3" x2="8" y2="7" />
+      <line x1="16" y1="3" x2="16" y2="7" />
+    </svg>
+  )
+}
+function IconHouse() {
+  return (
+    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 11l8-7 8 7" />
+      <path d="M6 10v10h12V10" />
+      <text x="12" y="17" fontSize="7" fontWeight="700" textAnchor="middle" fill="currentColor" stroke="none">$</text>
+    </svg>
+  )
+}
+function IconSchool() {
+  return (
+    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M5 9l7-5 7 5v10H5z" />
+      <path d="M9 19v-5h6v5" />
+      <circle cx="17" cy="17" r="3" strokeWidth="1.6" />
+      <text x="17" y="18.5" fontSize="4.5" fontWeight="700" textAnchor="middle" fill="currentColor" stroke="none">$</text>
+    </svg>
+  )
+}
+function IconFee() {
+  return (
+    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 13l2-9h14l2 9" />
+      <path d="M3 13h18l-2 7H5z" />
+      <circle cx="12" cy="16" r="2.5" />
+    </svg>
   )
 }
 
