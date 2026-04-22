@@ -265,7 +265,7 @@ export default async function ProgramPage({
           )}
 
           {/* Двух-колоночная раскладка: описание слева-широко, сводка справа */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 16 }} className="prog-grid">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 16, alignItems: 'start' }} className="prog-grid">
             <style>{`
               @media (max-width: 900px) {
                 .prog-grid { grid-template-columns: 1fr !important; }
@@ -316,10 +316,18 @@ export default async function ProgramPage({
 
               <div style={cardStyle}>
                 <div style={sectionTitle}>Возможности</div>
-                <FeatureLine on={!!(attr.pgwp_participating || attr.pgwp_visible || curatorData?.pgwp_eligible)} label="Право на рабочую визу (PGWP)" />
-                <FeatureLine on={coopLen > 0} label={`Co-op / стажировка${coopLen > 0 ? ` (${coopLen} мес)` : ''}`} />
-                <FeatureLine on={!!attr.bypass_eligibility} label="Условный оффер (Conditional)" />
-                <FeatureLine on={!!attr.ab_app_creation_enabled} label="Можно подать через ApplyBoard" />
+                <FeatureLine
+                  on={curatorData?.pgwp_eligible ?? !!(attr.pgwp_participating || attr.pgwp_visible)}
+                  label="Право на рабочую визу (PGWP)"
+                />
+                <FeatureLine
+                  on={curatorData?.coop_available ?? coopLen > 0}
+                  label={`Co-op / стажировка${coopLen > 0 ? ` (${coopLen} мес)` : ''}`}
+                />
+                <FeatureLine
+                  on={curatorData?.conditional_offer_available ?? !!attr.bypass_eligibility}
+                  label="Условный оффер (Conditional)"
+                />
               </div>
 
               {Array.isArray(curatorData?.source_urls) && curatorData!.source_urls.length > 0 && (
@@ -567,6 +575,17 @@ function IconFee() {
   )
 }
 
+function IconChart() {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="7" y1="18" x2="7" y2="11" />
+      <line x1="12" y1="18" x2="12" y2="6" />
+      <line x1="17" y1="18" x2="17" y2="13" />
+      <line x1="4" y1="20" x2="20" y2="20" />
+    </svg>
+  )
+}
+
 function AdmissionRequirements({ data }: { data: any }) {
   const hasAcademic = data.min_education_level || data.min_gpa_percent != null
   const langs: { key: string; label: string; value: any }[] = [
@@ -579,14 +598,24 @@ function AdmissionRequirements({ data }: { data: any }) {
   if (!hasAcademic && langs.length === 0) return null
 
   return (
-    <div style={{ ...cardStyle, marginBottom: 16 }}>
+    <div style={cardStyle} className="adm-card">
+      <style>{`
+        @media (max-width: 640px) {
+          .adm-card .adm-lang { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+          .adm-card .adm-academic { grid-template-columns: 1fr !important; }
+        }
+      `}</style>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
         <div style={{
           width: 32, height: 32, borderRadius: '50%',
-          background: 'var(--pl)', color: 'var(--purple)',
+          background: 'var(--surf2)',
+          border: '1px solid var(--bor)',
+          color: 'var(--text)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 14,
-        }}>📊</div>
+          flexShrink: 0,
+        }}>
+          <IconChart />
+        </div>
         <div>
           <div style={{ fontSize: 16, fontWeight: 700 }}>Admission Requirements</div>
           <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 1 }}>
@@ -596,13 +625,13 @@ function AdmissionRequirements({ data }: { data: any }) {
       </div>
 
       {hasAcademic && (
-        <div style={{ marginTop: 16 }}>
+        <div style={{ marginTop: 14 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
             Academic Background
           </div>
-          <div style={{
+          <div className="adm-academic" style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+            gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
             gap: 10,
           }}>
             {data.min_education_level && (
@@ -616,13 +645,13 @@ function AdmissionRequirements({ data }: { data: any }) {
       )}
 
       {langs.length > 0 && (
-        <div style={{ marginTop: 18 }}>
+        <div style={{ marginTop: 14 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
             Minimum Language Test Scores
           </div>
-          <div style={{
+          <div className="adm-lang" style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+            gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
             gap: 10,
           }}>
             {langs.map(l => (

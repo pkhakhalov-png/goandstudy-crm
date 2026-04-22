@@ -74,6 +74,14 @@ const SAVE_TOOL = {
         type: ['string', 'null'],
         description: 'Описание условий PGWP (2-5 предложений)',
       },
+      coop_available: {
+        type: ['boolean', 'null'],
+        description: 'Есть ли Co-op/стажировки в этой программе',
+      },
+      conditional_offer_available: {
+        type: ['boolean', 'null'],
+        description: 'Выдаёт ли вуз по этой программе условный оффер (Conditional Offer Letter)',
+      },
       source_urls: {
         type: ['array', 'null'],
         description: 'Список URL-источников, откуда взята инфа',
@@ -136,6 +144,8 @@ export async function POST(req: NextRequest) {
 - Minimum GPA (в процентах)
 - Минимальные баллы по IELTS / TOEFL / PTE / Duolingo
 - Post-Study Work Visa — применимость и краткое описание (для Канады/UK)
+- Co-op / стажировки — есть ли в программе
+- Conditional Offer — выдаёт ли вуз условный оффер по этой программе
 
 Критически важно: если поля нет в открытом доступе или ты не уверен — передавай null. Лучше пустое поле, чем выдуманное число.
 
@@ -185,6 +195,8 @@ export async function POST(req: NextRequest) {
       duolingo_min: typeof input.duolingo_min === 'number' ? input.duolingo_min : null,
       pgwp_eligible: typeof input.pgwp_eligible === 'boolean' ? input.pgwp_eligible : null,
       pgwp_text: input.pgwp_text ?? null,
+      coop_available: typeof input.coop_available === 'boolean' ? input.coop_available : null,
+      conditional_offer_available: typeof input.conditional_offer_available === 'boolean' ? input.conditional_offer_available : null,
       source_urls: Array.isArray(input.source_urls) ? input.source_urls : null,
       is_ai_generated: true,
       last_updated_by: curatorId || null,
