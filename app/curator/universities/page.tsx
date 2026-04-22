@@ -52,7 +52,21 @@ export default async function UniversitiesPage({
   if (country) query = query.eq('country_code', country)
   if (search) query = query.or(`name.ilike.%${search}%,city.ilike.%${search}%`)
 
-  const { data: schools, count } = await query
+  const { data: schools, count, error: schoolsError } = await query
+  if (schoolsError) {
+    console.error('[curator/universities] schools query error:', schoolsError)
+  }
+  if (!process.env.NEXT_PUBLIC_PARSER_SUPABASE_URL) {
+    console.error('[curator/universities] NEXT_PUBLIC_PARSER_SUPABASE_URL is not set')
+  }
+  if (!process.env.NEXT_PUBLIC_PARSER_SUPABASE_ANON_KEY) {
+    console.error('[curator/universities] NEXT_PUBLIC_PARSER_SUPABASE_ANON_KEY is not set')
+  }
+  console.log('[curator/universities]', {
+    parserUrl: process.env.NEXT_PUBLIC_PARSER_SUPABASE_URL,
+    anonKeyLen: process.env.NEXT_PUBLIC_PARSER_SUPABASE_ANON_KEY?.length,
+    count, returnedRows: schools?.length, error: schoolsError?.message,
+  })
 
   const total = count ?? 0
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
