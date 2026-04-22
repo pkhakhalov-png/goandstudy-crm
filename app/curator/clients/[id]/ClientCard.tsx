@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { advanceStage, addActivity, toggleChecklist, updateClientField, addUniversity } from './actions'
+import { removeFromShortlist, updateShortlistNote, updateShortlistStatus } from '@/app/curator/shortlist/actions'
 
 interface Props {
   client: any
@@ -15,6 +16,7 @@ interface Props {
   checklistProgress: any[]
   messages: any[]
   files: any[]
+  shortlists: any[]
   curatorId: string
 }
 
@@ -65,8 +67,8 @@ function colorForSender(name: string | null | undefined): string {
   return SENDER_COLORS[hash % SENDER_COLORS.length]
 }
 
-export function ClientCard({ client, stages, clientStages, universities, documents, activities, checklist, checklistProgress, messages, files, curatorId }: Props) {
-  const [tab, setTab] = useState<'info' | 'activity' | 'universities' | 'documents' | 'chat'>('info')
+export function ClientCard({ client, stages, clientStages, universities, documents, activities, checklist, checklistProgress, messages, files, shortlists, curatorId }: Props) {
+  const [tab, setTab] = useState<'info' | 'activity' | 'universities' | 'shortlist' | 'documents' | 'chat'>('info')
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [editingField, setEditingField] = useState<string | null>(null)
   const [fieldDraft, setFieldDraft] = useState('')
@@ -135,6 +137,7 @@ export function ClientCard({ client, stages, clientStages, universities, documen
     { key: 'info' as const, label: 'Основное' },
     { key: 'chat' as const, label: `Чат${messages.length > 0 ? ` (${messages.length})` : ''}` },
     { key: 'universities' as const, label: `Вузы (${universities.length})` },
+    { key: 'shortlist' as const, label: `Подборка (${shortlists.length})` },
     { key: 'documents' as const, label: `Документы (${documents.length})` },
     { key: 'activity' as const, label: `Активность (${activities.length})` },
   ]
@@ -613,6 +616,11 @@ export function ClientCard({ client, stages, clientStages, universities, documen
               </div>
             )}
 
+            {/* ═══ TAB: Подборка программ (из базы вузов) ═══ */}
+            {tab === 'shortlist' && (
+              <ShortlistBlock shortlists={shortlists} clientId={client.id} />
+            )}
+
             {/* ═══ TAB: Документы ═══ */}
             {tab === 'documents' && (
               <div>
@@ -701,6 +709,169 @@ export function ClientCard({ client, stages, clientStages, universities, documen
             )}
           </div>
         </div>
+      </div>
+    </div>
+  )
+}
+
+/* ═══ Подборка программ из базы вузов ═══ */
+
+const SHORTLIST_STATUS: Record<string, { label: string; color: string; bg: string }> = {
+  shortlisted: { label: 'В подборке', color: 'var(--purple)', bg: 'rgba(177,94,204,.1)' },
+  applied: { label: 'Подано', color: '#0088cc', bg: 'rgba(0,136,204,.1)' },
+  offered: { label: 'Оффер', color: 'var(--gold)', bg: 'rgba(201,125,0,.1)' },
+  rejected: { label: 'Отказ', color: 'var(--red)', bg: 'rgba(220,53,69,.1)' },
+  accepted: { label: 'Принят', color: 'var(--green)', bg: 'rgba(22,163,97,.1)' },
+}
+
+const COUNTRY_RU: Record<string, string> = {
+  ca: 'Канада', au: 'Австралия', gb: 'Великобритания', de: 'Германия', us: 'США',
+}
+
+function ShortlistBlock({ shortlists, clientId }: { shortlists: any[]; clientId: number }) {
+  if (shortlists.length === 0) {
+    return (
+      <div style={{ ...cardStyle, textAlign: 'center', padding: 40, color: 'var(--muted)' }}>
+        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', marginBottom: 6 }}>
+          Подборка пока пустая
+        </div>
+        <div style={{ fontSize: 13, marginBottom: 14 }}>
+          Открой базу вузов и добавь подходящие программы.
+        </div>
+        <Link href="/curator/universities" className="btn-p" style={{ fontSize: 12 }}>
+          → Открыть базу вузов
+        </Link>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ display: 'grid', gap: 10 }}>
+      {shortlists.map(s => (
+        <ShortlistRow key={s.id} row={s} clientId={clientId} />
+      ))}
+    </div>
+  )
+}
+
+function ShortlistRow({ row, clientId }: { row: any; clientId: number }) {
+  const [noteDraft, setNoteDraft] = useState(row.note || '')
+  const [noteEditing, setNoteEditing] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const st = SHORTLIST_STATUS[row.status] || SHORTLIST_STATUS.shortlisted
+  const country = COUNTRY_RU[(row.country_code || '').toLowerCase()] || (row.country_code || '').toUpperCase()
+
+  async function handleDelete() {
+    if (busy || !confirm('Убрать программу из подборки?')) return
+    setBusy(true)
+    try { await removeFromShortlist(row.id, clientId) } finally { setBusy(false) }
+  }
+
+  async function handleStatus(next: string) {
+    if (busy || next === row.status) return
+    setBusy(true)
+    try { await updateShortlistStatus(row.id, clientId, next as any) } finally { setBusy(false) }
+  }
+
+  async function handleNoteSave() {
+    if (busy) return
+    setBusy(true)
+    try {
+      await updateShortlistNote(row.id, clientId, noteDraft.trim())
+      setNoteEditing(false)
+    } finally { setBusy(false) }
+  }
+
+  return (
+    <div style={cardStyle}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
+        <div style={{ flex: '1 1 260px', minWidth: 0 }}>
+          <Link
+            href={`/curator/universities/${row.school_id}`}
+            style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', textDecoration: 'none' }}
+          >
+            {row.school_name}
+          </Link>
+          <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
+            {row.program_name}
+          </div>
+          <div style={{ display: 'flex', gap: 10, marginTop: 8, fontSize: 11, color: 'var(--muted)' }}>
+            {country && <span>📍 {country}</span>}
+            {row.tuition != null && (
+              <span>💵 {Math.round(Number(row.tuition)).toLocaleString('ru')} {row.currency || ''}/год</span>
+            )}
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+          <select
+            value={row.status}
+            onChange={(e) => handleStatus(e.target.value)}
+            disabled={busy}
+            style={{
+              padding: '4px 10px', borderRadius: 20, fontSize: 10, fontWeight: 700,
+              color: st.color, background: st.bg, border: `1px solid ${st.color}`,
+              outline: 'none', cursor: 'pointer', fontFamily: 'inherit',
+              appearance: 'none',
+            }}
+          >
+            {Object.entries(SHORTLIST_STATUS).map(([k, v]) => (
+              <option key={k} value={k} style={{ color: 'var(--text)', background: 'var(--surf)' }}>
+                {v.label}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={busy}
+            style={{
+              background: 'none', border: 'none', padding: 0,
+              color: 'var(--muted)', fontSize: 11, cursor: 'pointer', fontFamily: 'inherit',
+            }}
+            title="Убрать из подборки"
+          >
+            ✕ Убрать
+          </button>
+        </div>
+      </div>
+
+      <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--bor)' }}>
+        {noteEditing ? (
+          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+            <textarea
+              value={noteDraft}
+              onChange={(e) => setNoteDraft(e.target.value)}
+              placeholder="Заметка к этой программе…"
+              rows={2}
+              style={{
+                flex: 1, padding: '8px 12px',
+                border: '1px solid var(--bor2)', borderRadius: 8,
+                fontSize: 12, fontFamily: 'inherit', outline: 'none',
+                background: 'var(--bg)', resize: 'vertical',
+              }}
+            />
+            <button type="button" onClick={handleNoteSave} className="btn-p" style={{ fontSize: 11, padding: '6px 12px' }}>
+              Сохранить
+            </button>
+            <button type="button" onClick={() => { setNoteDraft(row.note || ''); setNoteEditing(false) }} className="btn-s" style={{ fontSize: 11, padding: '6px 12px' }}>
+              Отмена
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setNoteEditing(true)}
+            style={{
+              width: '100%', textAlign: 'left', background: 'none',
+              border: 'none', padding: 0, fontFamily: 'inherit',
+              fontSize: 12, color: row.note ? 'var(--text)' : 'var(--muted)',
+              cursor: 'pointer', lineHeight: 1.5,
+            }}
+          >
+            {row.note || '+ Добавить заметку'}
+          </button>
+        )}
       </div>
     </div>
   )

@@ -40,6 +40,7 @@ export default async function CuratorClientPage({ params }: { params: Promise<{ 
     { data: checklistProgress },
     { data: messages },
     { data: files },
+    { data: shortlists },
   ] = await Promise.all([
     admin.from('curator_stages').select('*').order('position'),
     admin.from('client_stages').select('*').eq('client_id', clientId),
@@ -50,6 +51,7 @@ export default async function CuratorClientPage({ params }: { params: Promise<{ 
     admin.from('client_checklist_progress').select('*').eq('client_id', clientId),
     admin.from('client_tg_messages').select('*').eq('client_id', clientId).order('created_at', { ascending: true }),
     admin.from('client_tg_files').select('*').eq('client_id', clientId),
+    admin.from('client_shortlists').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
   ])
 
   const initials = (profile?.name || user.email || 'КР')
@@ -69,6 +71,7 @@ export default async function CuratorClientPage({ params }: { params: Promise<{ 
         checklistProgress={checklistProgress ?? []}
         messages={messages ?? []}
         files={files ?? []}
+        shortlists={shortlists ?? []}
         curatorId={curatorId || ''}
       />
     </div>

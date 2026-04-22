@@ -20,6 +20,7 @@ const accentLight = 'rgba(177,94,204,.1)'
 const navItems = [
   { key: 'home', href: '/curator', label: 'Главная', icon: 'M3 9.5L8 4l5 5.5V14H3z' },
   { key: 'clients', href: '/curator/clients', label: 'Клиенты', icon: 'M2 3h12v10H2zM5 7h6M5 10h4' },
+  { key: 'universities', href: '/curator/universities', label: 'База вузов', icon: 'M2 6l6-3 6 3M3 6v7h10V6M6 13v-4h4v4' },
   { key: 'templates', href: '/curator/templates', label: 'Шаблоны', icon: 'M3 2h10a2 2 0 012 2v8a2 2 0 01-2 2H3a2 2 0 01-2-2V4a2 2 0 012-2zM5 5h6M5 8h4' },
   { key: 'guide', href: '/curator/guide', label: 'Регламент', icon: 'M2 1h8a2 2 0 012 2v10a2 2 0 01-2 2H2V1zM5 5h4M5 8h3M5 11h4' },
   { key: 'resources', href: '/curator/resources', label: 'Ресурсы', icon: 'M8 1v6M4.9 4.9L8 8M1 8h6M15 8h-6M11.1 4.9L8 8M8 15v-6' },
@@ -49,7 +50,7 @@ export function CuratorSidebar({ userName, userEmail, initials, activePage = 'ho
         </div>
         <nav className="nav">
           <div className="ns">Работа</div>
-          {navItems.slice(0, 2).map(item => (
+          {navItems.slice(0, 3).map(item => (
             <Link key={item.key} href={item.href} onClick={() => setOpen(false)}
               className={`ni${activePage === item.key ? ' active' : ''}`}
               style={activePage === item.key ? { borderLeftColor: accent, color: accent, background: accentBg } : undefined}>
@@ -60,7 +61,7 @@ export function CuratorSidebar({ userName, userEmail, initials, activePage = 'ho
             </Link>
           ))}
           <div className="ns" style={{ marginTop: 12 }}>Инструменты</div>
-          {navItems.slice(2, 5).map(item => (
+          {navItems.slice(3, 6).map(item => (
             <Link key={item.key} href={item.href} onClick={() => setOpen(false)}
               className={`ni${activePage === item.key ? ' active' : ''}`}
               style={activePage === item.key ? { borderLeftColor: accent, color: accent, background: accentBg } : undefined}>
@@ -71,7 +72,7 @@ export function CuratorSidebar({ userName, userEmail, initials, activePage = 'ho
             </Link>
           ))}
           <div className="ns" style={{ marginTop: 12 }}>Профиль</div>
-          {navItems.slice(5).map(item => (
+          {navItems.slice(6).map(item => (
             <Link key={item.key} href={item.href} onClick={() => setOpen(false)}
               className={`ni${activePage === item.key ? ' active' : ''}`}
               style={activePage === item.key ? { borderLeftColor: accent, color: accent, background: accentBg } : undefined}>
