@@ -37,10 +37,14 @@ export function SchoolTabs({ school, programs, myClients }: Props) {
 
   return (
     <div>
-      {/* Tab bar */}
+      {/* Tab bar — sticky, чтобы не терялись при скролле */}
       <div style={{
         display: 'flex', gap: 4, borderBottom: '1px solid var(--bor)',
         marginBottom: 20, overflowX: 'auto',
+        position: 'sticky', top: 56, zIndex: 5,
+        background: 'var(--bg)',
+        paddingTop: 8,
+        marginLeft: -4, paddingLeft: 4,
       }}>
         {tabs.map(t => (
           <button
@@ -456,6 +460,7 @@ function LocationTab({ school, raw }: { school: any; raw: any }) {
 
 function ProgramsTab({ school, programs, myClients }: { school: any; programs: any[]; myClients: any[] }) {
   const [levelFilter, setLevelFilter] = useState<string>('')
+  const [search, setSearch] = useState('')
   const currencyFromSchool = (school.raw_data as any)?.attributes?.currency_of_fees?.code
 
   const levels = Array.from(new Set(
@@ -464,9 +469,16 @@ function ProgramsTab({ school, programs, myClients }: { school: any; programs: a
       .filter(Boolean)
   )).sort()
 
-  const filtered = levelFilter
-    ? programs.filter(p => p.raw_data?.attributes?.level_text === levelFilter)
-    : programs
+  const q = search.trim().toLowerCase()
+  const filtered = programs.filter(p => {
+    if (levelFilter && p.raw_data?.attributes?.level_text !== levelFilter) return false
+    if (q) {
+      const name = (p.name || '').toLowerCase()
+      const descr = (p.raw_data?.attributes?.description || '').toLowerCase()
+      if (!name.includes(q) && !descr.includes(q)) return false
+    }
+    return true
+  })
 
   if (programs.length === 0) {
     return (
@@ -478,36 +490,98 @@ function ProgramsTab({ school, programs, myClients }: { school: any; programs: a
 
   return (
     <div>
-      {levels.length > 0 && (
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'minmax(240px, 1fr) minmax(160px, 0.6fr)',
+        gap: 10, alignItems: 'center', marginBottom: 16,
+      }} className="prog-filter-row">
+        <style>{`
+          @media (max-width: 700px) {
+            .prog-filter-row { grid-template-columns: 1fr !important; }
+          }
+        `}</style>
+        <div style={{ position: 'relative' }}>
+          <svg
+            viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6"
+            style={{
+              position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)',
+              width: 14, height: 14, color: 'var(--muted)',
+            }}
+          >
+            <circle cx="7" cy="7" r="4.5" />
+            <line x1="10.5" y1="10.5" x2="14" y2="14" />
+          </svg>
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Поиск по названию или описанию программы"
+            style={{
+              width: '100%',
+              padding: '9px 12px 9px 32px',
+              border: '1px solid var(--bor2)',
+              borderRadius: 10,
+              fontSize: 13, fontFamily: 'inherit', outline: 'none',
+              background: 'var(--surf)', color: 'var(--text)',
+            }}
+          />
+        </div>
+        {levels.length > 0 && (
           <select
             value={levelFilter}
             onChange={(e) => setLevelFilter(e.target.value)}
-            className="si"
-            style={{ padding: '9px 12px', borderRadius: 10, fontSize: 13 }}
+            style={{
+              padding: '9px 12px',
+              border: '1px solid var(--bor2)',
+              borderRadius: 10,
+              fontSize: 13, fontFamily: 'inherit', outline: 'none',
+              background: 'var(--surf)', color: 'var(--text)',
+            }}
           >
             <option value="">Все уровни</option>
             {levels.map(l => (
               <option key={l as string} value={l as string}>{l as string}</option>
             ))}
           </select>
-          <span style={{ fontSize: 12, color: 'var(--muted)' }}>
-            Показано: {filtered.length} из {programs.length}
-          </span>
+        )}
+      </div>
+
+      <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>
+        {filtered.length === programs.length
+          ? `${programs.length} программ`
+          : `Показано ${filtered.length} из ${programs.length}`}
+        {(search || levelFilter) && (
+          <button
+            type="button"
+            onClick={() => { setSearch(''); setLevelFilter('') }}
+            style={{
+              background: 'none', border: 'none', marginLeft: 10,
+              color: 'var(--purple)', fontSize: 12, fontWeight: 600,
+              cursor: 'pointer', padding: 0, fontFamily: 'inherit',
+            }}
+          >
+            Сбросить фильтры
+          </button>
+        )}
+      </div>
+
+      {filtered.length === 0 ? (
+        <div style={{ ...cardStyle, textAlign: 'center', padding: 32, color: 'var(--muted)', fontSize: 13 }}>
+          Ничего не найдено. Попробуй изменить поиск или уровень.
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gap: 10 }}>
+          {filtered.map(p => (
+            <ProgramRow
+              key={p.id}
+              program={p}
+              schoolId={school.id}
+              fallbackCurrency={currencyFromSchool}
+              myClients={myClients}
+            />
+          ))}
         </div>
       )}
-
-      <div style={{ display: 'grid', gap: 10 }}>
-        {filtered.map(p => (
-          <ProgramRow
-            key={p.id}
-            program={p}
-            schoolId={school.id}
-            fallbackCurrency={currencyFromSchool}
-            myClients={myClients}
-          />
-        ))}
-      </div>
     </div>
   )
 }
