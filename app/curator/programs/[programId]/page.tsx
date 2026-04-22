@@ -4,6 +4,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { createParserClient } from '@/lib/supabase/parser'
 import { CuratorSidebar } from '../../CuratorSidebar'
 import { AddToShortlistButton } from '../../universities/[schoolId]/AddToShortlistButton'
+import { FillProgramButton } from './FillProgramButton'
 
 const COUNTRY_LABEL: Record<string, string> = {
   ca: 'Канада', au: 'Австралия', gb: 'Великобритания', de: 'Германия',
@@ -54,19 +55,25 @@ export default async function ProgramPage({
   const attr = program.raw_data?.attributes || {}
   const schoolRaw = school.raw_data?.attributes || {}
 
-  // Клиенты куратора для дропдауна
+  // Клиенты куратора + заполненные ИИ данные
   const admin = await createAdminClient()
   const { data: curatorRec } = await admin
     .from('curators').select('id').eq('user_id', user.id).maybeSingle()
   const curatorId = curatorRec?.id
-  const { data: myClients } = curatorId
-    ? await admin
-        .from('clients')
-        .select('id, name, country')
-        .eq('curator_id', curatorId)
-        .eq('status', 'active')
-        .order('name')
-    : { data: [] as { id: number; name: string; country?: string | null }[] }
+  const [{ data: myClients }, { data: curatorData }] = await Promise.all([
+    curatorId
+      ? admin.from('clients').select('id, name, country').eq('curator_id', curatorId).eq('status', 'active').order('name')
+      : Promise.resolve({ data: [] as { id: number; name: string; country?: string | null }[] }),
+    admin.from('program_curator_data').select('*').eq('program_id', id).maybeSingle(),
+  ])
+
+  // Кто последним обновлял — для подписи «обновил X»
+  let lastUpdatedByName: string | null = null
+  if (curatorData?.last_updated_by) {
+    const { data: c } = await admin
+      .from('curators').select('name').eq('id', curatorData.last_updated_by).maybeSingle()
+    lastUpdatedByName = c?.name || null
+  }
 
   const initials = (profile?.name || user.email || 'КР')
     .split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)
@@ -221,7 +228,7 @@ export default async function ProgramPage({
             </div>
 
             {/* Action */}
-            <div style={{ marginTop: 16, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <div style={{ marginTop: 16, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
               <AddToShortlistButton
                 schoolId={school.id}
                 programId={program.id}
@@ -234,8 +241,39 @@ export default async function ProgramPage({
               >
                 Все программы вуза →
               </Link>
+              <FillProgramButton programId={program.id} hasData={!!curatorData} />
+              {curatorData?.last_updated_at && (
+                <span style={{ fontSize: 11, color: 'var(--muted)', marginLeft: 'auto' }}>
+                  {lastUpdatedByName ? `Обновил ${lastUpdatedByName}` : 'Обновлено'} · {relativeTime(curatorData.last_updated_at)}
+                </span>
+              )}
             </div>
           </div>
+
+          {/* ИИ-данные */}
+          {curatorData && (
+            <>
+              <CuratorDataSummary data={curatorData} levelText={levelText} />
+              <AdmissionRequirements data={curatorData} />
+              {curatorData.pgwp_text && <PGWPCard text={curatorData.pgwp_text} eligible={curatorData.pgwp_eligible} />}
+              {Array.isArray(curatorData.source_urls) && curatorData.source_urls.length > 0 && (
+                <SourceList urls={curatorData.source_urls as string[]} />
+              )}
+            </>
+          )}
+          {!curatorData && (
+            <div style={{
+              ...cardStyle, textAlign: 'center', padding: 32, marginBottom: 16,
+              background: 'rgba(177,94,204,.04)', border: '1px dashed rgba(177,94,204,.3)',
+            }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', marginBottom: 6 }}>
+                🤖 Информация ещё не заполнена
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+                Нажми «Заполнить через ИИ» выше — агент найдёт требования, цены и сроки с официального сайта вуза. Занимает 15-30 сек.
+              </div>
+            </div>
+          )}
 
           {/* Два колоночный блок: метрики + доп. инфа */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 16 }} className="prog-grid">
@@ -385,4 +423,200 @@ function deliveryLabel(d: string): string {
   if (d === 'online') return 'Онлайн'
   if (d === 'blended' || d === 'hybrid') return 'Смешанный'
   return d
+}
+
+function relativeTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime()
+  const s = Math.floor(diff / 1000)
+  if (s < 60) return 'только что'
+  const m = Math.floor(s / 60)
+  if (m < 60) return `${m} мин назад`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `${h} ч назад`
+  const d = Math.floor(h / 24)
+  if (d < 7) return `${d} дн назад`
+  return new Date(iso).toLocaleDateString('ru', { day: 'numeric', month: 'short' })
+}
+
+/* ─── ИИ-данные ─── */
+
+function CuratorDataSummary({ data, levelText }: { data: any; levelText?: string }) {
+  const rows: { icon: string; value: string; label: string }[] = []
+  if (levelText) rows.push({ icon: '🎓', value: levelText, label: 'Program Level' })
+  if (data.program_length_text) rows.push({ icon: '🗓', value: data.program_length_text, label: 'Program Length' })
+  if (data.cost_of_living_label) rows.push({ icon: '🏠', value: data.cost_of_living_label, label: 'Cost of Living' })
+  if (data.gross_tuition_label) rows.push({ icon: '💵', value: data.gross_tuition_label, label: 'Gross Tuition' })
+  if (data.application_fee_label) rows.push({ icon: '📝', value: data.application_fee_label, label: 'Application Fee' })
+
+  const otherFees: any[] = Array.isArray(data.other_fees) ? data.other_fees : []
+
+  if (rows.length === 0 && otherFees.length === 0) return null
+
+  return (
+    <div style={{ ...cardStyle, marginBottom: 16 }}>
+      <div style={sectionTitle}>Сводка программы (ИИ)</div>
+      <div style={{ display: 'grid', gap: 14 }}>
+        {rows.map((r, i) => (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div style={{
+              width: 40, height: 40, borderRadius: 10,
+              background: 'var(--pl)', color: 'var(--purple)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 18, flexShrink: 0,
+            }}>
+              {r.icon}
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>{r.value}</div>
+              <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 1 }}>{r.label}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {otherFees.length > 0 && (
+        <div style={{ marginTop: 18, paddingTop: 14, borderTop: '1px solid var(--bor)' }}>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>Other Fees</div>
+          <div style={{ display: 'grid', gap: 6 }}>
+            {otherFees.map((f, i) => {
+              const amt = f?.amount != null ? `${f.amount}${f.currency ? ` ${f.currency}` : ''}` : ''
+              return (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 13 }}>
+                  <span style={{ color: 'var(--muted)' }}>{f?.label || '—'}{f?.note ? ` (${f.note})` : ''}</span>
+                  {amt && <span style={{ fontWeight: 700, color: 'var(--text)', whiteSpace: 'nowrap' }}>{amt}</span>}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function AdmissionRequirements({ data }: { data: any }) {
+  const hasAcademic = data.min_education_level || data.min_gpa_percent != null
+  const langs: { key: string; label: string; value: any }[] = [
+    { key: 'ielts', label: 'IELTS', value: data.ielts_min },
+    { key: 'toefl', label: 'TOEFL', value: data.toefl_min },
+    { key: 'pte', label: 'PTE', value: data.pte_min },
+    { key: 'duolingo', label: 'Duolingo', value: data.duolingo_min },
+  ].filter(l => l.value != null)
+
+  if (!hasAcademic && langs.length === 0) return null
+
+  return (
+    <div style={{ ...cardStyle, marginBottom: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+        <div style={{
+          width: 32, height: 32, borderRadius: '50%',
+          background: 'var(--pl)', color: 'var(--purple)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 14,
+        }}>📊</div>
+        <div>
+          <div style={{ fontSize: 16, fontWeight: 700 }}>Admission Requirements</div>
+          <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 1 }}>
+            Может варьироваться в зависимости от гражданства и академической истории студента.
+          </div>
+        </div>
+      </div>
+
+      {hasAcademic && (
+        <div style={{ marginTop: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
+            Academic Background
+          </div>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+            gap: 10,
+          }}>
+            {data.min_education_level && (
+              <RequirementCard label="Minimum Level of Education Completed" value={data.min_education_level} />
+            )}
+            {data.min_gpa_percent != null && (
+              <RequirementCard label="Minimum GPA" value={`${Number(data.min_gpa_percent).toFixed(1)}%`} />
+            )}
+          </div>
+        </div>
+      )}
+
+      {langs.length > 0 && (
+        <div style={{ marginTop: 18 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
+            Minimum Language Test Scores
+          </div>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+            gap: 10,
+          }}>
+            {langs.map(l => (
+              <RequirementCard key={l.key} label={l.label} value={String(l.value)} />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function RequirementCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{
+      border: '1px solid var(--bor)',
+      borderRadius: 10,
+      padding: '10px 14px',
+      background: 'var(--surf2)',
+    }}>
+      <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 600, marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', lineHeight: 1.2 }}>{value}</div>
+    </div>
+  )
+}
+
+function PGWPCard({ text, eligible }: { text: string; eligible?: boolean | null }) {
+  return (
+    <div style={{ ...cardStyle, marginBottom: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+        <span style={{ fontSize: 16 }}>🛂</span>
+        <div style={{ fontSize: 14, fontWeight: 700 }}>Post-Study Work Visa</div>
+        {eligible === true && (
+          <span style={{
+            padding: '2px 8px', borderRadius: 20, fontSize: 10, fontWeight: 700,
+            color: 'var(--green)', background: 'rgba(22,163,97,.1)',
+            border: '1px solid rgba(22,163,97,.25)',
+          }}>Eligible</span>
+        )}
+        {eligible === false && (
+          <span style={{
+            padding: '2px 8px', borderRadius: 20, fontSize: 10, fontWeight: 700,
+            color: 'var(--red)', background: 'rgba(220,53,69,.1)',
+            border: '1px solid rgba(220,53,69,.25)',
+          }}>Not eligible</span>
+        )}
+      </div>
+      <div style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--text)', whiteSpace: 'pre-wrap' }}>
+        {text}
+      </div>
+    </div>
+  )
+}
+
+function SourceList({ urls }: { urls: string[] }) {
+  return (
+    <div style={{ ...cardStyle, marginBottom: 16 }}>
+      <div style={sectionTitle}>Источники (ИИ)</div>
+      <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, lineHeight: 1.8 }}>
+        {urls.slice(0, 8).map((u, i) => (
+          <li key={i} style={{ color: 'var(--text)' }}>
+            <a href={u} target="_blank" rel="noreferrer" style={{ color: 'var(--purple)', wordBreak: 'break-all' }}>
+              {u}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
 }
