@@ -7,7 +7,7 @@ interface Props {
 
 const HREFS: Record<string, string | undefined> = {
   resume: '/client/resume',
-  // motivation: '/client/motivation', // пока не реализован, кнопка не активна
+  motivation: '/client/motivation',
 }
 
 export function EssayCards({ essays }: Props) {
