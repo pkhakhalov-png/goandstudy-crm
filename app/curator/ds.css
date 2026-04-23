@@ -1,0 +1,418 @@
+/* =======================================================================
+   Go & Study Design System — scoped to /curator/* (and /client/* later)
+   Source of truth: DESIGN.md at repo root
+   Do NOT edit without updating DESIGN.md
+   ======================================================================= */
+
+.ds-scope {
+  /* ── Base — Light ────────────────────────────────────────────────── */
+  --ds-bg: #FFFFFF;
+  --ds-bg-alt: #F5F5F7;
+  --ds-bg-soft: #FAFAFB;
+  --ds-ink: #1D1D1F;
+  --ds-ink-dim: #424245;
+  --ds-muted: #86868B;
+  --ds-border: #E5E5E7;
+  --ds-border-soft: #EFEFF1;
+
+  /* ── Brand accents ───────────────────────────────────────────────── */
+  --ds-purple: #B57FCF;
+  --ds-purple-hov: #A16BBD;
+  --ds-purple-deep: #8B5FA8;
+  --ds-purple-soft: rgba(181, 127, 207, 0.12);
+  --ds-amber: #E8B844;
+  --ds-amber-hov: #D9AA35;
+  --ds-amber-soft: rgba(232, 184, 68, 0.16);
+
+  /* ── Semantic ────────────────────────────────────────────────────── */
+  --ds-success: #34C759;
+  --ds-success-ink: #1D7A35;
+  --ds-success-soft: rgba(52, 199, 89, 0.14);
+  --ds-warning: #E8B844;
+  --ds-error: #FF3B30;
+  --ds-error-ink: #C92D22;
+  --ds-error-soft: rgba(255, 59, 48, 0.14);
+  --ds-info: #0071E3;
+  --ds-info-soft: rgba(0, 113, 227, 0.12);
+
+  /* ── Spacing ─────────────────────────────────────────────────────── */
+  --ds-sp-1: 4px;
+  --ds-sp-2: 8px;
+  --ds-sp-3: 12px;
+  --ds-sp-4: 16px;
+  --ds-sp-6: 24px;
+  --ds-sp-8: 32px;
+  --ds-sp-10: 40px;
+  --ds-sp-12: 48px;
+  --ds-sp-16: 64px;
+
+  /* ── Radius ──────────────────────────────────────────────────────── */
+  --ds-r-sm: 8px;
+  --ds-r-md: 12px;
+  --ds-r-lg: 18px;
+  --ds-r-xl: 24px;
+
+  /* ── Type stacks ─────────────────────────────────────────────────
+     Body/UI: Geist — современный sans с кириллицей, tabular-nums.
+     Display: Oswald — condensed bold caps с кириллицей, ДНК лендинга.
+     Обе переменные приходят из next/font в layout.tsx.
+     ──────────────────────────────────────────────────────────────── */
+  --ds-font: var(--ds-font-body), -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Inter', sans-serif;
+  --ds-font-display-stack: var(--ds-font-display), 'Oswald', 'Arial Narrow', 'Roboto Condensed', -apple-system, sans-serif;
+  --ds-font-mono: 'JetBrains Mono', 'SF Mono', ui-monospace, monospace;
+
+  /* ── Shadows ─────────────────────────────────────────────────────── */
+  --ds-sh-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --ds-sh-md: 0 4px 16px rgba(0, 0, 0, 0.06);
+  --ds-sh-lg: 0 24px 80px -24px rgba(29, 29, 31, 0.18);
+  --ds-glow-p: 0 0 0 4px rgba(181, 127, 207, 0.18);
+
+  /* Apply defaults inside the scope */
+  font-family: var(--ds-font);
+  color: var(--ds-ink);
+  background: var(--ds-bg);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.005em;
+}
+
+/* Override globals.css body/app chrome within curator scope */
+.ds-scope .main {
+  background: var(--ds-bg);
+}
+
+/* Replace legacy topbar look inside curator */
+.ds-scope .topbar {
+  background: var(--ds-bg);
+  border-bottom: 1px solid var(--ds-border-soft);
+  padding: 16px 32px;
+}
+.ds-scope .pt {
+  font-family: var(--ds-font-display-stack);
+  font-weight: 700;
+  font-size: 20px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ds-ink);
+}
+
+/* ────────────────────────────────────────────────────────────────────
+   HERO (page header used instead of plain topbar for main sections)
+   ──────────────────────────────────────────────────────────────────── */
+.ds-hero {
+  position: relative;
+  overflow: hidden;
+  padding: 44px 32px 32px;
+  border-bottom: 1px solid var(--ds-border-soft);
+  background: var(--ds-bg);
+}
+.ds-hero::before {
+  content: "";
+  position: absolute;
+  top: -40%; right: -15%;
+  width: 800px; height: 500px;
+  background: radial-gradient(ellipse at center, rgba(181, 127, 207, 0.08) 0%, transparent 60%);
+  pointer-events: none;
+  z-index: 0;
+}
+.ds-hero-inner { position: relative; z-index: 1; max-width: 1400px; }
+
+.ds-hero-eyebrow {
+  font-size: 12px;
+  color: var(--ds-purple);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+.ds-hero-h1 {
+  font-family: var(--ds-font-display-stack);
+  font-weight: 700;
+  font-size: clamp(32px, 4vw, 56px);
+  letter-spacing: 0.01em;
+  line-height: 1;
+  margin: 0 0 12px 0;
+  text-transform: uppercase;
+}
+
+.ds-hero-sub {
+  font-size: 15px;
+  color: var(--ds-ink-dim);
+  line-height: 1.45;
+  max-width: 720px;
+  margin: 0;
+  letter-spacing: -0.005em;
+}
+
+.ds-hero-stats {
+  display: flex;
+  gap: 32px;
+  align-items: baseline;
+  margin-top: 18px;
+  flex-wrap: wrap;
+}
+.ds-stat-num {
+  font-family: var(--ds-font-display-stack);
+  font-weight: 700;
+  font-size: 44px;
+  line-height: 1;
+  color: var(--ds-purple-deep);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+.ds-stat-label {
+  font-size: 12px;
+  color: var(--ds-muted);
+  font-weight: 500;
+  margin-left: 8px;
+  display: inline-block;
+}
+
+/* Amber highlight pill for keyword */
+.ds-hl {
+  background: var(--ds-amber);
+  color: var(--ds-ink);
+  padding: 2px 12px 4px;
+  display: inline-block;
+  border-radius: 6px;
+  line-height: inherit;
+}
+
+/* ────────────────────────────────────────────────────────────────────
+   LABEL (eyebrow-style section label)
+   ──────────────────────────────────────────────────────────────────── */
+.ds-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ds-muted);
+}
+
+/* ────────────────────────────────────────────────────────────────────
+   CARDS
+   ──────────────────────────────────────────────────────────────────── */
+.ds-card {
+  background: var(--ds-bg);
+  border: 1px solid var(--ds-border-soft);
+  border-radius: var(--ds-r-xl);
+  padding: var(--ds-sp-8);
+  box-shadow: var(--ds-sh-sm);
+  transition: box-shadow 120ms ease-out, border-color 120ms ease-out;
+}
+.ds-card:hover {
+  box-shadow: var(--ds-sh-md);
+  border-color: var(--ds-border);
+}
+.ds-card-alt {
+  background: var(--ds-bg-alt);
+  border-radius: var(--ds-r-xl);
+  padding: var(--ds-sp-8);
+  border: 1px solid var(--ds-border-soft);
+}
+
+/* ────────────────────────────────────────────────────────────────────
+   BUTTONS
+   ──────────────────────────────────────────────────────────────────── */
+.ds-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 100px;
+  font-family: var(--ds-font);
+  font-size: 14px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  letter-spacing: -0.005em;
+  transition: background 120ms, color 120ms, border-color 120ms, opacity 120ms;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.ds-btn-primary { background: var(--ds-purple); color: #FFFFFF; }
+.ds-btn-primary:hover { background: var(--ds-purple-hov); }
+.ds-btn-amber { background: var(--ds-amber); color: var(--ds-ink); }
+.ds-btn-amber:hover { background: var(--ds-amber-hov); }
+.ds-btn-secondary { background: rgba(0, 0, 0, 0.06); color: var(--ds-ink); }
+.ds-btn-secondary:hover { background: rgba(0, 0, 0, 0.1); }
+.ds-btn-ghost { background: transparent; color: var(--ds-purple); }
+.ds-btn-ghost:hover { color: var(--ds-purple-hov); }
+.ds-btn-sm { padding: 7px 16px; font-size: 13px; }
+
+/* ────────────────────────────────────────────────────────────────────
+   INPUTS
+   ──────────────────────────────────────────────────────────────────── */
+.ds-input {
+  font-family: var(--ds-font);
+  font-size: 14px;
+  color: var(--ds-ink);
+  background: var(--ds-bg);
+  border: 1px solid var(--ds-border);
+  padding: 10px 14px;
+  border-radius: var(--ds-r-md);
+  outline: none;
+  width: 100%;
+  transition: border-color 120ms, box-shadow 120ms;
+  letter-spacing: -0.005em;
+}
+.ds-input:focus {
+  border-color: var(--ds-purple);
+  box-shadow: 0 0 0 3px var(--ds-purple-soft);
+}
+.ds-input::placeholder { color: var(--ds-muted); }
+
+.ds-input-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ds-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 6px;
+}
+
+/* ────────────────────────────────────────────────────────────────────
+   CHIPS
+   ──────────────────────────────────────────────────────────────────── */
+.ds-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 100px;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+.ds-chip-success { background: var(--ds-success-soft); color: var(--ds-success-ink); }
+.ds-chip-warning { background: var(--ds-amber-soft); color: #8A6D1E; }
+.ds-chip-error { background: var(--ds-error-soft); color: var(--ds-error-ink); }
+.ds-chip-info { background: var(--ds-info-soft); color: var(--ds-info); }
+.ds-chip-purple { background: var(--ds-purple-soft); color: var(--ds-purple-deep); }
+.ds-chip-neutral { background: var(--ds-bg-alt); color: var(--ds-muted); border: 1px solid var(--ds-border); }
+
+/* ────────────────────────────────────────────────────────────────────
+   LOGO MARK — three-line "GO / AND / STUDY" in ink circle
+   ──────────────────────────────────────────────────────────────────── */
+.ds-logo-mark {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: var(--ds-ink);
+  display: grid;
+  place-items: center;
+  font-family: var(--ds-font-display-stack);
+  font-weight: 700;
+  font-size: 8px;
+  line-height: 1.05;
+  letter-spacing: 0.04em;
+  text-align: center;
+  padding: 0 2px;
+  flex-shrink: 0;
+}
+.ds-logo-mark span { display: block; }
+.ds-logo-mark span:nth-child(1) { color: var(--ds-purple); }
+.ds-logo-mark span:nth-child(2) { color: var(--ds-amber); }
+.ds-logo-mark span:nth-child(3) { color: #FFFFFF; }
+
+.ds-logo-mark-sm {
+  width: 28px; height: 28px;
+  font-size: 6px;
+}
+
+/* ────────────────────────────────────────────────────────────────────
+   MONO numbers helper
+   ──────────────────────────────────────────────────────────────────── */
+.ds-mono {
+  font-family: var(--ds-font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+/* ────────────────────────────────────────────────────────────────────
+   DIVIDER
+   ──────────────────────────────────────────────────────────────────── */
+.ds-divider {
+  height: 1px;
+  background: var(--ds-border-soft);
+  border: 0;
+  margin: 0;
+}
+
+/* ────────────────────────────────────────────────────────────────────
+   EMPTY STATE
+   ──────────────────────────────────────────────────────────────────── */
+.ds-empty {
+  text-align: center;
+  padding: 64px 24px;
+  background: var(--ds-bg-alt);
+  border: 1px solid var(--ds-border-soft);
+  border-radius: var(--ds-r-xl);
+  color: var(--ds-muted);
+  font-size: 14px;
+}
+.ds-empty-title {
+  font-family: var(--ds-font-display-stack);
+  font-weight: 700;
+  font-size: 20px;
+  color: var(--ds-ink);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 8px;
+}
+
+/* ────────────────────────────────────────────────────────────────────
+   PAGINATION
+   ──────────────────────────────────────────────────────────────────── */
+.ds-pag {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 32px;
+}
+.ds-pag-btn {
+  min-width: 36px;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: var(--ds-r-sm);
+  border: 1px solid var(--ds-border);
+  background: var(--ds-bg);
+  color: var(--ds-ink);
+  font-family: var(--ds-font);
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  transition: all 120ms;
+  cursor: pointer;
+}
+.ds-pag-btn:hover {
+  border-color: var(--ds-purple);
+  color: var(--ds-purple);
+}
+.ds-pag-btn.active {
+  background: var(--ds-purple);
+  border-color: var(--ds-purple);
+  color: #FFFFFF;
+}
+.ds-pag-btn.active:hover { background: var(--ds-purple-hov); border-color: var(--ds-purple-hov); color: #FFFFFF; }
+.ds-pag-ellipsis { color: var(--ds-muted); padding: 0 4px; font-size: 13px; }
+
+/* ────────────────────────────────────────────────────────────────────
+   LINKS
+   ──────────────────────────────────────────────────────────────────── */
+.ds-link {
+  color: var(--ds-purple);
+  text-decoration: none;
+  font-weight: 600;
+}
+.ds-link:hover { color: var(--ds-purple-hov); }

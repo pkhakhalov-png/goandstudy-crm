@@ -57,6 +57,10 @@ Schema is managed in the Supabase dashboard, not in the repo.
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` — public anon key
 - `SUPABASE_SERVICE_ROLE_KEY` — admin key (server-only)
 
+## Design System
+
+Always read `DESIGN.md` before making any visual or UI decisions in `/curator/*`, `/client/*`, or new shared components. All font choices, colors, spacing, and aesthetic direction are defined there. Do not deviate without explicit user approval. Admin and Sales routes keep existing utilitarian styles (out of scope for DESIGN.md v1).
+
 ## Skill routing
 
 When the user's request matches an available skill, invoke it via the Skill tool. The

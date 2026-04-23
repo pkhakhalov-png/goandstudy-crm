@@ -26,13 +26,12 @@ export function ProgramCardInteractive({ program, myClients }: Props) {
   const appFee = program.application_fee ?? attr.application_fee
   const intake = attr.earliest_intake?.start_date || program.earliest_intake_date
 
-  // Tags from raw_data flags
-  const tags: { label: string; color: string }[] = []
-  if (attr.pgwp_participating || attr.pgwp_visible) tags.push({ label: 'PGWP', color: 'var(--green)' })
-  if (attr.coop_length > 0) tags.push({ label: 'Co-op', color: '#0088cc' })
-  if (attr.bypass_eligibility) tags.push({ label: 'Conditional Offer', color: 'var(--gold)' })
-  if (attr.delivery_method === 'in_class') tags.push({ label: 'В кампусе', color: 'var(--muted)' })
-  else if (attr.delivery_method === 'online') tags.push({ label: 'Онлайн', color: 'var(--muted)' })
+  const flags: string[] = []
+  if (attr.pgwp_participating || attr.pgwp_visible) flags.push('PGWP')
+  if (attr.coop_length > 0) flags.push('Co-op')
+  if (attr.bypass_eligibility) flags.push('Conditional')
+  if (attr.delivery_method === 'online') flags.push('Онлайн')
+  else if (attr.delivery_method === 'in_class') flags.push('Кампус')
 
   const countryLabel = COUNTRY_LABEL[(school.country_code || '').toLowerCase()]
     || (school.country_code || '').toUpperCase()
@@ -52,18 +51,14 @@ export function ProgramCardInteractive({ program, myClients }: Props) {
   }
 
   return (
-    <div style={{
-      background: 'var(--surf)',
-      border: '1px solid var(--bor)',
-      borderRadius: 14,
-      padding: 16,
-      boxShadow: 'var(--sh)',
+    <div className="ds-card" style={{
+      padding: 20,
       display: 'flex',
       flexDirection: 'column',
-      gap: 12,
-      minHeight: 280,
+      gap: 14,
+      minHeight: 300,
     }}>
-      {/* School header: logo + name (link to school detail) */}
+      {/* School header */}
       <Link
         href={`/curator/universities/${school.id}`}
         style={{
@@ -72,8 +67,8 @@ export function ProgramCardInteractive({ program, myClients }: Props) {
           alignItems: 'center',
           textDecoration: 'none',
           color: 'inherit',
-          paddingBottom: 10,
-          borderBottom: '1px solid var(--bor)',
+          paddingBottom: 12,
+          borderBottom: '1px solid var(--ds-border-soft)',
         }}
       >
         {school.logo_url ? (
@@ -82,51 +77,56 @@ export function ProgramCardInteractive({ program, myClients }: Props) {
             src={school.logo_url}
             alt={school.name}
             style={{
-              width: 32, height: 32, borderRadius: 8,
+              width: 36, height: 36, borderRadius: 8,
               objectFit: 'contain', background: '#fff',
-              border: '1px solid var(--bor)', flexShrink: 0,
+              border: '1px solid var(--ds-border-soft)', flexShrink: 0,
             }}
           />
         ) : (
           <div style={{
-            width: 32, height: 32, borderRadius: 8, flexShrink: 0,
-            background: 'var(--purple)', color: '#fff',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 13, fontWeight: 700,
+            width: 36, height: 36, borderRadius: 8, flexShrink: 0,
+            background: 'var(--ds-purple-soft)',
+            color: 'var(--ds-purple-deep)',
+            display: 'grid', placeItems: 'center',
+            fontFamily: 'var(--ds-font-display-stack)',
+            fontSize: 14, fontWeight: 900,
           }}>
             {(school.name || '?').trim()[0]?.toUpperCase() || '?'}
           </div>
         )}
         <div style={{ minWidth: 0, flex: 1 }}>
           <div style={{
-            fontSize: 12, fontWeight: 700, color: 'var(--text)',
+            fontSize: 13, fontWeight: 700, color: 'var(--ds-ink)',
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            letterSpacing: '-0.01em',
           }}>
             {school.name}
           </div>
-          <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 1 }}>
-            {countryLabel}{school.city ? `, ${school.city}` : ''}
+          <div style={{
+            fontSize: 11, color: 'var(--ds-muted)', marginTop: 2,
+            textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 500,
+          }}>
+            {countryLabel}{school.city ? ` · ${school.city}` : ''}
           </div>
         </div>
       </Link>
 
-      {/* Program level + name (link to program detail) */}
+      {/* Program level + name */}
       <Link
         href={`/curator/programs/${program.id}`}
         style={{ flex: 1, textDecoration: 'none', color: 'inherit' }}
       >
         {levelText && (
-          <div style={{
-            fontSize: 10, fontWeight: 700, color: 'var(--purple)',
-            textTransform: 'uppercase', letterSpacing: '0.05em',
-            marginBottom: 4,
-          }}>
-            {levelText}
+          <div style={{ marginBottom: 8 }}>
+            <span className="ds-chip ds-chip-purple" style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>
+              {levelText}
+            </span>
           </div>
         )}
         <div style={{
-          fontSize: 14, fontWeight: 700, color: 'var(--text)',
-          lineHeight: 1.35,
+          fontFamily: 'var(--ds-font)',
+          fontSize: 16, fontWeight: 700, color: 'var(--ds-ink)',
+          lineHeight: 1.3, letterSpacing: '-0.015em',
           display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical',
           overflow: 'hidden',
         }}>
@@ -134,41 +134,53 @@ export function ProgramCardInteractive({ program, myClients }: Props) {
         </div>
       </Link>
 
-      {/* Metrics */}
-      <div style={{ display: 'grid', gap: 4, fontSize: 11, color: 'var(--muted)' }}>
+      {/* Metrics — tabular, no emoji noise */}
+      <div style={{
+        display: 'grid', gap: 6, fontSize: 12,
+        paddingTop: 4,
+      }}>
         {tuition != null && (
-          <div>💵 <span style={{ color: 'var(--text)', fontWeight: 600 }}>
-            {fmt(tuition)}{currency ? ` ${currency}` : ''}
-          </span> /год</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+            <span style={{ color: 'var(--ds-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: 10, fontWeight: 600 }}>
+              Стоимость
+            </span>
+            <span className="ds-mono" style={{ color: 'var(--ds-ink)', fontWeight: 700, fontSize: 13 }}>
+              {fmt(tuition)}{currency ? ` ${currency}` : ''} <span style={{ color: 'var(--ds-muted)', fontWeight: 500 }}>/год</span>
+            </span>
+          </div>
         )}
         {intake && (
-          <div>📅 Старт: <span style={{ color: 'var(--text)', fontWeight: 600 }}>{fmtDate(intake)}</span></div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+            <span style={{ color: 'var(--ds-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: 10, fontWeight: 600 }}>
+              Старт
+            </span>
+            <span className="ds-mono" style={{ color: 'var(--ds-ink)', fontWeight: 600, fontSize: 12 }}>
+              {fmtDate(intake)}
+            </span>
+          </div>
         )}
         {appFee != null && (
-          <div>📝 Взнос: <span style={{ color: 'var(--text)', fontWeight: 600 }}>{fmt(appFee)}{currency ? ` ${currency}` : ''}</span></div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+            <span style={{ color: 'var(--ds-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: 10, fontWeight: 600 }}>
+              Взнос
+            </span>
+            <span className="ds-mono" style={{ color: 'var(--ds-ink)', fontWeight: 600, fontSize: 12 }}>
+              {fmt(appFee)}{currency ? ` ${currency}` : ''}
+            </span>
+          </div>
         )}
       </div>
 
-      {/* Tags */}
-      {tags.length > 0 && (
+      {/* Flags */}
+      {flags.length > 0 && (
         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-          {tags.map((tag, i) => (
+          {flags.map((label, i) => (
             <span
               key={i}
-              style={{
-                display: 'inline-block',
-                padding: '2px 8px',
-                borderRadius: 20,
-                fontSize: 9,
-                fontWeight: 700,
-                color: tag.color,
-                background: `color-mix(in srgb, ${tag.color} 12%, transparent)`,
-                border: `1px solid color-mix(in srgb, ${tag.color} 25%, transparent)`,
-                letterSpacing: '0.02em',
-                textTransform: 'uppercase',
-              }}
+              className="ds-chip ds-chip-neutral"
+              style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}
             >
-              {tag.label}
+              {label}
             </span>
           ))}
         </div>

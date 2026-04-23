@@ -116,16 +116,27 @@ export default async function UniversitiesPage({
     <div className="app">
       <CuratorSidebar userName={profile?.name || ''} userEmail={user.email || ''} initials={initials} activePage="universities" />
       <div className="main">
-        <div className="topbar">
-          <div className="pt">База программ</div>
-          <div className="tbr">
-            <span style={{ fontSize: 12, color: 'var(--muted)' }}>
-              {total > 0 ? `Найдено ${total.toLocaleString('ru')} программ` : 'Ничего не найдено'}
-            </span>
+        <section className="ds-hero">
+          <div className="ds-hero-inner">
+            <div className="ds-hero-eyebrow">Каталог программ</div>
+            <h1 className="ds-hero-h1">
+              База <span className="ds-hl">вузов</span> и программ
+            </h1>
+            <p className="ds-hero-sub">
+              Поиск по зарубежным университетам. Фильтры по стране, уровню и intake. Найденную программу можно добавить клиенту в shortlist одной кнопкой.
+            </p>
+            <div className="ds-hero-stats">
+              <div>
+                <span className="ds-stat-num">{total.toLocaleString('ru')}</span>
+                <span className="ds-stat-label">
+                  {total === 1 ? 'программа найдена' : total >= 2 && total <= 4 ? 'программы найдено' : 'программ найдено'}
+                </span>
+              </div>
+            </div>
           </div>
-        </div>
+        </section>
 
-        <div style={{ padding: '20px 28px 40px' }}>
+        <div style={{ padding: '28px 32px 48px' }}>
           <UniversityFilters
             countryCodes={countryCodes}
             countryLabels={COUNTRY_LABEL}
@@ -134,19 +145,16 @@ export default async function UniversitiesPage({
           />
 
           {(programs ?? []).length === 0 ? (
-            <div style={{
-              marginTop: 40, textAlign: 'center', padding: '48px 20px',
-              color: 'var(--muted)', fontSize: 14,
-              background: 'var(--surf)', border: '1px solid var(--bor)', borderRadius: 14,
-            }}>
-              Ничего не найдено. Попробуй изменить фильтры.
+            <div className="ds-empty" style={{ marginTop: 28 }}>
+              <div className="ds-empty-title">Ничего не найдено</div>
+              Попробуй изменить фильтры или сбросить поиск.
             </div>
           ) : (
             <>
               <div style={{
-                marginTop: 16,
+                marginTop: 20,
                 display: 'grid',
-                gap: 16,
+                gap: 20,
                 gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
               }}>
                 {(programs ?? []).map((prog) => (
@@ -205,37 +213,27 @@ function Pagination({
   if (end - start < maxButtons - 1) start = Math.max(1, end - maxButtons + 1)
   for (let i = start; i <= end; i++) pages.push(i)
 
-  const btnStyle = (active = false): React.CSSProperties => ({
-    minWidth: 32,
-    height: 32,
-    padding: '0 10px',
-    borderRadius: 8,
-    border: `1px solid ${active ? 'var(--purple)' : 'var(--bor2)'}`,
-    background: active ? 'var(--purple)' : 'var(--surf)',
-    color: active ? '#fff' : 'var(--text)',
-    fontSize: 12,
-    fontWeight: 600,
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    textDecoration: 'none',
-  })
-
   return (
-    <div style={{ display: 'flex', gap: 6, marginTop: 24, justifyContent: 'center', flexWrap: 'wrap' }}>
-      {currentPage > 1 && <Link href={href(currentPage - 1)} style={btnStyle()}>‹</Link>}
+    <div className="ds-pag">
+      {currentPage > 1 && <Link href={href(currentPage - 1)} className="ds-pag-btn">‹</Link>}
       {start > 1 && <>
-        <Link href={href(1)} style={btnStyle()}>1</Link>
-        {start > 2 && <span style={{ color: 'var(--muted)', padding: '0 4px' }}>…</span>}
+        <Link href={href(1)} className="ds-pag-btn">1</Link>
+        {start > 2 && <span className="ds-pag-ellipsis">…</span>}
       </>}
       {pages.map(p => (
-        <Link key={p} href={href(p)} style={btnStyle(p === currentPage)}>{p}</Link>
+        <Link
+          key={p}
+          href={href(p)}
+          className={`ds-pag-btn${p === currentPage ? ' active' : ''}`}
+        >
+          {p}
+        </Link>
       ))}
       {end < totalPages && <>
-        {end < totalPages - 1 && <span style={{ color: 'var(--muted)', padding: '0 4px' }}>…</span>}
-        <Link href={href(totalPages)} style={btnStyle()}>{totalPages}</Link>
+        {end < totalPages - 1 && <span className="ds-pag-ellipsis">…</span>}
+        <Link href={href(totalPages)} className="ds-pag-btn">{totalPages}</Link>
       </>}
-      {currentPage < totalPages && <Link href={href(currentPage + 1)} style={btnStyle()}>›</Link>}
+      {currentPage < totalPages && <Link href={href(currentPage + 1)} className="ds-pag-btn">›</Link>}
     </div>
   )
 }

@@ -86,15 +86,17 @@ export function UniversityFilters({ countryCodes, countryLabels, schools, initia
   const hasFilters = Boolean(q || country || school || levels.length > 0 || intakeYears.length > 0 || sort !== 'name_asc')
 
   const inputStyle: React.CSSProperties = {
-    padding: '9px 12px',
-    border: '1px solid var(--bor2)',
-    borderRadius: 10,
-    fontSize: 13,
+    padding: '10px 14px',
+    border: '1px solid var(--ds-border)',
+    borderRadius: 12,
+    fontSize: 14,
     fontFamily: 'inherit',
     outline: 'none',
-    background: 'var(--surf)',
-    color: 'var(--text)',
+    background: 'var(--ds-bg)',
+    color: 'var(--ds-ink)',
     minWidth: 0,
+    letterSpacing: '-0.005em',
+    transition: 'border-color 120ms, box-shadow 120ms',
   }
 
   return (
@@ -115,8 +117,9 @@ export function UniversityFilters({ countryCodes, countryLabels, schools, initia
           <svg
             viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6"
             style={{
-              position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)',
-              width: 14, height: 14, color: 'var(--muted)',
+              position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)',
+              width: 15, height: 15, color: 'var(--ds-muted)',
+              pointerEvents: 'none',
             }}
           >
             <circle cx="7" cy="7" r="4.5" />
@@ -127,7 +130,7 @@ export function UniversityFilters({ countryCodes, countryLabels, schools, initia
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Что изучать? Например, computer science"
-            style={{ ...inputStyle, width: '100%', paddingLeft: 32 }}
+            style={{ ...inputStyle, width: '100%', paddingLeft: 36 }}
           />
         </form>
 
@@ -193,11 +196,16 @@ export function UniversityFilters({ countryCodes, countryLabels, schools, initia
 
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {hasFilters && (
-            <button type="button" onClick={reset} className="btn-s" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>
+            <button
+              type="button"
+              onClick={reset}
+              className="ds-btn ds-btn-secondary ds-btn-sm"
+              style={{ whiteSpace: 'nowrap' }}
+            >
               Сбросить
             </button>
           )}
-          {pending && <span style={{ fontSize: 11, color: 'var(--muted)' }}>…</span>}
+          {pending && <span style={{ fontSize: 11, color: 'var(--ds-muted)' }}>…</span>}
         </div>
       </div>
     </div>
@@ -250,12 +258,12 @@ function CheckboxDropdown({
         onClick={() => setOpen(v => !v)}
         style={{
           width: '100%',
-          padding: '9px 12px',
-          border: `1px solid ${active ? 'var(--purple)' : 'var(--bor2)'}`,
-          borderRadius: 10,
-          background: active ? 'rgba(177,94,204,.08)' : 'var(--surf)',
-          color: active ? 'var(--purple)' : 'var(--text)',
-          fontSize: 13,
+          padding: '10px 14px',
+          border: `1px solid ${active ? 'var(--ds-purple)' : 'var(--ds-border)'}`,
+          borderRadius: 12,
+          background: active ? 'var(--ds-purple-soft)' : 'var(--ds-bg)',
+          color: active ? 'var(--ds-purple-deep)' : 'var(--ds-ink)',
+          fontSize: 14,
           fontWeight: active ? 600 : 400,
           cursor: 'pointer',
           display: 'flex',
@@ -264,6 +272,8 @@ function CheckboxDropdown({
           fontFamily: 'inherit',
           textAlign: 'left',
           gap: 8,
+          letterSpacing: '-0.005em',
+          transition: 'all 120ms',
         }}
       >
         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -279,25 +289,25 @@ function CheckboxDropdown({
       {open && (
         <div style={{
           position: 'absolute',
-          top: 'calc(100% + 4px)',
+          top: 'calc(100% + 6px)',
           left: 0,
-          minWidth: 260,
-          maxHeight: 360,
+          minWidth: 280,
+          maxHeight: 380,
           overflowY: 'auto',
-          background: 'var(--surf)',
-          border: '1px solid var(--bor2)',
-          borderRadius: 10,
-          boxShadow: '0 8px 28px rgba(0,0,0,.12)',
+          background: 'var(--ds-bg)',
+          border: '1px solid var(--ds-border)',
+          borderRadius: 14,
+          boxShadow: '0 12px 40px -12px rgba(29,29,31,0.18)',
           zIndex: 30,
-          padding: 8,
+          padding: 10,
         }}>
           {Object.entries(groups).map(([group, items]) => (
-            <div key={group} style={{ marginBottom: group ? 8 : 0 }}>
+            <div key={group} style={{ marginBottom: group ? 10 : 0 }}>
               {group && (
                 <div style={{
-                  fontSize: 10, fontWeight: 700, color: 'var(--muted)',
-                  textTransform: 'uppercase', letterSpacing: '0.06em',
-                  padding: '6px 8px 4px',
+                  fontSize: 10, fontWeight: 700, color: 'var(--ds-muted)',
+                  textTransform: 'uppercase', letterSpacing: '0.1em',
+                  padding: '8px 8px 4px',
                 }}>
                   {group}
                 </div>
@@ -308,21 +318,22 @@ function CheckboxDropdown({
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 8,
-                    padding: '7px 8px',
-                    borderRadius: 6,
+                    gap: 10,
+                    padding: '8px 10px',
+                    borderRadius: 8,
                     cursor: 'pointer',
-                    fontSize: 12,
-                    color: 'var(--text)',
+                    fontSize: 13,
+                    color: 'var(--ds-ink)',
+                    transition: 'background 120ms',
                   }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = 'var(--rh)'}
+                  onMouseEnter={(e) => e.currentTarget.style.background = 'var(--ds-bg-alt)'}
                   onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                 >
                   <input
                     type="checkbox"
                     checked={selected.includes(opt.value)}
                     onChange={() => toggle(opt.value)}
-                    style={{ accentColor: 'var(--purple)', cursor: 'pointer' }}
+                    style={{ accentColor: 'var(--ds-purple)', cursor: 'pointer', width: 16, height: 16 }}
                   />
                   <span>{opt.label}</span>
                 </label>
@@ -330,14 +341,15 @@ function CheckboxDropdown({
             </div>
           ))}
           {selected.length > 0 && (
-            <div style={{ borderTop: '1px solid var(--bor)', marginTop: 6, paddingTop: 6 }}>
+            <div style={{ borderTop: '1px solid var(--ds-border-soft)', marginTop: 8, paddingTop: 8 }}>
               <button
                 type="button"
                 onClick={() => onChange([])}
                 style={{
-                  width: '100%', textAlign: 'center', padding: 6,
-                  background: 'none', border: 'none', cursor: 'pointer',
-                  color: 'var(--muted)', fontSize: 12, fontFamily: 'inherit',
+                  width: '100%', textAlign: 'center', padding: 8,
+                  background: 'transparent', border: 'none', cursor: 'pointer',
+                  color: 'var(--ds-purple)', fontSize: 12, fontFamily: 'inherit',
+                  fontWeight: 600,
                 }}
               >
                 Очистить ({selected.length})
