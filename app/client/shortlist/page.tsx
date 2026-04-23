@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { ClientTopNav } from '../ClientTopNav'
 import { ShortlistView } from './ShortlistView'
-import { CURATOR_SHORTLIST, MAX_PRIORITY } from '../mock-data'
+import { CURATOR_SHORTLIST, MAIN_PAGE_PRIORITY_LIMIT } from '../mock-data'
 
 export default async function ClientShortlistPage() {
   const supabase = await createClient()
@@ -87,8 +87,8 @@ export default async function ClientShortlistPage() {
             }}
           >
             Куратор Анна подготовила <b>{CURATOR_SHORTLIST.length} программ</b> под проект Игоря.
-            Выбери <b>{MAX_PRIORITY} приоритетные</b> — именно они появятся на главной странице кабинета
-            и в первую очередь пойдут в работу по документам. Остальные останутся как запасной вариант.
+            Отметь <b>приоритетные</b> — сколько захочешь. На главной кабинета показываются первые {MAIN_PAGE_PRIORITY_LIMIT},
+            но в этом списке видны все отмеченные. Порядок можно поменять перетаскиванием или кнопками ↑ ↓.
           </p>
         </div>
       </section>

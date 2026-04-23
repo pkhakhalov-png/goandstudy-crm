@@ -1,8 +1,14 @@
 'use client'
 
-import { useMemo } from 'react'
-import { MAX_PRIORITY, type University } from '../mock-data'
-import { useClientState, togglePriority, priorityRank } from '../shared-store'
+import { useMemo, useState } from 'react'
+import { MAIN_PAGE_PRIORITY_LIMIT, type University } from '../mock-data'
+import {
+  useClientState,
+  togglePriority,
+  priorityRank,
+  reorderPriority,
+  movePriority,
+} from '../shared-store'
 
 interface Props {
   items: University[]
@@ -10,22 +16,42 @@ interface Props {
 
 export function ShortlistView({ items }: Props) {
   const { state, update, hydrated } = useClientState()
+  const [dragFromIdx, setDragFromIdx] = useState<number | null>(null)
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null)
 
   const { priority, rest } = useMemo(() => {
     const keyIndex = new Map(items.map((u, i) => [u.key, i] as const))
-    // priority — отсортированный в порядке выбора клиента
     const priority = state.priorityUniKeys
       .map(k => items.find(u => u.key === k))
       .filter((x): x is University => Boolean(x))
     const rest = items
       .filter(u => !state.priorityUniKeys.includes(u.key))
-      // стабильный порядок по match%, иначе — по исходному индексу
       .sort((a, b) => (b.match - a.match) || (keyIndex.get(a.key)! - keyIndex.get(b.key)!))
     return { priority, rest }
   }, [items, state.priorityUniKeys])
 
-  const full = state.priorityUniKeys.length >= MAX_PRIORITY
-  const selectedCount = state.priorityUniKeys.length
+  const selectedCount = priority.length
+  const mainPageCount = Math.min(selectedCount, MAIN_PAGE_PRIORITY_LIMIT)
+
+  /* ─── drag handlers ─── */
+  function onDragStart(idx: number) {
+    setDragFromIdx(idx)
+  }
+  function onDragOver(e: React.DragEvent, idx: number) {
+    e.preventDefault()
+    setDragOverIdx(idx)
+  }
+  function onDrop(idx: number) {
+    if (dragFromIdx != null && dragFromIdx !== idx) {
+      update(s => reorderPriority(s, dragFromIdx, idx))
+    }
+    setDragFromIdx(null)
+    setDragOverIdx(null)
+  }
+  function onDragEnd() {
+    setDragFromIdx(null)
+    setDragOverIdx(null)
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 40 }}>
@@ -47,13 +73,13 @@ export function ShortlistView({ items }: Props) {
               fontFamily: 'var(--ds-font-display-stack)',
               fontWeight: 700,
               fontSize: 32,
-              color: full ? 'var(--ds-success-ink)' : 'var(--ds-purple-deep)',
+              color: selectedCount > 0 ? 'var(--ds-purple-deep)' : 'var(--ds-muted)',
               fontVariantNumeric: 'tabular-nums',
               lineHeight: 1,
               letterSpacing: 0,
             }}
           >
-            {selectedCount} / {MAX_PRIORITY}
+            {selectedCount}
           </div>
           <div>
             <div
@@ -66,33 +92,34 @@ export function ShortlistView({ items }: Props) {
                 color: 'var(--ds-ink)',
               }}
             >
-              {full ? 'Приоритеты выбраны' : 'Выбери приоритетные программы'}
+              {selectedCount === 0
+                ? 'Выбери приоритетные'
+                : `Приоритетн${formatWord(selectedCount, ['ая', 'ые', 'ых'])} ${formatWord(selectedCount, ['программа', 'программы', 'программ'])}`}
             </div>
             <div style={{ fontSize: 12, color: 'var(--ds-muted)', marginTop: 2 }}>
-              {full
-                ? 'На главной кабинета отображаются именно эти три.'
-                : `Осталось выбрать ${MAX_PRIORITY - selectedCount} — нажми «В приоритет» на карточке.`}
+              {selectedCount === 0
+                ? 'Отметь сколько угодно — на главной показываются первые ' + MAIN_PAGE_PRIORITY_LIMIT + '.'
+                : selectedCount <= MAIN_PAGE_PRIORITY_LIMIT
+                  ? 'Все показываются на главной кабинета.'
+                  : `На главной — первые ${MAIN_PAGE_PRIORITY_LIMIT}. Переставь порядок чтобы поменять что показывается.`}
             </div>
           </div>
         </div>
-        <div
-          style={{
-            width: 200,
-            height: 4,
-            background: 'var(--ds-bg-alt)',
-            borderRadius: 2,
-            overflow: 'hidden',
-          }}
-        >
+        {selectedCount > 0 && (
           <div
             style={{
-              width: `${(selectedCount / MAX_PRIORITY) * 100}%`,
-              height: '100%',
-              background: full ? 'var(--ds-success)' : 'var(--ds-purple)',
-              transition: 'width 200ms ease-out, background 200ms',
+              fontSize: 12,
+              color: 'var(--ds-muted)',
+              fontWeight: 500,
+              background: 'var(--ds-bg-alt)',
+              padding: '6px 12px',
+              borderRadius: 100,
+              fontVariantNumeric: 'tabular-nums',
             }}
-          />
-        </div>
+          >
+            На главной: {mainPageCount} из {selectedCount}
+          </div>
+        )}
       </div>
 
       {/* ═══ PRIORITY — top ═══ */}
@@ -102,8 +129,8 @@ export function ShortlistView({ items }: Props) {
           title={selectedCount > 0 ? 'Ваш выбор' : 'Пока не выбрано'}
           subtitle={
             selectedCount > 0
-              ? 'Эти программы показываются на главной и идут в работу первыми.'
-              : `Отметьте до ${MAX_PRIORITY} программ ниже — они появятся здесь сверху.`
+              ? 'Перетащи карточку за иконку ⋮⋮ слева чтобы поменять порядок. Первые 3 показываются на главной.'
+              : 'Отметьте программы ниже кнопкой «+ В приоритет». Они появятся здесь сверху.'
           }
         />
 
@@ -122,29 +149,33 @@ export function ShortlistView({ items }: Props) {
           >
             Ни одна программа пока не отмечена.
             <br />
-            Пролистайте список ниже и нажмите <b style={{ color: 'var(--ds-ink)' }}>«В приоритет»</b> на трёх понравившихся.
+            Пролистай список ниже и нажми <b style={{ color: 'var(--ds-ink)' }}>«+ В приоритет»</b>.
           </div>
         ) : (
           <div
             style={{
               marginTop: 16,
               display: 'grid',
-              gridTemplateColumns: `repeat(${priority.length}, minmax(0, 1fr))`,
+              gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
               gap: 16,
             }}
-            className="priority-grid"
           >
-            <style>{`
-              @media (max-width: 920px) { .priority-grid { grid-template-columns: 1fr !important; } }
-            `}</style>
-            {priority.map((uni) => (
-              <UniCard
+            {priority.map((uni, idx) => (
+              <PriorityCard
                 key={uni.key}
                 uni={uni}
-                rank={priorityRank(state, uni.key)}
-                isPriority
-                full={full}
-                onToggle={() => update(s => togglePriority(s, uni.key))}
+                rank={idx + 1}
+                total={priority.length}
+                inMainPage={idx < MAIN_PAGE_PRIORITY_LIMIT}
+                isDragging={dragFromIdx === idx}
+                isDragOver={dragOverIdx === idx && dragFromIdx !== idx}
+                onDragStart={() => onDragStart(idx)}
+                onDragOver={(e) => onDragOver(e, idx)}
+                onDrop={() => onDrop(idx)}
+                onDragEnd={onDragEnd}
+                onMoveUp={idx > 0 ? () => update(s => movePriority(s, uni.key, 'up')) : undefined}
+                onMoveDown={idx < priority.length - 1 ? () => update(s => movePriority(s, uni.key, 'down')) : undefined}
+                onRemove={() => update(s => togglePriority(s, uni.key))}
                 hydrated={hydrated}
               />
             ))}
@@ -153,33 +184,32 @@ export function ShortlistView({ items }: Props) {
       </section>
 
       {/* ═══ REST ═══ */}
-      <section>
-        <SectionHeader
-          eyebrow="Остальные варианты"
-          title={`Ещё ${rest.length} ${formatWord(rest.length, ['программа', 'программы', 'программ'])}`}
-          subtitle="Куратор оставил их в резерве — можно переключить приоритет в любой момент."
-        />
-        <div
-          style={{
-            marginTop: 16,
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-            gap: 16,
-          }}
-        >
-          {rest.map((uni) => (
-            <UniCard
-              key={uni.key}
-              uni={uni}
-              rank={null}
-              isPriority={false}
-              full={full}
-              onToggle={() => update(s => togglePriority(s, uni.key))}
-              hydrated={hydrated}
-            />
-          ))}
-        </div>
-      </section>
+      {rest.length > 0 && (
+        <section>
+          <SectionHeader
+            eyebrow="Остальные варианты"
+            title={`Ещё ${rest.length} ${formatWord(rest.length, ['программа', 'программы', 'программ'])}`}
+            subtitle="Куратор оставил их в резерве. Можно добавить в приоритет в любой момент — сколько захочешь."
+          />
+          <div
+            style={{
+              marginTop: 16,
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+              gap: 16,
+            }}
+          >
+            {rest.map((uni) => (
+              <RestCard
+                key={uni.key}
+                uni={uni}
+                onToggle={() => update(s => togglePriority(s, uni.key))}
+                hydrated={hydrated}
+              />
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   )
 }
@@ -221,7 +251,7 @@ function SectionHeader({
         {title}
       </h2>
       {subtitle && (
-        <p style={{ fontSize: 14, color: 'var(--ds-muted)', margin: '6px 0 0', lineHeight: 1.5 }}>
+        <p style={{ fontSize: 14, color: 'var(--ds-muted)', margin: '6px 0 0', lineHeight: 1.5, maxWidth: 760 }}>
           {subtitle}
         </p>
       )}
@@ -229,56 +259,215 @@ function SectionHeader({
   )
 }
 
-/* ─── Uni card ─── */
+/* ═══════════════════════════════════════════════════════════════
+   PriorityCard — с drag-handle + ↑↓ кнопками + убрать
+   ═══════════════════════════════════════════════════════════════ */
 
-function UniCard({
-  uni, rank, isPriority, full, onToggle, hydrated,
+function PriorityCard({
+  uni, rank, total, inMainPage,
+  isDragging, isDragOver,
+  onDragStart, onDragOver, onDrop, onDragEnd,
+  onMoveUp, onMoveDown, onRemove,
+  hydrated,
 }: {
   uni: University
-  rank: number | null
-  isPriority: boolean
-  full: boolean
-  onToggle: () => void
+  rank: number
+  total: number
+  inMainPage: boolean
+  isDragging: boolean
+  isDragOver: boolean
+  onDragStart: () => void
+  onDragOver: (e: React.DragEvent) => void
+  onDrop: () => void
+  onDragEnd: () => void
+  onMoveUp?: () => void
+  onMoveDown?: () => void
+  onRemove: () => void
   hydrated: boolean
 }) {
-  const disabled = !isPriority && full
+  return (
+    <article
+      draggable={hydrated}
+      onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; onDragStart() }}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      onDragEnd={onDragEnd}
+      style={{
+        background: inMainPage ? 'var(--ds-bg-alt)' : 'var(--ds-bg)',
+        border: `1px solid ${inMainPage ? 'var(--ds-purple)' : 'var(--ds-border)'}`,
+        borderRadius: 'var(--ds-r-xl)',
+        padding: 22,
+        paddingLeft: 16,
+        boxShadow: inMainPage ? '0 0 0 3px rgba(181,127,207,0.12)' : 'var(--ds-sh-sm)',
+        display: 'flex',
+        gap: 10,
+        position: 'relative',
+        opacity: isDragging ? 0.4 : 1,
+        transform: isDragOver ? 'scale(1.02)' : 'scale(1)',
+        transition: 'transform 150ms, opacity 150ms',
+        cursor: isDragging ? 'grabbing' : 'default',
+      }}
+    >
+      {/* ── Drag handle + arrows column ── */}
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 6,
+          flexShrink: 0,
+          paddingTop: 4,
+        }}
+      >
+        <div
+          title="Перетащи чтобы поменять порядок"
+          style={{
+            cursor: 'grab',
+            color: 'var(--ds-muted)',
+            padding: 4,
+            opacity: 0.55,
+            display: 'grid',
+            gridTemplateColumns: 'repeat(2, 3px)',
+            gridAutoRows: '3px',
+            gap: 3,
+            userSelect: 'none',
+          }}
+        >
+          {Array.from({ length: 6 }, (_, i) => (
+            <span key={i} style={{ width: 3, height: 3, background: 'currentColor', borderRadius: '50%' }} />
+          ))}
+        </div>
+
+        <button
+          type="button"
+          onClick={onMoveUp}
+          disabled={!onMoveUp || !hydrated}
+          aria-label="Переместить выше"
+          style={{
+            width: 28,
+            height: 28,
+            borderRadius: 7,
+            background: 'var(--ds-bg)',
+            border: '1px solid var(--ds-border)',
+            color: 'var(--ds-ink)',
+            cursor: onMoveUp ? 'pointer' : 'not-allowed',
+            opacity: onMoveUp ? 1 : 0.35,
+            fontSize: 12,
+            fontWeight: 700,
+            lineHeight: 1,
+            padding: 0,
+          }}
+        >
+          ↑
+        </button>
+        <button
+          type="button"
+          onClick={onMoveDown}
+          disabled={!onMoveDown || !hydrated}
+          aria-label="Переместить ниже"
+          style={{
+            width: 28,
+            height: 28,
+            borderRadius: 7,
+            background: 'var(--ds-bg)',
+            border: '1px solid var(--ds-border)',
+            color: 'var(--ds-ink)',
+            cursor: onMoveDown ? 'pointer' : 'not-allowed',
+            opacity: onMoveDown ? 1 : 0.35,
+            fontSize: 12,
+            fontWeight: 700,
+            lineHeight: 1,
+            padding: 0,
+          }}
+        >
+          ↓
+        </button>
+      </div>
+
+      {/* ── Content ── */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 14, minWidth: 0 }}>
+        {/* rank + main-page badge */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span
+              style={{
+                background: inMainPage ? 'var(--ds-purple)' : 'var(--ds-bg-alt)',
+                color: inMainPage ? '#fff' : 'var(--ds-muted)',
+                fontFamily: 'var(--ds-font-display-stack)',
+                fontWeight: 700,
+                fontSize: 11,
+                letterSpacing: '0.12em',
+                textTransform: 'uppercase',
+                padding: '4px 10px',
+                borderRadius: 100,
+                fontVariantNumeric: 'tabular-nums',
+              }}
+            >
+              #{rank}
+            </span>
+            {inMainPage && (
+              <span
+                className="ds-chip ds-chip-warning"
+                style={{ textTransform: 'uppercase', letterSpacing: '0.08em', fontSize: 10, fontWeight: 700 }}
+              >
+                ★ на главной
+              </span>
+            )}
+            {!inMainPage && (
+              <span
+                className="ds-chip ds-chip-neutral"
+                style={{ textTransform: 'uppercase', letterSpacing: '0.08em', fontSize: 10, fontWeight: 700 }}
+              >
+                резерв
+              </span>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={onRemove}
+            aria-label="Убрать из приоритета"
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: 'var(--ds-muted)',
+              cursor: 'pointer',
+              fontSize: 16,
+              lineHeight: 1,
+              padding: 4,
+              opacity: 0.6,
+              transition: 'opacity 120ms, color 120ms',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.color = 'var(--ds-error)' }}
+            onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.6'; e.currentTarget.style.color = 'var(--ds-muted)' }}
+          >
+            ✕
+          </button>
+        </div>
+
+        <UniInfo uni={uni} />
+      </div>
+    </article>
+  )
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   RestCard — для невыбранных (+ В приоритет)
+   ═══════════════════════════════════════════════════════════════ */
+
+function RestCard({ uni, onToggle, hydrated }: { uni: University; onToggle: () => void; hydrated: boolean }) {
   return (
     <article
       style={{
-        background: isPriority ? 'var(--ds-bg-alt)' : 'var(--ds-bg)',
-        border: `1px solid ${isPriority ? 'var(--ds-purple)' : 'var(--ds-border-soft)'}`,
+        background: 'var(--ds-bg)',
+        border: '1px solid var(--ds-border-soft)',
         borderRadius: 'var(--ds-r-xl)',
         padding: 22,
-        boxShadow: isPriority ? '0 0 0 3px rgba(181,127,207,0.12)' : 'var(--ds-sh-sm)',
+        boxShadow: 'var(--ds-sh-sm)',
         display: 'flex',
         flexDirection: 'column',
         gap: 14,
-        position: 'relative',
-        transition: 'all 150ms',
       }}
     >
-      {isPriority && rank != null && (
-        <div
-          style={{
-            position: 'absolute',
-            top: -10,
-            left: 16,
-            background: 'var(--ds-purple)',
-            color: '#fff',
-            fontFamily: 'var(--ds-font-display-stack)',
-            fontWeight: 700,
-            fontSize: 11,
-            letterSpacing: '0.12em',
-            textTransform: 'uppercase',
-            padding: '4px 10px',
-            borderRadius: 100,
-            fontVariantNumeric: 'tabular-nums',
-          }}
-        >
-          #{rank} приоритет
-        </div>
-      )}
-
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
         <div style={{ fontSize: 34, lineHeight: 1 }}>{uni.flag}</div>
         <div
@@ -295,76 +484,79 @@ function UniCard({
         </div>
       </div>
 
-      <div style={{ flex: 1 }}>
-        <h4
-          style={{
-            fontSize: 16,
-            fontWeight: 700,
-            letterSpacing: '-0.015em',
-            color: 'var(--ds-ink)',
-            margin: '0 0 4px 0',
-            lineHeight: 1.22,
-          }}
-        >
-          {uni.name}
-        </h4>
-        <div style={{ fontSize: 12, color: 'var(--ds-muted)', marginBottom: 8 }}>
-          {uni.city} · {uni.country}
-        </div>
-        <div
-          style={{
-            fontSize: 11,
-            fontWeight: 700,
-            color: 'var(--ds-ink)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.08em',
-            marginBottom: 8,
-          }}
-        >
-          {uni.program}
-        </div>
-        {uni.tuition && (
-          <div style={{ fontSize: 12, color: 'var(--ds-ink-dim)', marginBottom: 8 }}>
-            <span className="ds-mono" style={{ fontWeight: 600 }}>{uni.tuition}</span>
-          </div>
-        )}
-        <p style={{ fontSize: 13, color: 'var(--ds-ink-dim)', lineHeight: 1.45, margin: 0, letterSpacing: '-0.005em' }}>
-          {uni.reason}
-        </p>
-        {uni.tags && uni.tags.length > 0 && (
-          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 10 }}>
-            {uni.tags.map(tag => (
-              <span
-                key={tag}
-                className="ds-chip ds-chip-neutral"
-                style={{ textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: 10, fontWeight: 700 }}
-              >
-                {tag}
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
+      <UniInfo uni={uni} />
 
-      <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-        <button
-          type="button"
-          onClick={onToggle}
-          disabled={disabled || !hydrated}
-          className={`ds-btn ds-btn-sm ${isPriority ? 'ds-btn-amber' : 'ds-btn-primary'}`}
-          style={{
-            flex: 1,
-            opacity: (disabled || !hydrated) ? 0.5 : 1,
-            cursor: disabled ? 'not-allowed' : 'pointer',
-          }}
-          title={disabled ? 'Сначала убери одну из уже выбранных приоритетных' : undefined}
-        >
-          {isPriority ? '✓ В приоритете' : disabled ? 'Приоритеты заняты' : '+ В приоритет'}
-        </button>
-      </div>
+      <button
+        type="button"
+        onClick={onToggle}
+        disabled={!hydrated}
+        className="ds-btn ds-btn-primary ds-btn-sm"
+        style={{ alignSelf: 'stretch' }}
+      >
+        + В приоритет
+      </button>
     </article>
   )
 }
+
+/* ─── Shared content block — uni info ─── */
+
+function UniInfo({ uni }: { uni: University }) {
+  return (
+    <div style={{ flex: 1, minWidth: 0 }}>
+      <h4
+        style={{
+          fontSize: 16,
+          fontWeight: 700,
+          letterSpacing: '-0.015em',
+          color: 'var(--ds-ink)',
+          margin: '0 0 4px 0',
+          lineHeight: 1.22,
+        }}
+      >
+        {uni.name}
+      </h4>
+      <div style={{ fontSize: 12, color: 'var(--ds-muted)', marginBottom: 8 }}>
+        {uni.city} · {uni.country}
+      </div>
+      <div
+        style={{
+          fontSize: 11,
+          fontWeight: 700,
+          color: 'var(--ds-ink)',
+          textTransform: 'uppercase',
+          letterSpacing: '0.08em',
+          marginBottom: 8,
+        }}
+      >
+        {uni.program}
+      </div>
+      {uni.tuition && (
+        <div style={{ fontSize: 12, color: 'var(--ds-ink-dim)', marginBottom: 8 }}>
+          <span className="ds-mono" style={{ fontWeight: 600 }}>{uni.tuition}</span>
+        </div>
+      )}
+      <p style={{ fontSize: 13, color: 'var(--ds-ink-dim)', lineHeight: 1.45, margin: 0, letterSpacing: '-0.005em' }}>
+        {uni.reason}
+      </p>
+      {uni.tags && uni.tags.length > 0 && (
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 10 }}>
+          {uni.tags.map(tag => (
+            <span
+              key={tag}
+              className="ds-chip ds-chip-neutral"
+              style={{ textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: 10, fontWeight: 700 }}
+            >
+              {tag}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ─── helpers ─── */
 
 function formatWord(n: number, forms: [string, string, string]) {
   const mod10 = n % 10

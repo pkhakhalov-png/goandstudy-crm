@@ -120,8 +120,11 @@ export const CURATOR_SHORTLIST: University[] = [
 /** Для удобства: сколько всего в подборке от куратора. */
 export const SHORTLIST_TOTAL = CURATOR_SHORTLIST.length
 
-/** Максимум 3 приоритетные. Если захотим больше — крутим здесь. */
-export const MAX_PRIORITY = 3
+/**
+ * Сколько приоритетных программ показывается на главной /client.
+ * Полный список приоритетов (сколько клиент отметил) видно в /client/shortlist.
+ */
+export const MAIN_PAGE_PRIORITY_LIMIT = 3
 
 export type Curator = {
   name: string

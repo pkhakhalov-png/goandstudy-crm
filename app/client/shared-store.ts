@@ -13,7 +13,6 @@
  */
 
 import { useCallback, useEffect, useState } from 'react'
-import { MAX_PRIORITY } from './mock-data'
 
 const STORAGE_KEY = 'gastudy-client-state-v1'
 
@@ -40,7 +39,7 @@ function safeLoad(): ClientSharedState {
     if (!raw) return DEFAULT_STATE
     const parsed = JSON.parse(raw) as Partial<ClientSharedState>
     return {
-      priorityUniKeys: Array.isArray(parsed.priorityUniKeys) ? parsed.priorityUniKeys.slice(0, MAX_PRIORITY) : [],
+      priorityUniKeys: Array.isArray(parsed.priorityUniKeys) ? parsed.priorityUniKeys : [],
       updatedAt: typeof parsed.updatedAt === 'number' ? parsed.updatedAt : 0,
     }
   } catch {
@@ -99,18 +98,30 @@ export function useClientState() {
 export function togglePriority(state: ClientSharedState, uniKey: string): ClientSharedState {
   const existing = state.priorityUniKeys
   const idx = existing.indexOf(uniKey)
-
   if (idx >= 0) {
-    // Снимаем приоритет
     return { ...state, priorityUniKeys: existing.filter(k => k !== uniKey) }
   }
-
-  if (existing.length >= MAX_PRIORITY) {
-    // Заполнено — ничего не меняем, UI должен блокировать кнопку
-    return state
-  }
-
+  // Без жёсткого лимита — клиент может выбрать сколько угодно приоритетных.
+  // На главной /client отображаются только первые MAIN_PAGE_PRIORITY_LIMIT.
   return { ...state, priorityUniKeys: [...existing, uniKey] }
+}
+
+export function reorderPriority(state: ClientSharedState, fromIdx: number, toIdx: number): ClientSharedState {
+  if (fromIdx === toIdx) return state
+  if (fromIdx < 0 || fromIdx >= state.priorityUniKeys.length) return state
+  if (toIdx < 0 || toIdx >= state.priorityUniKeys.length) return state
+  const arr = [...state.priorityUniKeys]
+  const [item] = arr.splice(fromIdx, 1)
+  arr.splice(toIdx, 0, item)
+  return { ...state, priorityUniKeys: arr }
+}
+
+/** Переместить уже приоритетный вуз на конкретную позицию (для up/down кнопок). */
+export function movePriority(state: ClientSharedState, uniKey: string, direction: 'up' | 'down'): ClientSharedState {
+  const idx = state.priorityUniKeys.indexOf(uniKey)
+  if (idx < 0) return state
+  const target = direction === 'up' ? idx - 1 : idx + 1
+  return reorderPriority(state, idx, target)
 }
 
 export function isPriority(state: ClientSharedState, uniKey: string): boolean {
