@@ -1,7 +1,7 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { redirect, notFound } from 'next/navigation'
 import { CuratorSidebar } from '../../CuratorSidebar'
-import { ClientCard } from './ClientCard'
+import { ClientWorkspace } from './ClientWorkspace'
 
 export default async function CuratorClientPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -60,7 +60,7 @@ export default async function CuratorClientPage({ params }: { params: Promise<{ 
   return (
     <div className="app">
       <CuratorSidebar userName={profile?.name || ''} userEmail={user.email || ''} initials={initials} activePage="clients" />
-      <ClientCard
+      <ClientWorkspace
         client={client}
         stages={stages ?? []}
         clientStages={clientStages ?? []}
