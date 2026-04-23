@@ -1,7 +1,13 @@
+import Link from 'next/link'
 import type { Essay } from './mock-data'
 
 interface Props {
   essays: Essay[]
+}
+
+const HREFS: Record<string, string | undefined> = {
+  resume: '/client/resume',
+  // motivation: '/client/motivation', // пока не реализован, кнопка не активна
 }
 
 export function EssayCards({ essays }: Props) {
@@ -81,9 +87,15 @@ function EssayCard({ essay }: { essay: Essay }) {
       </div>
 
       <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
-        <button className="ds-btn ds-btn-primary" type="button" style={{ minWidth: 160 }}>
-          {ctaText}
-        </button>
+        {HREFS[essay.key] ? (
+          <Link href={HREFS[essay.key]!} className="ds-btn ds-btn-primary" style={{ minWidth: 160, textDecoration: 'none' }}>
+            {ctaText}
+          </Link>
+        ) : (
+          <button className="ds-btn ds-btn-primary" type="button" style={{ minWidth: 160 }}>
+            {ctaText}
+          </button>
+        )}
         <div style={{ fontSize: 11, color: 'var(--ds-muted)', fontWeight: 500 }}>
           {label}
         </div>
