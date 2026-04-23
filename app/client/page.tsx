@@ -11,7 +11,7 @@ import {
   TIMELINE_STAGES,
   ROADMAP,
   STUDENT_PROJECT,
-  SHORTLIST_TOP,
+  CURATOR_SHORTLIST,
   SHORTLIST_TOTAL,
   ESSAYS,
   REQUIRED_DOCS,
@@ -52,7 +52,7 @@ export default async function ClientHomePage() {
         <ProjectAndRoadmap project={STUDENT_PROJECT} roadmap={ROADMAP} />
 
         {/* 3 — ПОДБОРКА ВУЗОВ (горизонтальный full-width) */}
-        <ShortlistBlock items={SHORTLIST_TOP} total={SHORTLIST_TOTAL} />
+        <ShortlistBlock items={CURATOR_SHORTLIST} total={SHORTLIST_TOTAL} />
 
         {/* 4 — РЕЗЮМЕ + МОТИВАЦИОННОЕ ПИСЬМО */}
         <EssayCards essays={ESSAYS} />
