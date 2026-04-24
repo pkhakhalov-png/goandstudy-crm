@@ -31,7 +31,7 @@ async function resolveClient(requestedClientId: number | null, email: string, ro
 export async function saveClientDraft(opts: { clientId?: number; type: EssayType; content: any }) {
   const v = await getViewer()
   if (v.error) return { error: v.error }
-  const client = await resolveClient(opts.clientId || null, v.email, v.role)
+  const client = await resolveClient(opts.clientId || null, v.email || '', v.role)
   if (!client) return { error: 'Клиент не найден' }
 
   const admin = await createAdminClient()
@@ -69,7 +69,7 @@ export async function saveClientDraft(opts: { clientId?: number; type: EssayType
 export async function submitToCurator(opts: { type: EssayType; clientId?: number }) {
   const v = await getViewer()
   if (v.error) return { error: v.error }
-  const client = await resolveClient(opts.clientId || null, v.email, v.role)
+  const client = await resolveClient(opts.clientId || null, v.email || '', v.role)
   if (!client) return { error: 'Клиент не найден' }
 
   const admin = await createAdminClient()
