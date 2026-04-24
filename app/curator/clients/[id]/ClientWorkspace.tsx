@@ -48,7 +48,6 @@ interface Props {
   checklistProgress: any[]
   messages: any[]
   files: any[]
-  shortlists: any[]
   curatorId: string
   initialTab?: string
   catalog?: CatalogData | null
@@ -86,7 +85,7 @@ const UNI_STATUS: Record<string, { label: string; chipClass: string }> = {
 }
 
 export function ClientWorkspace(props: Props) {
-  const { client, stages, clientStages, universities, documents, activities, checklist, checklistProgress, shortlists, catalog, enrichmentByProgram = {}, logoBySchool = {} } = props
+  const { client, stages, clientStages, universities, documents, activities, checklist, checklistProgress, catalog, enrichmentByProgram = {}, logoBySchool = {} } = props
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -124,7 +123,6 @@ export function ClientWorkspace(props: Props) {
         counts={{
           universities: universities.length,
           documents: documents.length,
-          shortlists: shortlists.length,
           activities: activities.length,
         }}
       />
@@ -133,7 +131,7 @@ export function ClientWorkspace(props: Props) {
       <TabBar tab={tab} setTab={setTab} counts={{
         project: 0,
         roadmap: checklist.length,
-        shortlist: shortlists.length,
+        shortlist: universities.length,
         documents: documents.length,
         essays: 0,
         notes: activities.length,
@@ -154,7 +152,6 @@ export function ClientWorkspace(props: Props) {
         {tab === 'shortlist' && (
           <ShortlistTab
             client={client}
-            shortlists={shortlists}
             universities={universities}
             catalog={catalog || null}
             enrichmentByProgram={enrichmentByProgram}
@@ -374,7 +371,6 @@ function Hero({
         <div style={{ marginTop: 20, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12 }}>
           <QuickStat label="Вузов в работе" value={counts.universities} />
           <QuickStat label="Документов" value={counts.documents} />
-          <QuickStat label="Подборок" value={counts.shortlists} />
           <QuickStat label="Активностей" value={counts.activities} />
         </div>
       </div>
@@ -903,10 +899,9 @@ function RoadmapTab({
    ═══════════════════════════════════════════════════════════════ */
 
 function ShortlistTab({
-  client, shortlists, universities, catalog, enrichmentByProgram, logoBySchool,
+  client, universities, catalog, enrichmentByProgram, logoBySchool,
 }: {
   client: any
-  shortlists: any[]
   universities: any[]
   catalog: CatalogData | null
   enrichmentByProgram: Record<number, any>
@@ -1017,37 +1012,6 @@ function ShortlistTab({
           </div>
         )}
       </div>
-
-      {/* Shortlists (из curator/shortlist) */}
-      {shortlists.length > 0 && (
-        <div className="ds-card" style={{ padding: 28 }}>
-          <SectionHead
-            eyebrow="Подборки"
-            title={`Сохранённые shortlist'ы · ${shortlists.length}`}
-            description="Наборы программ которые куратор уже сформировал для этого клиента на странице /curator/shortlist."
-          />
-          <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {shortlists.map(sl => (
-              <div
-                key={sl.id}
-                style={{
-                  padding: '12px 16px',
-                  background: 'var(--ds-bg-alt)',
-                  border: '1px solid var(--ds-border-soft)',
-                  borderRadius: 'var(--ds-r-md)',
-                  fontSize: 13,
-                  color: 'var(--ds-ink-dim)',
-                }}
-              >
-                <div style={{ fontWeight: 600, color: 'var(--ds-ink)' }}>{sl.title || 'Без названия'}</div>
-                <div style={{ fontSize: 11, color: 'var(--ds-muted)', marginTop: 3 }}>
-                  Создана {sl.created_at ? formatDate(sl.created_at) : '—'}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Каталог базы вузов — ищем + добавляем в подборку клиента */}
       {catalog && <CatalogPanel client={client} catalog={catalog} />}

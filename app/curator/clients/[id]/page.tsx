@@ -79,10 +79,6 @@ export default async function CuratorClientPage({
   const { data: essays } = await admin
     .from('client_essays').select('*').eq('client_id', clientId)
     .then(r => r, () => ({ data: [] as any[] }))
-  // client_shortlists table may not exist in all envs — fail-soft
-  const { data: shortlists } = await admin
-    .from('client_shortlists').select('*').eq('client_id', clientId).order('created_at', { ascending: false })
-    .then(r => r, () => ({ data: [] as any[] }))
 
   // Extract school + program ids from universities.notes
   const programIds: number[] = []
@@ -201,7 +197,6 @@ export default async function CuratorClientPage({
         checklistProgress={checklistProgress ?? []}
         messages={messages ?? []}
         files={files ?? []}
-        shortlists={shortlists ?? []}
         curatorId={curatorId || client.curator_id || ''}
         initialTab={initialTab}
         catalog={catalog}
