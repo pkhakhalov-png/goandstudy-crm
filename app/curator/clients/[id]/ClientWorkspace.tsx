@@ -1,25 +1,41 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect, useRef } from 'react'
 import Link from 'next/link'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import {
   advanceStage,
   addActivity,
   toggleChecklist,
   updateClientField,
   addUniversity,
+  updateUniversityStatus,
+  removeUniversity,
+  publishShortlist,
 } from './actions'
 import {
   removeFromShortlist,
   updateShortlistNote,
   updateShortlistStatus,
 } from '@/app/curator/shortlist/actions'
+import { UniversityFilters } from '@/app/curator/universities/UniversityFilters'
+import { ProgramCardInteractive } from '@/app/curator/universities/ProgramCard'
 
 /* ═══════════════════════════════════════════════════════════════
    PROPS + ШЛЯПА — props структуры из Supabase (пока any, чтобы
    не тащить типы; когда схема стабилизируется — перейдём на
    Database['public']['Tables']['clients']['Row']).
    ═══════════════════════════════════════════════════════════════ */
+
+interface CatalogData {
+  programs: any[]
+  schools: any[]
+  countryCodes: string[]
+  total: number
+  page: number
+  pageSize: number
+  filters: { q?: string; country?: string; school?: string; levels?: string; intakes?: string; sort?: string }
+}
 
 interface Props {
   client: any
@@ -34,6 +50,11 @@ interface Props {
   files: any[]
   shortlists: any[]
   curatorId: string
+  initialTab?: string
+  catalog?: CatalogData | null
+  enrichmentByProgram?: Record<number, any>
+  logoBySchool?: Record<number, string | null>
+  essays?: any[]
 }
 
 type TabKey = 'project' | 'roadmap' | 'shortlist' | 'documents' | 'essays' | 'notes'
@@ -65,8 +86,25 @@ const UNI_STATUS: Record<string, { label: string; chipClass: string }> = {
 }
 
 export function ClientWorkspace(props: Props) {
-  const { client, stages, clientStages, universities, documents, activities, checklist, checklistProgress, shortlists } = props
-  const [tab, setTab] = useState<TabKey>('project')
+  const { client, stages, clientStages, universities, documents, activities, checklist, checklistProgress, shortlists, catalog, enrichmentByProgram = {}, logoBySchool = {} } = props
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const initialTab = (TABS.find(t => t.key === props.initialTab)?.key || 'project') as TabKey
+  const [tab, setTabState] = useState<TabKey>(initialTab)
+
+  function setTab(newTab: TabKey) {
+    setTabState(newTab)
+    const params = new URLSearchParams(searchParams.toString())
+    if (newTab === 'project') params.delete('tab')
+    else params.set('tab', newTab)
+    // Reset catalog filters when leaving shortlist tab
+    if (newTab !== 'shortlist') {
+      ;['q', 'country', 'school', 'levels', 'intakes', 'sort', 'page'].forEach(k => params.delete(k))
+    }
+    const qs = params.toString()
+    router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+  }
 
   const initials = (client.name || 'К').split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)
   const currentStage = stages.find(s => s.code === client.current_stage_code)
@@ -118,10 +156,13 @@ export function ClientWorkspace(props: Props) {
             client={client}
             shortlists={shortlists}
             universities={universities}
+            catalog={catalog || null}
+            enrichmentByProgram={enrichmentByProgram}
+            logoBySchool={logoBySchool}
           />
         )}
         {tab === 'documents' && <DocumentsTab documents={documents} />}
-        {tab === 'essays' && <EssaysTab client={client} />}
+        {tab === 'essays' && <EssaysTab client={client} essays={props.essays || []} />}
         {tab === 'notes' && <NotesTab client={client} activities={activities} />}
       </main>
     </div>
@@ -230,6 +271,17 @@ function Hero({
             >
               {client.name || 'Без имени'}
             </h1>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+              <a
+                href={`/client?clientId=${client.id}`}
+                target="_blank"
+                rel="noreferrer"
+                className="ds-btn ds-btn-secondary ds-btn-sm"
+                style={{ textDecoration: 'none' }}
+              >
+                Смотреть как клиент ↗
+              </a>
+            </div>
             <div
               style={{
                 display: 'flex',
@@ -831,7 +883,7 @@ function RoadmapTab({
                             letterSpacing: '-0.005em',
                           }}
                         >
-                          {item.title}
+                          {item.text}
                         </div>
                       </button>
                     )
@@ -851,29 +903,42 @@ function RoadmapTab({
    ═══════════════════════════════════════════════════════════════ */
 
 function ShortlistTab({
-  client, shortlists, universities,
+  client, shortlists, universities, catalog, enrichmentByProgram, logoBySchool,
 }: {
   client: any
   shortlists: any[]
   universities: any[]
+  catalog: CatalogData | null
+  enrichmentByProgram: Record<number, any>
+  logoBySchool: Record<number, string | null>
 }) {
   const [pending, startTransition] = useTransition()
-  const [adding, setAdding] = useState(false)
-  const [uniDraft, setUniDraft] = useState({ name: '', program: '', country: '', deadline: '', priority: '' })
+  const [publishToast, setPublishToast] = useState<string | null>(null)
 
-  function handleAddUni() {
-    if (!uniDraft.name.trim() || pending) return
+  function setStatus(uniId: string, status: string) {
     const fd = new FormData()
     fd.append('client_id', String(client.id))
-    fd.append('university_name', uniDraft.name)
-    if (uniDraft.program) fd.append('program_name', uniDraft.program)
-    if (uniDraft.country) fd.append('country', uniDraft.country)
-    if (uniDraft.deadline) fd.append('deadline', uniDraft.deadline)
-    if (uniDraft.priority) fd.append('priority', uniDraft.priority)
+    fd.append('uni_id', uniId)
+    fd.append('status', status)
+    startTransition(() => { updateUniversityStatus(fd) })
+  }
+
+  function remove(uniId: string) {
+    if (!confirm('Удалить программу из подборки?')) return
+    const fd = new FormData()
+    fd.append('client_id', String(client.id))
+    fd.append('uni_id', uniId)
+    startTransition(() => { removeUniversity(fd) })
+  }
+
+  function handlePublish() {
+    if (universities.length === 0) return
+    const fd = new FormData()
+    fd.append('client_id', String(client.id))
     startTransition(async () => {
-      await addUniversity(fd)
-      setUniDraft({ name: '', program: '', country: '', deadline: '', priority: '' })
-      setAdding(false)
+      await publishShortlist(fd)
+      setPublishToast('Подборка отправлена клиенту ✓')
+      setTimeout(() => setPublishToast(null), 2400)
     })
   }
 
@@ -884,49 +949,37 @@ function ShortlistTab({
           <SectionHead
             eyebrow="В работе"
             title={`Вузы клиента · ${universities.length}`}
-            description="Программы с которыми ведём процесс поступления. Статус обновляется по ходу — подано / оффер / отказ / принят."
+            description="Программы из каталога ниже. Кликни по строке чтобы открыть программу, по статусу — изменить, ✕ — удалить."
           />
-          <button
-            type="button"
-            className="ds-btn ds-btn-primary ds-btn-sm"
-            onClick={() => setAdding(!adding)}
-          >
-            {adding ? '✕ Отмена' : '+ Добавить вуз'}
-          </button>
+          {universities.length > 0 && (
+            <button
+              type="button"
+              className="ds-btn ds-btn-primary ds-btn-sm"
+              onClick={handlePublish}
+              disabled={pending}
+            >
+              {pending ? '…' : '↗ Отправить клиенту'}
+            </button>
+          )}
         </div>
 
-        {adding && (
-          <div
-            style={{
-              marginTop: 20,
-              padding: 20,
-              background: 'var(--ds-bg-alt)',
-              border: '1px solid var(--ds-border)',
-              borderRadius: 'var(--ds-r-md)',
-            }}
-          >
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <InputWithLabel label="Название вуза" value={uniDraft.name} onChange={v => setUniDraft({ ...uniDraft, name: v })} placeholder="University of Edinburgh" />
-              <InputWithLabel label="Программа" value={uniDraft.program} onChange={v => setUniDraft({ ...uniDraft, program: v })} placeholder="BSc Computer Science" />
-              <InputWithLabel label="Страна" value={uniDraft.country} onChange={v => setUniDraft({ ...uniDraft, country: v })} placeholder="UK" />
-              <InputWithLabel label="Дедлайн" value={uniDraft.deadline} onChange={v => setUniDraft({ ...uniDraft, deadline: v })} placeholder="YYYY-MM-DD" />
-            </div>
-            <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
-              <button type="button" className="ds-btn ds-btn-primary ds-btn-sm" onClick={handleAddUni} disabled={pending}>
-                {pending ? '…' : 'Добавить'}
-              </button>
-              <button type="button" className="ds-btn ds-btn-secondary ds-btn-sm" onClick={() => setAdding(false)}>
-                Отмена
-              </button>
-            </div>
-          </div>
+        {publishToast && (
+          <div style={{
+            marginTop: 12,
+            padding: '10px 14px',
+            background: 'var(--ds-success-soft)',
+            color: 'var(--ds-success-ink)',
+            borderRadius: 'var(--ds-r-sm)',
+            fontSize: 13,
+            fontWeight: 600,
+          }}>{publishToast}</div>
         )}
 
         {universities.length === 0 ? (
           <div
             style={{
               marginTop: 20,
-              padding: '48px 24px',
+              padding: '32px 24px',
               textAlign: 'center',
               background: 'var(--ds-bg-alt)',
               border: '1px dashed var(--ds-border)',
@@ -935,38 +988,30 @@ function ShortlistTab({
               fontSize: 14,
             }}
           >
-            Ещё нет добавленных вузов. Нажми <b style={{ color: 'var(--ds-ink)' }}>+ Добавить вуз</b> выше.
+            Ещё нет добавленных вузов. Выбирай из каталога ниже → кнопка <b style={{ color: 'var(--ds-ink)' }}>+ В подборку</b>.
           </div>
         ) : (
           <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 10 }}>
             {universities.map((uni) => {
-              const status = UNI_STATUS[uni.status] || UNI_STATUS.planned
+              let programId: number | null = null
+              let schoolId: number | null = null
+              try {
+                const meta = JSON.parse(uni.notes || '{}')
+                programId = meta.program_id || null
+                schoolId = meta.school_id || null
+              } catch {}
               return (
-                <div
+                <UniversityRow
                   key={uni.id}
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: '1fr auto',
-                    gap: 12,
-                    padding: '14px 16px',
-                    background: 'var(--ds-bg)',
-                    border: '1px solid var(--ds-border-soft)',
-                    borderRadius: 'var(--ds-r-md)',
-                    alignItems: 'center',
-                  }}
-                >
-                  <div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ds-ink)', letterSpacing: '-0.01em' }}>
-                      {uni.university_name}
-                    </div>
-                    <div style={{ fontSize: 12, color: 'var(--ds-muted)', marginTop: 2 }}>
-                      {[uni.program_name, uni.country, uni.deadline].filter(Boolean).join(' · ')}
-                    </div>
-                  </div>
-                  <span className={`ds-chip ${status.chipClass}`} style={{ textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: 10, fontWeight: 700 }}>
-                    {status.label}
-                  </span>
-                </div>
+                  uni={uni}
+                  pending={pending}
+                  programId={programId}
+                  schoolId={schoolId}
+                  logoUrl={schoolId ? logoBySchool[schoolId] : null}
+                  enrichment={programId ? enrichmentByProgram[programId] : null}
+                  onStatusChange={(s) => setStatus(uni.id, s)}
+                  onRemove={() => remove(uni.id)}
+                />
               )
             })}
           </div>
@@ -1002,6 +1047,380 @@ function ShortlistTab({
             ))}
           </div>
         </div>
+      )}
+
+      {/* Каталог базы вузов — ищем + добавляем в подборку клиента */}
+      {catalog && <CatalogPanel client={client} catalog={catalog} />}
+    </div>
+  )
+}
+
+const CATALOG_COUNTRY_LABELS: Record<string, string> = {
+  ca: 'Канада', au: 'Австралия', gb: 'Великобритания', de: 'Германия', us: 'США', ie: 'Ирландия',
+}
+
+function UniLogo({ logoUrl, name, size = 40 }: { logoUrl: string | null | undefined; name: string; size?: number }) {
+  if (logoUrl) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={logoUrl}
+        alt={name}
+        style={{
+          width: size, height: size, borderRadius: 10,
+          objectFit: 'contain', background: '#fff',
+          border: '1px solid var(--ds-border-soft)', flexShrink: 0,
+        }}
+      />
+    )
+  }
+  const letter = (name || '?').trim()[0]?.toUpperCase() || '?'
+  return (
+    <div
+      style={{
+        width: size, height: size, borderRadius: 10, flexShrink: 0,
+        background: 'var(--ds-purple-soft)', color: 'var(--ds-purple-deep)',
+        display: 'grid', placeItems: 'center',
+        fontFamily: 'var(--ds-font-display-stack)',
+        fontSize: Math.round(size * 0.4), fontWeight: 700,
+        border: '1px solid var(--ds-border-soft)',
+      }}
+    >
+      {letter}
+    </div>
+  )
+}
+
+function UniversityRow({
+  uni, pending, programId, schoolId, logoUrl, enrichment, onStatusChange, onRemove,
+}: {
+  uni: any
+  pending: boolean
+  programId: number | null
+  schoolId: number | null
+  logoUrl: string | null | undefined
+  enrichment: any | null
+  onStatusChange: (s: string) => void
+  onRemove: () => void
+}) {
+  const [statusOpen, setStatusOpen] = useState(false)
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiError, setAiError] = useState<string | null>(null)
+  const statusRef = useRef<HTMLDivElement>(null)
+  const status = UNI_STATUS[uni.status] || UNI_STATUS.planned
+  const programHref = programId ? `/curator/programs/${programId}` : null
+  const schoolHref = schoolId ? `/curator/universities/${schoolId}` : null
+
+  async function triggerAI() {
+    if (!programId || aiLoading) return
+    setAiLoading(true)
+    setAiError(null)
+    try {
+      const res = await fetch('/api/ai/fill-program', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ programId }),
+      })
+      const json = await res.json()
+      if (!json.ok) {
+        setAiError(json.error || 'Ошибка ИИ')
+      } else {
+        // Reload page to fetch fresh enrichment
+        window.location.reload()
+      }
+    } catch (e: any) {
+      setAiError(e?.message || 'Ошибка сети')
+    } finally {
+      setAiLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!statusOpen) return
+    function handle(e: MouseEvent) {
+      if (statusRef.current && !statusRef.current.contains(e.target as Node)) setStatusOpen(false)
+    }
+    document.addEventListener('mousedown', handle)
+    return () => document.removeEventListener('mousedown', handle)
+  }, [statusOpen])
+
+  const aiFacts: string[] = []
+  if (enrichment) {
+    if (enrichment.earliest_intake_label) aiFacts.push(`🗓 ${enrichment.earliest_intake_label}`)
+    if (enrichment.deadline_label) aiFacts.push(`⏱ ${enrichment.deadline_label}`)
+    if (enrichment.gross_tuition_label) aiFacts.push(`💵 ${enrichment.gross_tuition_label}`)
+    if (enrichment.ielts_min) aiFacts.push(`IELTS ≥ ${enrichment.ielts_min}`)
+    if (enrichment.min_gpa_percent) aiFacts.push(`GPA ≥ ${enrichment.min_gpa_percent}%`)
+    if (enrichment.pgwp_eligible) aiFacts.push('PGWP')
+    if (enrichment.coop_available) aiFacts.push('Co-op')
+    if (enrichment.conditional_offer_available) aiFacts.push('Conditional')
+  }
+
+  const schoolName = schoolHref ? (
+    <Link href={schoolHref} style={{ color: 'inherit', textDecoration: 'none' }} className="ds-link-hover">
+      {uni.university_name}
+    </Link>
+  ) : uni.university_name
+
+  const programName = programHref ? (
+    <Link href={programHref} style={{ color: 'inherit', textDecoration: 'none' }} className="ds-link-hover">
+      {uni.program_name}
+    </Link>
+  ) : (uni.program_name || 'Программа')
+
+  return (
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: 'auto 1fr auto auto auto',
+        gap: 12,
+        padding: '14px 16px',
+        background: 'var(--ds-bg)',
+        border: '1px solid var(--ds-border-soft)',
+        borderRadius: 'var(--ds-r-md)',
+        alignItems: 'center',
+      }}
+    >
+      <UniLogo logoUrl={logoUrl} name={uni.university_name} size={40} />
+
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ds-ink)', letterSpacing: '-0.01em' }}>
+          {schoolName}
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--ds-muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {programName}{[uni.country, uni.city].filter(Boolean).length > 0 ? ' · ' : ''}{[uni.country, uni.city].filter(Boolean).join(' · ')}
+        </div>
+        {aiFacts.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+            {aiFacts.map((fact, i) => (
+              <span
+                key={i}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  padding: '2px 8px',
+                  fontSize: 10,
+                  fontWeight: 600,
+                  letterSpacing: '0.02em',
+                  background: 'var(--ds-purple-soft)',
+                  color: 'var(--ds-purple-deep)',
+                  borderRadius: 999,
+                }}
+              >
+                {fact}
+              </span>
+            ))}
+          </div>
+        )}
+        {aiError && (
+          <div style={{ marginTop: 6, fontSize: 11, color: 'var(--ds-error)' }}>
+            ИИ: {aiError}
+          </div>
+        )}
+      </div>
+
+      <div ref={statusRef} style={{ position: 'relative' }}>
+        <button
+          type="button"
+          onClick={() => setStatusOpen(v => !v)}
+          disabled={pending}
+          className={`ds-chip ${status.chipClass}`}
+          style={{
+            textTransform: 'uppercase',
+            letterSpacing: '0.06em',
+            fontSize: 10,
+            fontWeight: 700,
+            cursor: 'pointer',
+            border: 'none',
+            fontFamily: 'inherit',
+          }}
+        >
+          {status.label} ▾
+        </button>
+        {statusOpen && (
+          <div style={{
+            position: 'absolute',
+            top: 'calc(100% + 6px)',
+            right: 0,
+            minWidth: 180,
+            background: 'var(--ds-bg)',
+            border: '1px solid var(--ds-border)',
+            borderRadius: 10,
+            boxShadow: '0 8px 28px -8px rgba(29,29,31,0.18)',
+            zIndex: 40,
+            padding: 6,
+          }}>
+            {Object.entries(UNI_STATUS).map(([key, val]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => { onStatusChange(key); setStatusOpen(false) }}
+                style={{
+                  width: '100%',
+                  textAlign: 'left',
+                  padding: '8px 10px',
+                  background: key === uni.status ? 'var(--ds-bg-alt)' : 'transparent',
+                  border: 'none',
+                  borderRadius: 6,
+                  cursor: 'pointer',
+                  fontSize: 12,
+                  fontFamily: 'inherit',
+                  color: 'var(--ds-ink)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = 'var(--ds-bg-alt)'}
+                onMouseLeave={(e) => e.currentTarget.style.background = key === uni.status ? 'var(--ds-bg-alt)' : 'transparent'}
+              >
+                <span className={`ds-chip ${val.chipClass}`} style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                  {val.label}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {programId && (
+        <button
+          type="button"
+          onClick={triggerAI}
+          disabled={aiLoading || pending}
+          title={enrichment ? 'Обновить данные через ИИ' : 'Получить данные через ИИ'}
+          style={{
+            padding: '6px 10px',
+            background: enrichment ? 'var(--ds-bg)' : 'var(--ds-purple-soft)',
+            border: `1px solid ${enrichment ? 'var(--ds-border-soft)' : 'var(--ds-purple)'}`,
+            borderRadius: 8,
+            fontSize: 11,
+            fontWeight: 600,
+            color: enrichment ? 'var(--ds-ink)' : 'var(--ds-purple-deep)',
+            cursor: aiLoading ? 'wait' : 'pointer',
+            fontFamily: 'inherit',
+            whiteSpace: 'nowrap',
+            letterSpacing: '0.04em',
+            textTransform: 'uppercase',
+          }}
+        >
+          {aiLoading ? '⏳' : enrichment ? '↻ ИИ' : '✨ ИИ'}
+        </button>
+      )}
+
+      <button
+        type="button"
+        onClick={onRemove}
+        disabled={pending}
+        title="Удалить из подборки"
+        style={{
+          padding: '6px 10px',
+          background: 'transparent',
+          border: '1px solid var(--ds-border-soft)',
+          borderRadius: 8,
+          fontSize: 14,
+          color: 'var(--ds-muted)',
+          cursor: 'pointer',
+          fontFamily: 'inherit',
+          lineHeight: 1,
+        }}
+      >
+        ✕
+      </button>
+    </div>
+  )
+}
+
+function CatalogPanel({ client, catalog }: { client: any; catalog: CatalogData }) {
+  const myClient = [{ id: client.id, name: client.name || 'Клиент', country: client.country }]
+  const totalPages = Math.max(1, Math.ceil((catalog.total || 0) / catalog.pageSize))
+  const currentPage = catalog.page
+  const filters = catalog.filters
+
+  function buildPageHref(p: number) {
+    const params = new URLSearchParams()
+    params.set('tab', 'shortlist')
+    if (filters.q) params.set('q', filters.q)
+    if (filters.country) params.set('country', filters.country)
+    if (filters.school) params.set('school', filters.school)
+    if (filters.levels) params.set('levels', filters.levels)
+    if (filters.intakes) params.set('intakes', filters.intakes)
+    if (filters.sort && filters.sort !== 'name_asc') params.set('sort', filters.sort)
+    if (p > 1) params.set('page', String(p))
+    return `?${params.toString()}`
+  }
+
+  const pageButtons: number[] = []
+  let start = Math.max(1, currentPage - 3)
+  const end = Math.min(totalPages, start + 6)
+  if (end - start < 6) start = Math.max(1, end - 6)
+  for (let i = start; i <= end; i++) pageButtons.push(i)
+
+  return (
+    <div className="ds-card" style={{ padding: 28 }}>
+      <SectionHead
+        eyebrow="Каталог базы вузов"
+        title={`Всего программ · ${catalog.total.toLocaleString('ru')}`}
+        description="Ищи программу в полной базе и добавляй в подборку этого клиента одним кликом."
+      />
+
+      <div style={{ marginTop: 20 }}>
+        <UniversityFilters
+          countryCodes={catalog.countryCodes}
+          countryLabels={CATALOG_COUNTRY_LABELS}
+          schools={catalog.schools}
+          basePath={`/curator/clients/${client.id}`}
+          stickyParams={{ tab: 'shortlist' }}
+          initial={{
+            q: filters.q || '',
+            country: filters.country || '',
+            school: filters.school || '',
+            levels: (filters.levels || '').split(',').filter(Boolean),
+            intakeYears: (filters.intakes || '').split(',').filter(Boolean),
+            sort: (filters.sort as any) || 'name_asc',
+          }}
+        />
+      </div>
+
+      {catalog.programs.length === 0 ? (
+        <div
+          style={{
+            marginTop: 20,
+            padding: '48px 24px',
+            textAlign: 'center',
+            background: 'var(--ds-bg-alt)',
+            border: '1px dashed var(--ds-border)',
+            borderRadius: 'var(--ds-r-md)',
+            color: 'var(--ds-muted)',
+            fontSize: 14,
+          }}
+        >
+          Ничего не найдено — попробуй изменить фильтры.
+        </div>
+      ) : (
+        <>
+          <div style={{ marginTop: 20, display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))' }}>
+            {catalog.programs.map(prog => (
+              <ProgramCardInteractive key={prog.id} program={prog} myClients={myClient} />
+            ))}
+          </div>
+
+          {totalPages > 1 && (
+            <div className="ds-pag" style={{ marginTop: 24, justifyContent: 'center' }}>
+              {currentPage > 1 && <Link href={buildPageHref(currentPage - 1)} className="ds-pag-btn" scroll={false}>‹</Link>}
+              {pageButtons.map(p => (
+                <Link
+                  key={p}
+                  href={buildPageHref(p)}
+                  scroll={false}
+                  className={`ds-pag-btn${p === currentPage ? ' active' : ''}`}
+                >
+                  {p}
+                </Link>
+              ))}
+              {currentPage < totalPages && <Link href={buildPageHref(currentPage + 1)} className="ds-pag-btn" scroll={false}>›</Link>}
+            </div>
+          )}
+        </>
       )}
     </div>
   )
@@ -1079,26 +1498,123 @@ function DocumentsTab({ documents }: { documents: any[] }) {
    TAB · Эссе
    ═══════════════════════════════════════════════════════════════ */
 
-function EssaysTab({ client }: { client: any }) {
+function EssaysTab({ client, essays }: { client: any; essays: any[] }) {
+  const resume = essays.find(e => e.type === 'resume')
+  const motivation = essays.find(e => e.type === 'motivation')
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }} className="essays-grid">
       <style>{`
         @media (max-width: 820px) { .essays-grid { grid-template-columns: 1fr !important; } }
       `}</style>
 
-      <EssayPlaceholder
+      <EssayCard
+        client={client}
+        essay={resume}
+        type="resume"
         emoji="📋"
         title="Резюме"
-        subtitle="Клиент заполняет через /client/resume. После отправки финала куратору — появится здесь для ревью."
-        status="Не начато"
+        editHref={`/client/resume?clientId=${client.id}`}
       />
-
-      <EssayPlaceholder
+      <EssayCard
+        client={client}
+        essay={motivation}
+        type="motivation"
         emoji="✍️"
         title="Мотивационное письмо"
-        subtitle="Клиент заполняет через /client/motivation. После отправки финала куратору — появится здесь для ревью."
-        status="Не начато"
+        editHref={`/client/motivation?clientId=${client.id}`}
       />
+    </div>
+  )
+}
+
+const ESSAY_STATUS_MAP: Record<string, { label: string; chip: string }> = {
+  not_started: { label: 'Нужно сделать', chip: 'ds-chip-warning' },
+  draft: { label: 'Клиент заполняет', chip: 'ds-chip-neutral' },
+  sent: { label: 'Отправлено — ждёт ревью', chip: 'ds-chip-info' },
+  editing: { label: 'Куратор дорабатывает', chip: 'ds-chip-warning' },
+  approved: { label: 'Готово ✓', chip: 'ds-chip-success' },
+}
+
+function EssayCard({
+  client, essay, type, emoji, title, editHref,
+}: {
+  client: any
+  essay: any | undefined
+  type: 'resume' | 'motivation'
+  emoji: string
+  title: string
+  editHref: string
+}) {
+  const [pending, startTransition] = useTransition()
+  const status = essay?.status || 'not_started'
+  const info = ESSAY_STATUS_MAP[status] || { label: 'Нужно сделать', chip: 'ds-chip-warning' }
+  const hasDraft = Boolean(essay && (essay.content || essay.curator_content))
+
+  async function approve() {
+    if (!client.id || pending) return
+    const { approveEssay } = await import('@/app/client/essays/actions')
+    startTransition(async () => {
+      const res = await approveEssay({ clientId: client.id, type })
+      if (res && (res as any).error) alert((res as any).error)
+    })
+  }
+
+  return (
+    <div
+      className="ds-card"
+      style={{
+        padding: 28,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 14,
+        minHeight: 240,
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+        <div style={{ fontSize: 40, lineHeight: 1, filter: 'grayscale(1) contrast(1.15)' }}>
+          {emoji}
+        </div>
+        <div style={{ flex: 1 }}>
+          <h3 style={{ fontFamily: 'var(--ds-font-display-stack)', fontWeight: 700, fontSize: 20, textTransform: 'uppercase', letterSpacing: '0.04em', margin: 0, lineHeight: 1.1 }}>
+            {title}
+          </h3>
+          <div style={{ marginTop: 8 }}>
+            <span className={`ds-chip ${info.chip}`} style={{ textTransform: 'uppercase', letterSpacing: '0.08em', fontSize: 10, fontWeight: 700 }}>
+              {info.label}
+            </span>
+          </div>
+          {essay?.submitted_at && (
+            <div style={{ marginTop: 6, fontSize: 11, color: 'var(--ds-muted)' }}>
+              Отправлено: {formatDate(essay.submitted_at)}
+            </div>
+          )}
+          {essay?.approved_at && (
+            <div style={{ marginTop: 4, fontSize: 11, color: 'var(--ds-muted)' }}>
+              Утверждено: {formatDate(essay.approved_at)}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 'auto' }}>
+        <Link
+          href={editHref}
+          className="ds-btn ds-btn-secondary ds-btn-sm"
+          style={{ textDecoration: 'none' }}
+        >
+          {hasDraft ? 'Редактировать' : 'Заполнить / редактировать'}
+        </Link>
+        {status === 'sent' || status === 'editing' ? (
+          <button
+            type="button"
+            onClick={approve}
+            disabled={pending}
+            className="ds-btn ds-btn-primary ds-btn-sm"
+          >
+            {pending ? '…' : '✓ Готово'}
+          </button>
+        ) : null}
+      </div>
     </div>
   )
 }

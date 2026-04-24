@@ -53,6 +53,7 @@ export async function advanceStage(formData: FormData) {
   revalidatePath(`/curator/clients/${clientId}`)
   revalidatePath('/curator/clients')
   revalidatePath('/curator')
+  revalidatePath('/client', 'layout')
   return { success: true }
 }
 
@@ -105,6 +106,7 @@ export async function toggleChecklist(formData: FormData) {
   if (error) return { error: error.message }
 
   revalidatePath(`/curator/clients/${clientId}`)
+  revalidatePath('/client', 'layout')
   return { success: true }
 }
 
@@ -128,6 +130,7 @@ export async function updateClientField(formData: FormData) {
 
   revalidatePath(`/curator/clients/${clientId}`)
   revalidatePath('/curator/clients')
+  revalidatePath('/client', 'layout')
   return { success: true }
 }
 
@@ -156,5 +159,77 @@ export async function addUniversity(formData: FormData) {
 
   revalidatePath(`/curator/clients/${clientId}`)
   revalidatePath('/curator/clients')
+  revalidatePath('/client', 'layout')
+  return { success: true }
+}
+
+const UNI_STATUSES = ['planned', 'applied', 'offer_received', 'rejected', 'accepted'] as const
+
+export async function updateUniversityStatus(formData: FormData) {
+  const { error: authErr, curatorId } = await assertCurator()
+  if (authErr) return { error: authErr }
+
+  const clientId = Number(formData.get('client_id'))
+  const uniId = formData.get('uni_id') as string
+  const status = formData.get('status') as string
+  if (!clientId || !uniId || !UNI_STATUSES.includes(status as any)) return { error: 'Неверные данные' }
+
+  const admin = await createAdminClient()
+  if (!await verifyClientOwnership(admin, clientId, curatorId!)) return { error: 'Клиент не найден' }
+
+  const { error } = await admin
+    .from('client_universities')
+    .update({ status, updated_at: new Date().toISOString() })
+    .eq('id', uniId)
+    .eq('client_id', clientId)
+  if (error) return { error: error.message }
+
+  revalidatePath(`/curator/clients/${clientId}`)
+  revalidatePath('/client', 'layout')
+  return { success: true }
+}
+
+export async function removeUniversity(formData: FormData) {
+  const { error: authErr, curatorId } = await assertCurator()
+  if (authErr) return { error: authErr }
+
+  const clientId = Number(formData.get('client_id'))
+  const uniId = formData.get('uni_id') as string
+  if (!clientId || !uniId) return { error: 'Неверные данные' }
+
+  const admin = await createAdminClient()
+  if (!await verifyClientOwnership(admin, clientId, curatorId!)) return { error: 'Клиент не найден' }
+
+  const { error } = await admin
+    .from('client_universities')
+    .delete()
+    .eq('id', uniId)
+    .eq('client_id', clientId)
+  if (error) return { error: error.message }
+
+  revalidatePath(`/curator/clients/${clientId}`)
+  revalidatePath('/client', 'layout')
+  return { success: true }
+}
+
+export async function publishShortlist(formData: FormData) {
+  const { error: authErr, curatorId, userId } = await assertCurator()
+  if (authErr) return { error: authErr }
+
+  const clientId = Number(formData.get('client_id'))
+  if (!clientId) return { error: 'Неверные данные' }
+
+  const admin = await createAdminClient()
+  if (!await verifyClientOwnership(admin, clientId, curatorId!)) return { error: 'Клиент не найден' }
+
+  await admin.from('client_activities').insert({
+    client_id: clientId,
+    user_id: userId,
+    activity_type: 'note',
+    content: 'Куратор отправил подборку клиенту на ознакомление',
+  })
+
+  revalidatePath(`/curator/clients/${clientId}`)
+  revalidatePath('/client', 'layout')
   return { success: true }
 }

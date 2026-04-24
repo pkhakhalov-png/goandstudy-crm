@@ -16,6 +16,7 @@ export function AddToShortlistButton({ schoolId, programId, myClients }: Props) 
   const [saving, setSaving] = useState<number | null>(null)
   const [toast, setToast] = useState<Toast>(null)
   const ref = useRef<HTMLDivElement>(null)
+  const directMode = myClients.length === 1
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -52,14 +53,20 @@ export function AddToShortlistButton({ schoolId, programId, myClients }: Props) 
     <div ref={ref} style={{ position: 'relative' }}>
       <button
         type="button"
-        onClick={() => setOpen(v => !v)}
+        onClick={() => {
+          if (directMode) handlePick(myClients[0].id)
+          else setOpen(v => !v)
+        }}
+        disabled={saving !== null}
         className="btn-p"
         style={{ fontSize: 12, padding: '8px 14px', whiteSpace: 'nowrap' }}
       >
-        + Добавить клиенту <span style={{ opacity: 0.8, fontSize: 10 }}>▾</span>
+        {directMode
+          ? (saving !== null ? 'Добавляем…' : '+ В подборку')
+          : <>+ Добавить клиенту <span style={{ opacity: 0.8, fontSize: 10 }}>▾</span></>}
       </button>
 
-      {open && (
+      {!directMode && open && (
         <div style={{
           position: 'absolute',
           top: 'calc(100% + 6px)',

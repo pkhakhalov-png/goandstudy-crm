@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect, useRef, useTransition } from 'react'
 import {
   INITIAL_RESUME,
   SECTION_TEMPLATES,
@@ -21,14 +21,59 @@ import {
 } from './mock'
 import { AccordionSection, SubItem, AddMoreButton, Field, SelectField } from './AccordionSection'
 import { ResumePreview } from './ResumePreview'
+import { saveClientDraft, submitToCurator } from '@/app/client/essays/actions'
 
 const SKILL_LEVELS: SkillLevel[] = ['Beginner', 'Intermediate', 'Advanced', 'Expert']
 const LANG_LEVELS: LanguageLevel[] = ['Beginner', 'Intermediate', 'Good command', 'Very good command', 'Highly proficient', 'Native speaker']
 
 const uid = () => Math.random().toString(36).slice(2, 10)
 
-export function ResumeEditor() {
-  const [resume, setResume] = useState<Resume>(INITIAL_RESUME)
+interface ResumeEditorProps {
+  initialResume?: Resume
+  clientId?: number
+  status?: 'draft' | 'sent' | 'editing' | 'approved'
+}
+
+export function ResumeEditor({ initialResume, clientId, status = 'draft' }: ResumeEditorProps = {}) {
+  const [resume, setResume] = useState<Resume>(initialResume || INITIAL_RESUME)
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [pending, startTransition] = useTransition()
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isLocked = status === 'approved'
+
+  const [saveErrMsg, setSaveErrMsg] = useState<string | null>(null)
+
+  // Debounced auto-save — always on when editor is mounted
+  useEffect(() => {
+    if (isLocked) return
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    setSaveState('saving')
+    saveTimer.current = setTimeout(async () => {
+      const res = await saveClientDraft({ clientId, type: 'resume', content: resume })
+      if (res && (res as any).error) {
+        setSaveState('error')
+        setSaveErrMsg((res as any).error)
+      } else {
+        setSaveState('saved')
+        setSaveErrMsg(null)
+      }
+    }, 1000)
+    return () => { if (saveTimer.current) clearTimeout(saveTimer.current) }
+  }, [resume, clientId, isLocked])
+
+  function handleSubmit() {
+    if (pending) return
+    startTransition(async () => {
+      const saved = await saveClientDraft({ clientId, type: 'resume', content: resume })
+      if (saved && (saved as any).error) {
+        alert('Сохранение не удалось: ' + (saved as any).error)
+        return
+      }
+      const res = await submitToCurator({ type: 'resume', clientId })
+      if (res && (res as any).error) alert('Не отправилось: ' + (res as any).error)
+      else alert('Резюме отправлено куратору ✓')
+    })
+  }
 
   /* ── helpers to update immutably ── */
   function updatePersonal<K extends keyof Resume['personal']>(key: K, value: Resume['personal'][K]) {
@@ -59,6 +104,13 @@ export function ResumeEditor() {
 
       {/* ─── Editor column ─── */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <EssayStatusBar
+          status={status}
+          saveState={saveState}
+          pending={pending}
+          onSubmit={handleSubmit}
+          isLocked={isLocked}
+        />
         <ProgressCard completeness={completeness} />
 
         {/* ═══ Personal details ═══ */}
@@ -469,6 +521,56 @@ export function ResumeEditor() {
    Progress card — верхний блок с процентом + suggestion-чипами
    ═══════════════════════════════════════════════════════════════ */
 
+function EssayStatusBar({
+  status, saveState, pending, onSubmit, isLocked,
+}: {
+  status: 'draft' | 'sent' | 'editing' | 'approved'
+  saveState: 'idle' | 'saving' | 'saved' | 'error'
+  pending: boolean
+  onSubmit: () => void
+  isLocked: boolean
+}) {
+  const statusInfo: Record<string, { label: string; chip: string }> = {
+    draft: { label: 'Черновик — только у тебя', chip: 'ds-chip-neutral' },
+    sent: { label: 'Отправлено куратору', chip: 'ds-chip-info' },
+    editing: { label: 'Куратор дорабатывает', chip: 'ds-chip-warning' },
+    approved: { label: 'Готово ✓ Утверждено куратором', chip: 'ds-chip-success' },
+  }
+  const s = statusInfo[status]
+  return (
+    <div
+      className="ds-card"
+      style={{
+        padding: '16px 20px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 16,
+        flexWrap: 'wrap',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <span className={`ds-chip ${s.chip}`} style={{ textTransform: 'uppercase', letterSpacing: '0.08em', fontSize: 10, fontWeight: 700 }}>
+          {s.label}
+        </span>
+        {saveState === 'error' && (
+          <span style={{ fontSize: 12, color: 'var(--ds-error)' }}>Не сохраняется — проверь что таблица client_essays создана</span>
+        )}
+      </div>
+      {!isLocked && (
+        <button
+          type="button"
+          className="ds-btn ds-btn-primary ds-btn-sm"
+          onClick={onSubmit}
+          disabled={pending}
+        >
+          {pending ? '…' : status === 'sent' || status === 'editing' ? 'Отправить ещё раз' : '↗ Отправить куратору'}
+        </button>
+      )}
+    </div>
+  )
+}
+
 function ProgressCard({ completeness }: { completeness: ReturnType<typeof calcCompleteness> }) {
   return (
     <div
@@ -559,16 +661,18 @@ function calcCompleteness(resume: Resume) {
     { key: 'jobTitle', weight: 10, ok: resume.personal.jobTitle.trim().length > 0, label: 'Add job title' },
     { key: 'profileSummary', weight: 15, ok: resume.personal.profileSummary.trim().length > 20, label: 'Add profile summary' },
     { key: 'country', weight: 2, ok: resume.personal.country.trim().length > 0, label: 'Add a country name' },
-    { key: 'city', weight: 2, ok: resume.personal.city.trim().length > 0, label: 'Add a city name' },
-    { key: 'employment', weight: 25, ok: false, label: 'Add employment history' },
-    { key: 'placements', weight: 2, ok: resume.volunteering.length > 0 || resume.customSections.length > 0, label: 'Add placements' },
-    { key: 'education', weight: 10, ok: resume.education.length > 0 },
-    { key: 'skills', weight: 10, ok: resume.skills.length > 0 },
-    { key: 'languages', weight: 5, ok: resume.languages.length > 0 },
-    { key: 'email', weight: 5, ok: resume.personal.email.trim().length > 0 },
-    { key: 'phone', weight: 5, ok: resume.personal.phone.trim().length > 0 },
-    { key: 'firstName', weight: 5, ok: resume.personal.firstName.trim().length > 0 },
-    { key: 'lastName', weight: 5, ok: resume.personal.lastName.trim().length > 0 },
+    { key: 'city', weight: 5, ok: resume.personal.city.trim().length > 0, label: 'Add a city name' },
+    { key: 'summary', weight: 15, ok: resume.personal.profileSummary.trim().length > 20, label: 'Write a profile summary' },
+    { key: 'experience', weight: 15, ok: resume.courses.length > 0 || resume.conferences.length > 0 || resume.customSections.length > 0, label: 'Add courses / conferences / custom experience' },
+    { key: 'volunteering', weight: 5, ok: resume.volunteering.length > 0, label: 'Add volunteering' },
+    { key: 'education', weight: 15, ok: resume.education.length > 0, label: 'Add education' },
+    { key: 'skills', weight: 10, ok: resume.skills.length > 0, label: 'Add skills' },
+    { key: 'languages', weight: 5, ok: resume.languages.length > 0, label: 'Add languages' },
+    { key: 'email', weight: 5, ok: resume.personal.email.trim().length > 0, label: 'Add email' },
+    { key: 'phone', weight: 5, ok: resume.personal.phone.trim().length > 0, label: 'Add phone' },
+    { key: 'firstName', weight: 5, ok: resume.personal.firstName.trim().length > 0, label: 'Add first name' },
+    { key: 'lastName', weight: 5, ok: resume.personal.lastName.trim().length > 0, label: 'Add last name' },
+    { key: 'jobTitle', weight: 5, ok: resume.personal.jobTitle.trim().length > 0, label: 'Add a job title' },
   ]
   const total = scores.reduce((a, s) => a + s.weight, 0)
   const gained = scores.reduce((a, s) => a + (s.ok ? s.weight : 0), 0)

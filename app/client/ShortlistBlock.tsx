@@ -185,6 +185,9 @@ function EmptyState({ total }: { total: number }) {
 }
 
 function UniCard({ uni, rank }: { uni: University; rank: number }) {
+  const programHref = uni.programId ? `/curator/programs/${uni.programId}` : '/client/shortlist'
+  const schoolHref = uni.schoolId ? `/curator/universities/${uni.schoolId}` : null
+
   return (
     <article
       style={{
@@ -200,7 +203,7 @@ function UniCard({ uni, rank }: { uni: University; rank: number }) {
     >
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ fontSize: 34, lineHeight: 1 }}>{uni.flag}</div>
+          <UniLogo uni={uni} size={44} />
           <div
             style={{
               fontFamily: 'var(--ds-font-display-stack)',
@@ -240,7 +243,11 @@ function UniCard({ uni, rank }: { uni: University; rank: number }) {
             lineHeight: 1.2,
           }}
         >
-          {uni.name}
+          {schoolHref ? (
+            <Link href={schoolHref} style={{ textDecoration: 'none', color: 'inherit' }} className="ds-link-hover">
+              {uni.name}
+            </Link>
+          ) : uni.name}
         </h4>
         <div style={{ fontSize: 12, color: 'var(--ds-muted)', marginBottom: 10 }}>
           {uni.city} · {uni.country}
@@ -255,20 +262,58 @@ function UniCard({ uni, rank }: { uni: University; rank: number }) {
             marginBottom: 8,
           }}
         >
-          {uni.program}
+          {uni.programId ? (
+            <Link href={programHref} style={{ textDecoration: 'none', color: 'inherit' }} className="ds-link-hover">
+              {uni.program}
+            </Link>
+          ) : uni.program}
         </div>
         <p style={{ fontSize: 13, color: 'var(--ds-ink-dim)', lineHeight: 1.45, margin: 0, letterSpacing: '-0.005em' }}>
           {uni.reason}
         </p>
       </div>
-
-      <Link
-        href="/client/shortlist"
-        className="ds-btn ds-btn-ghost ds-btn-sm"
-        style={{ padding: 0, alignSelf: 'flex-start', textDecoration: 'none' }}
-      >
-        Подробнее о программе →
-      </Link>
     </article>
+  )
+}
+
+function UniLogo({ uni, size = 44 }: { uni: University; size?: number }) {
+  if (uni.logoUrl) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={uni.logoUrl}
+        alt={uni.name}
+        style={{
+          width: size,
+          height: size,
+          borderRadius: 10,
+          objectFit: 'contain',
+          background: '#fff',
+          border: '1px solid var(--ds-border-soft)',
+          flexShrink: 0,
+        }}
+      />
+    )
+  }
+  const letter = (uni.name || '?').trim()[0]?.toUpperCase() || '?'
+  return (
+    <div
+      style={{
+        width: size,
+        height: size,
+        borderRadius: 10,
+        flexShrink: 0,
+        background: 'var(--ds-purple-soft)',
+        color: 'var(--ds-purple-deep)',
+        display: 'grid',
+        placeItems: 'center',
+        fontFamily: 'var(--ds-font-display-stack)',
+        fontSize: size * 0.4,
+        fontWeight: 700,
+        border: '1px solid var(--ds-border-soft)',
+      }}
+    >
+      {letter}
+    </div>
   )
 }

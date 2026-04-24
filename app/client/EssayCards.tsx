@@ -106,8 +106,10 @@ function EssayCard({ essay }: { essay: Essay }) {
 
 function stateLabel(state: Essay['state']) {
   switch (state) {
-    case 'not_started': return 'Ещё не начато'
-    case 'in_progress': return 'В работе, куратор поможет'
+    case 'not_started': return 'Нужно сделать'
+    case 'in_progress': return 'Заполняешь'
+    case 'sent':        return 'Отправлено куратору'
+    case 'editing':     return 'Куратор дорабатывает'
     case 'ready':       return 'Готово, финальная версия'
   }
 }

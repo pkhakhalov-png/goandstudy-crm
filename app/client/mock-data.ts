@@ -17,6 +17,7 @@ export type RequiredDoc = {
   hasExample?: boolean
   exampleTitle?: string
   lockedHint?: string // для status: 'locked' — что разблокирует
+  href?: string // если задан — клик на карточку ведёт сюда (вместо модалки)
 }
 
 export const REQUIRED_DOCS: RequiredDoc[] = [
@@ -88,6 +89,9 @@ export type University = {
   city: string
   country: string
   flag: string
+  logoUrl?: string | null // реальное лого из парсер-базы
+  programId?: number | null
+  schoolId?: number | null
   program: string
   tuition?: string
   match: number
@@ -233,7 +237,7 @@ export const STUDENT_PROJECT: StudentProject = {
   updatedAt: '08.02.2026',
 }
 
-export type EssayState = 'not_started' | 'in_progress' | 'ready'
+export type EssayState = 'not_started' | 'in_progress' | 'sent' | 'editing' | 'ready'
 
 export type Essay = {
   key: string

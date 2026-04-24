@@ -60,21 +60,26 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/rop', request.url))
     } else if (profile?.role === 'curator') {
       return NextResponse.redirect(new URL('/curator', request.url))
+    } else if (profile?.role === 'client') {
+      return NextResponse.redirect(new URL('/client', request.url))
     } else {
       return NextResponse.redirect(new URL('/sales', request.url))
     }
   }
 
-  // Curator blocked from admin/sales/rop sections
-  if (user && (pathname.startsWith('/admin') || pathname.startsWith('/sales') || pathname.startsWith('/rop'))) {
+  // Role-scoped redirects for non-staff paths
+  if (user && (pathname.startsWith('/admin') || pathname.startsWith('/sales') || pathname.startsWith('/rop') || pathname.startsWith('/curator'))) {
     const { data: profile } = await supabase
       .from('users')
       .select('role')
       .eq('id', user.id)
       .single()
 
-    if (profile?.role === 'curator') {
+    if (profile?.role === 'curator' && (pathname.startsWith('/admin') || pathname.startsWith('/sales') || pathname.startsWith('/rop'))) {
       return NextResponse.redirect(new URL('/curator', request.url))
+    }
+    if (profile?.role === 'client') {
+      return NextResponse.redirect(new URL('/client', request.url))
     }
   }
 

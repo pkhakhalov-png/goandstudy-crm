@@ -7,7 +7,24 @@ interface Props {
 
 export function DashboardHero({ ctx, stages }: Props) {
   const currentStage = stages.find(s => s.state === 'current')
-  const progress = currentStage?.progress ?? 0
+  const doneCount = stages.filter(s => s.state === 'done').length
+  const currentShare = (currentStage?.progress ?? 0) / 100
+  const total = stages.length || 1
+  const progress = Math.round(((doneCount + currentShare) / total) * 100)
+  const withinStage = currentStage?.progress ?? 0
+
+  // Gradient intensity grows with progress: 0% → faint purple, 100% → vivid pink
+  const t = progress / 100
+  // Purple (181, 127, 207) → Pink (232, 96, 168)
+  const r = Math.round(181 + (232 - 181) * t)
+  const g = Math.round(127 + (96 - 127) * t)
+  const b = Math.round(207 + (168 - 207) * t)
+  const baseOpacity = 0.12 + t * 0.45 // 0.12 at 0% → 0.57 at 100%
+  const midOpacity = 0.04 + t * 0.25
+  const amberOpacity = 0.08 + t * 0.22
+
+  const primaryGradient = `radial-gradient(ellipse at center, rgba(${r},${g},${b},${baseOpacity}) 0%, rgba(${r},${g},${b},${midOpacity}) 40%, transparent 70%)`
+  const amberGradient = `radial-gradient(ellipse at center, rgba(232,184,68,${amberOpacity}) 0%, rgba(232,184,68,${amberOpacity * 0.3}) 45%, transparent 70%)`
 
   return (
     <section
@@ -18,7 +35,7 @@ export function DashboardHero({ ctx, stages }: Props) {
         background: 'var(--ds-bg)',
       }}
     >
-      {/* Purple radial — сверху слева, доминирующий */}
+      {/* Purple → Pink radial (intensity grows with progress) */}
       <div
         aria-hidden
         style={{
@@ -27,11 +44,12 @@ export function DashboardHero({ ctx, stages }: Props) {
           left: '-10%',
           width: 1100,
           height: 700,
-          background: 'radial-gradient(ellipse at center, rgba(181,127,207,0.22) 0%, rgba(181,127,207,0.06) 40%, transparent 70%)',
+          background: primaryGradient,
           pointerEvents: 'none',
+          transition: 'background 800ms ease',
         }}
       />
-      {/* Amber radial — сверху справа, acent-подсветка */}
+      {/* Amber radial */}
       <div
         aria-hidden
         style={{
@@ -40,8 +58,9 @@ export function DashboardHero({ ctx, stages }: Props) {
           right: '-10%',
           width: 800,
           height: 500,
-          background: 'radial-gradient(ellipse at center, rgba(232,184,68,0.14) 0%, rgba(232,184,68,0.04) 45%, transparent 70%)',
+          background: amberGradient,
           pointerEvents: 'none',
+          transition: 'background 800ms ease',
         }}
       />
       {/* Fade-down mask — чтобы градиент растворялся снизу в чистый фон */}
@@ -99,8 +118,8 @@ export function DashboardHero({ ctx, stages }: Props) {
             letterSpacing: '-0.01em',
           }}
         >
-          {ctx.parentFirstName}, вы на этапе «{currentStage?.title.toLowerCase()}» —{' '}
-          {progress}% пути пройдено. Следующая контрольная точка — {ctx.nextMilestone}, {ctx.nextMilestoneDate}.
+          {ctx.parentFirstName}, вы на этапе «{currentStage?.title.toLowerCase() || 'не начат'}» —{' '}
+          {progress}% пути пройдено{withinStage > 0 ? `, в этапе ${withinStage}% чек-листа` : ''}.
         </p>
 
         {/* Прогресс — крупный % + метка */}

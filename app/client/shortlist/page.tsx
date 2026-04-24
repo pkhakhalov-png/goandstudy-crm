@@ -1,11 +1,13 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { resolveClientForViewer, getClientUniversities } from '@/lib/client-data'
 import { ClientTopNav } from '../ClientTopNav'
+import { PreviewBanner } from '../PreviewBanner'
 import { ShortlistView } from './ShortlistView'
-import { CURATOR_SHORTLIST, MAIN_PAGE_PRIORITY_LIMIT } from '../mock-data'
+import { MAIN_PAGE_PRIORITY_LIMIT } from '../mock-data'
 
-export default async function ClientShortlistPage() {
+export default async function ClientShortlistPage({ searchParams }: { searchParams: Promise<{ clientId?: string }> }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
@@ -16,8 +18,23 @@ export default async function ClientShortlistPage() {
     .eq('id', user.id)
     .single()
 
+  const params = await searchParams
+  const requestedClientId = params.clientId ? Number(params.clientId) : undefined
+
+  const client = await resolveClientForViewer({
+    userId: user.id,
+    userEmail: user.email || '',
+    role: profile?.role,
+    requestedClientId,
+  })
+  if (!client) redirect('/client')
+
+  const universities = await getClientUniversities(client.id)
+  const isPreview = profile?.role !== 'client'
+
   return (
     <div style={{ minHeight: '100vh', background: 'var(--ds-bg)' }}>
+      {isPreview && <PreviewBanner clientName={client.name || 'клиент'} clientId={client.id} />}
       <ClientTopNav userName={profile?.name || user.email || ''} activePage="shortlist" />
 
       <section style={{ position: 'relative', overflow: 'hidden', borderBottom: '1px solid var(--ds-border-soft)', background: 'var(--ds-bg)' }}>
@@ -86,15 +103,15 @@ export default async function ClientShortlistPage() {
               letterSpacing: '-0.005em',
             }}
           >
-            Куратор Анна подготовила <b>{CURATOR_SHORTLIST.length} программ</b> под проект Игоря.
-            Отметь <b>приоритетные</b> — сколько захочешь. На главной кабинета показываются первые {MAIN_PAGE_PRIORITY_LIMIT},
-            но в этом списке видны все отмеченные. Порядок можно поменять перетаскиванием или кнопками ↑ ↓.
+            Куратор подготовил <b>{universities.length} программ</b> под твой проект.
+            Отметь <b>приоритетные</b> — до 5 штук. На главной кабинета показываются первые {MAIN_PAGE_PRIORITY_LIMIT},
+            в этом списке видны все отмеченные. Порядок можно поменять перетаскиванием или кнопками ↑ ↓.
           </p>
         </div>
       </section>
 
       <main style={{ maxWidth: 1200, margin: '0 auto', padding: '32px 32px 80px' }}>
-        <ShortlistView items={CURATOR_SHORTLIST} />
+        <ShortlistView items={universities} />
       </main>
     </div>
   )

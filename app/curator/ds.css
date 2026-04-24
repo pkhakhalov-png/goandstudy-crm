@@ -416,3 +416,15 @@
   font-weight: 600;
 }
 .ds-link:hover { color: var(--ds-purple-hov); }
+
+/* Subtle underline on clickable names inside cards */
+.ds-link-hover {
+  transition: color 120ms, text-decoration-color 120ms;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 3px;
+}
+.ds-link-hover:hover {
+  color: var(--ds-purple-deep);
+  text-decoration-color: var(--ds-purple);
+}

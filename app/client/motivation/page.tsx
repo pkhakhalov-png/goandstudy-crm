@@ -1,11 +1,18 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { resolveClientForViewer, getClientEssay } from '@/lib/client-data'
 import { ClientTopNav } from '../ClientTopNav'
 import { MotivationEditor } from './MotivationEditor'
 import { CLIENT_CTX } from '../mock-data'
 
-export default async function MotivationBuilderPage() {
+export const dynamic = 'force-dynamic'
+
+export default async function MotivationBuilderPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ clientId?: string }>
+}) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
@@ -16,9 +23,21 @@ export default async function MotivationBuilderPage() {
     .eq('id', user.id)
     .single()
 
-  // Имя автора для превью. В реальном кабинете тут имя СТУДЕНТА (ребёнка),
-  // а не родителя — пока берём childFullName из mock-контекста.
-  const authorName = CLIENT_CTX.childFullName
+  const sp = await searchParams
+  const requestedClientId = sp.clientId ? Number(sp.clientId) : undefined
+  const client = await resolveClientForViewer({
+    userId: user.id,
+    userEmail: user.email || '',
+    role: profile?.role,
+    requestedClientId,
+  })
+  const essay = client ? await getClientEssay(client.id, 'motivation') : null
+  const displayContent =
+    essay?.status === 'approved' && essay.curator_content
+      ? essay.curator_content
+      : essay?.content || undefined
+
+  const authorName = client?.name || CLIENT_CTX.childFullName
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--ds-bg)' }}>
@@ -114,19 +133,16 @@ export default async function MotivationBuilderPage() {
             </p>
           </div>
 
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            <button className="ds-btn ds-btn-secondary" type="button">
-              Сохранить черновик
-            </button>
-            <button className="ds-btn ds-btn-primary" type="button">
-              Отправить куратору
-            </button>
-          </div>
         </div>
       </section>
 
       <main style={{ maxWidth: 1400, margin: '0 auto', padding: '32px 32px 80px' }}>
-        <MotivationEditor authorName={authorName} />
+        <MotivationEditor
+          authorName={authorName}
+          initialLetter={displayContent}
+          clientId={client?.id}
+          status={essay?.status || 'draft'}
+        />
       </main>
     </div>
   )

@@ -20,6 +20,12 @@ async function requireCuratorId(): Promise<string> {
   return curator.id
 }
 
+const COUNTRY_LABEL: Record<string, string> = {
+  ca: 'Канада', au: 'Австралия', gb: 'Великобритания', de: 'Германия',
+  us: 'США', ie: 'Ирландия', nl: 'Нидерланды', fr: 'Франция', se: 'Швеция',
+  fi: 'Финляндия', dk: 'Дания', it: 'Италия', es: 'Испания', ch: 'Швейцария',
+}
+
 export async function addToShortlist(params: {
   clientId: number
   schoolId: number
@@ -28,46 +34,63 @@ export async function addToShortlist(params: {
   const curatorId = await requireCuratorId()
   const admin = await createAdminClient()
 
-  // Проверяем, что клиент действительно закреплён за этим куратором
   const { data: client } = await admin
     .from('clients')
     .select('id, curator_id')
     .eq('id', params.clientId)
     .maybeSingle()
-  if (!client || client.curator_id !== curatorId) {
-    throw new Error('Client not assigned to this curator')
-  }
+  if (!client) throw new Error('Клиент не найден')
+  if (client.curator_id !== curatorId) throw new Error('Клиент закреплён за другим куратором')
 
-  // Тянем денормализованные данные из парсер-базы
   const parser = createParserClient()
   const [{ data: school }, { data: program }] = await Promise.all([
-    parser.from('schools').select('id, name, country_code').eq('id', params.schoolId).maybeSingle(),
-    parser.from('programs').select('id, name, tuition, raw_data').eq('id', params.programId).maybeSingle(),
+    parser.from('schools').select('id, name, country_code, city').eq('id', params.schoolId).maybeSingle(),
+    parser.from('programs').select('id, name, tuition, application_fee, raw_data').eq('id', params.programId).maybeSingle(),
   ])
-  if (!school || !program) throw new Error('School or program not found')
+  if (!school || !program) throw new Error('Вуз или программа не найдены в базе парсера')
 
-  const currency = (program.raw_data as any)?.attributes?.currency_of_fees?.code
-    ?? (program.raw_data as any)?.attributes?.currency
-    ?? null
+  const attrs = (program.raw_data as any)?.attributes || {}
+  const currency = attrs.currency_of_fees?.code ?? attrs.currency?.code ?? null
+  const language = attrs.language?.name || attrs.language_of_instruction || null
+  const intake = attrs.earliest_intake?.start_date || null
+  const countryCode = (school.country_code || '').toLowerCase()
+  const countryLabel = COUNTRY_LABEL[countryCode] || (school.country_code || '').toUpperCase()
 
-  const { error } = await admin.from('client_shortlists').insert({
+  // Avoid duplicate: check for same program_name + university_name for this client
+  const { data: existing } = await admin
+    .from('client_universities')
+    .select('id')
+    .eq('client_id', params.clientId)
+    .eq('university_name', school.name)
+    .eq('program_name', program.name)
+    .maybeSingle()
+
+  if (existing) {
+    revalidatePath(`/curator/clients/${params.clientId}`)
+    revalidatePath('/client', 'layout')
+    return { ok: true, alreadyAdded: true }
+  }
+
+  const { error } = await admin.from('client_universities').insert({
     client_id: params.clientId,
-    curator_id: curatorId,
-    school_id: school.id,
-    program_id: program.id,
-    school_name: school.name,
+    university_name: school.name,
     program_name: program.name,
-    country_code: school.country_code,
-    tuition: program.tuition,
+    country: countryLabel,
+    city: school.city || null,
+    tuition_per_year: program.tuition ?? null,
     currency,
+    language,
+    start_date: intake,
+    status: 'planned',
+    portal_url: `/curator/programs/${program.id}`,
+    notes: JSON.stringify({ school_id: school.id, program_id: program.id }),
   })
-
-  // 23505 = уже есть в подборке — это ок
-  if (error && error.code !== '23505') throw error
+  if (error) throw new Error(error.message)
 
   revalidatePath(`/curator/clients/${params.clientId}`)
   revalidatePath('/curator')
-  return { ok: true, alreadyAdded: error?.code === '23505' }
+  revalidatePath('/client', 'layout')
+  return { ok: true, alreadyAdded: false }
 }
 
 export async function removeFromShortlist(shortlistId: string, clientId: number) {

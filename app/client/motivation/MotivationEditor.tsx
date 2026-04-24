@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect, useRef, useTransition } from 'react'
 import {
   INITIAL_LETTER,
   MAX_CHARS,
@@ -12,13 +12,55 @@ import {
   type Question,
 } from './mock'
 import { MotivationPreview } from './MotivationPreview'
+import { saveClientDraft, submitToCurator } from '@/app/client/essays/actions'
 
 interface Props {
   authorName: string
+  initialLetter?: MotivationLetter
+  clientId?: number
+  status?: 'draft' | 'sent' | 'editing' | 'approved'
 }
 
-export function MotivationEditor({ authorName }: Props) {
-  const [letter, setLetter] = useState<MotivationLetter>(INITIAL_LETTER)
+export function MotivationEditor({ authorName, initialLetter, clientId, status = 'draft' }: Props) {
+  const [letter, setLetter] = useState<MotivationLetter>(initialLetter || INITIAL_LETTER)
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [pending, startTransition] = useTransition()
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isLocked = status === 'approved'
+
+  const [saveErrMsg, setSaveErrMsg] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (isLocked) return
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    setSaveState('saving')
+    saveTimer.current = setTimeout(async () => {
+      const res = await saveClientDraft({ clientId, type: 'motivation', content: letter })
+      if (res && (res as any).error) {
+        setSaveState('error')
+        setSaveErrMsg((res as any).error)
+      } else {
+        setSaveState('saved')
+        setSaveErrMsg(null)
+      }
+    }, 1000)
+    return () => { if (saveTimer.current) clearTimeout(saveTimer.current) }
+  }, [letter, clientId, isLocked])
+
+  function handleSubmit() {
+    if (pending) return
+    startTransition(async () => {
+      const saved = await saveClientDraft({ clientId, type: 'motivation', content: letter })
+      if (saved && (saved as any).error) {
+        alert('Сохранение не удалось: ' + (saved as any).error)
+        return
+      }
+      const res = await submitToCurator({ type: 'motivation', clientId })
+      if (res && (res as any).error) alert('Не отправилось: ' + (res as any).error)
+      else alert('Письмо отправлено куратору ✓')
+    })
+  }
+
   // Только одна секция раскрыта одновременно — как в UCAS билдере
   const [openSection, setOpenSection] = useState<SectionKey | null>('course')
 
@@ -56,6 +98,14 @@ export function MotivationEditor({ authorName }: Props) {
       {/* ═══════════════════════════════════════════════════════════
           EDITOR
           ═══════════════════════════════════════════════════════════ */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <EssayStatusBar
+        status={status}
+        saveState={saveState}
+        pending={pending}
+        onSubmit={handleSubmit}
+        isLocked={isLocked}
+      />
       <div
         className="ds-card"
         style={{
@@ -187,6 +237,7 @@ export function MotivationEditor({ authorName }: Props) {
             </button>
           </div>
         </footer>
+      </div>
       </div>
 
       {/* ═══════════════════════════════════════════════════════════
@@ -432,5 +483,38 @@ function PreviewIcon() {
       <line x1="7" y1="10" x2="13" y2="10" />
       <line x1="7" y1="13" x2="13" y2="13" />
     </svg>
+  )
+}
+
+function EssayStatusBar({
+  status, saveState, pending, onSubmit, isLocked,
+}: {
+  status: 'draft' | 'sent' | 'editing' | 'approved'
+  saveState: 'idle' | 'saving' | 'saved' | 'error'
+  pending: boolean
+  onSubmit: () => void
+  isLocked: boolean
+}) {
+  const statusInfo: Record<string, { label: string; chip: string }> = {
+    draft: { label: 'Черновик — только у тебя', chip: 'ds-chip-neutral' },
+    sent: { label: 'Отправлено куратору', chip: 'ds-chip-info' },
+    editing: { label: 'Куратор дорабатывает', chip: 'ds-chip-warning' },
+    approved: { label: 'Готово ✓ Утверждено куратором', chip: 'ds-chip-success' },
+  }
+  const s = statusInfo[status]
+  return (
+    <div className="ds-card" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <span className={`ds-chip ${s.chip}`} style={{ textTransform: 'uppercase', letterSpacing: '0.08em', fontSize: 10, fontWeight: 700 }}>{s.label}</span>
+        {saveState === 'error' && (
+          <span style={{ fontSize: 12, color: 'var(--ds-error)' }}>Не сохраняется — проверь что таблица client_essays создана</span>
+        )}
+      </div>
+      {!isLocked && (
+        <button type="button" className="ds-btn ds-btn-primary ds-btn-sm" onClick={onSubmit} disabled={pending}>
+          {pending ? '…' : status === 'sent' || status === 'editing' ? 'Отправить ещё раз' : '↗ Отправить куратору'}
+        </button>
+      )}
+    </div>
   )
 }

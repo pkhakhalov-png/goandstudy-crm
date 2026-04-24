@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import Link from 'next/link'
 import { MAIN_PAGE_PRIORITY_LIMIT, type University } from '../mock-data'
 import {
   useClientState,
@@ -444,7 +445,10 @@ function PriorityCard({
           </button>
         </div>
 
-        <UniInfo uni={uni} />
+        <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+          <UniLogo uni={uni} size={48} />
+          <UniInfo uni={uni} />
+        </div>
       </div>
     </article>
   )
@@ -469,7 +473,7 @@ function RestCard({ uni, onToggle, hydrated }: { uni: University; onToggle: () =
       }}
     >
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
-        <div style={{ fontSize: 34, lineHeight: 1 }}>{uni.flag}</div>
+        <UniLogo uni={uni} size={44} />
         <div
           style={{
             fontFamily: 'var(--ds-font-display-stack)',
@@ -502,6 +506,8 @@ function RestCard({ uni, onToggle, hydrated }: { uni: University; onToggle: () =
 /* ─── Shared content block — uni info ─── */
 
 function UniInfo({ uni }: { uni: University }) {
+  const programHref = uni.programId ? `/curator/programs/${uni.programId}` : null
+  const schoolHref = uni.schoolId ? `/curator/universities/${uni.schoolId}` : null
   return (
     <div style={{ flex: 1, minWidth: 0 }}>
       <h4
@@ -514,7 +520,17 @@ function UniInfo({ uni }: { uni: University }) {
           lineHeight: 1.22,
         }}
       >
-        {uni.name}
+        {schoolHref ? (
+          <Link
+            href={schoolHref}
+            style={{ textDecoration: 'none', color: 'inherit' }}
+            className="ds-link-hover"
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            {uni.name}
+          </Link>
+        ) : uni.name}
       </h4>
       <div style={{ fontSize: 12, color: 'var(--ds-muted)', marginBottom: 8 }}>
         {uni.city} · {uni.country}
@@ -529,7 +545,17 @@ function UniInfo({ uni }: { uni: University }) {
           marginBottom: 8,
         }}
       >
-        {uni.program}
+        {programHref ? (
+          <Link
+            href={programHref}
+            style={{ textDecoration: 'none', color: 'inherit' }}
+            className="ds-link-hover"
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            {uni.program}
+          </Link>
+        ) : uni.program}
       </div>
       {uni.tuition && (
         <div style={{ fontSize: 12, color: 'var(--ds-ink-dim)', marginBottom: 8 }}>
@@ -552,6 +578,50 @@ function UniInfo({ uni }: { uni: University }) {
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+/* ─── Shared: logo + links ─── */
+
+function UniLogo({ uni, size = 44 }: { uni: University; size?: number }) {
+  if (uni.logoUrl) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={uni.logoUrl}
+        alt={uni.name}
+        style={{
+          width: size,
+          height: size,
+          borderRadius: 10,
+          objectFit: 'contain',
+          background: '#fff',
+          border: '1px solid var(--ds-border-soft)',
+          flexShrink: 0,
+        }}
+      />
+    )
+  }
+  const letter = (uni.name || '?').trim()[0]?.toUpperCase() || '?'
+  return (
+    <div
+      style={{
+        width: size,
+        height: size,
+        borderRadius: 10,
+        flexShrink: 0,
+        background: 'var(--ds-purple-soft)',
+        color: 'var(--ds-purple-deep)',
+        display: 'grid',
+        placeItems: 'center',
+        fontFamily: 'var(--ds-font-display-stack)',
+        fontSize: Math.round(size * 0.4),
+        fontWeight: 700,
+        border: '1px solid var(--ds-border-soft)',
+      }}
+    >
+      {letter}
     </div>
   )
 }

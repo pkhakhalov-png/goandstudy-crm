@@ -15,6 +15,10 @@ interface Props {
     intakeYears: string[]
     sort: string
   }
+  /** Base path to navigate on filter change. Extra params passed through. */
+  basePath?: string
+  /** Extra URL params to preserve on every navigation (e.g., `tab=shortlist`) */
+  stickyParams?: Record<string, string>
 }
 
 const SORT_OPTIONS: { key: string; label: string }[] = [
@@ -42,7 +46,7 @@ const LEVEL_OPTIONS: { value: string; label: string; group: string }[] = [
 
 const INTAKE_YEARS = ['2026', '2027', '2028']
 
-export function UniversityFilters({ countryCodes, countryLabels, schools, initial }: Props) {
+export function UniversityFilters({ countryCodes, countryLabels, schools, initial, basePath = '/curator/universities', stickyParams }: Props) {
   const router = useRouter()
   const [q, setQ] = useState(initial.q)
   const [country, setCountry] = useState(initial.country)
@@ -62,6 +66,7 @@ export function UniversityFilters({ countryCodes, countryLabels, schools, initia
       sort: next.sort !== undefined ? next.sort : sort,
     }
     const qs = new URLSearchParams()
+    if (stickyParams) for (const [k, v] of Object.entries(stickyParams)) qs.set(k, v)
     if (merged.q) qs.set('q', merged.q)
     if (merged.country) qs.set('country', merged.country)
     if (merged.school) qs.set('school', merged.school)
@@ -70,13 +75,16 @@ export function UniversityFilters({ countryCodes, countryLabels, schools, initia
     if (merged.sort && merged.sort !== 'name_asc') qs.set('sort', merged.sort)
     const str = qs.toString()
     startTransition(() => {
-      router.push(str ? `/curator/universities?${str}` : '/curator/universities')
+      router.push(str ? `${basePath}?${str}` : basePath, { scroll: false })
     })
   }
 
   function reset() {
     setQ(''); setCountry(''); setSchool(''); setLevels([]); setIntakeYears([]); setSort('name_asc')
-    startTransition(() => router.push('/curator/universities'))
+    const qs = new URLSearchParams()
+    if (stickyParams) for (const [k, v] of Object.entries(stickyParams)) qs.set(k, v)
+    const str = qs.toString()
+    startTransition(() => router.push(str ? `${basePath}?${str}` : basePath, { scroll: false }))
   }
 
   const filteredSchools = country

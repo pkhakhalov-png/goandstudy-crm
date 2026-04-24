@@ -179,10 +179,19 @@ function DocCard({ doc, onClick }: { doc: RequiredDoc; onClick: () => void }) {
   const statusMeta = getStatusMeta(doc.status)
   const locked = doc.status === 'locked'
 
+  function handleClick() {
+    if (locked) return
+    if (doc.href) {
+      window.open(doc.href, '_blank', 'noopener')
+      return
+    }
+    onClick()
+  }
+
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={handleClick}
       disabled={locked}
       style={{
         background: locked ? 'var(--ds-bg-alt)' : 'var(--ds-bg)',

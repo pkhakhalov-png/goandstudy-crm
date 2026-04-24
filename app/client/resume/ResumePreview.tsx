@@ -108,7 +108,7 @@ export function ResumePreview({ resume }: Props) {
             {resume.hobbies && (
               <div style={{ marginTop: 8 }}>
                 <PreviewHeading>Hobbies</PreviewHeading>
-                <div style={{ whiteSpace: 'pre-wrap', fontSize: 10.5, lineHeight: 1.55, marginTop: 6 }}>
+                <div style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', wordBreak: 'break-word', fontSize: 10.5, lineHeight: 1.55, marginTop: 6 }}>
                   {resume.hobbies}
                 </div>
               </div>
@@ -286,7 +286,7 @@ function PreviewEntry({ title, meta, subtitle, body }: { title: string; meta?: s
       </div>
       {subtitle && <div style={{ fontSize: 10.5, color: '#555', marginTop: 2 }}>{subtitle}</div>}
       {body && (
-        <div style={{ fontSize: 11, lineHeight: 1.55, marginTop: 6, whiteSpace: 'pre-wrap' }}>
+        <div style={{ fontSize: 11, lineHeight: 1.55, marginTop: 6, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
           {body}
         </div>
       )}

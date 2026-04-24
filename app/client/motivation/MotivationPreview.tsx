@@ -106,6 +106,8 @@ export function MotivationPreview({ letter, authorName }: Props) {
                     lineHeight: 1.65,
                     margin: 0,
                     whiteSpace: 'pre-wrap',
+                    overflowWrap: 'anywhere',
+                    wordBreak: 'break-word',
                     color: '#1D1D1F',
                   }}
                 >

@@ -14,7 +14,10 @@ export default async function RootPage() {
     .single()
 
   if (profile?.role === 'admin') redirect('/admin/clients')
-  if (profile?.role !== 'admin') redirect('/sales')
+  if (profile?.role === 'rop') redirect('/rop')
+  if (profile?.role === 'curator') redirect('/curator')
+  if (profile?.role === 'client') redirect('/client')
+  redirect('/sales')
 
   return (
     <div className="app">
