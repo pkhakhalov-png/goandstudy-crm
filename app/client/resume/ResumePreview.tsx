@@ -51,6 +51,11 @@ export function ResumePreview({ resume }: Props) {
         >
           {fullName}
         </h1>
+        {resume.personal.profileSummary && (
+          <p style={{ fontSize: 12, lineHeight: 1.6, color: '#1D1D1F', margin: '0 0 16px 0', whiteSpace: 'pre-wrap' }}>
+            {resume.personal.profileSummary}
+          </p>
+        )}
         <div style={{ height: 1, background: '#111', marginBottom: 24 }} />
 
         <div
@@ -70,8 +75,8 @@ export function ResumePreview({ resume }: Props) {
             {resume.personal.email && (
               <PreviewField label="Email" value={resume.personal.email} />
             )}
-            {resume.personal.dateOfBirth && (
-              <PreviewField label="Date of birth" value={resume.personal.dateOfBirth} />
+            {resume.personal.city && (
+              <PreviewField label="City" value={resume.personal.city} />
             )}
 
             {resume.links.length > 0 && (
@@ -136,6 +141,20 @@ export function ResumePreview({ resume }: Props) {
 
           {/* RIGHT column */}
           <main style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+            {resume.workExperience.length > 0 && (
+              <PreviewSection title="Work Experience">
+                {resume.workExperience.map(w => (
+                  <PreviewEntry
+                    key={w.id}
+                    title={[w.jobTitle, w.company].filter(Boolean).join(' at ') || w.jobTitle || w.company}
+                    meta={w.city}
+                    subtitle={[w.startDate, w.endDate].filter(Boolean).join(' — ')}
+                    body={w.description}
+                  />
+                ))}
+              </PreviewSection>
+            )}
+
             {resume.education.length > 0 && (
               <PreviewSection title="Education">
                 {resume.education.map(e => (

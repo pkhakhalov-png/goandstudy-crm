@@ -11,10 +11,14 @@ const COUNTRY_LABEL: Record<string, string> = {
 
 export default async function SchoolPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ schoolId: string }>
+  searchParams: Promise<{ asClient?: string; clientId?: string }>
 }) {
   const { schoolId } = await params
+  const sp = await searchParams
+  const asClient = sp.asClient === '1'
   const id = Number(schoolId)
   if (!id) notFound()
 
@@ -130,6 +134,8 @@ export default async function SchoolPage({
             school={school}
             programs={programs ?? []}
             myClients={myClients ?? []}
+            asClient={asClient}
+            clientId={sp.clientId}
           />
         </div>
       </div>

@@ -111,7 +111,7 @@ export default async function ClientShortlistPage({ searchParams }: { searchPara
       </section>
 
       <main style={{ maxWidth: 1200, margin: '0 auto', padding: '32px 32px 80px' }}>
-        <ShortlistView items={universities} />
+        <ShortlistView items={universities} clientId={client.id} />
       </main>
     </div>
   )

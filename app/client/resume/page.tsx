@@ -28,11 +28,24 @@ export default async function ResumeBuilderPage({
   })
 
   const essay = client ? await getClientEssay(client.id, 'resume') : null
-  // Curator edits go into curator_content → client sees approved curator_content if approved
-  const displayContent =
+  // /client/* is always client-cabinet preview. Curator edits via /curator/clients/[id]/resume.
+  // If approved → client sees curator_content (final), else their own content.
+  const rawContent =
     essay?.status === 'approved' && essay.curator_content
       ? essay.curator_content
       : essay?.content || undefined
+
+  // If saved draft is essentially empty (no personal info, no sections) — fall back
+  // to INITIAL_RESUME sample so user sees an example to edit, not a blank canvas.
+  const isEmpty = !rawContent || (
+    !rawContent.personal?.firstName?.trim?.() &&
+    !rawContent.personal?.lastName?.trim?.() &&
+    !rawContent.personal?.profileSummary?.trim?.() &&
+    !(rawContent.workExperience?.length) &&
+    !(rawContent.education?.length) &&
+    !(rawContent.skills?.length)
+  )
+  const displayContent = isEmpty ? undefined : rawContent
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--ds-bg)' }}>

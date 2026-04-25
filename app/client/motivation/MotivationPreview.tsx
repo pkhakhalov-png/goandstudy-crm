@@ -61,10 +61,7 @@ export function MotivationPreview({ letter, authorName }: Props) {
         >
           {authorName || 'Ваше имя'}
         </h1>
-        <div style={{ fontSize: 12, color: '#555', marginBottom: 24 }}>
-          Подано в Go &amp; Study · черновик
-        </div>
-        <div style={{ height: 1, background: '#E5E5E7', marginBottom: 28 }} />
+        <div style={{ height: 1, background: '#E5E5E7', margin: '20px 0 28px' }} />
 
         {/* Body */}
         {isEmpty ? (

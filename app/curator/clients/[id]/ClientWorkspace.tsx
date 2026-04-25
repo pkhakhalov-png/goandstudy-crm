@@ -1477,7 +1477,7 @@ function EssaysTab({ client, essays }: { client: any; essays: any[] }) {
         type="resume"
         emoji="📋"
         title="Резюме"
-        editHref={`/client/resume?clientId=${client.id}`}
+        editHref={`/curator/clients/${client.id}/resume`}
       />
       <EssayCard
         client={client}
@@ -1485,7 +1485,7 @@ function EssaysTab({ client, essays }: { client: any; essays: any[] }) {
         type="motivation"
         emoji="✍️"
         title="Мотивационное письмо"
-        editHref={`/client/motivation?clientId=${client.id}`}
+        editHref={`/curator/clients/${client.id}/motivation`}
       />
     </div>
   )

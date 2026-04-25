@@ -26,10 +26,14 @@ const sectionTitle: React.CSSProperties = {
 
 export default async function ProgramPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ programId: string }>
+  searchParams: Promise<{ asClient?: string; clientId?: string }>
 }) {
   const { programId } = await params
+  const sp = await searchParams
+  const asClient = sp.asClient === '1'
   const id = Number(programId)
   if (!id) notFound()
 
@@ -229,20 +233,22 @@ export default async function ProgramPage({
 
             {/* Action */}
             <div style={{ marginTop: 16, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-              <AddToShortlistButton
-                schoolId={school.id}
-                programId={program.id}
-                myClients={myClients ?? []}
-              />
+              {!asClient && (
+                <AddToShortlistButton
+                  schoolId={school.id}
+                  programId={program.id}
+                  myClients={myClients ?? []}
+                />
+              )}
               <Link
-                href={`/curator/universities/${school.id}`}
+                href={asClient ? `/curator/universities/${school.id}?asClient=1${sp.clientId ? `&clientId=${sp.clientId}` : ''}` : `/curator/universities/${school.id}`}
                 className="btn-s"
                 style={{ fontSize: 12, textDecoration: 'none' }}
               >
                 Все программы вуза →
               </Link>
-              <FillProgramButton programId={program.id} hasData={!!curatorData} />
-              {curatorData?.last_updated_at && (
+              {!asClient && <FillProgramButton programId={program.id} hasData={!!curatorData} />}
+              {!asClient && curatorData?.last_updated_at && (
                 <span style={{ fontSize: 11, color: 'var(--muted)', marginLeft: 'auto' }}>
                   {lastUpdatedByName ? `Обновил ${lastUpdatedByName}` : 'Обновлено'} · {relativeTime(curatorData.last_updated_at)}
                 </span>
@@ -250,7 +256,7 @@ export default async function ProgramPage({
             </div>
           </div>
 
-          {!curatorData && (
+          {!curatorData && !asClient && (
             <div style={{
               ...cardStyle, textAlign: 'center', padding: 24, marginBottom: 16,
               background: 'rgba(177,94,204,.04)', border: '1px dashed rgba(177,94,204,.3)',

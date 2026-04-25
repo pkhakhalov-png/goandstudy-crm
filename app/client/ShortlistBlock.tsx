@@ -9,9 +9,10 @@ import { useClientState } from './shared-store'
 interface Props {
   items: University[] // полный список от куратора (15)
   total: number
+  clientId?: number
 }
 
-export function ShortlistBlock({ items, total }: Props) {
+export function ShortlistBlock({ items, total, clientId }: Props) {
   const { state, hydrated } = useClientState()
 
   const { shown, selectedCount } = useMemo(() => {
@@ -104,7 +105,7 @@ export function ShortlistBlock({ items, total }: Props) {
             @media (max-width: 600px) { .shortlist-priority-grid { grid-template-columns: 1fr !important; } }
           `}</style>
           {shown.map((uni, idx) => (
-            <UniCard key={uni.key} uni={uni} rank={idx + 1} />
+            <UniCard key={uni.key} uni={uni} rank={idx + 1} clientId={clientId} />
           ))}
         </div>
       )}
@@ -184,9 +185,10 @@ function EmptyState({ total }: { total: number }) {
   )
 }
 
-function UniCard({ uni, rank }: { uni: University; rank: number }) {
-  const programHref = uni.programId ? `/curator/programs/${uni.programId}` : '/client/shortlist'
-  const schoolHref = uni.schoolId ? `/curator/universities/${uni.schoolId}` : null
+function UniCard({ uni, rank, clientId }: { uni: University; rank: number; clientId?: number }) {
+  const qs = `?asClient=1${clientId ? `&clientId=${clientId}` : ''}`
+  const programHref = uni.programId ? `/curator/programs/${uni.programId}${qs}` : '/client/shortlist'
+  const schoolHref = uni.schoolId ? `/curator/universities/${uni.schoolId}${qs}` : null
 
   return (
     <article

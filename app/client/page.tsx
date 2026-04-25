@@ -143,7 +143,7 @@ export default async function ClientHomePage({ searchParams }: { searchParams: P
         }}
       >
         <ProjectAndRoadmap project={STUDENT_PROJECT} roadmap={ROADMAP} />
-        <ShortlistBlock items={universities} total={universities.length} />
+        <ShortlistBlock items={universities} total={universities.length} clientId={client.id} />
         <EssayCards essays={essaysWithState} />
         <DocumentsSection required={requiredDocs} optional={optionalDocs} />
       </main>

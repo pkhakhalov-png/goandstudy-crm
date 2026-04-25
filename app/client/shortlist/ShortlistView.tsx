@@ -13,9 +13,10 @@ import {
 
 interface Props {
   items: University[]
+  clientId?: number
 }
 
-export function ShortlistView({ items }: Props) {
+export function ShortlistView({ items, clientId }: Props) {
   const { state, update, hydrated } = useClientState()
   const [dragFromIdx, setDragFromIdx] = useState<number | null>(null)
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null)
@@ -178,6 +179,7 @@ export function ShortlistView({ items }: Props) {
                 onMoveDown={idx < priority.length - 1 ? () => update(s => movePriority(s, uni.key, 'down')) : undefined}
                 onRemove={() => update(s => togglePriority(s, uni.key))}
                 hydrated={hydrated}
+                clientId={clientId}
               />
             ))}
           </div>
@@ -206,6 +208,7 @@ export function ShortlistView({ items }: Props) {
                 uni={uni}
                 onToggle={() => update(s => togglePriority(s, uni.key))}
                 hydrated={hydrated}
+                clientId={clientId}
               />
             ))}
           </div>
@@ -269,7 +272,7 @@ function PriorityCard({
   isDragging, isDragOver,
   onDragStart, onDragOver, onDrop, onDragEnd,
   onMoveUp, onMoveDown, onRemove,
-  hydrated,
+  hydrated, clientId,
 }: {
   uni: University
   rank: number
@@ -285,6 +288,7 @@ function PriorityCard({
   onMoveDown?: () => void
   onRemove: () => void
   hydrated: boolean
+  clientId?: number
 }) {
   return (
     <article
@@ -447,7 +451,7 @@ function PriorityCard({
 
         <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
           <UniLogo uni={uni} size={48} />
-          <UniInfo uni={uni} />
+          <UniInfo uni={uni} clientId={clientId} />
         </div>
       </div>
     </article>
@@ -458,7 +462,7 @@ function PriorityCard({
    RestCard — для невыбранных (+ В приоритет)
    ═══════════════════════════════════════════════════════════════ */
 
-function RestCard({ uni, onToggle, hydrated }: { uni: University; onToggle: () => void; hydrated: boolean }) {
+function RestCard({ uni, onToggle, hydrated, clientId }: { uni: University; onToggle: () => void; hydrated: boolean; clientId?: number }) {
   return (
     <article
       style={{
@@ -488,7 +492,7 @@ function RestCard({ uni, onToggle, hydrated }: { uni: University; onToggle: () =
         </div>
       </div>
 
-      <UniInfo uni={uni} />
+      <UniInfo uni={uni} clientId={clientId} />
 
       <button
         type="button"
@@ -505,9 +509,10 @@ function RestCard({ uni, onToggle, hydrated }: { uni: University; onToggle: () =
 
 /* ─── Shared content block — uni info ─── */
 
-function UniInfo({ uni }: { uni: University }) {
-  const programHref = uni.programId ? `/curator/programs/${uni.programId}` : null
-  const schoolHref = uni.schoolId ? `/curator/universities/${uni.schoolId}` : null
+function UniInfo({ uni, clientId }: { uni: University; clientId?: number }) {
+  const qs = `?asClient=1${clientId ? `&clientId=${clientId}` : ''}`
+  const programHref = uni.programId ? `/curator/programs/${uni.programId}${qs}` : null
+  const schoolHref = uni.schoolId ? `/curator/universities/${uni.schoolId}${qs}` : null
   return (
     <div style={{ flex: 1, minWidth: 0 }}>
       <h4

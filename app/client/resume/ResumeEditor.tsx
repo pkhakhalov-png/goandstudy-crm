@@ -4,6 +4,7 @@ import { useMemo, useState, useEffect, useRef, useTransition } from 'react'
 import {
   INITIAL_RESUME,
   SECTION_TEMPLATES,
+  normalizeResume,
   type Resume,
   type LinkItem,
   type EducationItem,
@@ -18,10 +19,12 @@ import {
   type AwardItem,
   type VolunteeringItem,
   type OlympiadItem,
+  type WorkExperienceItem,
+  type OptionalSectionFlags,
 } from './mock'
 import { AccordionSection, SubItem, AddMoreButton, Field, SelectField } from './AccordionSection'
 import { ResumePreview } from './ResumePreview'
-import { saveClientDraft, submitToCurator } from '@/app/client/essays/actions'
+import { saveClientDraft, submitToCurator, curatorSaveEdit, approveEssay } from '@/app/client/essays/actions'
 
 const SKILL_LEVELS: SkillLevel[] = ['Beginner', 'Intermediate', 'Advanced', 'Expert']
 const LANG_LEVELS: LanguageLevel[] = ['Beginner', 'Intermediate', 'Good command', 'Very good command', 'Highly proficient', 'Native speaker']
@@ -32,14 +35,17 @@ interface ResumeEditorProps {
   initialResume?: Resume
   clientId?: number
   status?: 'draft' | 'sent' | 'editing' | 'approved'
+  viewerRole?: string
 }
 
-export function ResumeEditor({ initialResume, clientId, status = 'draft' }: ResumeEditorProps = {}) {
-  const [resume, setResume] = useState<Resume>(initialResume || INITIAL_RESUME)
+export function ResumeEditor({ initialResume, clientId, status = 'draft', viewerRole }: ResumeEditorProps = {}) {
+  const isCurator = viewerRole === 'curator' || viewerRole === 'admin' || viewerRole === 'rop'
+  const [resume, setResume] = useState<Resume>(() => normalizeResume(initialResume || INITIAL_RESUME))
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [pending, startTransition] = useTransition()
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const isLocked = status === 'approved'
+  // Locked = approved AND viewer is the client. Curator can re-edit even after approval.
+  const isLocked = status === 'approved' && !isCurator
 
   const [saveErrMsg, setSaveErrMsg] = useState<string | null>(null)
 
@@ -49,7 +55,9 @@ export function ResumeEditor({ initialResume, clientId, status = 'draft' }: Resu
     if (saveTimer.current) clearTimeout(saveTimer.current)
     setSaveState('saving')
     saveTimer.current = setTimeout(async () => {
-      const res = await saveClientDraft({ clientId, type: 'resume', content: resume })
+      const res = isCurator && clientId
+        ? await curatorSaveEdit({ clientId, type: 'resume', curatorContent: resume })
+        : await saveClientDraft({ clientId, type: 'resume', content: resume })
       if (res && (res as any).error) {
         setSaveState('error')
         setSaveErrMsg((res as any).error)
@@ -59,11 +67,24 @@ export function ResumeEditor({ initialResume, clientId, status = 'draft' }: Resu
       }
     }, 1000)
     return () => { if (saveTimer.current) clearTimeout(saveTimer.current) }
-  }, [resume, clientId, isLocked])
+  }, [resume, clientId, isLocked, isCurator])
+
+  function handleReset() {
+    if (!confirm('Сбросить резюме к образцу? Все введённые данные пропадут.')) return
+    setResume(normalizeResume(INITIAL_RESUME))
+  }
 
   function handleSubmit() {
     if (pending) return
     startTransition(async () => {
+      if (isCurator && clientId) {
+        const saved = await curatorSaveEdit({ clientId, type: 'resume', curatorContent: resume })
+        if (saved && (saved as any).error) { alert('Сохранение не удалось: ' + (saved as any).error); return }
+        const res = await approveEssay({ clientId, type: 'resume' })
+        if (res && (res as any).error) alert('Не утвердилось: ' + (res as any).error)
+        else alert('Резюме утверждено ✓ Клиент увидит финальную версию.')
+        return
+      }
       const saved = await saveClientDraft({ clientId, type: 'resume', content: resume })
       if (saved && (saved as any).error) {
         alert('Сохранение не удалось: ' + (saved as any).error)
@@ -75,12 +96,73 @@ export function ResumeEditor({ initialResume, clientId, status = 'draft' }: Resu
     })
   }
 
+  function handleDownloadPdf() {
+    if (!clientId) { window.print(); return }
+    const url = `/client/resume/print?clientId=${clientId}`
+    window.open(url, '_blank', 'noopener')
+  }
+
   /* ── helpers to update immutably ── */
   function updatePersonal<K extends keyof Resume['personal']>(key: K, value: Resume['personal'][K]) {
     setResume(r => ({ ...r, personal: { ...r.personal, [key]: value } }))
   }
   function updateList<K extends keyof Resume>(key: K, updater: (list: Resume[K]) => Resume[K]) {
     setResume(r => ({ ...r, [key]: updater(r[key]) }))
+  }
+
+  function isOptionalShown(key: keyof OptionalSectionFlags): boolean {
+    const flag = resume.optional?.[key]
+    if (typeof flag === 'boolean') return flag
+    // Backwards compat: derive from data
+    if (key === 'hobbies') return resume.hobbies.trim().length > 0
+    if (key === 'links') return resume.links.length > 0
+    if (key === 'conferences') return resume.conferences.length > 0
+    if (key === 'volunteering') return resume.volunteering.length > 0
+    if (key === 'olympiads') return resume.olympiads.length > 0
+    if (key === 'awards') return resume.awards.length > 0
+    // Core sections — shown by default unless explicitly removed
+    if (key === 'workExperience') return resume.workExperience.length > 0
+    if (key === 'education') return resume.education.length > 0
+    if (key === 'courses') return resume.courses.length > 0
+    if (key === 'skills') return resume.skills.length > 0
+    if (key === 'languages') return resume.languages.length > 0
+    return false
+  }
+
+  function setOptional(key: keyof OptionalSectionFlags, value: boolean) {
+    setResume(r => ({ ...r, optional: { ...(r.optional || {}), [key]: value } }))
+  }
+
+  function removeOptionalSection(key: keyof OptionalSectionFlags) {
+    if (!confirm('Удалить эту секцию из резюме? Данные внутри будут очищены.')) return
+    setResume(r => {
+      const next = { ...r, optional: { ...(r.optional || {}), [key]: false } }
+      if (key === 'hobbies') next.hobbies = ''
+      if (key === 'links') next.links = []
+      if (key === 'conferences') next.conferences = []
+      if (key === 'volunteering') next.volunteering = []
+      if (key === 'olympiads') next.olympiads = []
+      if (key === 'awards') next.awards = []
+      if (key === 'workExperience') next.workExperience = []
+      if (key === 'education') next.education = []
+      if (key === 'courses') next.courses = []
+      if (key === 'skills') next.skills = []
+      if (key === 'languages') next.languages = []
+      return next
+    })
+  }
+
+  function RemoveSectionBtn({ onClick }: { onClick: () => void }) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        title="Удалить секцию"
+        style={{ background: 'transparent', border: 'none', color: 'var(--ds-muted)', fontSize: 12, cursor: 'pointer', padding: '4px 8px', borderRadius: 'var(--ds-r-sm)' }}
+      >
+        × удалить
+      </button>
+    )
   }
 
   const completeness = useMemo(() => calcCompleteness(resume), [resume])
@@ -109,38 +191,20 @@ export function ResumeEditor({ initialResume, clientId, status = 'draft' }: Resu
           saveState={saveState}
           pending={pending}
           onSubmit={handleSubmit}
+          onReset={handleReset}
+          onDownloadPdf={handleDownloadPdf}
           isLocked={isLocked}
+          isCurator={isCurator}
         />
         <ProgressCard completeness={completeness} />
 
         {/* ═══ Personal details ═══ */}
         <AccordionSection title="Personal details" defaultOpen>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-            <Field
-              label="Job title"
-              value={resume.personal.jobTitle}
-              onChange={(v) => updatePersonal('jobTitle', v)}
-              placeholder="The role you want"
-              width="half"
-              hint={<span style={{ fontSize: 11, fontWeight: 700, color: 'var(--ds-success-ink)', background: 'var(--ds-success-soft)', padding: '2px 8px', borderRadius: 100 }}>+10%</span>}
-            />
-            <div style={{ gridColumn: 'auto', display: 'flex', alignItems: 'center', gap: 12, padding: '22px 0 0 12px' }}>
-              <div style={{ width: 56, height: 56, borderRadius: 'var(--ds-r-md)', background: 'var(--ds-bg-alt)', color: 'var(--ds-muted)', display: 'grid', placeItems: 'center', fontSize: 20, flexShrink: 0 }}>🔒</div>
-              <div style={{ fontSize: 12, color: 'var(--ds-muted)', lineHeight: 1.4 }}>
-                Этот шаблон не поддерживает загрузку фото
-              </div>
-            </div>
             <Field label="First name" value={resume.personal.firstName} onChange={(v) => updatePersonal('firstName', v)} width="half" />
             <Field label="Surname" value={resume.personal.lastName} onChange={(v) => updatePersonal('lastName', v)} width="half" />
-            <Field label="Email" value={resume.personal.email} onChange={(v) => updatePersonal('email', v)} width="half" />
-            <Field label="Phone" value={resume.personal.phone} onChange={(v) => updatePersonal('phone', v)} width="half" />
-            <Field label="Date of birth" value={resume.personal.dateOfBirth} onChange={(v) => updatePersonal('dateOfBirth', v)} placeholder="DD.MM.YYYY" width="half" />
-            <Field label="LinkedIn URL" value={resume.personal.linkedIn} onChange={(v) => updatePersonal('linkedIn', v)} placeholder="linkedin.com/in/yourprofile" width="half" />
-            <Field label="Postcode" value={resume.personal.postcode} onChange={(v) => updatePersonal('postcode', v)} width="half" />
-            <Field label="City, county" value={resume.personal.city} onChange={(v) => updatePersonal('city', v)} width="half" />
-            <Field label="Country" value={resume.personal.country} onChange={(v) => updatePersonal('country', v)} width="half" />
           </div>
-          <div style={{ marginTop: 20 }}>
+          <div style={{ marginTop: 16 }}>
             <Field
               label="Profile summary"
               value={resume.personal.profileSummary}
@@ -151,38 +215,82 @@ export function ResumeEditor({ initialResume, clientId, status = 'draft' }: Resu
               hint={<span style={{ fontSize: 11, fontWeight: 700, color: 'var(--ds-success-ink)', background: 'var(--ds-success-soft)', padding: '2px 8px', borderRadius: 100 }}>+15%</span>}
             />
           </div>
+          <div style={{ marginTop: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            <Field label="Email" value={resume.personal.email} onChange={(v) => updatePersonal('email', v)} width="half" />
+            <Field label="Phone" value={resume.personal.phone} onChange={(v) => updatePersonal('phone', v)} width="half" />
+            <Field label="LinkedIn URL" value={resume.personal.linkedIn} onChange={(v) => updatePersonal('linkedIn', v)} placeholder="linkedin.com/in/yourprofile" width="half" />
+            <Field label="City" value={resume.personal.city} onChange={(v) => updatePersonal('city', v)} width="half" />
+          </div>
         </AccordionSection>
 
-        {/* ═══ Websites & Social Links ═══ */}
+        {/* ═══ Work Experience ═══ */}
+        {isOptionalShown('workExperience') && (
         <AccordionSection
-          title="Websites & Social Links"
-          description="Ссылки на портфолио, LinkedIn, YouTube или личный сайт — всё что стоит увидеть приёмной комиссии."
+          title="Work Experience"
+          description="Стажировки, подработки, волонтёрские должности с обязанностями. Помогает приёмной комиссии увидеть твою ответственность."
+          right={<RemoveSectionBtn onClick={() => removeOptionalSection('workExperience')} />}
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {resume.links.map((link, idx) => (
+            {resume.workExperience.map((w, idx) => (
               <SubItem
-                key={link.id}
-                title={link.title || 'Новая ссылка'}
-                subtitle={link.url}
-                onRemove={() => updateList('links', l => l.filter((_, i) => i !== idx))}
+                key={w.id}
+                title={[w.jobTitle, w.company].filter(Boolean).join(' at ') || 'Новая запись'}
+                subtitle={[w.city, [w.startDate, w.endDate].filter(Boolean).join(' – ')].filter(Boolean).join(' · ')}
+                onRemove={() => updateList('workExperience', list => list.filter((_, i) => i !== idx))}
               >
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 12 }}>
-                  <Field label="Название" value={link.title} onChange={(v) => updateList('links', l => l.map((x, i) => i === idx ? { ...x, title: v } : x))} />
-                  <Field label="URL" value={link.url} onChange={(v) => updateList('links', l => l.map((x, i) => i === idx ? { ...x, url: v } : x))} placeholder="https://..." />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                  <Field label="Job title" value={w.jobTitle} onChange={(v) => updateList('workExperience', list => list.map((x, i) => i === idx ? { ...x, jobTitle: v } : x))} placeholder="The role you want" width="half" />
+                  <Field label="Company" value={w.company} onChange={(v) => updateList('workExperience', list => list.map((x, i) => i === idx ? { ...x, company: v } : x))} width="half" />
+                  <Field label="City" value={w.city} onChange={(v) => updateList('workExperience', list => list.map((x, i) => i === idx ? { ...x, city: v } : x))} width="half" />
+                  <Field label="Start date" value={w.startDate} onChange={(v) => updateList('workExperience', list => list.map((x, i) => i === idx ? { ...x, startDate: v } : x))} width="half" />
+                  <Field label="End date" value={w.endDate} onChange={(v) => updateList('workExperience', list => list.map((x, i) => i === idx ? { ...x, endDate: v } : x))} placeholder="Present" width="half" />
+                  <Field label="Description" value={w.description} onChange={(v) => updateList('workExperience', list => list.map((x, i) => i === idx ? { ...x, description: v } : x))} multiline rows={4} />
                 </div>
               </SubItem>
             ))}
           </div>
           <AddMoreButton
-            label="Добавить ссылку"
-            onClick={() => updateList<'links'>('links', l => [...l, { id: uid(), title: '', url: '' } as LinkItem])}
+            label="Добавить опыт работы"
+            onClick={() => updateList<'workExperience'>('workExperience', list => [...list, { id: uid(), jobTitle: '', company: '', city: '', startDate: '', endDate: '', description: '' } as WorkExperienceItem])}
           />
         </AccordionSection>
+        )}
+
+        {/* ═══ Websites & Social Links — optional ═══ */}
+        {isOptionalShown('links') && (
+          <AccordionSection
+            title="Websites & Social Links"
+            description="Ссылки на портфолио, LinkedIn, YouTube или личный сайт — всё что стоит увидеть приёмной комиссии."
+            right={<RemoveSectionBtn onClick={() => removeOptionalSection('links')} />}
+          >
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {resume.links.map((link, idx) => (
+                <SubItem
+                  key={link.id}
+                  title={link.title || 'Новая ссылка'}
+                  subtitle={link.url}
+                  onRemove={() => updateList('links', l => l.filter((_, i) => i !== idx))}
+                >
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 12 }}>
+                    <Field label="Название" value={link.title} onChange={(v) => updateList('links', l => l.map((x, i) => i === idx ? { ...x, title: v } : x))} />
+                    <Field label="URL" value={link.url} onChange={(v) => updateList('links', l => l.map((x, i) => i === idx ? { ...x, url: v } : x))} placeholder="https://..." />
+                  </div>
+                </SubItem>
+              ))}
+            </div>
+            <AddMoreButton
+              label="Добавить ссылку"
+              onClick={() => updateList<'links'>('links', l => [...l, { id: uid(), title: '', url: '' } as LinkItem])}
+            />
+          </AccordionSection>
+        )}
 
         {/* ═══ Education ═══ */}
+        {isOptionalShown('education') && (
         <AccordionSection
           title="Education"
           description="Школы, колледжи, гимназии и любые учебные заведения которые добавляют вес заявке."
+          right={<RemoveSectionBtn onClick={() => removeOptionalSection('education')} />}
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {resume.education.map((e, idx) => (
@@ -214,9 +322,11 @@ export function ResumeEditor({ initialResume, clientId, status = 'draft' }: Resu
             onClick={() => updateList<'education'>('education', list => [...list, { id: uid(), school: '', degree: '', startDate: '', endDate: '', city: '', description: '' } as EducationItem])}
           />
         </AccordionSection>
+        )}
 
         {/* ═══ Courses ═══ */}
-        <AccordionSection title="Courses">
+        {isOptionalShown('courses') && (
+        <AccordionSection title="Courses" right={<RemoveSectionBtn onClick={() => removeOptionalSection('courses')} />}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {resume.courses.map((c, idx) => (
               <SubItem
@@ -239,8 +349,10 @@ export function ResumeEditor({ initialResume, clientId, status = 'draft' }: Resu
             onClick={() => updateList<'courses'>('courses', list => [...list, { id: uid(), title: '' } as CourseItem])}
           />
         </AccordionSection>
+        )}
 
         {/* ═══ Areas of Expertise (Skills) ═══ */}
+        {isOptionalShown('skills') && (
         <AccordionSection
           title="Areas of Expertise"
           description="5 ключевых навыков. Покажите уровень — или скройте через тумблер ниже."
@@ -251,6 +363,7 @@ export function ResumeEditor({ initialResume, clientId, status = 'draft' }: Resu
                 value={resume.skillsShowLevel}
                 onChange={(v) => setResume(r => ({ ...r, skillsShowLevel: v }))}
               />
+              <RemoveSectionBtn onClick={() => removeOptionalSection('skills')} />
             </div>
           }
         >
@@ -280,31 +393,34 @@ export function ResumeEditor({ initialResume, clientId, status = 'draft' }: Resu
             onClick={() => updateList<'skills'>('skills', list => [...list, { id: uid(), name: '', level: 'Intermediate' } as SkillItem])}
           />
         </AccordionSection>
+        )}
 
-        {/* ═══ Conferences ═══ */}
-        <AccordionSection title="Conferences">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {resume.conferences.map((c, idx) => (
-              <SubItem
-                key={c.id}
-                title={c.title || 'Новая конференция'}
-                subtitle={[c.city, c.date].filter(Boolean).join(' · ')}
-                onRemove={() => updateList('conferences', list => list.filter((_, i) => i !== idx))}
-              >
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                  <Field label="Title" value={c.title} onChange={(v) => updateList('conferences', list => list.map((x, i) => i === idx ? { ...x, title: v } : x))} />
-                  <Field label="City" value={c.city ?? ''} onChange={(v) => updateList('conferences', list => list.map((x, i) => i === idx ? { ...x, city: v } : x))} width="half" />
-                  <Field label="Date" value={c.date} onChange={(v) => updateList('conferences', list => list.map((x, i) => i === idx ? { ...x, date: v } : x))} placeholder="Mar 2023" width="half" />
-                  <Field label="Description" value={c.description} onChange={(v) => updateList('conferences', list => list.map((x, i) => i === idx ? { ...x, description: v } : x))} multiline rows={4} />
-                </div>
-              </SubItem>
-            ))}
-          </div>
-          <AddMoreButton
-            label="Добавить конференцию"
-            onClick={() => updateList<'conferences'>('conferences', list => [...list, { id: uid(), title: '', date: '', description: '' } as ConferenceItem])}
-          />
-        </AccordionSection>
+        {/* ═══ Conferences — optional ═══ */}
+        {isOptionalShown('conferences') && (
+          <AccordionSection title="Conferences" right={<RemoveSectionBtn onClick={() => removeOptionalSection('conferences')} />}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {resume.conferences.map((c, idx) => (
+                <SubItem
+                  key={c.id}
+                  title={c.title || 'Новая конференция'}
+                  subtitle={[c.city, c.date].filter(Boolean).join(' · ')}
+                  onRemove={() => updateList('conferences', list => list.filter((_, i) => i !== idx))}
+                >
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                    <Field label="Title" value={c.title} onChange={(v) => updateList('conferences', list => list.map((x, i) => i === idx ? { ...x, title: v } : x))} />
+                    <Field label="City" value={c.city ?? ''} onChange={(v) => updateList('conferences', list => list.map((x, i) => i === idx ? { ...x, city: v } : x))} width="half" />
+                    <Field label="Date" value={c.date} onChange={(v) => updateList('conferences', list => list.map((x, i) => i === idx ? { ...x, date: v } : x))} placeholder="Mar 2023" width="half" />
+                    <Field label="Description" value={c.description} onChange={(v) => updateList('conferences', list => list.map((x, i) => i === idx ? { ...x, description: v } : x))} multiline rows={4} />
+                  </div>
+                </SubItem>
+              ))}
+            </div>
+            <AddMoreButton
+              label="Добавить конференцию"
+              onClick={() => updateList<'conferences'>('conferences', list => [...list, { id: uid(), title: '', date: '', description: '' } as ConferenceItem])}
+            />
+          </AccordionSection>
+        )}
 
         {/* ═══ Custom sections (TED Ed Student Talks и др.) ═══ */}
         {resume.customSections.map((cs, csIdx) => (
@@ -351,20 +467,23 @@ export function ResumeEditor({ initialResume, clientId, status = 'draft' }: Resu
           </AccordionSection>
         ))}
 
-        {/* ═══ Hobbies ═══ */}
-        <AccordionSection title="Hobbies">
-          <Field
-            label="What do you like?"
-            value={resume.hobbies}
-            onChange={(v) => setResume(r => ({ ...r, hobbies: v }))}
-            placeholder="Ballet, running, photography..."
-            multiline
-            rows={4}
-          />
-        </AccordionSection>
+        {/* ═══ Hobbies — optional ═══ */}
+        {isOptionalShown('hobbies') && (
+          <AccordionSection title="Hobbies" right={<RemoveSectionBtn onClick={() => removeOptionalSection('hobbies')} />}>
+            <Field
+              label="What do you like?"
+              value={resume.hobbies}
+              onChange={(v) => setResume(r => ({ ...r, hobbies: v }))}
+              placeholder="Ballet, running, photography..."
+              multiline
+              rows={4}
+            />
+          </AccordionSection>
+        )}
 
         {/* ═══ Languages ═══ */}
-        <AccordionSection title="Languages">
+        {isOptionalShown('languages') && (
+        <AccordionSection title="Languages" right={<RemoveSectionBtn onClick={() => removeOptionalSection('languages')} />}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {resume.languages.map((l, idx) => (
               <SubItem
@@ -391,84 +510,174 @@ export function ResumeEditor({ initialResume, clientId, status = 'draft' }: Resu
             onClick={() => updateList<'languages'>('languages', list => [...list, { id: uid(), name: '', level: 'Intermediate' } as LanguageItem])}
           />
         </AccordionSection>
+        )}
 
-        {/* ═══ Awards ═══ */}
-        <AccordionSection title="Awards">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {resume.awards.map((a, idx) => (
-              <SubItem
-                key={a.id}
-                title={a.title || 'Новая награда'}
-                subtitle={a.year}
-                onRemove={() => updateList('awards', list => list.filter((_, i) => i !== idx))}
-              >
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                  <Field label="Title" value={a.title} onChange={(v) => updateList('awards', list => list.map((x, i) => i === idx ? { ...x, title: v } : x))} />
-                  <Field label="Year" value={a.year ?? ''} onChange={(v) => updateList('awards', list => list.map((x, i) => i === idx ? { ...x, year: v } : x))} width="half" />
-                  <Field label="Description" value={a.description ?? ''} onChange={(v) => updateList('awards', list => list.map((x, i) => i === idx ? { ...x, description: v } : x))} multiline rows={2} />
-                </div>
-              </SubItem>
-            ))}
-          </div>
-          <AddMoreButton
-            label="Добавить награду"
-            onClick={() => updateList<'awards'>('awards', list => [...list, { id: uid(), title: '' } as AwardItem])}
-          />
-        </AccordionSection>
+        {/* ═══ Awards — optional ═══ */}
+        {isOptionalShown('awards') && (
+          <AccordionSection title="Awards" right={<RemoveSectionBtn onClick={() => removeOptionalSection('awards')} />}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {resume.awards.map((a, idx) => (
+                <SubItem
+                  key={a.id}
+                  title={a.title || 'Новая награда'}
+                  subtitle={a.year}
+                  onRemove={() => updateList('awards', list => list.filter((_, i) => i !== idx))}
+                >
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                    <Field label="Title" value={a.title} onChange={(v) => updateList('awards', list => list.map((x, i) => i === idx ? { ...x, title: v } : x))} />
+                    <Field label="Year" value={a.year ?? ''} onChange={(v) => updateList('awards', list => list.map((x, i) => i === idx ? { ...x, year: v } : x))} width="half" />
+                    <Field label="Description" value={a.description ?? ''} onChange={(v) => updateList('awards', list => list.map((x, i) => i === idx ? { ...x, description: v } : x))} multiline rows={2} />
+                  </div>
+                </SubItem>
+              ))}
+            </div>
+            <AddMoreButton
+              label="Добавить награду"
+              onClick={() => updateList<'awards'>('awards', list => [...list, { id: uid(), title: '' } as AwardItem])}
+            />
+          </AccordionSection>
+        )}
 
-        {/* ═══ Volunteering ═══ */}
-        <AccordionSection title="Volunteering">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {resume.volunteering.map((v, idx) => (
-              <SubItem
-                key={v.id}
-                title={v.title || 'Новая запись'}
-                subtitle={[v.city, [v.startDate, v.endDate].filter(Boolean).join(' – ')].filter(Boolean).join(' · ')}
-                onRemove={() => updateList('volunteering', list => list.filter((_, i) => i !== idx))}
-              >
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                  <Field label="Title" value={v.title} onChange={(x) => updateList('volunteering', list => list.map((r, i) => i === idx ? { ...r, title: x } : r))} />
-                  <Field label="City" value={v.city} onChange={(x) => updateList('volunteering', list => list.map((r, i) => i === idx ? { ...r, city: x } : r))} width="half" />
-                  <Field label="Start date" value={v.startDate} onChange={(x) => updateList('volunteering', list => list.map((r, i) => i === idx ? { ...r, startDate: x } : r))} width="half" />
-                  <Field label="End date" value={v.endDate} onChange={(x) => updateList('volunteering', list => list.map((r, i) => i === idx ? { ...r, endDate: x } : r))} width="half" />
-                  <Field label="Description" value={v.description} onChange={(x) => updateList('volunteering', list => list.map((r, i) => i === idx ? { ...r, description: x } : r))} multiline rows={4} />
-                </div>
-              </SubItem>
-            ))}
-          </div>
-          <AddMoreButton
-            label="Добавить волонтёрский опыт"
-            onClick={() => updateList<'volunteering'>('volunteering', list => [...list, { id: uid(), title: '', city: '', startDate: '', endDate: '', description: '' } as VolunteeringItem])}
-          />
-        </AccordionSection>
+        {/* ═══ Volunteering — optional ═══ */}
+        {isOptionalShown('volunteering') && (
+          <AccordionSection title="Volunteering" right={<RemoveSectionBtn onClick={() => removeOptionalSection('volunteering')} />}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {resume.volunteering.map((v, idx) => (
+                <SubItem
+                  key={v.id}
+                  title={v.title || 'Новая запись'}
+                  subtitle={[v.city, [v.startDate, v.endDate].filter(Boolean).join(' – ')].filter(Boolean).join(' · ')}
+                  onRemove={() => updateList('volunteering', list => list.filter((_, i) => i !== idx))}
+                >
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                    <Field label="Title" value={v.title} onChange={(x) => updateList('volunteering', list => list.map((r, i) => i === idx ? { ...r, title: x } : r))} />
+                    <Field label="City" value={v.city} onChange={(x) => updateList('volunteering', list => list.map((r, i) => i === idx ? { ...r, city: x } : r))} width="half" />
+                    <Field label="Start date" value={v.startDate} onChange={(x) => updateList('volunteering', list => list.map((r, i) => i === idx ? { ...r, startDate: x } : r))} width="half" />
+                    <Field label="End date" value={v.endDate} onChange={(x) => updateList('volunteering', list => list.map((r, i) => i === idx ? { ...r, endDate: x } : r))} width="half" />
+                    <Field label="Description" value={v.description} onChange={(x) => updateList('volunteering', list => list.map((r, i) => i === idx ? { ...r, description: x } : r))} multiline rows={4} />
+                  </div>
+                </SubItem>
+              ))}
+            </div>
+            <AddMoreButton
+              label="Добавить волонтёрский опыт"
+              onClick={() => updateList<'volunteering'>('volunteering', list => [...list, { id: uid(), title: '', city: '', startDate: '', endDate: '', description: '' } as VolunteeringItem])}
+            />
+          </AccordionSection>
+        )}
 
-        {/* ═══ Olympiads ═══ */}
-        <AccordionSection title="Olympiads">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {resume.olympiads.map((o, idx) => (
-              <SubItem
-                key={o.id}
-                title={o.title || 'Новая олимпиада'}
-                subtitle={o.year}
-                onRemove={() => updateList('olympiads', list => list.filter((_, i) => i !== idx))}
-              >
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                  <Field label="Title" value={o.title} onChange={(v) => updateList('olympiads', list => list.map((x, i) => i === idx ? { ...x, title: v } : x))} />
-                  <Field label="Year" value={o.year} onChange={(v) => updateList('olympiads', list => list.map((x, i) => i === idx ? { ...x, year: v } : x))} width="half" />
-                  <Field label="Description" value={o.description ?? ''} onChange={(v) => updateList('olympiads', list => list.map((x, i) => i === idx ? { ...x, description: v } : x))} multiline rows={2} />
-                </div>
-              </SubItem>
-            ))}
-          </div>
-          <AddMoreButton
-            label="Добавить олимпиаду"
-            onClick={() => updateList<'olympiads'>('olympiads', list => [...list, { id: uid(), title: '', year: '' } as OlympiadItem])}
-          />
-        </AccordionSection>
+        {/* ═══ Olympiads — optional ═══ */}
+        {isOptionalShown('olympiads') && (
+          <AccordionSection title="Olympiads" right={<RemoveSectionBtn onClick={() => removeOptionalSection('olympiads')} />}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {resume.olympiads.map((o, idx) => (
+                <SubItem
+                  key={o.id}
+                  title={o.title || 'Новая олимпиада'}
+                  subtitle={o.year}
+                  onRemove={() => updateList('olympiads', list => list.filter((_, i) => i !== idx))}
+                >
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                    <Field label="Title" value={o.title} onChange={(v) => updateList('olympiads', list => list.map((x, i) => i === idx ? { ...x, title: v } : x))} />
+                    <Field label="Year" value={o.year} onChange={(v) => updateList('olympiads', list => list.map((x, i) => i === idx ? { ...x, year: v } : x))} width="half" />
+                    <Field label="Description" value={o.description ?? ''} onChange={(v) => updateList('olympiads', list => list.map((x, i) => i === idx ? { ...x, description: v } : x))} multiline rows={2} />
+                  </div>
+                </SubItem>
+              ))}
+            </div>
+            <AddMoreButton
+              label="Добавить олимпиаду"
+              onClick={() => updateList<'olympiads'>('olympiads', list => [...list, { id: uid(), title: '', year: '' } as OlympiadItem])}
+            />
+          </AccordionSection>
+        )}
 
         {/* ═══ Add Section ═══ */}
         <AddSectionGrid
           onAdd={(templateKey) => {
+            // Optional typed sections — toggle visible + seed empty item if needed
+            if (templateKey === 'links') {
+              setOptional('links', true)
+              if (resume.links.length === 0) {
+                updateList<'links'>('links', l => [...l, { id: uid(), title: '', url: '' } as LinkItem])
+              }
+              return
+            }
+            if (templateKey === 'conferences') {
+              setOptional('conferences', true)
+              if (resume.conferences.length === 0) {
+                updateList<'conferences'>('conferences', l => [...l, { id: uid(), title: '', date: '', description: '' } as ConferenceItem])
+              }
+              return
+            }
+            if (templateKey === 'volunteering') {
+              setOptional('volunteering', true)
+              if (resume.volunteering.length === 0) {
+                updateList<'volunteering'>('volunteering', l => [...l, { id: uid(), title: '', city: '', startDate: '', endDate: '', description: '' } as VolunteeringItem])
+              }
+              return
+            }
+            if (templateKey === 'olympiads') {
+              setOptional('olympiads', true)
+              if (resume.olympiads.length === 0) {
+                updateList<'olympiads'>('olympiads', l => [...l, { id: uid(), title: '', year: '' } as OlympiadItem])
+              }
+              return
+            }
+            if (templateKey === 'hobbies') {
+              setOptional('hobbies', true)
+              return
+            }
+            if (templateKey === 'awards') {
+              setOptional('awards', true)
+              if (resume.awards.length === 0) {
+                updateList<'awards'>('awards', l => [...l, { id: uid(), title: '' } as AwardItem])
+              }
+              return
+            }
+            if (templateKey === 'workExperience') {
+              setOptional('workExperience', true)
+              if (resume.workExperience.length === 0) {
+                updateList<'workExperience'>('workExperience', l => [...l, { id: uid(), jobTitle: '', company: '', city: '', startDate: '', endDate: '', description: '' } as WorkExperienceItem])
+              }
+              return
+            }
+            if (templateKey === 'education') {
+              setOptional('education', true)
+              if (resume.education.length === 0) {
+                updateList<'education'>('education', l => [...l, { id: uid(), school: '', degree: '', startDate: '', endDate: '', city: '', description: '' } as EducationItem])
+              }
+              return
+            }
+            if (templateKey === 'courses') {
+              setOptional('courses', true)
+              if (resume.courses.length === 0) {
+                updateList<'courses'>('courses', l => [...l, { id: uid(), title: '' } as CourseItem])
+              }
+              return
+            }
+            if (templateKey === 'skills') {
+              setOptional('skills', true)
+              if (resume.skills.length === 0) {
+                updateList<'skills'>('skills', l => [...l, { id: uid(), name: '', level: 'Intermediate' } as SkillItem])
+              }
+              return
+            }
+            if (templateKey === 'languages') {
+              setOptional('languages', true)
+              if (resume.languages.length === 0) {
+                updateList<'languages'>('languages', l => [...l, { id: uid(), name: '', level: 'Intermediate' } as LanguageItem])
+              }
+              return
+            }
+            if (templateKey === 'ted') {
+              updateList<'customSections'>('customSections', list => [
+                ...list,
+                { id: uid(), title: 'TED Talks', items: [{ id: uid(), title: '' } as CustomSectionItem] } as CustomSection,
+              ])
+              return
+            }
+            // Generic custom-section templates
             if (templateKey === 'custom' || templateKey === 'training' || templateKey === 'extracurricular' || templateKey === 'additional' || templateKey === 'references') {
               const titleMap: Record<string, string> = {
                 custom: 'Custom Section',
@@ -522,20 +731,30 @@ export function ResumeEditor({ initialResume, clientId, status = 'draft' }: Resu
    ═══════════════════════════════════════════════════════════════ */
 
 function EssayStatusBar({
-  status, saveState, pending, onSubmit, isLocked,
+  status, saveState, pending, onSubmit, onReset, onDownloadPdf, isLocked, isCurator,
 }: {
   status: 'draft' | 'sent' | 'editing' | 'approved'
   saveState: 'idle' | 'saving' | 'saved' | 'error'
   pending: boolean
   onSubmit: () => void
+  onReset: () => void
+  onDownloadPdf: () => void
   isLocked: boolean
+  isCurator: boolean
 }) {
-  const statusInfo: Record<string, { label: string; chip: string }> = {
-    draft: { label: 'Черновик — только у тебя', chip: 'ds-chip-neutral' },
-    sent: { label: 'Отправлено куратору', chip: 'ds-chip-info' },
-    editing: { label: 'Куратор дорабатывает', chip: 'ds-chip-warning' },
-    approved: { label: 'Готово ✓ Утверждено куратором', chip: 'ds-chip-success' },
-  }
+  const statusInfo: Record<string, { label: string; chip: string }> = isCurator
+    ? {
+        draft: { label: 'Клиент заполняет', chip: 'ds-chip-neutral' },
+        sent: { label: 'Прислано клиентом — на ревью', chip: 'ds-chip-info' },
+        editing: { label: 'Дорабатываете', chip: 'ds-chip-warning' },
+        approved: { label: 'Утверждено вами ✓', chip: 'ds-chip-success' },
+      }
+    : {
+        draft: { label: 'Черновик — только у тебя', chip: 'ds-chip-neutral' },
+        sent: { label: 'Отправлено куратору', chip: 'ds-chip-info' },
+        editing: { label: 'Куратор дорабатывает', chip: 'ds-chip-warning' },
+        approved: { label: 'Готово ✓ Утверждено куратором', chip: 'ds-chip-success' },
+      }
   const s = statusInfo[status]
   return (
     <div
@@ -550,23 +769,57 @@ function EssayStatusBar({
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <span className={`ds-chip ${s.chip}`} style={{ textTransform: 'uppercase', letterSpacing: '0.08em', fontSize: 10, fontWeight: 700 }}>
-          {s.label}
-        </span>
+        {status !== 'draft' && (
+          <span className={`ds-chip ${s.chip}`} style={{ textTransform: 'uppercase', letterSpacing: '0.08em', fontSize: 10, fontWeight: 700 }}>
+            {s.label}
+          </span>
+        )}
         {saveState === 'error' && (
           <span style={{ fontSize: 12, color: 'var(--ds-error)' }}>Не сохраняется — проверь что таблица client_essays создана</span>
         )}
       </div>
-      {!isLocked && (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <button
           type="button"
-          className="ds-btn ds-btn-primary ds-btn-sm"
-          onClick={onSubmit}
+          onClick={onDownloadPdf}
           disabled={pending}
+          className="ds-btn ds-btn-secondary ds-btn-sm"
+          title="Открыть резюме в виде для печати (Cmd+P → Save as PDF)"
         >
-          {pending ? '…' : status === 'sent' || status === 'editing' ? 'Отправить ещё раз' : '↗ Отправить куратору'}
+          ↓ Скачать PDF
         </button>
-      )}
+        {!isCurator && (
+          <button
+            type="button"
+            onClick={onReset}
+            disabled={pending}
+            style={{ background: 'transparent', border: '1px solid var(--ds-border)', color: 'var(--ds-muted)', fontSize: 12, padding: '6px 12px', borderRadius: 'var(--ds-r-sm)', cursor: 'pointer' }}
+            title="Стереть всё и подгрузить пример Yulia Pozdnukhova"
+          >
+            ↻ К образцу
+          </button>
+        )}
+        {isCurator && status !== 'approved' && (
+          <button
+            type="button"
+            className="ds-btn ds-btn-primary ds-btn-sm"
+            onClick={onSubmit}
+            disabled={pending}
+          >
+            {pending ? '…' : '✓ Утвердить'}
+          </button>
+        )}
+        {!isCurator && !isLocked && (
+          <button
+            type="button"
+            className="ds-btn ds-btn-primary ds-btn-sm"
+            onClick={onSubmit}
+            disabled={pending}
+          >
+            {pending ? '…' : status === 'sent' || status === 'editing' ? 'Отправить ещё раз' : '↗ Отправить куратору'}
+          </button>
+        )}
+      </div>
     </div>
   )
 }
@@ -658,21 +911,17 @@ function ProgressCard({ completeness }: { completeness: ReturnType<typeof calcCo
 
 function calcCompleteness(resume: Resume) {
   const scores = [
-    { key: 'jobTitle', weight: 10, ok: resume.personal.jobTitle.trim().length > 0, label: 'Add job title' },
-    { key: 'profileSummary', weight: 15, ok: resume.personal.profileSummary.trim().length > 20, label: 'Add profile summary' },
-    { key: 'country', weight: 2, ok: resume.personal.country.trim().length > 0, label: 'Add a country name' },
-    { key: 'city', weight: 5, ok: resume.personal.city.trim().length > 0, label: 'Add a city name' },
-    { key: 'summary', weight: 15, ok: resume.personal.profileSummary.trim().length > 20, label: 'Write a profile summary' },
-    { key: 'experience', weight: 15, ok: resume.courses.length > 0 || resume.conferences.length > 0 || resume.customSections.length > 0, label: 'Add courses / conferences / custom experience' },
-    { key: 'volunteering', weight: 5, ok: resume.volunteering.length > 0, label: 'Add volunteering' },
-    { key: 'education', weight: 15, ok: resume.education.length > 0, label: 'Add education' },
-    { key: 'skills', weight: 10, ok: resume.skills.length > 0, label: 'Add skills' },
-    { key: 'languages', weight: 5, ok: resume.languages.length > 0, label: 'Add languages' },
-    { key: 'email', weight: 5, ok: resume.personal.email.trim().length > 0, label: 'Add email' },
-    { key: 'phone', weight: 5, ok: resume.personal.phone.trim().length > 0, label: 'Add phone' },
     { key: 'firstName', weight: 5, ok: resume.personal.firstName.trim().length > 0, label: 'Add first name' },
     { key: 'lastName', weight: 5, ok: resume.personal.lastName.trim().length > 0, label: 'Add last name' },
-    { key: 'jobTitle', weight: 5, ok: resume.personal.jobTitle.trim().length > 0, label: 'Add a job title' },
+    { key: 'profileSummary', weight: 15, ok: resume.personal.profileSummary.trim().length > 20, label: 'Add profile summary' },
+    { key: 'email', weight: 5, ok: resume.personal.email.trim().length > 0, label: 'Add email' },
+    { key: 'phone', weight: 5, ok: resume.personal.phone.trim().length > 0, label: 'Add phone' },
+    { key: 'city', weight: 5, ok: resume.personal.city.trim().length > 0, label: 'Add a city name' },
+    { key: 'workExperience', weight: 15, ok: resume.workExperience.length > 0, label: 'Add work experience' },
+    { key: 'education', weight: 15, ok: resume.education.length > 0, label: 'Add education' },
+    { key: 'skills', weight: 10, ok: resume.skills.length > 0, label: 'Add skills' },
+    { key: 'languages', weight: 10, ok: resume.languages.length > 0, label: 'Add languages' },
+    { key: 'experience', weight: 10, ok: resume.courses.length > 0 || resume.conferences.length > 0 || resume.customSections.length > 0, label: 'Add courses / conferences / custom experience' },
   ]
   const total = scores.reduce((a, s) => a + s.weight, 0)
   const gained = scores.reduce((a, s) => a + (s.ok ? s.weight : 0), 0)

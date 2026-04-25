@@ -32,10 +32,16 @@ export default async function MotivationBuilderPage({
     requestedClientId,
   })
   const essay = client ? await getClientEssay(client.id, 'motivation') : null
-  const displayContent =
+  const rawContent =
     essay?.status === 'approved' && essay.curator_content
       ? essay.curator_content
       : essay?.content || undefined
+  // Fall back to seed if saved draft is essentially empty
+  const isEmpty = !rawContent || (
+    typeof rawContent === 'object' &&
+    Object.values(rawContent).every((v) => typeof v !== 'string' || !v.trim())
+  )
+  const displayContent = isEmpty ? undefined : rawContent
 
   const authorName = client?.name || CLIENT_CTX.childFullName
 

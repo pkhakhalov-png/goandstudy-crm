@@ -12,21 +12,23 @@ import {
   type Question,
 } from './mock'
 import { MotivationPreview } from './MotivationPreview'
-import { saveClientDraft, submitToCurator } from '@/app/client/essays/actions'
+import { saveClientDraft, submitToCurator, curatorSaveEdit, approveEssay } from '@/app/client/essays/actions'
 
 interface Props {
   authorName: string
   initialLetter?: MotivationLetter
   clientId?: number
   status?: 'draft' | 'sent' | 'editing' | 'approved'
+  viewerRole?: string
 }
 
-export function MotivationEditor({ authorName, initialLetter, clientId, status = 'draft' }: Props) {
+export function MotivationEditor({ authorName, initialLetter, clientId, status = 'draft', viewerRole }: Props) {
+  const isCurator = viewerRole === 'curator' || viewerRole === 'admin' || viewerRole === 'rop'
   const [letter, setLetter] = useState<MotivationLetter>(initialLetter || INITIAL_LETTER)
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [pending, startTransition] = useTransition()
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const isLocked = status === 'approved'
+  const isLocked = status === 'approved' && !isCurator
 
   const [saveErrMsg, setSaveErrMsg] = useState<string | null>(null)
 
@@ -35,7 +37,9 @@ export function MotivationEditor({ authorName, initialLetter, clientId, status =
     if (saveTimer.current) clearTimeout(saveTimer.current)
     setSaveState('saving')
     saveTimer.current = setTimeout(async () => {
-      const res = await saveClientDraft({ clientId, type: 'motivation', content: letter })
+      const res = isCurator && clientId
+        ? await curatorSaveEdit({ clientId, type: 'motivation', curatorContent: letter })
+        : await saveClientDraft({ clientId, type: 'motivation', content: letter })
       if (res && (res as any).error) {
         setSaveState('error')
         setSaveErrMsg((res as any).error)
@@ -45,11 +49,30 @@ export function MotivationEditor({ authorName, initialLetter, clientId, status =
       }
     }, 1000)
     return () => { if (saveTimer.current) clearTimeout(saveTimer.current) }
-  }, [letter, clientId, isLocked])
+  }, [letter, clientId, isLocked, isCurator])
+
+  function handleReset() {
+    if (!confirm('Сбросить письмо к образцу? Текущий черновик пропадёт.')) return
+    setLetter(INITIAL_LETTER)
+  }
+
+  function handleDownloadPdf() {
+    if (!clientId) { window.print(); return }
+    const url = `/client/motivation/print?clientId=${clientId}`
+    window.open(url, '_blank', 'noopener')
+  }
 
   function handleSubmit() {
     if (pending) return
     startTransition(async () => {
+      if (isCurator && clientId) {
+        const saved = await curatorSaveEdit({ clientId, type: 'motivation', curatorContent: letter })
+        if (saved && (saved as any).error) { alert('Сохранение не удалось: ' + (saved as any).error); return }
+        const res = await approveEssay({ clientId, type: 'motivation' })
+        if (res && (res as any).error) alert('Не утвердилось: ' + (res as any).error)
+        else alert('Письмо утверждено ✓ Клиент увидит финальную версию.')
+        return
+      }
       const saved = await saveClientDraft({ clientId, type: 'motivation', content: letter })
       if (saved && (saved as any).error) {
         alert('Сохранение не удалось: ' + (saved as any).error)
@@ -104,7 +127,10 @@ export function MotivationEditor({ authorName, initialLetter, clientId, status =
         saveState={saveState}
         pending={pending}
         onSubmit={handleSubmit}
+        onReset={handleReset}
+        onDownloadPdf={handleDownloadPdf}
         isLocked={isLocked}
+        isCurator={isCurator}
       />
       <div
         className="ds-card"
@@ -180,6 +206,21 @@ export function MotivationEditor({ authorName, initialLetter, clientId, status =
           <MenuButton />
         </header>
 
+        {/* Author name input */}
+        <div style={{ padding: '20px 32px 0', display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <label style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--ds-muted)' }}>
+            Имя автора (как подписать письмо)
+          </label>
+          <input
+            type="text"
+            value={letter.authorName ?? ''}
+            onChange={(e) => setLetter(l => ({ ...l, authorName: e.target.value }))}
+            placeholder={authorName}
+            className="ds-input"
+            style={{ fontSize: 15 }}
+          />
+        </div>
+
         {/* Секции */}
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           {(Object.keys(SECTION_TITLES) as SectionKey[]).map((sectionKey, idx) => (
@@ -195,48 +236,6 @@ export function MotivationEditor({ authorName, initialLetter, clientId, status =
           ))}
         </div>
 
-        {/* Footer: Preview + Save & close */}
-        <footer
-          style={{
-            padding: '20px 32px',
-            borderTop: '1px solid var(--ds-border-soft)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 16,
-            flexWrap: 'wrap',
-          }}
-        >
-          <button
-            type="button"
-            style={{
-              background: 'transparent',
-              border: 'none',
-              padding: 0,
-              cursor: 'pointer',
-              color: 'var(--ds-ink)',
-              fontSize: 14,
-              fontWeight: 500,
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 8,
-              fontFamily: 'var(--ds-font)',
-              letterSpacing: '-0.005em',
-            }}
-            onMouseEnter={(e) => e.currentTarget.style.color = 'var(--ds-purple)'}
-            onMouseLeave={(e) => e.currentTarget.style.color = 'var(--ds-ink)'}
-          >
-            <PreviewIcon /> Preview
-          </button>
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-            <button className="ds-btn ds-btn-secondary ds-btn-sm" type="button">
-              Save
-            </button>
-            <button className="ds-btn ds-btn-primary ds-btn-sm" type="button">
-              Save &amp; close
-            </button>
-          </div>
-        </footer>
       </div>
       </div>
 
@@ -267,7 +266,7 @@ export function MotivationEditor({ authorName, initialLetter, clientId, status =
           <span>Live preview</span>
           <span style={{ fontSize: 10, fontWeight: 500 }}>{percentUsed}% от лимита</span>
         </div>
-        <MotivationPreview letter={letter} authorName={authorName} />
+        <MotivationPreview letter={letter} authorName={letter.authorName?.trim() || authorName} />
       </aside>
     </div>
   )
@@ -373,7 +372,7 @@ function Section({
             <QuestionField
               key={q.key}
               question={q}
-              value={letter[q.key]}
+              value={letter[q.key] ?? ''}
               onChange={(v) => onUpdate(q.key, v)}
             />
           ))}
@@ -487,34 +486,73 @@ function PreviewIcon() {
 }
 
 function EssayStatusBar({
-  status, saveState, pending, onSubmit, isLocked,
+  status, saveState, pending, onSubmit, onReset, onDownloadPdf, isLocked, isCurator,
 }: {
   status: 'draft' | 'sent' | 'editing' | 'approved'
   saveState: 'idle' | 'saving' | 'saved' | 'error'
   pending: boolean
   onSubmit: () => void
+  onReset: () => void
+  onDownloadPdf: () => void
   isLocked: boolean
+  isCurator: boolean
 }) {
-  const statusInfo: Record<string, { label: string; chip: string }> = {
-    draft: { label: 'Черновик — только у тебя', chip: 'ds-chip-neutral' },
-    sent: { label: 'Отправлено куратору', chip: 'ds-chip-info' },
-    editing: { label: 'Куратор дорабатывает', chip: 'ds-chip-warning' },
-    approved: { label: 'Готово ✓ Утверждено куратором', chip: 'ds-chip-success' },
-  }
+  const statusInfo: Record<string, { label: string; chip: string }> = isCurator
+    ? {
+        draft: { label: 'Клиент заполняет', chip: 'ds-chip-neutral' },
+        sent: { label: 'Прислано клиентом — на ревью', chip: 'ds-chip-info' },
+        editing: { label: 'Дорабатываете', chip: 'ds-chip-warning' },
+        approved: { label: 'Утверждено вами ✓', chip: 'ds-chip-success' },
+      }
+    : {
+        draft: { label: 'Черновик — только у тебя', chip: 'ds-chip-neutral' },
+        sent: { label: 'Отправлено куратору', chip: 'ds-chip-info' },
+        editing: { label: 'Куратор дорабатывает', chip: 'ds-chip-warning' },
+        approved: { label: 'Готово ✓ Утверждено куратором', chip: 'ds-chip-success' },
+      }
   const s = statusInfo[status]
   return (
     <div className="ds-card" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <span className={`ds-chip ${s.chip}`} style={{ textTransform: 'uppercase', letterSpacing: '0.08em', fontSize: 10, fontWeight: 700 }}>{s.label}</span>
+        {status !== 'draft' && (
+          <span className={`ds-chip ${s.chip}`} style={{ textTransform: 'uppercase', letterSpacing: '0.08em', fontSize: 10, fontWeight: 700 }}>{s.label}</span>
+        )}
         {saveState === 'error' && (
           <span style={{ fontSize: 12, color: 'var(--ds-error)' }}>Не сохраняется — проверь что таблица client_essays создана</span>
         )}
       </div>
-      {!isLocked && (
-        <button type="button" className="ds-btn ds-btn-primary ds-btn-sm" onClick={onSubmit} disabled={pending}>
-          {pending ? '…' : status === 'sent' || status === 'editing' ? 'Отправить ещё раз' : '↗ Отправить куратору'}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          onClick={onDownloadPdf}
+          disabled={pending}
+          className="ds-btn ds-btn-secondary ds-btn-sm"
+          title="Открыть письмо в виде для печати (Cmd+P → Save as PDF)"
+        >
+          ↓ Скачать PDF
         </button>
-      )}
+        {!isCurator && (
+          <button
+            type="button"
+            onClick={onReset}
+            disabled={pending}
+            style={{ background: 'transparent', border: '1px solid var(--ds-border)', color: 'var(--ds-muted)', fontSize: 12, padding: '6px 12px', borderRadius: 'var(--ds-r-sm)', cursor: 'pointer' }}
+            title="Стереть всё и подгрузить пример"
+          >
+            ↻ К образцу
+          </button>
+        )}
+        {isCurator && status !== 'approved' && (
+          <button type="button" className="ds-btn ds-btn-primary ds-btn-sm" onClick={onSubmit} disabled={pending}>
+            {pending ? '…' : '✓ Утвердить'}
+          </button>
+        )}
+        {!isCurator && !isLocked && (
+          <button type="button" className="ds-btn ds-btn-primary ds-btn-sm" onClick={onSubmit} disabled={pending}>
+            {pending ? '…' : status === 'sent' || status === 'editing' ? 'Отправить ещё раз' : '↗ Отправить куратору'}
+          </button>
+        )}
+      </div>
     </div>
   )
 }

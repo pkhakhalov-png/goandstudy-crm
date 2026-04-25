@@ -89,9 +89,34 @@ export type VolunteeringItem = {
 
 export type OlympiadItem = { id: string; title: string; year: string; description?: string }
 
+export type WorkExperienceItem = {
+  id: string
+  jobTitle: string
+  company: string
+  city: string
+  startDate: string
+  endDate: string
+  description: string
+}
+
+export type OptionalSectionFlags = {
+  hobbies?: boolean
+  links?: boolean
+  conferences?: boolean
+  volunteering?: boolean
+  olympiads?: boolean
+  awards?: boolean
+  workExperience?: boolean
+  education?: boolean
+  courses?: boolean
+  skills?: boolean
+  languages?: boolean
+}
+
 export type Resume = {
   personal: PersonalDetails
   links: LinkItem[]
+  workExperience: WorkExperienceItem[]
   education: EducationItem[]
   courses: CourseItem[]
   skills: SkillItem[]
@@ -103,6 +128,7 @@ export type Resume = {
   awards: AwardItem[]
   volunteering: VolunteeringItem[]
   olympiads: OlympiadItem[]
+  optional?: OptionalSectionFlags
 }
 
 export const INITIAL_RESUME: Resume = {
@@ -112,13 +138,26 @@ export const INITIAL_RESUME: Resume = {
     lastName: 'Pozdnukhova',
     email: 'j.pozdnukhova@gmail.com',
     phone: '+7 985 433 41 14',
-    linkedIn: '',
+    linkedIn: 'linkedin.com/in/yulia-pozdnukhova',
     postcode: '',
-    city: '',
+    city: 'Moscow',
     country: '',
-    dateOfBirth: '19.05.2006',
-    profileSummary: '',
+    dateOfBirth: '',
+    profileSummary:
+      'Driven student with strong academic record (GPA 5.0/5.0) and four years of active leadership in international youth diplomacy. Native Russian, highly proficient in English. Passionate about public speaking, cross-cultural communication, and building social impact projects.',
   },
+  workExperience: [
+    {
+      id: 'w1',
+      jobTitle: 'Junior Editor (Intern)',
+      company: 'Primakov School Press Club',
+      city: 'Moscow',
+      startDate: 'Sep 2022',
+      endDate: 'Jun 2023',
+      description:
+        'Готовила еженедельные англоязычные новостные сводки для школьного сайта. Брала интервью у приглашённых спикеров, редактировала материалы младших школьников.',
+    },
+  ],
   links: [
     { id: 'l1', title: 'TED Ed (Speech)', url: 'https://youtu.be/c6C27CCVa6Q' },
     { id: 'l2', title: 'UN Speech', url: 'https://media.un.org/en/asset/k1e/k1e7dh9qbk' },
@@ -249,6 +288,42 @@ export const INITIAL_RESUME: Resume = {
   ],
 }
 
+/* ─── Normalize loaded resume — backfill missing fields for old saved drafts ─── */
+
+export function normalizeResume(input: any): Resume {
+  const r = input || {}
+  const personal = r.personal || {}
+  return {
+    personal: {
+      jobTitle: personal.jobTitle ?? '',
+      firstName: personal.firstName ?? '',
+      lastName: personal.lastName ?? '',
+      email: personal.email ?? '',
+      phone: personal.phone ?? '',
+      linkedIn: personal.linkedIn ?? '',
+      postcode: personal.postcode ?? '',
+      city: personal.city ?? '',
+      country: personal.country ?? '',
+      dateOfBirth: personal.dateOfBirth ?? '',
+      profileSummary: personal.profileSummary ?? '',
+    },
+    links: Array.isArray(r.links) ? r.links : [],
+    workExperience: Array.isArray(r.workExperience) ? r.workExperience : [],
+    education: Array.isArray(r.education) ? r.education : [],
+    courses: Array.isArray(r.courses) ? r.courses : [],
+    skills: Array.isArray(r.skills) ? r.skills : [],
+    skillsShowLevel: typeof r.skillsShowLevel === 'boolean' ? r.skillsShowLevel : true,
+    conferences: Array.isArray(r.conferences) ? r.conferences : [],
+    customSections: Array.isArray(r.customSections) ? r.customSections : [],
+    hobbies: typeof r.hobbies === 'string' ? r.hobbies : '',
+    languages: Array.isArray(r.languages) ? r.languages : [],
+    awards: Array.isArray(r.awards) ? r.awards : [],
+    volunteering: Array.isArray(r.volunteering) ? r.volunteering : [],
+    olympiads: Array.isArray(r.olympiads) ? r.olympiads : [],
+    optional: r.optional && typeof r.optional === 'object' ? r.optional : undefined,
+  }
+}
+
 /* ─── Available add-section templates ─── */
 
 export type SectionTemplate = {
@@ -260,18 +335,25 @@ export type SectionTemplate = {
 }
 
 export const SECTION_TEMPLATES: SectionTemplate[] = [
+  { key: 'workExperience', title: 'Work Experience', emoji: '💼' },
+  { key: 'education', title: 'Education', emoji: '🎓' },
+  { key: 'courses', title: 'Courses', emoji: '📘' },
+  { key: 'skills', title: 'Skills', emoji: '⭐' },
+  { key: 'languages', title: 'Languages', emoji: '🗣️' },
+  { key: 'links', title: 'Websites & Social Links', emoji: '🔗' },
+  { key: 'conferences', title: 'Conferences', emoji: '📢' },
+  { key: 'ted', title: 'TED Talks', emoji: '🎤' },
+  { key: 'hobbies', title: 'Hobbies', emoji: '♟️' },
+  { key: 'volunteering', title: 'Volunteering', emoji: '🤝' },
+  { key: 'olympiads', title: 'Olympiads', emoji: '🏅' },
+  { key: 'awards', title: 'Awards', emoji: '💎' },
+  { key: 'extracurricular', title: 'Extracurricular Activities', emoji: '🌱' },
+  { key: 'additional', title: 'Additional Experience', emoji: '💎' },
+  { key: 'training', title: 'Professional Training', emoji: '🏆' },
+  { key: 'references', title: 'References', emoji: '🔖' },
   { key: 'custom', title: 'Custom Section', emoji: '⚙️' },
   { key: 'header', title: 'Header & Footer', emoji: '📄', locked: true },
-  { key: 'training', title: 'Professional Training', emoji: '🎓' },
-  { key: 'extracurricular', title: 'Extracurricular Activities', emoji: '🌱' },
-  { key: 'additional', title: 'Additional Experience', emoji: '💼' },
-  { key: 'conferences', title: 'Conferences', emoji: '📢', locked: true, hint: 'уже в резюме' },
-  { key: 'volunteering', title: 'Volunteering', emoji: '🤝', locked: true, hint: 'уже в резюме' },
-  { key: 'hobbies', title: 'Hobbies', emoji: '♟️', locked: true, hint: 'уже в резюме' },
-  { key: 'languages', title: 'Languages', emoji: '🗣️', locked: true, hint: 'уже в резюме' },
-  { key: 'references', title: 'References', emoji: '🔖' },
   { key: 'power', title: 'Power Statement', emoji: '⚡', locked: true },
-  { key: 'awards', title: 'Awards', emoji: '💎', locked: true, hint: 'уже в резюме' },
   { key: 'affiliations', title: 'Affiliations', emoji: '🏛️', locked: true },
   { key: 'licenses', title: 'Licenses & Certifications', emoji: '📜', locked: true },
 ]

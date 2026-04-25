@@ -8,6 +8,8 @@ interface Props {
   school: any
   programs: any[]
   myClients: { id: number; name: string; country?: string | null }[]
+  asClient?: boolean
+  clientId?: string
 }
 
 type Tab = 'overview' | 'features' | 'location' | 'programs'
@@ -25,7 +27,7 @@ const sectionTitle: React.CSSProperties = {
   letterSpacing: '0.06em', color: 'var(--muted)', marginBottom: 12,
 }
 
-export function SchoolTabs({ school, programs, myClients }: Props) {
+export function SchoolTabs({ school, programs, myClients, asClient, clientId }: Props) {
   const [tab, setTab] = useState<Tab>('overview')
   const raw = school.raw_data?.attributes || {}
 
@@ -74,7 +76,7 @@ export function SchoolTabs({ school, programs, myClients }: Props) {
       {tab === 'features' && <FeaturesTab school={school} programs={programs} />}
       {tab === 'location' && <LocationTab school={school} raw={raw} />}
       {tab === 'programs' && (
-        <ProgramsTab school={school} programs={programs} myClients={myClients} />
+        <ProgramsTab school={school} programs={programs} myClients={myClients} asClient={asClient} clientId={clientId} />
       )}
     </div>
   )
@@ -459,7 +461,7 @@ function LocationTab({ school, raw }: { school: any; raw: any }) {
 
 /* ─── Programs ─── */
 
-function ProgramsTab({ school, programs, myClients }: { school: any; programs: any[]; myClients: any[] }) {
+function ProgramsTab({ school, programs, myClients, asClient, clientId }: { school: any; programs: any[]; myClients: any[]; asClient?: boolean; clientId?: string }) {
   const [levelFilter, setLevelFilter] = useState<string>('')
   const [search, setSearch] = useState('')
   const currencyFromSchool = (school.raw_data as any)?.attributes?.currency_of_fees?.code
@@ -579,6 +581,8 @@ function ProgramsTab({ school, programs, myClients }: { school: any; programs: a
               schoolId={school.id}
               fallbackCurrency={currencyFromSchool}
               myClients={myClients}
+              asClient={asClient}
+              clientId={clientId}
             />
           ))}
         </div>
@@ -588,13 +592,18 @@ function ProgramsTab({ school, programs, myClients }: { school: any; programs: a
 }
 
 function ProgramRow({
-  program, schoolId, fallbackCurrency, myClients,
+  program, schoolId, fallbackCurrency, myClients, asClient, clientId,
 }: {
   program: any
   schoolId: number
   fallbackCurrency?: string
   myClients: any[]
+  asClient?: boolean
+  clientId?: string
 }) {
+  const programHref = asClient
+    ? `/curator/programs/${program.id}?asClient=1${clientId ? `&clientId=${clientId}` : ''}`
+    : `/curator/programs/${program.id}`
   const attr = program.raw_data?.attributes || {}
   const levelText = attr.level_text
   const tuition = program.tuition
@@ -623,7 +632,7 @@ function ProgramRow({
     <div style={cardStyle}>
       <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap' }}>
         <Link
-          href={`/curator/programs/${program.id}`}
+          href={programHref}
           style={{
             flex: '1 1 260px', minWidth: 0,
             textDecoration: 'none', color: 'inherit',
@@ -638,11 +647,13 @@ function ProgramRow({
             </div>
           )}
         </Link>
-        <AddToShortlistButton
-          schoolId={schoolId}
-          programId={program.id}
-          myClients={myClients}
-        />
+        {!asClient && (
+          <AddToShortlistButton
+            schoolId={schoolId}
+            programId={program.id}
+            myClients={myClients}
+          />
+        )}
       </div>
 
       <div style={{
