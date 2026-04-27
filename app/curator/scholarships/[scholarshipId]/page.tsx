@@ -4,6 +4,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { createScholarshipsClient, type Scholarship } from '@/lib/supabase/scholarships'
 import { CuratorSidebar } from '../../CuratorSidebar'
 import { AddScholarshipButton } from '../AddScholarshipButton'
+import { ScholarshipLogo } from '../ScholarshipLogo'
 
 export const dynamic = 'force-dynamic'
 
@@ -99,18 +100,12 @@ export default async function ScholarshipDetailPage({
           {/* Header */}
           <div style={{ ...cardStyle, padding: 20, marginBottom: 16 }}>
             <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
-              {scholarship.institution_logo_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={scholarship.institution_logo_url}
-                  alt={scholarship.institution_title || ''}
-                  style={{ width: 64, height: 64, objectFit: 'contain', background: '#fff', borderRadius: 12, border: '1px solid var(--bor)', flexShrink: 0 }}
-                />
-              ) : (
-                <div style={{ width: 64, height: 64, background: 'var(--purple)', color: '#fff', borderRadius: 12, display: 'grid', placeItems: 'center', fontSize: 22, fontWeight: 700 }}>
-                  {(scholarship.institution_title || scholarship.title)[0]?.toUpperCase() || '?'}
-                </div>
-              )}
+              <ScholarshipLogo
+                logoUrl={scholarship.institution_logo_url_local || scholarship.institution_logo_url}
+                fallbackUrl={scholarship.institution_logo_url_local ? scholarship.institution_logo_url : null}
+                title={scholarship.institution_title || scholarship.title}
+                size={64}
+              />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <h1 style={{ fontSize: 24, fontWeight: 700, margin: 0, lineHeight: 1.2 }}>{scholarship.title}</h1>
                 {scholarship.institution_title && (

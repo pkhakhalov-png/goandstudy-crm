@@ -4,6 +4,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { createScholarshipsClient, type Scholarship } from '@/lib/supabase/scholarships'
 import { CuratorSidebar } from '../CuratorSidebar'
 import { AddScholarshipButton } from './AddScholarshipButton'
+import { ScholarshipLogo } from './ScholarshipLogo'
 
 export const dynamic = 'force-dynamic'
 
@@ -194,18 +195,8 @@ function ScholarshipRow({ s, myClients }: { s: Scholarship; myClients: { id: num
 
   return (
     <div style={{ ...cardStyle, padding: 16, display: 'grid', gridTemplateColumns: '52px 1fr auto', gap: 14, alignItems: 'flex-start' }}>
-      {s.institution_logo_url ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={s.institution_logo_url}
-          alt={s.institution_title || ''}
-          style={{ width: 52, height: 52, objectFit: 'contain', background: '#fff', border: '1px solid var(--bor)', borderRadius: 10 }}
-        />
-      ) : (
-        <div style={{ width: 52, height: 52, background: 'var(--purple)', color: '#fff', borderRadius: 10, display: 'grid', placeItems: 'center', fontSize: 18, fontWeight: 700 }}>
-          {(s.institution_title || s.title)[0]?.toUpperCase() || '?'}
-        </div>
-      )}
+      <ScholarshipLogo logoUrl={s.institution_logo_url_local || s.institution_logo_url} fallbackUrl={s.institution_logo_url_local ? s.institution_logo_url : null} title={s.institution_title || s.title} size={52} />
+
 
       <div style={{ minWidth: 0 }}>
         <Link

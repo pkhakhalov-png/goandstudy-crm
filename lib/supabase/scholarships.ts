@@ -16,6 +16,7 @@ export type Scholarship = {
   institution_title: string | null
   institution_url: string | null
   institution_logo_url: string | null
+  institution_logo_url_local: string | null
   profile_core_id: number | null
   study_levels: string[] | null
   audience: string | null
