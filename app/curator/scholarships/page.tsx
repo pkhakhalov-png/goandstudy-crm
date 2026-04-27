@@ -30,19 +30,21 @@ export default async function ScholarshipsCatalogPage({
   const offset = (page - 1) * PAGE_SIZE
 
   const sb = createScholarshipsClient()
-  let query = sb.from('v_scholarships_active').select('*', { count: 'exact' })
+  // Query base table — view v_scholarships_active does not include institution_logo_url_local
+  const today = new Date().toISOString().slice(0, 10)
+  let query = sb
+    .from('scholarships_topuni')
+    .select('*', { count: 'exact' })
+    .eq('archived', false)
+    .or(`deadline.is.null,deadline.gte.${today}`)
   if (q) {
     query = query.or(`title.ilike.%${q}%,institution_title.ilike.%${q}%`)
   }
   if (level) query = query.contains('study_levels', [level])
   if (type) query = query.eq('amount_type', type)
   if (deadlineFilter === 'soon') {
-    const today = new Date()
-    const in90 = new Date(today.getTime() + 90 * 24 * 3600 * 1000)
-    query = query
-      .not('deadline', 'is', null)
-      .gte('deadline', today.toISOString().slice(0, 10))
-      .lte('deadline', in90.toISOString().slice(0, 10))
+    const in90 = new Date(Date.now() + 90 * 24 * 3600 * 1000).toISOString().slice(0, 10)
+    query = query.not('deadline', 'is', null).gte('deadline', today).lte('deadline', in90)
   }
   query = query.order('deadline', { ascending: true, nullsFirst: false }).range(offset, offset + PAGE_SIZE - 1)
   const { data: scholarships, count, error } = await query
