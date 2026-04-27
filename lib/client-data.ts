@@ -319,6 +319,29 @@ export async function getClientEssay(clientId: number, type: 'resume' | 'motivat
   return (data as EssayRow) || null
 }
 
+export type ClientDocumentRow = {
+  id: string
+  doc_type: string
+  title: string | null
+  status: DocRow['status']
+  file_name: string | null
+  file_size_bytes: number | null
+  mime_type: string | null
+  storage_path: string | null
+  uploaded_at: string | null
+}
+
+export async function getClientDocumentRows(clientId: number): Promise<ClientDocumentRow[]> {
+  const admin = await createAdminClient()
+  const { data } = await admin
+    .from('client_documents')
+    .select('id, doc_type, title, status, file_name, file_size_bytes, mime_type, storage_path, uploaded_at')
+    .eq('client_id', clientId)
+    .order('uploaded_at', { ascending: false, nullsFirst: false })
+    .then(r => r, () => ({ data: [] }))
+  return (data as ClientDocumentRow[]) || []
+}
+
 export async function getClientDocuments(clientId: number): Promise<RequiredDoc[]> {
   const admin = await createAdminClient()
   const { data } = await admin

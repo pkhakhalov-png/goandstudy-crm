@@ -7,7 +7,7 @@ import {
   resolveClientForViewer,
   getClientTimeline,
   getClientUniversities,
-  getClientDocuments,
+  getClientDocumentRows,
   getClientEssays,
 } from '@/lib/client-data'
 import { ClientTopNav } from './ClientTopNav'
@@ -23,8 +23,13 @@ import {
   STUDENT_PROJECT,
   ESSAYS,
   REQUIRED_DOCS,
-  OPTIONAL_DOCS,
 } from './mock-data'
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} Б`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} КБ`
+  return `${(bytes / 1024 / 1024).toFixed(1)} МБ`
+}
 
 export default async function ClientHomePage({ searchParams }: { searchParams: Promise<{ clientId?: string }> }) {
   const supabase = await createClient()
@@ -60,10 +65,10 @@ export default async function ClientHomePage({ searchParams }: { searchParams: P
     )
   }
 
-  const [timeline, universities, documents, essayRows] = await Promise.all([
+  const [timeline, universities, documentRows, essayRows] = await Promise.all([
     getClientTimeline(client.id),
     getClientUniversities(client.id),
-    getClientDocuments(client.id),
+    getClientDocumentRows(client.id),
     getClientEssays(client.id),
   ])
 
@@ -82,14 +87,15 @@ export default async function ClientHomePage({ searchParams }: { searchParams: P
       : e
   })
 
-  // Merge DB docs with template (always show passport/academic/language/certificate/resume/motivation)
-  const dbByKey = new Map(documents.map(d => [d.key, d]))
+  // Resume & motivation are virtual docs — backed by client_essays
   const resumeEssay = essayRows.find(r => r.type === 'resume')
   const motivationEssay = essayRows.find(r => r.type === 'motivation')
   const previewId = requestedClientId ? `?clientId=${requestedClientId}` : ''
 
+  // Real uploaded files from client_documents, keyed by doc_type
+  const uploadedByType = new Map(documentRows.map(d => [d.doc_type, d]))
+
   const requiredDocs = REQUIRED_DOCS.map(tpl => {
-    // Special-case: resume & motivation live in client_essays, not client_documents
     if (tpl.key === 'resume') {
       if (resumeEssay?.status === 'approved') {
         return { ...tpl, status: 'uploaded' as const, href: `/client/resume${previewId}`, fileName: 'Резюме — финал', hint: 'Готово, куратор утвердил. Открой чтобы посмотреть или распечатать в PDF.' }
@@ -108,11 +114,19 @@ export default async function ClientHomePage({ searchParams }: { searchParams: P
       }
       return { ...tpl, status: 'missing' as const, href: `/client/motivation${previewId}`, hint: 'Заполни письмо и отправь куратору', lockedHint: undefined }
     }
-    // Other doc types come from client_documents
-    const db = dbByKey.get(tpl.key) || [...dbByKey.values()].find(d => d.title?.toLowerCase().includes(tpl.title.toLowerCase()))
-    return db ? { ...tpl, status: db.status, hint: db.hint || tpl.hint } : tpl
+    const uploaded = uploadedByType.get(tpl.key)
+    if (uploaded?.storage_path) {
+      return {
+        ...tpl,
+        status: 'uploaded' as const,
+        fileName: uploaded.file_name || undefined,
+        fileSize: uploaded.file_size_bytes ? formatBytes(uploaded.file_size_bytes) : undefined,
+      }
+    }
+    return tpl
   })
-  const optionalDocs = OPTIONAL_DOCS
+  // Optional uploads — все записи с doc_type='optional'
+  const optionalUploads = documentRows.filter(d => d.doc_type === 'optional' && d.storage_path)
 
   const displayName = client.name || user.email || CLIENT_CTX.parentName
   const isPreview = role !== 'client'
@@ -145,7 +159,12 @@ export default async function ClientHomePage({ searchParams }: { searchParams: P
         <ProjectAndRoadmap project={STUDENT_PROJECT} roadmap={ROADMAP} />
         <ShortlistBlock items={universities} total={universities.length} clientId={client.id} />
         <EssayCards essays={essaysWithState} />
-        <DocumentsSection required={requiredDocs} optional={optionalDocs} />
+        <DocumentsSection
+          required={requiredDocs}
+          optionalUploads={optionalUploads}
+          clientId={client.id}
+          requiredRowsByType={Object.fromEntries(documentRows.filter(d => d.doc_type !== 'optional').map(d => [d.doc_type, d]))}
+        />
       </main>
     </div>
   )

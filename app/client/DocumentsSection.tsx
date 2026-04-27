@@ -1,14 +1,25 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import type { RequiredDoc, OptionalDoc } from './mock-data'
+import { useEffect, useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
+import type { RequiredDoc } from './mock-data'
+import type { ClientDocumentRow } from '@/lib/client-data'
+import { uploadDocument, deleteDocument, getDocumentDownloadUrl } from './documents/actions'
 
 interface Props {
   required: RequiredDoc[]
-  optional: OptionalDoc[]
+  optionalUploads: ClientDocumentRow[]
+  clientId: number
+  requiredRowsByType: Record<string, ClientDocumentRow>
 }
 
-export function DocumentsSection({ required, optional }: Props) {
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} Б`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} КБ`
+  return `${(bytes / 1024 / 1024).toFixed(1)} МБ`
+}
+
+export function DocumentsSection({ required, optionalUploads, clientId, requiredRowsByType }: Props) {
   const [modalDoc, setModalDoc] = useState<RequiredDoc | null>(null)
 
   // ESC закрывает модалку
@@ -97,75 +108,11 @@ export function DocumentsSection({ required, optional }: Props) {
         ))}
       </div>
 
-      {/* Optional docs */}
-      <div>
-        <h3
-          style={{
-            fontFamily: 'var(--ds-font-display-stack)',
-            fontWeight: 700,
-            fontSize: 18,
-            textTransform: 'uppercase',
-            letterSpacing: '0.04em',
-            color: 'var(--ds-ink)',
-            margin: '0 0 4px 0',
-          }}
-        >
-          Доп. документы
-        </h3>
-        <p style={{ fontSize: 13, color: 'var(--ds-muted)', margin: '0 0 16px' }}>
-          Сертификаты, справки, портфолио. Усиливают заявку, но не обязательны.
-        </p>
-
-        <div className="ds-card" style={{ padding: 20 }}>
-          {optional.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
-              {optional.map(d => (
-                <div
-                  key={d.key}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 12,
-                    padding: '10px 12px',
-                    background: 'var(--ds-bg-alt)',
-                    border: '1px solid var(--ds-border-soft)',
-                    borderRadius: 'var(--ds-r-md)',
-                  }}
-                >
-                  <div
-                    style={{
-                      width: 28,
-                      height: 28,
-                      borderRadius: 7,
-                      background: 'var(--ds-success-soft)',
-                      color: 'var(--ds-success-ink)',
-                      display: 'grid',
-                      placeItems: 'center',
-                      fontSize: 13,
-                      fontWeight: 700,
-                      flexShrink: 0,
-                    }}
-                  >
-                    ✓
-                  </div>
-                  <div style={{ flex: 1, fontSize: 13, fontWeight: 600, color: 'var(--ds-ink)', letterSpacing: '-0.005em' }}>
-                    {d.title}
-                  </div>
-                  <div className="ds-mono" style={{ fontSize: 11, color: 'var(--ds-muted)' }}>
-                    {d.fileSize ?? ''}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-          <button className="ds-btn ds-btn-secondary ds-btn-sm" type="button">
-            + Добавить документ
-          </button>
-        </div>
-      </div>
+      {/* Optional docs — реальные загрузки */}
+      <OptionalDocsBlock optionalUploads={optionalUploads} clientId={clientId} />
 
       {modalDoc && (
-        <DocumentModal doc={modalDoc} onClose={() => setModalDoc(null)} />
+        <DocumentModal doc={modalDoc} onClose={() => setModalDoc(null)} clientId={clientId} existingRow={requiredRowsByType[modalDoc.key]} />
       )}
     </section>
   )
@@ -344,7 +291,7 @@ function getStatusMeta(status: RequiredDoc['status']) {
    Modal — пример + загрузка
    ───────────────────────────────────────────────────────────────────── */
 
-function DocumentModal({ doc, onClose }: { doc: RequiredDoc; onClose: () => void }) {
+function DocumentModal({ doc, onClose, clientId, existingRow }: { doc: RequiredDoc; onClose: () => void; clientId: number; existingRow?: ClientDocumentRow }) {
   return (
     <div
       role="dialog"
@@ -485,7 +432,7 @@ function DocumentModal({ doc, onClose }: { doc: RequiredDoc; onClose: () => void
             {/* Upload zone */}
             <div>
               <SectionLabel>Загрузить ваш документ</SectionLabel>
-              <UploadZone doc={doc} />
+              <UploadZone doc={doc} clientId={clientId} existingRow={existingRow} />
               <div
                 style={{
                   marginTop: 14,
@@ -537,58 +484,84 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   )
 }
 
-/* ─── Upload zone ─────────────────────────────────────────────────── */
+/* ─── Upload zone — реальная загрузка через server action ───────────── */
 
-function UploadZone({ doc }: { doc: RequiredDoc }) {
+function UploadZone({ doc, clientId, existingRow }: { doc: RequiredDoc; clientId: number; existingRow?: ClientDocumentRow }) {
+  const router = useRouter()
   const [file, setFile] = useState<File | null>(null)
   const [dragOver, setDragOver] = useState(false)
+  const [pending, startTransition] = useTransition()
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
-  const hasExisting = Boolean(doc.fileName)
+  async function doUpload() {
+    if (!file) return
+    setErrorMsg(null)
+    const fd = new FormData()
+    fd.append('client_id', String(clientId))
+    fd.append('doc_type', doc.key)
+    if (doc.title) fd.append('title', doc.title)
+    fd.append('file', file)
+    startTransition(async () => {
+      const res = await uploadDocument(fd)
+      if (res && (res as any).error) {
+        setErrorMsg((res as any).error)
+      } else {
+        setFile(null)
+        router.refresh()
+      }
+    })
+  }
 
-  if (hasExisting && !file) {
+  async function doDownload() {
+    if (!existingRow) return
+    const res = await getDocumentDownloadUrl({ id: existingRow.id, clientId })
+    if ((res as any).error) { alert((res as any).error); return }
+    window.open((res as any).url, '_blank', 'noopener')
+  }
+
+  async function doDelete() {
+    if (!existingRow) return
+    if (!confirm('Удалить файл? Действие необратимо.')) return
+    startTransition(async () => {
+      const res = await deleteDocument({ id: existingRow.id, clientId })
+      if ((res as any).error) {
+        alert((res as any).error)
+      } else {
+        router.refresh()
+      }
+    })
+  }
+
+  if (existingRow?.storage_path && !file) {
     return (
       <div>
         <div
           style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 12,
+            display: 'flex', alignItems: 'center', gap: 12,
             padding: '14px 16px',
             background: 'var(--ds-success-soft)',
             borderRadius: 'var(--ds-r-md)',
             border: '1px solid rgba(52,199,89,0.3)',
           }}
         >
-          <div
-            style={{
-              width: 36,
-              height: 36,
-              borderRadius: 10,
-              background: 'var(--ds-success)',
-              color: '#fff',
-              display: 'grid',
-              placeItems: 'center',
-              fontSize: 16,
-              fontWeight: 700,
-              flexShrink: 0,
-            }}
-          >
-            ✓
-          </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ds-ink)', letterSpacing: '-0.005em' }}>
-              Уже загружено
-            </div>
-            <div style={{ fontSize: 12, color: 'var(--ds-muted)' }}>
-              {doc.fileName} · {doc.fileSize}
+          <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--ds-success)', color: '#fff', display: 'grid', placeItems: 'center', fontSize: 16, fontWeight: 700, flexShrink: 0 }}>✓</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ds-ink)' }}>Загружено</div>
+            <div style={{ fontSize: 12, color: 'var(--ds-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {existingRow.file_name}
+              {existingRow.file_size_bytes ? ` · ${formatBytes(existingRow.file_size_bytes)}` : ''}
             </div>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-          <button className="ds-btn ds-btn-secondary ds-btn-sm" type="button">
-            Заменить файл
+        <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+          <button type="button" className="ds-btn ds-btn-secondary ds-btn-sm" onClick={doDownload}>
+            ↓ Скачать
           </button>
-          <button className="ds-btn ds-btn-ghost ds-btn-sm" type="button">
+          <label className="ds-btn ds-btn-secondary ds-btn-sm" style={{ cursor: 'pointer' }}>
+            Заменить
+            <input type="file" accept="application/pdf,image/jpeg,image/png" onChange={(e) => setFile(e.target.files?.[0] ?? null)} style={{ display: 'none' }} />
+          </label>
+          <button type="button" className="ds-btn ds-btn-ghost ds-btn-sm" onClick={doDelete} disabled={pending}>
             Удалить
           </button>
         </div>
@@ -607,13 +580,8 @@ function UploadZone({ doc }: { doc: RequiredDoc }) {
           if (f) setFile(f)
         }}
         style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          textAlign: 'center',
-          gap: 12,
-          padding: '32px 20px',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          textAlign: 'center', gap: 12, padding: '32px 20px',
           border: `2px dashed ${dragOver ? 'var(--ds-purple)' : 'var(--ds-border)'}`,
           borderRadius: 'var(--ds-r-md)',
           background: dragOver ? 'var(--ds-purple-soft)' : 'var(--ds-bg-alt)',
@@ -621,28 +589,12 @@ function UploadZone({ doc }: { doc: RequiredDoc }) {
           transition: 'all 120ms',
         }}
       >
-        <div
-          style={{
-            width: 52,
-            height: 52,
-            borderRadius: 14,
-            background: 'var(--ds-purple-soft)',
-            color: 'var(--ds-purple-deep)',
-            display: 'grid',
-            placeItems: 'center',
-            fontSize: 24,
-            fontWeight: 700,
-          }}
-        >
-          ↑
-        </div>
+        <div style={{ width: 52, height: 52, borderRadius: 14, background: 'var(--ds-purple-soft)', color: 'var(--ds-purple-deep)', display: 'grid', placeItems: 'center', fontSize: 24, fontWeight: 700 }}>↑</div>
         <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ds-ink)', letterSpacing: '-0.005em' }}>
           {file ? file.name : 'Перетащи файл или нажми чтобы выбрать'}
         </div>
         <div style={{ fontSize: 12, color: 'var(--ds-muted)' }}>
-          {file
-            ? `${(file.size / 1024 / 1024).toFixed(1)} МБ · готово к загрузке`
-            : 'PDF, JPG или PNG · до 10 МБ'}
+          {file ? `${(file.size / 1024 / 1024).toFixed(1)} МБ · готово к загрузке` : 'PDF, JPG, PNG · до 15 МБ'}
         </div>
         <input
           type="file"
@@ -652,27 +604,141 @@ function UploadZone({ doc }: { doc: RequiredDoc }) {
         />
       </label>
 
+      {errorMsg && (
+        <div style={{ marginTop: 10, padding: 10, fontSize: 12, color: 'var(--ds-error)', background: 'rgba(255,59,48,0.06)', borderRadius: 'var(--ds-r-md)' }}>
+          {errorMsg}
+        </div>
+      )}
+
       {file && (
         <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
-          <button
-            type="button"
-            className="ds-btn ds-btn-primary"
-            onClick={() => {
-              // TODO: real upload via Supabase Storage + client_documents row
-              alert(`Загрузка ${file.name} — будет подключена когда появится таблица client_documents`)
-            }}
-          >
-            Загрузить
+          <button type="button" className="ds-btn ds-btn-primary" onClick={doUpload} disabled={pending}>
+            {pending ? 'Загружаем…' : 'Загрузить'}
           </button>
-          <button
-            type="button"
-            className="ds-btn ds-btn-secondary"
-            onClick={() => setFile(null)}
-          >
+          <button type="button" className="ds-btn ds-btn-secondary" onClick={() => { setFile(null); setErrorMsg(null) }} disabled={pending}>
             Отмена
           </button>
         </div>
       )}
+    </div>
+  )
+}
+
+/* ─── Optional docs — список + загрузка дополнительных ──────────────── */
+
+function OptionalDocsBlock({ optionalUploads, clientId }: { optionalUploads: ClientDocumentRow[]; clientId: number }) {
+  const router = useRouter()
+  const [file, setFile] = useState<File | null>(null)
+  const [title, setTitle] = useState('')
+  const [pending, startTransition] = useTransition()
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [showForm, setShowForm] = useState(false)
+
+  async function doUpload() {
+    if (!file) return
+    setErrorMsg(null)
+    const fd = new FormData()
+    fd.append('client_id', String(clientId))
+    fd.append('doc_type', 'optional')
+    if (title.trim()) fd.append('title', title.trim())
+    fd.append('file', file)
+    startTransition(async () => {
+      const res = await uploadDocument(fd)
+      if ((res as any).error) {
+        setErrorMsg((res as any).error)
+      } else {
+        setFile(null); setTitle(''); setShowForm(false)
+        router.refresh()
+      }
+    })
+  }
+
+  async function doDownload(id: string) {
+    const res = await getDocumentDownloadUrl({ id, clientId })
+    if ((res as any).error) { alert((res as any).error); return }
+    window.open((res as any).url, '_blank', 'noopener')
+  }
+
+  async function doDelete(id: string) {
+    if (!confirm('Удалить файл? Действие необратимо.')) return
+    startTransition(async () => {
+      const res = await deleteDocument({ id, clientId })
+      if ((res as any).error) alert((res as any).error)
+      else router.refresh()
+    })
+  }
+
+  return (
+    <div>
+      <h3 style={{ fontFamily: 'var(--ds-font-display-stack)', fontWeight: 700, fontSize: 18, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--ds-ink)', margin: '0 0 4px 0' }}>
+        Доп. документы
+      </h3>
+      <p style={{ fontSize: 13, color: 'var(--ds-muted)', margin: '0 0 16px' }}>
+        Сертификаты, справки, портфолио. Усиливают заявку, но не обязательны.
+      </p>
+
+      <div className="ds-card" style={{ padding: 20 }}>
+        {optionalUploads.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
+            {optionalUploads.map(d => (
+              <div
+                key={d.id}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  padding: '10px 12px',
+                  background: 'var(--ds-bg-alt)',
+                  border: '1px solid var(--ds-border-soft)',
+                  borderRadius: 'var(--ds-r-md)',
+                }}
+              >
+                <div style={{ width: 28, height: 28, borderRadius: 7, background: 'var(--ds-success-soft)', color: 'var(--ds-success-ink)', display: 'grid', placeItems: 'center', fontSize: 13, fontWeight: 700, flexShrink: 0 }}>✓</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ds-ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {d.title || d.file_name || 'Без названия'}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--ds-muted)' }}>
+                    {d.file_name}{d.file_size_bytes ? ` · ${formatBytes(d.file_size_bytes)}` : ''}
+                  </div>
+                </div>
+                <button type="button" className="ds-btn ds-btn-ghost ds-btn-sm" onClick={() => doDownload(d.id)}>↓</button>
+                <button type="button" className="ds-btn ds-btn-ghost ds-btn-sm" onClick={() => doDelete(d.id)} disabled={pending} title="Удалить">✕</button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {!showForm ? (
+          <button type="button" className="ds-btn ds-btn-secondary ds-btn-sm" onClick={() => setShowForm(true)}>
+            + Добавить документ
+          </button>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Название (например: Сертификат волонтёрства)"
+              className="ds-input"
+            />
+            <input
+              type="file"
+              accept="application/pdf,image/jpeg,image/png"
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            />
+            {errorMsg && (
+              <div style={{ padding: 10, fontSize: 12, color: 'var(--ds-error)', background: 'rgba(255,59,48,0.06)', borderRadius: 'var(--ds-r-md)' }}>{errorMsg}</div>
+            )}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button type="button" className="ds-btn ds-btn-primary ds-btn-sm" onClick={doUpload} disabled={!file || pending}>
+                {pending ? 'Загружаем…' : 'Загрузить'}
+              </button>
+              <button type="button" className="ds-btn ds-btn-ghost ds-btn-sm" onClick={() => { setShowForm(false); setFile(null); setTitle(''); setErrorMsg(null) }} disabled={pending}>
+                Отмена
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
