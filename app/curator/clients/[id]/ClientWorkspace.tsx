@@ -54,6 +54,7 @@ interface Props {
   enrichmentByProgram?: Record<number, any>
   logoBySchool?: Record<number, string | null>
   essays?: any[]
+  scholarships?: any[]
 }
 
 type TabKey = 'project' | 'roadmap' | 'shortlist' | 'documents' | 'essays' | 'notes'
@@ -156,6 +157,7 @@ export function ClientWorkspace(props: Props) {
             catalog={catalog || null}
             enrichmentByProgram={enrichmentByProgram}
             logoBySchool={logoBySchool}
+            scholarships={props.scholarships || []}
           />
         )}
         {tab === 'documents' && <DocumentsTab documents={documents} />}
@@ -899,13 +901,14 @@ function RoadmapTab({
    ═══════════════════════════════════════════════════════════════ */
 
 function ShortlistTab({
-  client, universities, catalog, enrichmentByProgram, logoBySchool,
+  client, universities, catalog, enrichmentByProgram, logoBySchool, scholarships,
 }: {
   client: any
   universities: any[]
   catalog: CatalogData | null
   enrichmentByProgram: Record<number, any>
   logoBySchool: Record<number, string | null>
+  scholarships: any[]
 }) {
   const [pending, startTransition] = useTransition()
   const [publishToast, setPublishToast] = useState<string | null>(null)
@@ -1013,8 +1016,100 @@ function ShortlistTab({
         )}
       </div>
 
+      {/* Стипендии в подборке клиента */}
+      <ScholarshipsBlock scholarships={scholarships} />
+
       {/* Каталог базы вузов — ищем + добавляем в подборку клиента */}
       {catalog && <CatalogPanel client={client} catalog={catalog} />}
+    </div>
+  )
+}
+
+function ScholarshipsBlock({ scholarships }: { scholarships: any[] }) {
+  function fmtDate(d: string | null) {
+    if (!d) return '—'
+    try {
+      return new Date(d).toLocaleDateString('ru', { day: 'numeric', month: 'short', year: 'numeric' })
+    } catch { return d }
+  }
+  const STATUS: Record<string, { label: string; chip: string }> = {
+    planned: { label: 'Планируется', chip: 'ds-chip-neutral' },
+    applying: { label: 'Подаём', chip: 'ds-chip-info' },
+    submitted: { label: 'Подано', chip: 'ds-chip-warning' },
+    awarded: { label: 'Получили', chip: 'ds-chip-success' },
+    rejected: { label: 'Отказ', chip: 'ds-chip-error' },
+  }
+  return (
+    <div className="ds-card" style={{ padding: 28 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+        <SectionHead
+          eyebrow="Финансы"
+          title={`Стипендии · ${scholarships.length}`}
+          description="Подбор стипендий из базы TopUniversities. Добавляй из каталога /curator/scholarships."
+        />
+        <Link
+          href="/curator/scholarships"
+          className="ds-btn ds-btn-secondary ds-btn-sm"
+          style={{ textDecoration: 'none' }}
+        >
+          Каталог стипендий →
+        </Link>
+      </div>
+
+      {scholarships.length === 0 ? (
+        <div
+          style={{
+            marginTop: 20,
+            padding: '24px 20px',
+            textAlign: 'center',
+            background: 'var(--ds-bg-alt)',
+            border: '1px dashed var(--ds-border)',
+            borderRadius: 'var(--ds-r-md)',
+            color: 'var(--ds-muted)',
+            fontSize: 13,
+          }}
+        >
+          Подобранных стипендий пока нет. Открой каталог и добавь нужные клиенту.
+        </div>
+      ) : (
+        <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {scholarships.map(s => {
+            const meta = STATUS[s.status] || STATUS.planned
+            return (
+              <div
+                key={s.id}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr auto',
+                  gap: 12,
+                  padding: '14px 16px',
+                  background: 'var(--ds-bg-alt)',
+                  border: '1px solid var(--ds-border-soft)',
+                  borderRadius: 'var(--ds-r-md)',
+                  alignItems: 'center',
+                }}
+              >
+                <div style={{ minWidth: 0 }}>
+                  <Link
+                    href={`/curator/scholarships/${s.scholarship_id}`}
+                    style={{ fontSize: 14, fontWeight: 600, color: 'var(--ds-ink)', textDecoration: 'none' }}
+                  >
+                    {s.scholarship_title}
+                  </Link>
+                  <div style={{ fontSize: 11, color: 'var(--ds-muted)', marginTop: 2 }}>
+                    {s.institution_title || '—'}
+                    {s.amount_text ? ` · ${s.amount_text}` : ''}
+                    {s.deadline ? ` · до ${fmtDate(s.deadline)}` : ''}
+                  </div>
+                </div>
+                <span className={`ds-chip ${meta.chip}`} style={{ textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: 10, fontWeight: 700 }}>
+                  {meta.label}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
