@@ -478,15 +478,7 @@ function DocumentModal({ doc, onClose }: { doc: RequiredDoc; onClose: () => void
             {doc.hasExample && (
               <div>
                 <SectionLabel>Образец документа</SectionLabel>
-                <PdfMock />
-                <div style={{ display: 'flex', gap: 10, marginTop: 14, flexWrap: 'wrap' }}>
-                  <button className="ds-btn ds-btn-secondary ds-btn-sm" type="button">
-                    Скачать шаблон PDF
-                  </button>
-                  <button className="ds-btn ds-btn-ghost ds-btn-sm" type="button">
-                    Открыть в новой вкладке
-                  </button>
-                </div>
+                {doc.samplePath ? <SamplePreview src={doc.samplePath} /> : <PdfMock />}
               </div>
             )}
 
@@ -681,6 +673,60 @@ function UploadZone({ doc }: { doc: RequiredDoc }) {
           </button>
         </div>
       )}
+    </div>
+  )
+}
+
+/* ─── Реальный образец (PDF / JPG / PNG) из /public/samples/ ───────── */
+
+function SamplePreview({ src }: { src: string }) {
+  const isPdf = /\.pdf($|\?)/i.test(src)
+  return (
+    <div
+      style={{
+        background: '#FFFFFF',
+        borderRadius: 'var(--ds-r-md)',
+        border: '1px solid var(--ds-border)',
+        aspectRatio: '1 / 1.25',
+        overflow: 'hidden',
+        boxShadow: 'var(--ds-sh-md)',
+        position: 'relative',
+      }}
+    >
+      {isPdf ? (
+        <iframe
+          src={`${src}#toolbar=0&navpanes=0&view=FitH`}
+          title="Образец документа"
+          style={{ width: '100%', height: '100%', border: 0, display: 'block' }}
+        />
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={src}
+          alt="Образец документа"
+          style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', background: '#fff' }}
+        />
+      )}
+      <div
+        style={{
+          position: 'absolute',
+          top: 14,
+          right: 14,
+          padding: '4px 10px',
+          background: 'rgba(255,255,255,0.92)',
+          border: '1px solid var(--ds-border-soft)',
+          borderRadius: 100,
+          fontFamily: 'var(--ds-font-display-stack)',
+          fontSize: 10,
+          fontWeight: 700,
+          letterSpacing: '0.12em',
+          textTransform: 'uppercase',
+          color: 'var(--ds-purple)',
+          pointerEvents: 'none',
+        }}
+      >
+        Образец
+      </div>
     </div>
   )
 }

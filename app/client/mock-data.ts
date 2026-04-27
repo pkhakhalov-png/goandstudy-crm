@@ -16,15 +16,19 @@ export type RequiredDoc = {
   fileSize?: string
   hasExample?: boolean
   exampleTitle?: string
+  /** Путь к образцу в /public/samples/ (PDF / JPG / PNG). Если задан — модалка показывает превью вместо плейсхолдера. */
+  samplePath?: string
   lockedHint?: string // для status: 'locked' — что разблокирует
   href?: string // если задан — клик на карточку ведёт сюда (вместо модалки)
 }
 
 export const REQUIRED_DOCS: RequiredDoc[] = [
-  { key: 'passport', title: 'Паспорт', hint: 'Заграничный, скан первой страницы', status: 'uploaded', fileName: 'passport.pdf', fileSize: '2.0 МБ' },
-  { key: 'academic', title: 'Академические документы', hint: 'Транскрипт, дипломы, выписки оценок', status: 'pending', hasExample: true, exampleTitle: 'Академические документы — образец' },
-  { key: 'language', title: 'Языковой тест', hint: 'IELTS или TOEFL сертификат', status: 'missing', hasExample: true, exampleTitle: 'Требования к языковому тесту' },
-  { key: 'certificate', title: 'Аттестат', hint: 'Школьный аттестат с приложением оценок', status: 'pending' },
+  { key: 'passport', title: 'Паспорт', hint: 'Заграничный, скан первой страницы', status: 'pending', hasExample: true, exampleTitle: 'Паспорт — образец', samplePath: '/samples/passport.jpg' },
+  { key: 'diploma', title: 'Диплом', hint: 'Диплом о высшем/среднем образовании', status: 'pending', hasExample: true, exampleTitle: 'Диплом — образец', samplePath: '/samples/diploma.jpg' },
+  { key: 'transcript', title: 'Транскрипт', hint: 'Выписка оценок (с переводом если требуется)', status: 'pending', hasExample: true, exampleTitle: 'Транскрипт — образец', samplePath: '/samples/transcript.jpg' },
+  { key: 'attestat', title: 'Аттестат', hint: 'Школьный аттестат с приложением оценок', status: 'pending', hasExample: true, exampleTitle: 'Аттестат — образец', samplePath: '/samples/attestat.jpeg' },
+  { key: 'ielts', title: 'IELTS / TOEFL', hint: 'Сертификат языкового теста', status: 'missing', hasExample: true, exampleTitle: 'IELTS — образец', samplePath: '/samples/ielts.jpg' },
+  { key: 'recommendation', title: 'Рекомендательное письмо', hint: 'От школы / преподавателя / работодателя', status: 'pending', hasExample: true, exampleTitle: 'Рекомендательное письмо — образец', samplePath: '/samples/recomm.pdf' },
   {
     key: 'resume',
     title: 'Резюме',
