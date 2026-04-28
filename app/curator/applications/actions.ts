@@ -305,6 +305,7 @@ export async function uploadApplicationDocument(formData: FormData) {
   })
   if (upErr) return { error: `Storage: ${upErr.message}` }
 
+  let savedDocId: string | null = null
   if (docIdRaw) {
     // Заменяем существующую запись
     const { data: existing } = await ctx.admin
@@ -331,8 +332,9 @@ export async function uploadApplicationDocument(formData: FormData) {
       await ctx.admin.storage.from(BUCKET).remove([storagePath])
       return { error: `DB: ${error.message}` }
     }
+    savedDocId = docIdRaw
   } else {
-    const { error } = await ctx.admin.from('application_documents').insert({
+    const { data: created, error } = await ctx.admin.from('application_documents').insert({
       application_id: applicationId,
       doc_type: docType,
       title,
@@ -344,17 +346,19 @@ export async function uploadApplicationDocument(formData: FormData) {
       mime_type: file.type || null,
       uploaded_by: ctx.user.id,
       uploaded_at: new Date().toISOString(),
-    })
+    }).select('id').single()
     if (error) {
       await ctx.admin.storage.from(BUCKET).remove([storagePath])
       return { error: `DB: ${error.message}` }
     }
+    savedDocId = created?.id ?? null
   }
 
   await ctx.admin.from('application_events').insert({
     application_id: applicationId,
     event_type: 'doc_uploaded',
     content: title || docType,
+    payload: { document_id: savedDocId, file_name: file.name, file_size_bytes: file.size },
     author_id: ctx.user.id,
   })
 

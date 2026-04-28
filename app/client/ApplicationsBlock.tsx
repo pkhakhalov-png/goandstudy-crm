@@ -36,8 +36,65 @@ export function ApplicationsBlock({
 }) {
   if (applications.length === 0) return null
 
+  // Новые офферы (получены за последние 14 дней) — для верхней плашки
+  const RECENT_DAYS = 14
+  const cutoff = Date.now() - RECENT_DAYS * 24 * 60 * 60 * 1000
+  const recentOffers = applications.filter(a =>
+    (a.decision === 'offer' || a.decision === 'conditional_offer') &&
+    a.decision_at && new Date(a.decision_at).getTime() >= cutoff
+  )
+  const recentRejects = applications.filter(a =>
+    a.decision === 'rejected' &&
+    a.decision_at && new Date(a.decision_at).getTime() >= cutoff
+  )
+
   return (
     <section style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {recentOffers.length > 0 && (
+        <div style={{
+          padding: '16px 20px',
+          background: 'linear-gradient(135deg, rgba(232,184,68,0.18) 0%, rgba(52,199,89,0.16) 100%)',
+          border: '1px solid rgba(232,184,68,0.4)',
+          borderRadius: 'var(--ds-r-lg)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 14,
+          boxShadow: '0 4px 16px -6px rgba(232,184,68,0.25)',
+        }}>
+          <div style={{ fontSize: 28, lineHeight: 1 }}>🎉</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.10em', textTransform: 'uppercase', color: 'var(--ds-amber-hov, #D9AA35)', marginBottom: 2 }}>
+              Новости
+            </div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--ds-ink)' }}>
+              {recentOffers.length === 1
+                ? `Получен оффер от ${recentOffers[0].university_name}`
+                : `Получено офферов: ${recentOffers.length}`}
+            </div>
+            {recentOffers.length === 1 && (
+              <div style={{ fontSize: 12, color: 'var(--ds-muted)', marginTop: 2 }}>
+                {[recentOffers[0].program_name, recentOffers[0].country].filter(Boolean).join(' · ')}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {recentRejects.length > 0 && recentOffers.length === 0 && (
+        <div style={{
+          padding: '14px 18px',
+          background: 'var(--ds-error-soft)',
+          border: '1px solid rgba(255,59,48,0.25)',
+          borderRadius: 'var(--ds-r-md)',
+          fontSize: 13,
+          color: 'var(--ds-ink)',
+        }}>
+          <b>Получен отказ от {recentRejects[0].university_name}</b>
+          {recentRejects.length > 1 && <span style={{ color: 'var(--ds-muted)' }}> · и ещё {recentRejects.length - 1}</span>}
+          <span style={{ color: 'var(--ds-muted)' }}> — обсуди следующие шаги с куратором</span>
+        </div>
+      )}
+
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
         <div>
           <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ds-purple)', marginBottom: 6 }}>

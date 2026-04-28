@@ -95,8 +95,52 @@ export function ApplicationView({
 }) {
   const stageIdx = STAGE_ORDER.indexOf(app.stage)
 
+  // Свежее уведомление: последнее значимое событие за 14 дней
+  const RECENT_DAYS = 14
+  const cutoff = Date.now() - RECENT_DAYS * 24 * 60 * 60 * 1000
+  const recentEvent = events.find(e =>
+    (e.event_type === 'stage_change' || e.event_type === 'decision_set') &&
+    new Date(e.created_at).getTime() >= cutoff
+  )
+  const isOfferDecision = app.decision === 'offer' || app.decision === 'conditional_offer'
+  const isRejectDecision = app.decision === 'rejected'
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {/* Свежий апдейт от куратора */}
+      {recentEvent && !isCurator && (
+        <div style={{
+          padding: '14px 18px',
+          background: isOfferDecision
+            ? 'linear-gradient(135deg, rgba(232,184,68,0.18) 0%, rgba(52,199,89,0.16) 100%)'
+            : isRejectDecision
+              ? 'var(--ds-error-soft)'
+              : 'var(--ds-purple-soft)',
+          border: `1px solid ${
+            isOfferDecision ? 'rgba(232,184,68,0.4)' :
+            isRejectDecision ? 'rgba(255,59,48,0.3)' :
+            'var(--ds-purple)'
+          }`,
+          borderRadius: 'var(--ds-r-md)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          boxShadow: isOfferDecision ? '0 4px 16px -6px rgba(232,184,68,0.25)' : 'none',
+        }}>
+          <div style={{ fontSize: 22, lineHeight: 1 }}>
+            {isOfferDecision ? '🎉' : isRejectDecision ? '😔' : '🔔'}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.10em', textTransform: 'uppercase', color: 'var(--ds-muted)', marginBottom: 2 }}>
+              Куратор обновил {new Date(recentEvent.created_at).toLocaleDateString('ru', { day: 'numeric', month: 'long' })}
+            </div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ds-ink)' }}>
+              {recentEvent.content || 'Изменения по заявке'}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Hero — белая «приподнятая» карточка с тенью */}
       <div style={{
         padding: 32,
@@ -662,23 +706,69 @@ function EventsSection({
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {events.map(ev => (
-            <div key={ev.id} style={{ padding: 14, background: 'var(--ds-bg)', border: '1px solid var(--ds-border)', borderRadius: 'var(--ds-r-md)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', marginBottom: 6 }}>
-                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--ds-purple)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                  {EVENT_LABELS[ev.event_type] || ev.event_type}
-                </span>
-                <span style={{ fontSize: 11, color: 'var(--ds-muted)' }}>
-                  {new Date(ev.created_at).toLocaleString('ru', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                </span>
-              </div>
-              {ev.content && (
-                <div style={{ fontSize: 13, color: 'var(--ds-ink)', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
-                  {ev.content}
-                </div>
-              )}
-            </div>
+            <EventRow key={ev.id} ev={ev} applicationId={applicationId} clientId={clientId} />
           ))}
         </div>
+      )}
+    </div>
+  )
+}
+
+function EventRow({ ev, applicationId, clientId }: { ev: any; applicationId: string; clientId: number }) {
+  const [downloadError, setDownloadError] = useState<string | null>(null)
+
+  const docId = ev.payload?.document_id as string | undefined
+  const fileName = ev.payload?.file_name as string | undefined
+  const fileSize = ev.payload?.file_size_bytes as number | undefined
+
+  async function download() {
+    if (!docId) return
+    setDownloadError(null)
+    const res = await getApplicationDocumentDownloadUrl({ documentId: docId, applicationId, clientId })
+    if ('error' in res && res.error) { setDownloadError(res.error); return }
+    if ('url' in res && res.url) window.open(res.url, '_blank')
+  }
+
+  function fmtBytes(b?: number): string {
+    if (!b) return ''
+    if (b < 1024) return `${b} Б`
+    if (b < 1024 * 1024) return `${(b / 1024).toFixed(0)} КБ`
+    return `${(b / 1024 / 1024).toFixed(1)} МБ`
+  }
+
+  return (
+    <div style={{ padding: 14, background: 'var(--ds-bg)', border: '1px solid var(--ds-border)', borderRadius: 'var(--ds-r-md)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', marginBottom: 6 }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--ds-purple)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+          {EVENT_LABELS[ev.event_type] || ev.event_type}
+        </span>
+        <span style={{ fontSize: 11, color: 'var(--ds-muted)' }}>
+          {new Date(ev.created_at).toLocaleString('ru', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+        </span>
+      </div>
+      {ev.content && (
+        <div style={{ fontSize: 13, color: 'var(--ds-ink)', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
+          {ev.content}
+        </div>
+      )}
+      {ev.event_type === 'doc_uploaded' && docId && (
+        <div style={{ marginTop: 10, padding: '8px 12px', background: 'var(--ds-bg-alt)', border: '1px solid var(--ds-border-soft)', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: 16, lineHeight: 1 }}>📎</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ds-ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {fileName || ev.content || 'Файл'}
+            </div>
+            {fileSize && (
+              <div style={{ fontSize: 11, color: 'var(--ds-muted)' }}>{fmtBytes(fileSize)}</div>
+            )}
+          </div>
+          <button type="button" className="ds-btn ds-btn-ghost" onClick={download} style={{ fontSize: 11, padding: '4px 10px' }}>
+            ↓ Скачать
+          </button>
+        </div>
+      )}
+      {downloadError && (
+        <div style={{ fontSize: 11, color: 'var(--ds-error-ink)', marginTop: 6 }}>{downloadError}</div>
       )}
     </div>
   )
