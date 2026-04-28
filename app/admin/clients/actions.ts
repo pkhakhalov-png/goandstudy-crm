@@ -218,6 +218,83 @@ export async function linkClientGroup(clientId: number, chatId: string, chatTitl
   return { success: true }
 }
 
+/**
+ * Возврат клиенту: помечает клиента как `refunded`, обнуляет приход
+ * (зеркальные платежи с минусом для каждого оплаченного), удаляет
+ * неоплаченные платежи и расходы. Уже оплаченные расходы не трогаем —
+ * иначе сломается история отчётности по прошлым месяцам.
+ */
+export async function refundAndDeleteClient(clientId: number, reason?: string) {
+  const { error: authErr } = await assertAdmin()
+  if (authErr) return { error: authErr }
+
+  const admin = await createAdminClient()
+
+  const { data: client } = await admin
+    .from('clients')
+    .select('id, name, status')
+    .eq('id', clientId)
+    .maybeSingle()
+  if (!client) return { error: 'Клиент не найден' }
+  if (client.status === 'refunded') return { error: 'Клиент уже в статусе «Возврат»' }
+
+  const { data: payments } = await admin
+    .from('payments')
+    .select('id, num, plan_date, plan_sum, fact_sum, fact_date, is_paid')
+    .eq('client_id', clientId)
+
+  const today = new Date().toISOString().slice(0, 10)
+  const noteSuffix = reason?.trim() ? ` · ${reason.trim()}` : ''
+
+  // Зеркальные минусовые записи на каждый оплаченный платёж
+  const refundRows = (payments ?? [])
+    .filter(p => p.is_paid)
+    .map(p => ({
+      client_id: clientId,
+      num: -1, // отрицательный № как маркер возврата
+      plan_date: today,
+      plan_sum: -Number(p.fact_sum ?? p.plan_sum),
+      fact_date: today,
+      fact_sum: -Number(p.fact_sum ?? p.plan_sum),
+      is_paid: true,
+      comment: `Возврат к платежу №${p.num}${noteSuffix}`,
+    }))
+
+  if (refundRows.length > 0) {
+    const { error: refErr } = await admin.from('payments').insert(refundRows)
+    if (refErr) return { error: `Не удалось записать возврат: ${refErr.message}` }
+  }
+
+  // Удаляем неоплаченные будущие платежи — их клиент уже не должен
+  const { error: delPayErr } = await admin
+    .from('payments')
+    .delete()
+    .eq('client_id', clientId)
+    .eq('is_paid', false)
+  if (delPayErr) return { error: `Не удалось удалить будущие платежи: ${delPayErr.message}` }
+
+  // Удаляем только НЕоплаченные расходы — оплаченные оставляем
+  // как реальные расходы прошлых периодов (не переписываем историю)
+  const { error: delExpErr } = await admin
+    .from('expenses')
+    .delete()
+    .eq('client_id', clientId)
+    .eq('is_paid', false)
+  if (delExpErr) return { error: `Не удалось удалить будущие расходы: ${delExpErr.message}` }
+
+  const { error: updErr } = await admin
+    .from('clients')
+    .update({ status: 'refunded' })
+    .eq('id', clientId)
+  if (updErr) return { error: `Не удалось обновить статус клиента: ${updErr.message}` }
+
+  revalidatePath('/admin')
+  revalidatePath('/admin/clients')
+  revalidatePath('/admin/payments')
+  revalidatePath('/admin/expenses')
+  return { success: true as const, refundedCount: refundRows.length }
+}
+
 export async function unlinkClientGroup(clientId: number) {
   const { supabase, error: authErr } = await assertAdmin()
   if (authErr) return { error: authErr }

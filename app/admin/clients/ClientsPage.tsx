@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
-import { assignCurator, updatePaymentSum, updateClientTotal, getAvailableGroups, linkClientGroup, unlinkClientGroup } from './actions'
+import { assignCurator, updatePaymentSum, updateClientTotal, getAvailableGroups, linkClientGroup, unlinkClientGroup, refundAndDeleteClient } from './actions'
 
 interface Props {
   clients: any[]
@@ -11,6 +11,7 @@ interface Props {
 }
 
 function getPaymentStatus(client: any) {
+  if (client.status === 'refunded') return { label: 'Возврат', cls: 'po' }
   if (client.status === 'completed') return { label: 'Завершён', cls: 'pd' }
   const pays = client.payments ?? []
   const unpaid = pays.filter((p: any) => !p.is_paid)
@@ -318,6 +319,15 @@ export function ClientsPage({ clients, salespersons, curators }: Props) {
                     <span style={{ fontWeight: 600 }}>{expPaid.toLocaleString('ru')} ₽</span>
                   </div>
                 </>}
+
+                {sel.status !== 'refunded' && (
+                  <RefundClientButton client={sel} onDone={() => { setSelected(null) }} />
+                )}
+                {sel.status === 'refunded' && (
+                  <div style={{ marginTop: 20, padding: '12px 14px', background: 'rgba(255,59,48,.06)', border: '1px solid rgba(255,59,48,.2)', borderRadius: 10, fontSize: 12, color: 'var(--red)' }}>
+                    Возврат оформлен — приход аннулирован, будущие платежи и неоплаченные расходы удалены.
+                  </div>
+                )}
               </>}
 
               {/* Payments tab */}
@@ -463,6 +473,7 @@ export function ClientsPage({ clients, salespersons, curators }: Props) {
               <option value="active">Активные</option>
               <option value="completed">Завершённые</option>
               <option value="frozen">Замороженные</option>
+              <option value="refunded">Возвраты</option>
             </select>
             <select className="si" value={filterSalesperson} onChange={e=>setFilterSalesperson(e.target.value)}>
               <option value="">Все продажники</option>
@@ -559,5 +570,121 @@ export function ClientsPage({ clients, salespersons, curators }: Props) {
         </div>
       </div>
     </>
+  )
+}
+function RefundClientButton({ client, onDone }: { client: any; onDone: () => void }) {
+  const [stage, setStage] = useState<'idle' | 'confirm'>('idle')
+  const [reason, setReason] = useState('')
+  const [pending, startTransition] = useTransition()
+  const [error, setError] = useState<string | null>(null)
+
+  const paidPayments = (client.payments ?? []).filter((p: any) => p.is_paid)
+  const totalPaid = paidPayments.reduce((s: number, p: any) => s + Number(p.fact_sum ?? p.plan_sum), 0)
+  const futurePayments = (client.payments ?? []).filter((p: any) => !p.is_paid)
+  const futureExpenses = (client.expenses ?? []).filter((e: any) => !e.is_paid)
+
+  function execute() {
+    setError(null)
+    startTransition(async () => {
+      const res = await refundAndDeleteClient(client.id, reason || undefined)
+      if (res?.error) {
+        setError(res.error)
+      } else {
+        onDone()
+      }
+    })
+  }
+
+  if (stage === 'idle') {
+    return (
+      <div style={{ marginTop: 24, paddingTop: 16, borderTop: '1px dashed rgba(255,59,48,.25)' }}>
+        <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--red)', fontWeight: 700, marginBottom: 6 }}>Опасная зона</div>
+        <button
+          onClick={() => setStage('confirm')}
+          style={{
+            width: '100%',
+            padding: '10px 14px',
+            background: '#fff',
+            border: '1px solid rgba(255,59,48,.35)',
+            borderRadius: 10,
+            color: 'var(--red)',
+            fontWeight: 600,
+            fontSize: 13,
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+          }}
+        >
+          ↺ Возврат и удаление клиента
+        </button>
+        <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6, lineHeight: 1.5 }}>
+          Клиент уйдёт в архив со статусом «Возврат», приход аннулируется зеркальными минусами в payments, неоплаченные платежи и расходы удалятся.
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ marginTop: 24, padding: 16, background: 'rgba(255,59,48,.06)', border: '1px solid rgba(255,59,48,.3)', borderRadius: 10 }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--red)', marginBottom: 10 }}>Подтверди возврат</div>
+
+      <div style={{ display: 'grid', gap: 6, fontSize: 12, marginBottom: 12 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <span style={{ color: 'var(--muted)' }}>Аннулируется приход:</span>
+          <b>{totalPaid.toLocaleString('ru')} ₽</b>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <span style={{ color: 'var(--muted)' }}>Оплаченных платежей:</span>
+          <b>{paidPayments.length}</b>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <span style={{ color: 'var(--muted)' }}>Будущих платежей удалится:</span>
+          <b>{futurePayments.length}</b>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <span style={{ color: 'var(--muted)' }}>Будущих расходов удалится:</span>
+          <b>{futureExpenses.length}</b>
+        </div>
+      </div>
+
+      <input
+        type="text"
+        value={reason}
+        onChange={(e) => setReason(e.target.value)}
+        placeholder="Причина возврата (необязательно)"
+        style={{ width: '100%', padding: '8px 10px', fontSize: 12, border: '1px solid rgba(0,0,0,.12)', borderRadius: 8, marginBottom: 10, fontFamily: 'inherit', boxSizing: 'border-box' }}
+      />
+
+      {error && (
+        <div style={{ fontSize: 12, color: 'var(--red)', marginBottom: 10 }}>{error}</div>
+      )}
+
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button
+          onClick={execute}
+          disabled={pending}
+          style={{
+            flex: 1,
+            padding: '10px 12px',
+            background: 'var(--red)',
+            border: 'none',
+            borderRadius: 8,
+            color: '#fff',
+            fontWeight: 700,
+            fontSize: 12,
+            cursor: pending ? 'wait' : 'pointer',
+            fontFamily: 'inherit',
+          }}
+        >
+          {pending ? 'Оформляем...' : 'Подтвердить возврат'}
+        </button>
+        <button
+          onClick={() => { setStage('idle'); setError(null) }}
+          disabled={pending}
+          style={{ padding: '10px 14px', background: '#fff', border: '1px solid rgba(0,0,0,.15)', borderRadius: 8, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}
+        >
+          Отмена
+        </button>
+      </div>
+    </div>
   )
 }
