@@ -6,9 +6,10 @@ import { addScholarshipToClient } from './actions'
 interface Props {
   scholarshipId: number
   myClients: { id: number; name: string }[]
+  kind?: 'private' | 'government'
 }
 
-export function AddScholarshipButton({ scholarshipId, myClients }: Props) {
+export function AddScholarshipButton({ scholarshipId, myClients, kind = 'private' }: Props) {
   const [open, setOpen] = useState(false)
   const [pending, startTransition] = useTransition()
   const [toast, setToast] = useState<string | null>(null)
@@ -18,6 +19,7 @@ export function AddScholarshipButton({ scholarshipId, myClients }: Props) {
     const fd = new FormData()
     fd.append('scholarship_id', String(scholarshipId))
     fd.append('client_id', String(clientId))
+    fd.append('kind', kind)
     startTransition(async () => {
       const res = await addScholarshipToClient(fd)
       if (res && (res as any).error) {

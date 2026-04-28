@@ -9,6 +9,59 @@ export function createScholarshipsClient() {
   })
 }
 
+/** Admin-клиент к проекту GS_apply — для записи (UPDATE government_scholarships, scholarships_topuni). */
+export function createScholarshipsAdminClient() {
+  const key = process.env.SCHOLARSHIPS_SERVICE_ROLE_KEY
+  if (!key) throw new Error('SCHOLARSHIPS_SERVICE_ROLE_KEY not configured')
+  return createClient(URL, key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  })
+}
+
+export type GovernmentScholarship = {
+  id: number
+  name: string
+  short_name: string | null
+  country_code: string | null
+  country_name: string | null
+  provider: string | null
+  type: string | null
+  description: string | null
+  eligibility: string | null
+  benefits: string | null
+  duration: string | null
+  coverage: string | null
+  monthly_stipend: number | null
+  monthly_stipend_currency: string | null
+  tuition_covered: boolean | null
+  travel_covered: boolean | null
+  insurance_covered: boolean | null
+  accommodation_covered: boolean | null
+  levels: string[] | null
+  required_languages: string[] | null
+  required_language_tests: Record<string, string> | null
+  required_gpa: number | null
+  age_limit: number | null
+  work_experience_required: number | null
+  cis_eligible: boolean | null
+  required_documents: any
+  application_deadline: string | null
+  application_period: string | null
+  intake_starts: string | null
+  next_round_year: number | null
+  official_url: string | null
+  application_url: string | null
+  info_url: string | null
+  contact_email: string | null
+  difficulty: string | null
+  success_rate_estimate: number | null
+  notes: string | null
+  is_active: boolean
+  last_verified_at: string | null
+  created_at: string
+  updated_at: string
+}
+
 export type Scholarship = {
   scholarship_id: number
   title: string

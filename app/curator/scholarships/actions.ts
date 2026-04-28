@@ -22,29 +22,56 @@ export async function addScholarshipToClient(formData: FormData) {
   if (ctx.error) return { error: ctx.error }
   const clientId = Number(formData.get('client_id'))
   const scholarshipId = Number(formData.get('scholarship_id'))
+  const kind = String(formData.get('kind') || 'private') as 'private' | 'government'
   if (!clientId || !scholarshipId) return { error: 'Не передан client_id или scholarship_id' }
+  if (kind !== 'private' && kind !== 'government') return { error: 'Неверный kind' }
 
-  // Подтянуть свежие данные стипендии для денормализации
   const sb = createScholarshipsClient()
-  const { data: scholarship, error: schErr } = await sb
-    .from('scholarships_topuni')
-    .select('scholarship_id, title, institution_title, amount_text, deadline')
-    .eq('scholarship_id', scholarshipId)
-    .maybeSingle()
-  if (schErr || !scholarship) return { error: 'Стипендия не найдена в каталоге' }
+
+  let title: string
+  let institution: string | null
+  let amount: string | null
+  let deadline: string | null
+
+  if (kind === 'government') {
+    const { data: g, error } = await sb
+      .from('government_scholarships')
+      .select('id, name, country_name, provider, monthly_stipend, monthly_stipend_currency, application_deadline')
+      .eq('id', scholarshipId)
+      .maybeSingle()
+    if (error || !g) return { error: 'Стипендия не найдена в каталоге' }
+    title = g.name
+    institution = g.provider || g.country_name || null
+    amount = g.monthly_stipend
+      ? `${g.monthly_stipend.toLocaleString('ru')} ${g.monthly_stipend_currency || ''}/мес`.trim()
+      : null
+    deadline = g.application_deadline
+  } else {
+    const { data: p, error } = await sb
+      .from('scholarships_topuni')
+      .select('scholarship_id, title, institution_title, amount_text, deadline')
+      .eq('scholarship_id', scholarshipId)
+      .maybeSingle()
+    if (error || !p) return { error: 'Стипендия не найдена в каталоге' }
+    title = p.title
+    institution = p.institution_title
+    amount = p.amount_text
+    deadline = p.deadline
+  }
 
   const { error } = await ctx.admin.from('client_scholarships').upsert(
     {
       client_id: clientId,
-      scholarship_id: scholarship.scholarship_id,
-      scholarship_title: scholarship.title,
-      institution_title: scholarship.institution_title,
-      amount_text: scholarship.amount_text,
-      deadline: scholarship.deadline,
+      kind,
+      scholarship_id: scholarshipId,
+      scholarship_title: title,
+      institution_title: institution,
+      amount_text: amount,
+      deadline,
       added_by: ctx.curatorId,
       updated_at: new Date().toISOString(),
     },
-    { onConflict: 'client_id,scholarship_id' },
+    { onConflict: 'client_id,kind,scholarship_id' },
   )
   if (error) return { error: error.message }
 
