@@ -342,6 +342,122 @@ export async function getClientDocumentRows(clientId: number): Promise<ClientDoc
   return (data as ClientDocumentRow[]) || []
 }
 
+export type AppStage = 'created' | 'docs_collected' | 'fee_paid' | 'submitted' | 'decision'
+export type AppDecision = 'offer' | 'conditional_offer' | 'rejected' | 'waitlisted' | 'withdrawn'
+export type AppDocStatus = 'pending' | 'in_review' | 'approved' | 'rejected' | 'optional'
+
+export type ApplicationRow = {
+  id: string
+  client_id: number
+  shortlist_id: string | null
+  university_name: string
+  program_name: string | null
+  country: string | null
+  intake: string | null
+  school_id: number | null
+  stage: AppStage
+  decision: AppDecision | null
+  app_deadline: string | null
+  submitted_at: string | null
+  decision_at: string | null
+  fee_amount: number | null
+  fee_currency: string | null
+  fee_paid_at: string | null
+  school_app_ref: string | null
+  hold_reason: string | null
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type ApplicationDocumentRow = {
+  id: string
+  application_id: string
+  doc_type: string
+  title: string | null
+  required: boolean
+  status: AppDocStatus
+  global_doc_id: string | null
+  storage_path: string | null
+  file_name: string | null
+  file_size_bytes: number | null
+  mime_type: string | null
+  due_date: string | null
+  notes: string | null
+  uploaded_at: string | null
+  created_at: string
+}
+
+export type ApplicationEventRow = {
+  id: string
+  application_id: string
+  event_type: 'stage_change' | 'note' | 'school_message' | 'doc_uploaded' | 'decision_set'
+  content: string | null
+  payload: any
+  author_id: string | null
+  created_at: string
+}
+
+export async function getClientApplications(clientId: number): Promise<ApplicationRow[]> {
+  const admin = await createAdminClient()
+  const { data } = await admin
+    .from('client_applications')
+    .select('*')
+    .eq('client_id', clientId)
+    .order('created_at', { ascending: false })
+    .then(r => r, () => ({ data: [] }))
+  return (data as ApplicationRow[]) || []
+}
+
+export async function getApplication(applicationId: string): Promise<ApplicationRow | null> {
+  const admin = await createAdminClient()
+  const { data } = await admin
+    .from('client_applications')
+    .select('*')
+    .eq('id', applicationId)
+    .maybeSingle()
+    .then(r => r, () => ({ data: null }))
+  return (data as ApplicationRow) || null
+}
+
+export async function getApplicationDocuments(applicationId: string): Promise<ApplicationDocumentRow[]> {
+  const admin = await createAdminClient()
+  const { data } = await admin
+    .from('application_documents')
+    .select('*')
+    .eq('application_id', applicationId)
+    .order('created_at', { ascending: true })
+    .then(r => r, () => ({ data: [] }))
+  return (data as ApplicationDocumentRow[]) || []
+}
+
+export async function getApplicationEvents(applicationId: string): Promise<ApplicationEventRow[]> {
+  const admin = await createAdminClient()
+  const { data } = await admin
+    .from('application_events')
+    .select('*')
+    .eq('application_id', applicationId)
+    .order('created_at', { ascending: false })
+    .then(r => r, () => ({ data: [] }))
+  return (data as ApplicationEventRow[]) || []
+}
+
+/** Все заявки во все вузы — для канбана куратора, сгруппированных по university_name+school_id */
+export async function getAllApplicationsForCurator(curatorId: string | null): Promise<(ApplicationRow & { client_name: string | null; client_email: string | null })[]> {
+  const admin = await createAdminClient()
+  let q = admin
+    .from('client_applications')
+    .select('*, clients!inner(id, name, email, curator_id)')
+    .order('updated_at', { ascending: false })
+  if (curatorId) q = q.eq('clients.curator_id', curatorId)
+  const { data } = await q.then(r => r, () => ({ data: [] }))
+  return ((data as any[]) || []).map(row => ({
+    ...row,
+    client_name: row.clients?.name ?? null,
+    client_email: row.clients?.email ?? null,
+  }))
+}
+
 export async function getClientDocuments(clientId: number): Promise<RequiredDoc[]> {
   const admin = await createAdminClient()
   const { data } = await admin

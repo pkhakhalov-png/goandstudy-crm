@@ -85,6 +85,11 @@ export default async function CuratorClientPage({
     .from('client_scholarships').select('*').eq('client_id', clientId).order('deadline', { ascending: true, nullsFirst: false })
     .then(r => r, () => ({ data: [] as any[] }))
 
+  // Applications — may not exist if migration not applied
+  const { data: applications } = await admin
+    .from('client_applications').select('*').eq('client_id', clientId).order('created_at', { ascending: false })
+    .then(r => r, () => ({ data: [] as any[] }))
+
   // Extract school + program ids from universities.notes
   const programIds: number[] = []
   const schoolIds: number[] = []
@@ -209,6 +214,7 @@ export default async function CuratorClientPage({
         logoBySchool={logoBySchool}
         essays={essays || []}
         scholarships={scholarships || []}
+        applications={applications || []}
       />
     </div>
   )

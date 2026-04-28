@@ -428,3 +428,8 @@
   color: var(--ds-purple-deep);
   text-decoration-color: var(--ds-purple);
 }
+
+.ds-app-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px -8px rgba(29,29,31,0.16), 0 2px 6px -1px rgba(29,29,31,0.06) !important;
+}

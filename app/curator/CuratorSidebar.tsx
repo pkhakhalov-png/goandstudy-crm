@@ -20,6 +20,7 @@ const accentLight = 'rgba(177,94,204,.1)'
 const navItems = [
   { key: 'home', href: '/curator', label: 'Главная', icon: 'M3 9.5L8 4l5 5.5V14H3z' },
   { key: 'clients', href: '/curator/clients', label: 'Клиенты', icon: 'M2 3h12v10H2zM5 7h6M5 10h4' },
+  { key: 'applications', href: '/curator/applications', label: 'Заявки', icon: 'M3 2h7l3 3v9a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1zm7 0v3h3M5 8h6M5 11h4' },
   { key: 'universities', href: '/curator/universities', label: 'База вузов', icon: 'M2 6l6-3 6 3M3 6v7h10V6M6 13v-4h4v4' },
   { key: 'scholarships', href: '/curator/scholarships', label: 'Стипендии', icon: 'M8 1l2 4 4 .5-3 3 1 4.5L8 11l-4 2 1-4.5-3-3 4-.5z' },
   { key: 'templates', href: '/curator/templates', label: 'Шаблоны', icon: 'M3 2h10a2 2 0 012 2v8a2 2 0 01-2 2H3a2 2 0 01-2-2V4a2 2 0 012-2zM5 5h6M5 8h4' },
@@ -51,7 +52,7 @@ export function CuratorSidebar({ userName, userEmail, initials, activePage = 'ho
         </div>
         <nav className="nav">
           <div className="ns">Работа</div>
-          {navItems.slice(0, 4).map(item => (
+          {navItems.slice(0, 5).map(item => (
             <Link key={item.key} href={item.href} onClick={() => setOpen(false)}
               className={`ni${activePage === item.key ? ' active' : ''}`}
               style={activePage === item.key ? { borderLeftColor: accent, color: accent, background: accentBg } : undefined}>
@@ -62,7 +63,7 @@ export function CuratorSidebar({ userName, userEmail, initials, activePage = 'ho
             </Link>
           ))}
           <div className="ns" style={{ marginTop: 12 }}>Инструменты</div>
-          {navItems.slice(4, 7).map(item => (
+          {navItems.slice(5, 8).map(item => (
             <Link key={item.key} href={item.href} onClick={() => setOpen(false)}
               className={`ni${activePage === item.key ? ' active' : ''}`}
               style={activePage === item.key ? { borderLeftColor: accent, color: accent, background: accentBg } : undefined}>
@@ -73,7 +74,7 @@ export function CuratorSidebar({ userName, userEmail, initials, activePage = 'ho
             </Link>
           ))}
           <div className="ns" style={{ marginTop: 12 }}>Профиль</div>
-          {navItems.slice(7).map(item => (
+          {navItems.slice(8).map(item => (
             <Link key={item.key} href={item.href} onClick={() => setOpen(false)}
               className={`ni${activePage === item.key ? ' active' : ''}`}
               style={activePage === item.key ? { borderLeftColor: accent, color: accent, background: accentBg } : undefined}>

@@ -18,8 +18,10 @@ import {
   updateShortlistNote,
   updateShortlistStatus,
 } from '@/app/curator/shortlist/actions'
+import { createApplication } from '@/app/curator/applications/actions'
 import { UniversityFilters } from '@/app/curator/universities/UniversityFilters'
 import { ProgramCardInteractive } from '@/app/curator/universities/ProgramCard'
+import { ApplicationsTab } from './ApplicationsTab'
 
 /* ═══════════════════════════════════════════════════════════════
    PROPS + ШЛЯПА — props структуры из Supabase (пока any, чтобы
@@ -55,17 +57,19 @@ interface Props {
   logoBySchool?: Record<number, string | null>
   essays?: any[]
   scholarships?: any[]
+  applications?: any[]
 }
 
-type TabKey = 'project' | 'roadmap' | 'shortlist' | 'documents' | 'essays' | 'notes'
+type TabKey = 'project' | 'roadmap' | 'shortlist' | 'applications' | 'documents' | 'essays' | 'notes'
 
 const TABS: Array<{ key: TabKey; label: string; hint?: string }> = [
-  { key: 'project',   label: 'Проект' },
-  { key: 'roadmap',   label: 'Дорожная карта' },
-  { key: 'shortlist', label: 'Подборка' },
-  { key: 'documents', label: 'Документы' },
-  { key: 'essays',    label: 'Эссе' },
-  { key: 'notes',     label: 'Заметки' },
+  { key: 'project',      label: 'Проект' },
+  { key: 'roadmap',      label: 'Дорожная карта' },
+  { key: 'shortlist',    label: 'Подборка' },
+  { key: 'applications', label: 'Заявки' },
+  { key: 'documents',    label: 'Документы' },
+  { key: 'essays',       label: 'Эссе' },
+  { key: 'notes',        label: 'Заметки' },
 ]
 
 const DOC_STATUS: Record<string, { label: string; chipClass: string }> = {
@@ -133,6 +137,7 @@ export function ClientWorkspace(props: Props) {
         project: 0,
         roadmap: checklist.length,
         shortlist: universities.length,
+        applications: (props.applications || []).length,
         documents: documents.length,
         essays: 0,
         notes: activities.length,
@@ -158,6 +163,14 @@ export function ClientWorkspace(props: Props) {
             enrichmentByProgram={enrichmentByProgram}
             logoBySchool={logoBySchool}
             scholarships={props.scholarships || []}
+            applications={props.applications || []}
+          />
+        )}
+        {tab === 'applications' && (
+          <ApplicationsTab
+            clientId={client.id}
+            applications={props.applications || []}
+            shortlist={universities}
           />
         )}
         {tab === 'documents' && <DocumentsTab documents={documents} />}
@@ -901,7 +914,7 @@ function RoadmapTab({
    ═══════════════════════════════════════════════════════════════ */
 
 function ShortlistTab({
-  client, universities, catalog, enrichmentByProgram, logoBySchool, scholarships,
+  client, universities, catalog, enrichmentByProgram, logoBySchool, scholarships, applications,
 }: {
   client: any
   universities: any[]
@@ -909,7 +922,13 @@ function ShortlistTab({
   enrichmentByProgram: Record<number, any>
   logoBySchool: Record<number, string | null>
   scholarships: any[]
+  applications: any[]
 }) {
+  const router = useRouter()
+  const appByShortlist = new Map<string, any>()
+  for (const a of applications) {
+    if (a.shortlist_id) appByShortlist.set(a.shortlist_id, a)
+  }
   const [pending, startTransition] = useTransition()
   const [publishToast, setPublishToast] = useState<string | null>(null)
 
@@ -998,6 +1017,7 @@ function ShortlistTab({
                 programId = meta.program_id || null
                 schoolId = meta.school_id || null
               } catch {}
+              const existingApp = appByShortlist.get(uni.id)
               return (
                 <UniversityRow
                   key={uni.id}
@@ -1009,6 +1029,9 @@ function ShortlistTab({
                   enrichment={programId ? enrichmentByProgram[programId] : null}
                   onStatusChange={(s) => setStatus(uni.id, s)}
                   onRemove={() => remove(uni.id)}
+                  existingApp={existingApp}
+                  clientId={client.id}
+                  onAppCreated={() => router.refresh()}
                 />
               )
             })}
@@ -1152,6 +1175,7 @@ function UniLogo({ logoUrl, name, size = 40 }: { logoUrl: string | null | undefi
 
 function UniversityRow({
   uni, pending, programId, schoolId, logoUrl, enrichment, onStatusChange, onRemove,
+  existingApp, clientId, onAppCreated,
 }: {
   uni: any
   pending: boolean
@@ -1161,7 +1185,35 @@ function UniversityRow({
   enrichment: any | null
   onStatusChange: (s: string) => void
   onRemove: () => void
+  existingApp: any | undefined
+  clientId: number
+  onAppCreated: () => void
 }) {
+  const [appPending, startApp] = useTransition()
+  const [appError, setAppError] = useState<string | null>(null)
+
+  function createApp() {
+    setAppError(null)
+    let intake: string | null = null
+    try {
+      const meta = JSON.parse(uni.notes || '{}')
+      if (meta.intake) intake = meta.intake
+    } catch {}
+    startApp(async () => {
+      const res = await createApplication({
+        clientId,
+        shortlistId: uni.id,
+        universityName: uni.university_name,
+        programName: uni.program_name || null,
+        country: uni.country || null,
+        intake,
+        schoolId: schoolId || null,
+      })
+      if ('error' in res && res.error) setAppError(res.error)
+      else onAppCreated()
+    })
+  }
+
   const [statusOpen, setStatusOpen] = useState(false)
   const [aiLoading, setAiLoading] = useState(false)
   const [aiError, setAiError] = useState<string | null>(null)
@@ -1231,7 +1283,7 @@ function UniversityRow({
     <div
       style={{
         display: 'grid',
-        gridTemplateColumns: 'auto 1fr auto auto auto',
+        gridTemplateColumns: 'auto 1fr auto auto auto auto',
         gap: 12,
         padding: '14px 16px',
         background: 'var(--ds-bg)',
@@ -1340,6 +1392,51 @@ function UniversityRow({
           </div>
         )}
       </div>
+
+      {existingApp ? (
+        <Link
+          href={`/client/applications/${existingApp.id}?clientId=${clientId}`}
+          title={`Заявка · стадия: ${existingApp.stage}`}
+          style={{
+            padding: '6px 10px',
+            background: 'var(--ds-success-soft)',
+            border: '1px solid rgba(52, 199, 89, 0.32)',
+            borderRadius: 8,
+            fontSize: 11,
+            fontWeight: 700,
+            color: 'var(--ds-success-ink)',
+            textDecoration: 'none',
+            whiteSpace: 'nowrap',
+            letterSpacing: '0.04em',
+            textTransform: 'uppercase',
+          }}
+        >
+          ✓ Заявка
+        </Link>
+      ) : (
+        <button
+          type="button"
+          onClick={createApp}
+          disabled={appPending || pending}
+          title={appError || 'Создать заявку из этой программы'}
+          style={{
+            padding: '6px 10px',
+            background: 'var(--ds-purple-soft)',
+            border: '1px solid var(--ds-purple)',
+            borderRadius: 8,
+            fontSize: 11,
+            fontWeight: 700,
+            color: 'var(--ds-purple-deep)',
+            cursor: appPending ? 'wait' : 'pointer',
+            fontFamily: 'inherit',
+            whiteSpace: 'nowrap',
+            letterSpacing: '0.04em',
+            textTransform: 'uppercase',
+          }}
+        >
+          {appPending ? '⏳' : '→ Заявка'}
+        </button>
+      )}
 
       {programId && (
         <button
