@@ -23,8 +23,13 @@ export function VerifyScholarshipButton({ id, kind }: Props) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ id, kind }),
         })
-        const json = await res.json()
-        if (!json.ok) {
+        const text = await res.text()
+        let json: any = null
+        try { json = text ? JSON.parse(text) : null } catch { /* not JSON */ }
+        if (!json) {
+          // Сервер вернул пусто или не-JSON (часто это 504 timeout от Vercel или 500 без тела)
+          setToast({ kind: 'err', text: `HTTP ${res.status}${res.statusText ? ` ${res.statusText}` : ''} — ${text.slice(0, 200) || 'пустой ответ (возможно таймаут)'}` })
+        } else if (!json.ok) {
           setToast({ kind: 'err', text: json.error || 'Не удалось проверить' })
         } else {
           const parts: string[] = []
@@ -40,7 +45,7 @@ export function VerifyScholarshipButton({ id, kind }: Props) {
       } catch (e: any) {
         setToast({ kind: 'err', text: e?.message || 'Сетевая ошибка' })
       }
-      setTimeout(() => setToast(null), 5000)
+      setTimeout(() => setToast(null), 8000)
     })
   }
 
