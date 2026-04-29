@@ -17,6 +17,9 @@ type Search = {
   intakes?: string
   sort?: string
   page?: string
+  specialty?: string
+  uniType?: string
+  budget?: string
 }
 
 export default async function CuratorClientPage({
@@ -129,6 +132,8 @@ export default async function CuratorClientPage({
     programs: any[]
     schools: any[]
     countryCodes: string[]
+    countryCounts: Record<string, number>
+    specialtyOptions: string[]
     total: number
     page: number
     pageSize: number
@@ -142,6 +147,9 @@ export default async function CuratorClientPage({
     const levels = (sp.levels || '').split(',').map(s => s.trim()).filter(Boolean)
     const intakeYears = (sp.intakes || '').split(',').map(s => s.trim()).filter(Boolean)
     const sort = (sp.sort as SortKey) || 'name_asc'
+    const specialty = sp.specialty?.trim() || ''
+    const uniType = sp.uniType?.trim() || ''
+    const budget = sp.budget?.trim() || ''
     const page = Math.max(1, parseInt(sp.page || '1', 10) || 1)
     const offset = (page - 1) * CATALOG_PAGE_SIZE
 
@@ -149,8 +157,10 @@ export default async function CuratorClientPage({
     let query = parser
       .from('programs')
       .select(
-        `id, name, tuition, application_fee, raw_data, school_id,
-         school:schools!inner(id, name, logo_url, country_code, city, institution_type)`,
+        `id, name, tuition, application_fee, raw_data, school_id, specialty_group, source,
+         degree_text, program_description, language_text, duration_text, start_date_text, deadline_text,
+         tuition_text, living_cost_text, scholarships_text, curator_note,
+         school:schools!inner(id, name, logo_url, country_code, city, institution_type, qs_rank, university_type, curator_note)`,
         { count: 'exact' }
       )
       .range(offset, offset + CATALOG_PAGE_SIZE - 1)
@@ -163,30 +173,62 @@ export default async function CuratorClientPage({
     if (country) query = query.eq('school.country_code', country)
     if (schoolFilter) query = query.eq('school_id', Number(schoolFilter))
     if (q) query = query.ilike('name', `%${q}%`)
+    if (specialty) query = query.eq('specialty_group', specialty)
+    if (uniType) query = query.eq('school.university_type', uniType)
+    if (budget === 'free') query = query.lt('tuition', 1000)
+    else if (budget === 'low') query = query.lt('tuition', 10000).gte('tuition', 0)
+    else if (budget === 'mid1') query = query.gte('tuition', 10000).lt('tuition', 25000)
+    else if (budget === 'mid2') query = query.gte('tuition', 25000).lt('tuition', 50000)
+    else if (budget === 'high') query = query.gte('tuition', 50000)
     if (levels.length > 0) query = query.in('raw_data->attributes->>level', levels)
     if (intakeYears.length > 0) {
       const orExpr = intakeYears.map(y => `raw_data->attributes->earliest_intake->>start_date.like.${y}%`).join(',')
       query = query.or(orExpr)
     }
 
-    const [{ data: progs, count }, { data: schoolsList }, { data: countryRows }] = await Promise.all([
-      query,
-      parser.from('schools').select('id, name, country_code').order('name').limit(1000),
-      parser.from('schools').select('country_code').limit(2000),
-    ])
+    // Подгружаем все школы постранично для дропдауна и счётчиков стран
+    const allSchools: { id: number; name: string; country_code: string | null }[] = []
+    for (let off = 0; off < 10000; off += 1000) {
+      const { data } = await parser.from('schools').select('id, name, country_code').order('name').range(off, off + 999)
+      if (!data || data.length === 0) break
+      allSchools.push(...(data as any[]))
+      if (data.length < 1000) break
+    }
 
-    const countryCodes = Array.from(
-      new Set((countryRows ?? []).map(r => (r.country_code || '').toLowerCase()).filter(Boolean))
-    ).sort()
+    // Считаем количество ПРОГРАММ по странам
+    const COUNTRY_CODES_FOR_COUNT = ['us', 'gb', 'ca', 'de', 'fr', 'it', 'es', 'nl', 'at', 'au', 'ie', 'ae', 'hu']
+    const countResults = await Promise.all(
+      COUNTRY_CODES_FOR_COUNT.map(c =>
+        parser.from('programs')
+          .select('id, school:schools!inner(country_code)', { count: 'exact', head: true })
+          .eq('school.country_code', c)
+          .then(r => ({ code: c, count: r.count || 0 }))
+      )
+    )
+    const countryCounts: Record<string, number> = {}
+    for (const r of countResults) countryCounts[r.code] = r.count
+
+    const { data: progs, count } = await query
+
+    const countryCodes = COUNTRY_CODES_FOR_COUNT.filter(c => countryCounts[c] > 0)
+
+    const SPECIALTY_OPTIONS = [
+      'Бизнес и управление', 'IT и технологии', 'Экономика и финансы', 'Инженерия',
+      'Медицина и здоровье', 'Право', 'Дизайн и искусство', 'Гуманитарные науки',
+      'Естественные науки', 'Социальные науки', 'Образование', 'Медиа и коммуникации',
+      'Туризм и гостиничный', 'Архитектура', 'Языковые курсы', 'Другое',
+    ]
 
     catalog = {
       programs: progs ?? [],
-      schools: schoolsList ?? [],
+      schools: allSchools,
       countryCodes,
+      countryCounts,
+      specialtyOptions: SPECIALTY_OPTIONS,
       total: count ?? 0,
       page,
       pageSize: CATALOG_PAGE_SIZE,
-      filters: { q, country, school: schoolFilter, levels: levels.join(','), intakes: intakeYears.join(','), sort },
+      filters: { q, country, school: schoolFilter, levels: levels.join(','), intakes: intakeYears.join(','), sort, specialty, uniType, budget },
     }
   }
 

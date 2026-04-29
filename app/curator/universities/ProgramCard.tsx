@@ -16,15 +16,24 @@ interface Props {
 export function ProgramCardInteractive({ program, myClients }: Props) {
   const school = program.school || {}
   const attr = program.raw_data?.attributes || {}
-  const levelText = attr.level_text || program.program_level_text || null
+  const isCurator = program.source === 'curator_gh'
+
+  // Куратор-поля имеют приоритет когда программа из BD
+  const rawLevel = program.degree_text || attr.level_text || program.program_level_text || null
+  // Сокращаем длинные multi-степени для бейджа: "Bachelor/Master/PhD" → "BACHELOR/MASTER" (2 макс)
+  const levelText = rawLevel
+    ? rawLevel.split(/[\/,]/).map((s: string) => s.trim()).filter(Boolean).slice(0, 2).join(' / ')
+    : null
   const tuition = program.tuition
+  const tuitionText = program.tuition_text
   const currency =
     attr.currency_of_fees?.code
     || attr.currency?.code
     || program.currency
     || null
   const appFee = program.application_fee ?? attr.application_fee
-  const intake = attr.earliest_intake?.start_date || program.earliest_intake_date
+  const intakeText = program.start_date_text || program.deadline_text
+  const intake = !intakeText ? (attr.earliest_intake?.start_date || program.earliest_intake_date) : null
 
   const flags: string[] = []
   if (attr.pgwp_participating || attr.pgwp_visible) flags.push('PGWP')
@@ -32,6 +41,13 @@ export function ProgramCardInteractive({ program, myClients }: Props) {
   if (attr.bypass_eligibility) flags.push('Conditional')
   if (attr.delivery_method === 'online') flags.push('Онлайн')
   else if (attr.delivery_method === 'in_class') flags.push('Кампус')
+  // Для BD-программ — short язык + тип вуза
+  if (isCurator && program.language_text) {
+    const shortLang = String(program.language_text).split(/[\/,]/).map((s: string) => s.trim()).filter(Boolean)[0] || null
+    if (shortLang) flags.push(shortLang)
+  }
+  if (isCurator && school.university_type) flags.push(school.university_type)
+  if (school.qs_rank && school.qs_rank < 999) flags.push(`QS #${school.qs_rank}`)
 
   const countryLabel = COUNTRY_LABEL[(school.country_code || '').toLowerCase()]
     || (school.country_code || '').toUpperCase()
@@ -139,23 +155,24 @@ export function ProgramCardInteractive({ program, myClients }: Props) {
         display: 'grid', gap: 6, fontSize: 12,
         paddingTop: 4,
       }}>
-        {tuition != null && (
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+        {(tuitionText || tuition != null) && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
             <span style={{ color: 'var(--ds-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: 10, fontWeight: 600 }}>
               Стоимость
             </span>
-            <span className="ds-mono" style={{ color: 'var(--ds-ink)', fontWeight: 700, fontSize: 13 }}>
-              {fmt(tuition)}{currency ? ` ${currency}` : ''} <span style={{ color: 'var(--ds-muted)', fontWeight: 500 }}>/год</span>
+            <span className="ds-mono" style={{ color: 'var(--ds-ink)', fontWeight: 700, fontSize: 13, textAlign: 'right' }}>
+              {tuitionText || `${fmt(tuition)}${currency ? ` ${currency}` : ''}`}
+              {!tuitionText && <span style={{ color: 'var(--ds-muted)', fontWeight: 500 }}> /год</span>}
             </span>
           </div>
         )}
-        {intake && (
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+        {(intakeText || intake) && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
             <span style={{ color: 'var(--ds-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: 10, fontWeight: 600 }}>
-              Старт
+              {program.deadline_text ? 'Дедлайн' : 'Старт'}
             </span>
-            <span className="ds-mono" style={{ color: 'var(--ds-ink)', fontWeight: 600, fontSize: 12 }}>
-              {fmtDate(intake)}
+            <span className="ds-mono" style={{ color: 'var(--ds-ink)', fontWeight: 600, fontSize: 12, textAlign: 'right' }}>
+              {intakeText || fmtDate(intake)}
             </span>
           </div>
         )}

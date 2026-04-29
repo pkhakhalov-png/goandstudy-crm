@@ -33,10 +33,12 @@ interface CatalogData {
   programs: any[]
   schools: any[]
   countryCodes: string[]
+  countryCounts?: Record<string, number>
+  specialtyOptions?: string[]
   total: number
   page: number
   pageSize: number
-  filters: { q?: string; country?: string; school?: string; levels?: string; intakes?: string; sort?: string }
+  filters: { q?: string; country?: string; school?: string; levels?: string; intakes?: string; sort?: string; specialty?: string; uniType?: string; budget?: string }
 }
 
 interface Props {
@@ -1138,7 +1140,9 @@ function ScholarshipsBlock({ scholarships }: { scholarships: any[] }) {
 }
 
 const CATALOG_COUNTRY_LABELS: Record<string, string> = {
-  ca: 'Канада', au: 'Австралия', gb: 'Великобритания', de: 'Германия', us: 'США', ie: 'Ирландия',
+  us: 'США', gb: 'Великобритания', ca: 'Канада', au: 'Австралия',
+  de: 'Германия', fr: 'Франция', it: 'Италия', es: 'Испания',
+  nl: 'Нидерланды', at: 'Австрия', ie: 'Ирландия', ae: 'ОАЭ', hu: 'Венгрия',
 }
 
 function UniLogo({ logoUrl, name, size = 40 }: { logoUrl: string | null | undefined; name: string; size?: number }) {
@@ -1501,6 +1505,9 @@ function CatalogPanel({ client, catalog }: { client: any; catalog: CatalogData }
     if (filters.levels) params.set('levels', filters.levels)
     if (filters.intakes) params.set('intakes', filters.intakes)
     if (filters.sort && filters.sort !== 'name_asc') params.set('sort', filters.sort)
+    if (filters.specialty) params.set('specialty', filters.specialty)
+    if (filters.uniType) params.set('uniType', filters.uniType)
+    if (filters.budget) params.set('budget', filters.budget)
     if (p > 1) params.set('page', String(p))
     return `?${params.toString()}`
   }
@@ -1523,7 +1530,9 @@ function CatalogPanel({ client, catalog }: { client: any; catalog: CatalogData }
         <UniversityFilters
           countryCodes={catalog.countryCodes}
           countryLabels={CATALOG_COUNTRY_LABELS}
+          countryCounts={catalog.countryCounts}
           schools={catalog.schools}
+          specialtyOptions={catalog.specialtyOptions}
           basePath={`/curator/clients/${client.id}`}
           stickyParams={{ tab: 'shortlist' }}
           initial={{
@@ -1533,6 +1542,9 @@ function CatalogPanel({ client, catalog }: { client: any; catalog: CatalogData }
             levels: (filters.levels || '').split(',').filter(Boolean),
             intakeYears: (filters.intakes || '').split(',').filter(Boolean),
             sort: (filters.sort as any) || 'name_asc',
+            specialty: filters.specialty || '',
+            uniType: filters.uniType || '',
+            budget: filters.budget || '',
           }}
         />
       </div>

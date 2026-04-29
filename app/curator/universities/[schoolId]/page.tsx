@@ -4,6 +4,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { createParserClient, schoolPhotoUrl } from '@/lib/supabase/parser'
 import { CuratorSidebar } from '../../CuratorSidebar'
 import { SchoolTabs } from './SchoolTabs'
+import { FillSchoolButton } from './FillSchoolButton'
 
 const COUNTRY_LABEL: Record<string, string> = {
   ca: 'Канада', au: 'Австралия', gb: 'Великобритания', de: 'Германия', us: 'США',
@@ -108,8 +109,13 @@ export default async function SchoolPage({
                 {(school.postal_code || raw.postal_code) && <span>{school.postal_code || raw.postal_code}</span>}
               </div>
               <div style={{ marginTop: 10, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {(school.institution_type || raw.institution_type) && (
-                  <span className="ctag">{school.institution_type || raw.institution_type}</span>
+                {(school.university_type || school.institution_type || raw.institution_type) && (
+                  <span className="ctag">{school.university_type || school.institution_type || raw.institution_type}</span>
+                )}
+                {school.qs_rank && school.qs_rank < 999 && (
+                  <span className="ctag" style={{ background: 'rgba(177,94,204,.10)', color: 'var(--purple)', borderColor: 'rgba(177,94,204,.3)' }}>
+                    QS #{school.qs_rank}
+                  </span>
                 )}
                 {(school.founded_in || raw.founded_in) && (
                   <span className="ctag" style={{ background: 'rgba(22,163,97,.08)', color: 'var(--green)', borderColor: 'rgba(22,163,97,.2)' }}>
@@ -122,8 +128,30 @@ export default async function SchoolPage({
                   </span>
                 )}
               </div>
+              {school.curator_note && (
+                <div style={{ marginTop: 12, fontSize: 13, lineHeight: 1.5, color: 'var(--text)', background: 'rgba(177,94,204,.06)', borderLeft: '3px solid var(--purple)', padding: '10px 12px', borderRadius: 4 }}>
+                  {school.curator_note}
+                </div>
+              )}
+              {!asClient && (
+                <div style={{ marginTop: 12 }}>
+                  <FillSchoolButton schoolId={school.id} hasData={!!(school.qs_rank || school.curator_note || school.university_type)} />
+                </div>
+              )}
             </div>
           </div>
+
+          {/* Карта */}
+          {(school.latitude && school.longitude) || school.address ? (
+            <SchoolMap
+              latitude={school.latitude}
+              longitude={school.longitude}
+              address={school.address}
+              name={school.name}
+              city={school.city}
+              countryCode={school.country_code}
+            />
+          ) : null}
 
           {/* Галерея */}
           {(photos ?? []).length > 0 && (
@@ -177,6 +205,65 @@ function SchoolPhotoGallery({ photos }: { photos: { id: string; url: string }[] 
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+function SchoolMap({ latitude, longitude, address, name, city, countryCode }: {
+  latitude: number | null
+  longitude: number | null
+  address: string | null
+  name: string
+  city: string | null
+  countryCode: string | null
+}) {
+  let embedUrl: string
+  let mapLink: string
+
+  if (latitude && longitude) {
+    // OpenStreetMap с маркером по координатам (точное)
+    const lat = Number(latitude)
+    const lon = Number(longitude)
+    const delta = 0.01
+    embedUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${lon - delta}%2C${lat - delta}%2C${lon + delta}%2C${lat + delta}&layer=mapnik&marker=${lat}%2C${lon}`
+    mapLink = `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}&zoom=16`
+  } else {
+    // Fallback: Google Maps по адресу (геокодинг на стороне Google, без API-ключа)
+    const q = encodeURIComponent([address, name, city, countryCode?.toUpperCase()].filter(Boolean).join(', '))
+    embedUrl = `https://www.google.com/maps?q=${q}&output=embed`
+    mapLink = `https://www.google.com/maps/search/?api=1&query=${q}`
+  }
+
+  return (
+    <div style={{
+      background: 'var(--surf)', border: '1px solid var(--bor)', borderRadius: 14,
+      padding: 0, marginBottom: 16, boxShadow: 'var(--sh)', overflow: 'hidden',
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', borderBottom: '1px solid var(--bor)' }}>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--muted)', marginBottom: 4 }}>
+            Локация
+          </div>
+          <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600 }}>
+            {address || [city, countryCode?.toUpperCase()].filter(Boolean).join(', ')}
+          </div>
+        </div>
+        <a
+          href={mapLink}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ fontSize: 12, color: 'var(--purple)', textDecoration: 'none', whiteSpace: 'nowrap' }}
+        >
+          Открыть на карте ↗
+        </a>
+      </div>
+      <iframe
+        src={embedUrl}
+        style={{ width: '100%', height: 320, border: 0, display: 'block' }}
+        loading="lazy"
+        referrerPolicy="no-referrer-when-downgrade"
+        title={`Карта · ${name}`}
+      />
     </div>
   )
 }

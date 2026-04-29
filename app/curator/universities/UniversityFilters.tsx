@@ -6,7 +6,9 @@ import { useRouter } from 'next/navigation'
 interface Props {
   countryCodes: string[]
   countryLabels: Record<string, string>
+  countryCounts?: Record<string, number>
   schools: { id: number; name: string; country_code?: string | null }[]
+  specialtyOptions?: string[]
   initial: {
     q: string
     country: string
@@ -14,12 +16,30 @@ interface Props {
     levels: string[]
     intakeYears: string[]
     sort: string
+    specialty?: string
+    uniType?: string
+    budget?: string
   }
   /** Base path to navigate on filter change. Extra params passed through. */
   basePath?: string
   /** Extra URL params to preserve on every navigation (e.g., `tab=shortlist`) */
   stickyParams?: Record<string, string>
 }
+
+const COUNTRY_FLAGS: Record<string, string> = {
+  us: '🇺🇸', gb: '🇬🇧', ca: '🇨🇦', au: '🇦🇺', de: '🇩🇪',
+  fr: '🇫🇷', it: '🇮🇹', es: '🇪🇸', nl: '🇳🇱', at: '🇦🇹',
+  ie: '🇮🇪', ae: '🇦🇪', hu: '🇭🇺',
+}
+
+const BUDGET_OPTIONS = [
+  { value: '', label: 'Любой бюджет' },
+  { value: 'free', label: 'Бесплатно (до $1k)' },
+  { value: 'low', label: 'до $10k' },
+  { value: 'mid1', label: '$10k–$25k' },
+  { value: 'mid2', label: '$25k–$50k' },
+  { value: 'high', label: 'от $50k' },
+]
 
 const SORT_OPTIONS: { key: string; label: string }[] = [
   { key: 'name_asc', label: 'По алфавиту' },
@@ -46,7 +66,7 @@ const LEVEL_OPTIONS: { value: string; label: string; group: string }[] = [
 
 const INTAKE_YEARS = ['2026', '2027', '2028']
 
-export function UniversityFilters({ countryCodes, countryLabels, schools, initial, basePath = '/curator/universities', stickyParams }: Props) {
+export function UniversityFilters({ countryCodes, countryLabels, countryCounts, schools, specialtyOptions, initial, basePath = '/curator/universities', stickyParams }: Props) {
   const router = useRouter()
   const [q, setQ] = useState(initial.q)
   const [country, setCountry] = useState(initial.country)
@@ -54,9 +74,12 @@ export function UniversityFilters({ countryCodes, countryLabels, schools, initia
   const [levels, setLevels] = useState<string[]>(initial.levels)
   const [intakeYears, setIntakeYears] = useState<string[]>(initial.intakeYears)
   const [sort, setSort] = useState(initial.sort || 'name_asc')
+  const [specialty, setSpecialty] = useState(initial.specialty || '')
+  const [uniType, setUniType] = useState(initial.uniType || '')
+  const [budget, setBudget] = useState(initial.budget || '')
   const [pending, startTransition] = useTransition()
 
-  function push(next: Partial<{ q: string; country: string; school: string; levels: string[]; intakeYears: string[]; sort: string }>) {
+  function push(next: Partial<{ q: string; country: string; school: string; levels: string[]; intakeYears: string[]; sort: string; specialty: string; uniType: string; budget: string }>) {
     const merged = {
       q: next.q !== undefined ? next.q : q,
       country: next.country !== undefined ? next.country : country,
@@ -64,6 +87,9 @@ export function UniversityFilters({ countryCodes, countryLabels, schools, initia
       levels: next.levels !== undefined ? next.levels : levels,
       intakeYears: next.intakeYears !== undefined ? next.intakeYears : intakeYears,
       sort: next.sort !== undefined ? next.sort : sort,
+      specialty: next.specialty !== undefined ? next.specialty : specialty,
+      uniType: next.uniType !== undefined ? next.uniType : uniType,
+      budget: next.budget !== undefined ? next.budget : budget,
     }
     const qs = new URLSearchParams()
     if (stickyParams) for (const [k, v] of Object.entries(stickyParams)) qs.set(k, v)
@@ -73,6 +99,9 @@ export function UniversityFilters({ countryCodes, countryLabels, schools, initia
     if (merged.levels.length > 0) qs.set('levels', merged.levels.join(','))
     if (merged.intakeYears.length > 0) qs.set('intakes', merged.intakeYears.join(','))
     if (merged.sort && merged.sort !== 'name_asc') qs.set('sort', merged.sort)
+    if (merged.specialty) qs.set('specialty', merged.specialty)
+    if (merged.uniType) qs.set('uniType', merged.uniType)
+    if (merged.budget) qs.set('budget', merged.budget)
     const str = qs.toString()
     startTransition(() => {
       router.push(str ? `${basePath}?${str}` : basePath, { scroll: false })
@@ -81,6 +110,7 @@ export function UniversityFilters({ countryCodes, countryLabels, schools, initia
 
   function reset() {
     setQ(''); setCountry(''); setSchool(''); setLevels([]); setIntakeYears([]); setSort('name_asc')
+    setSpecialty(''); setUniType(''); setBudget('')
     const qs = new URLSearchParams()
     if (stickyParams) for (const [k, v] of Object.entries(stickyParams)) qs.set(k, v)
     const str = qs.toString()
@@ -91,7 +121,7 @@ export function UniversityFilters({ countryCodes, countryLabels, schools, initia
     ? schools.filter(s => (s.country_code || '').toLowerCase() === country)
     : schools
 
-  const hasFilters = Boolean(q || country || school || levels.length > 0 || intakeYears.length > 0 || sort !== 'name_asc')
+  const hasFilters = Boolean(q || country || school || levels.length > 0 || intakeYears.length > 0 || sort !== 'name_asc' || specialty || uniType || budget)
 
   const inputStyle: React.CSSProperties = {
     padding: '10px 14px',
@@ -108,17 +138,73 @@ export function UniversityFilters({ countryCodes, countryLabels, schools, initia
   }
 
   return (
-    <div style={{ display: 'grid', gap: 10 }}>
+    <div style={{ display: 'grid', gap: 12 }}>
       <style>{`
         @media (max-width: 960px) {
-          .filters-row1, .filters-row2 { grid-template-columns: 1fr !important; }
+          .filters-row1, .filters-row2, .filters-row3 { grid-template-columns: 1fr !important; }
         }
       `}</style>
 
-      {/* Row 1 — search + country + institution */}
+      {/* Country tabs */}
+      <div style={{ display: 'flex', gap: 4, overflowX: 'auto', borderBottom: '1px solid var(--ds-border-soft)', paddingBottom: 2 }}>
+        <button
+          type="button"
+          onClick={() => { setCountry(''); setSchool(''); push({ country: '', school: '' }) }}
+          style={{
+            background: 'transparent', border: 'none', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', gap: 6,
+            padding: '10px 14px',
+            borderBottom: country === '' ? '2.5px solid var(--ds-purple)' : '2.5px solid transparent',
+            marginBottom: -2,
+            fontSize: 13, fontWeight: 700,
+            color: country === '' ? 'var(--ds-purple)' : 'var(--ds-muted)',
+            whiteSpace: 'nowrap',
+            fontFamily: 'inherit',
+          }}
+        >
+          🌍 Все
+        </button>
+        {countryCodes.map(code => {
+          const active = country === code
+          const cnt = countryCounts?.[code]
+          return (
+            <button
+              key={code}
+              type="button"
+              onClick={() => { setCountry(code); setSchool(''); push({ country: code, school: '' }) }}
+              style={{
+                background: 'transparent', border: 'none', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '10px 14px',
+                borderBottom: active ? '2.5px solid var(--ds-purple)' : '2.5px solid transparent',
+                marginBottom: -2,
+                fontSize: 13, fontWeight: 700,
+                color: active ? 'var(--ds-purple)' : 'var(--ds-muted)',
+                whiteSpace: 'nowrap',
+                fontFamily: 'inherit',
+              }}
+            >
+              <span style={{ fontSize: 16 }}>{COUNTRY_FLAGS[code] || ''}</span>
+              {countryLabels[code] || code.toUpperCase()}
+              {cnt !== undefined && (
+                <span style={{
+                  background: active ? 'var(--ds-purple-soft)' : 'var(--ds-bg-alt)',
+                  border: `1px solid ${active ? 'rgba(177,94,204,.3)' : 'var(--ds-border-soft)'}`,
+                  borderRadius: 100,
+                  fontSize: 9, fontWeight: 800,
+                  padding: '1px 7px',
+                  color: active ? 'var(--ds-purple)' : 'var(--ds-muted)',
+                }}>{cnt}</span>
+              )}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Row 1 — search + school */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'minmax(260px, 1.6fr) minmax(160px, 0.8fr) minmax(200px, 1fr)',
+        gridTemplateColumns: 'minmax(260px, 1.6fr) minmax(200px, 1fr)',
         gap: 10,
       }} className="filters-row1">
         <form onSubmit={(e) => { e.preventDefault(); push({ q }) }} style={{ position: 'relative' }}>
@@ -143,23 +229,6 @@ export function UniversityFilters({ countryCodes, countryLabels, schools, initia
         </form>
 
         <select
-          value={country}
-          onChange={(e) => {
-            const c = e.target.value
-            setCountry(c); setSchool('')
-            push({ country: c, school: '' })
-          }}
-          style={inputStyle}
-        >
-          <option value="">Все страны</option>
-          {countryCodes.map(code => (
-            <option key={code} value={code}>
-              {countryLabels[code] || code.toUpperCase()}
-            </option>
-          ))}
-        </select>
-
-        <select
           value={school}
           onChange={(e) => { setSchool(e.target.value); push({ school: e.target.value }) }}
           style={inputStyle}
@@ -171,13 +240,47 @@ export function UniversityFilters({ countryCodes, countryLabels, schools, initia
         </select>
       </div>
 
-      {/* Row 2 — multi-selects + sort */}
+      {/* Row 2 — specialty / uniType / budget */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'minmax(180px, 1.2fr) minmax(140px, 0.8fr) minmax(140px, 0.8fr)',
+        gap: 10,
+      }} className="filters-row2">
+        <select
+          value={specialty}
+          onChange={(e) => { setSpecialty(e.target.value); push({ specialty: e.target.value }) }}
+          style={inputStyle}
+        >
+          <option value="">Все направления</option>
+          {(specialtyOptions || []).map(s => <option key={s} value={s}>{s}</option>)}
+        </select>
+
+        <select
+          value={uniType}
+          onChange={(e) => { setUniType(e.target.value); push({ uniType: e.target.value }) }}
+          style={inputStyle}
+        >
+          <option value="">Все типы вузов</option>
+          <option value="Государственный">Государственный</option>
+          <option value="Частный">Частный</option>
+        </select>
+
+        <select
+          value={budget}
+          onChange={(e) => { setBudget(e.target.value); push({ budget: e.target.value }) }}
+          style={inputStyle}
+        >
+          {BUDGET_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+      </div>
+
+      {/* Row 3 — multi-selects + sort */}
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'minmax(180px, 1fr) minmax(140px, 0.6fr) minmax(160px, 0.8fr) auto',
         gap: 10,
         alignItems: 'center',
-      }} className="filters-row2">
+      }} className="filters-row3">
         <CheckboxDropdown
           label="Уровень программы"
           options={LEVEL_OPTIONS.map(o => ({ value: o.value, label: o.label, group: o.group }))}

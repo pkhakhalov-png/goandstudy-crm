@@ -9,8 +9,9 @@ import { ProgramCardInteractive } from './ProgramCard'
 const PAGE_SIZE = 24
 
 const COUNTRY_LABEL: Record<string, string> = {
-  ca: 'Канада', au: 'Австралия', gb: 'Великобритания', de: 'Германия',
-  us: 'США', ie: 'Ирландия',
+  us: 'США', gb: 'Великобритания', ca: 'Канада', au: 'Австралия',
+  de: 'Германия', fr: 'Франция', it: 'Италия', es: 'Испания',
+  nl: 'Нидерланды', at: 'Австрия', ie: 'Ирландия', ae: 'ОАЭ', hu: 'Венгрия',
 }
 
 type SortKey = 'name_asc' | 'price_asc' | 'price_desc' | 'recent'
@@ -23,6 +24,9 @@ type Search = {
   intakes?: string
   sort?: string
   page?: string
+  specialty?: string
+  uniType?: string
+  budget?: string
 }
 
 export default async function UniversitiesPage({
@@ -38,6 +42,9 @@ export default async function UniversitiesPage({
   const intakeYears = (params.intakes || '').split(',').map(s => s.trim()).filter(Boolean)
   const sort = (params.sort as SortKey) || 'name_asc'
   const page = Math.max(1, parseInt(params.page || '1', 10) || 1)
+  const specialty = params.specialty?.trim() || ''
+  const uniType = params.uniType?.trim() || ''
+  const budget = params.budget?.trim() || ''
 
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -54,8 +61,10 @@ export default async function UniversitiesPage({
     .from('programs')
     .select(
       `
-      id, name, tuition, application_fee, raw_data, school_id,
-      school:schools!inner(id, name, logo_url, country_code, city, institution_type)
+      id, name, tuition, application_fee, raw_data, school_id, specialty_group, source,
+      degree_text, program_description, language_text, duration_text, start_date_text, deadline_text,
+      tuition_text, living_cost_text, living_cost_period, scholarships_text, curator_note,
+      school:schools!inner(id, name, logo_url, country_code, city, institution_type, qs_rank, university_type, curator_note)
       `,
       { count: 'exact' }
     )
@@ -70,6 +79,14 @@ export default async function UniversitiesPage({
   if (country) query = query.eq('school.country_code', country)
   if (schoolFilter) query = query.eq('school_id', Number(schoolFilter))
   if (q) query = query.ilike('name', `%${q}%`)
+  if (specialty) query = query.eq('specialty_group', specialty)
+  if (uniType) query = query.eq('school.university_type', uniType)
+  // Бюджет (по программному tuition)
+  if (budget === 'free') query = query.lt('tuition', 1000)
+  else if (budget === 'low') query = query.lt('tuition', 10000).gte('tuition', 0)
+  else if (budget === 'mid1') query = query.gte('tuition', 10000).lt('tuition', 25000)
+  else if (budget === 'mid2') query = query.gte('tuition', 25000).lt('tuition', 50000)
+  else if (budget === 'high') query = query.gte('tuition', 50000)
   // Уровень программы — через JSONB path
   if (levels.length > 0) {
     query = query.in('raw_data->attributes->>level', levels)
@@ -82,15 +99,42 @@ export default async function UniversitiesPage({
     query = query.or(orExpr)
   }
 
-  const [{ data: programs, count }, { data: schoolsList }, { data: countryRows }] = await Promise.all([
-    query,
-    parser.from('schools').select('id, name, country_code').order('name').limit(1000),
-    parser.from('schools').select('country_code').limit(2000),
-  ])
+  // Подгружаем все школы постранично (Supabase лимит 1000 на запрос) — для дропдауна вузов
+  const allSchoolsForFilters: { id: number; name: string; country_code: string | null }[] = []
+  for (let off = 0; off < 10000; off += 1000) {
+    const { data } = await parser.from('schools').select('id, name, country_code').order('name').range(off, off + 999)
+    if (!data || data.length === 0) break
+    allSchoolsForFilters.push(...(data as any[]))
+    if (data.length < 1000) break
+  }
+  const schoolsList = allSchoolsForFilters
 
-  const countryCodes = Array.from(
-    new Set((countryRows ?? []).map(r => (r.country_code || '').toLowerCase()).filter(Boolean))
-  ).sort()
+  // Считаем количество ПРОГРАММ по странам (не школ) — параллельные head-count запросы
+  const COUNTRY_CODES_FOR_COUNT = ['us', 'gb', 'ca', 'de', 'fr', 'it', 'es', 'nl', 'at', 'au', 'ie', 'ae', 'hu']
+  const countResults = await Promise.all(
+    COUNTRY_CODES_FOR_COUNT.map(c =>
+      parser.from('programs')
+        .select('id, school:schools!inner(country_code)', { count: 'exact', head: true })
+        .eq('school.country_code', c)
+        .then(r => ({ code: c, count: r.count || 0 }))
+    )
+  )
+  const countryCounts: Record<string, number> = {}
+  for (const r of countResults) countryCounts[r.code] = r.count
+
+  const { data: programs, count } = await query
+  // Список стран — сначала те что в нашем COUNTRY_LABEL (известный порядок), потом остальные
+  const known = Object.keys(COUNTRY_LABEL).filter(c => countryCounts[c])
+  const others = Object.keys(countryCounts).filter(c => !COUNTRY_LABEL[c]).sort()
+  const countryCodes = [...known, ...others]
+
+  // Специальности (из импортированных через GitHub + классификации)
+  const SPECIALTY_OPTIONS = [
+    'Бизнес и управление', 'IT и технологии', 'Экономика и финансы', 'Инженерия',
+    'Медицина и здоровье', 'Право', 'Дизайн и искусство', 'Гуманитарные науки',
+    'Естественные науки', 'Социальные науки', 'Образование', 'Медиа и коммуникации',
+    'Туризм и гостиничный', 'Архитектура', 'Языковые курсы', 'Другое',
+  ]
 
   // Клиенты куратора — для кнопки «+ В подборку»
   const admin = await createAdminClient()
@@ -140,8 +184,10 @@ export default async function UniversitiesPage({
           <UniversityFilters
             countryCodes={countryCodes}
             countryLabels={COUNTRY_LABEL}
+            countryCounts={countryCounts}
             schools={schoolsList ?? []}
-            initial={{ q, country, school: schoolFilter, levels, intakeYears, sort }}
+            specialtyOptions={SPECIALTY_OPTIONS}
+            initial={{ q, country, school: schoolFilter, levels, intakeYears, sort, specialty, uniType, budget }}
           />
 
           {(programs ?? []).length === 0 ? (
@@ -176,6 +222,9 @@ export default async function UniversitiesPage({
                   levels={levels}
                   intakeYears={intakeYears}
                   sort={sort}
+                  specialty={specialty}
+                  uniType={uniType}
+                  budget={budget}
                 />
               )}
             </>
@@ -187,11 +236,12 @@ export default async function UniversitiesPage({
 }
 
 function Pagination({
-  currentPage, totalPages, q, country, school, levels, intakeYears, sort,
+  currentPage, totalPages, q, country, school, levels, intakeYears, sort, specialty, uniType, budget,
 }: {
   currentPage: number; totalPages: number;
   q: string; country: string; school: string;
-  levels: string[]; intakeYears: string[]; sort: string
+  levels: string[]; intakeYears: string[]; sort: string;
+  specialty: string; uniType: string; budget: string;
 }) {
   function href(p: number) {
     const qs = new URLSearchParams()
@@ -201,6 +251,9 @@ function Pagination({
     if (levels.length > 0) qs.set('levels', levels.join(','))
     if (intakeYears.length > 0) qs.set('intakes', intakeYears.join(','))
     if (sort && sort !== 'name_asc') qs.set('sort', sort)
+    if (specialty) qs.set('specialty', specialty)
+    if (uniType) qs.set('uniType', uniType)
+    if (budget) qs.set('budget', budget)
     if (p > 1) qs.set('page', String(p))
     const s = qs.toString()
     return s ? `/curator/universities?${s}` : '/curator/universities'

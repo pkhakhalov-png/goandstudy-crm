@@ -85,8 +85,10 @@ export default async function ProgramPage({
   const countryLabel = COUNTRY_LABEL[(school.country_code || '').toLowerCase()]
     || (school.country_code || '').toUpperCase()
 
-  const levelText = attr.level_text || program.program_level_text
+  const isCurator = program.source === 'curator_gh'
+  const levelText = program.degree_text || attr.level_text || program.program_level_text
   const tuition = program.tuition
+  const tuitionText = program.tuition_text
   const currency = attr.currency_of_fees?.code || attr.currency?.code
     || schoolRaw.currency_of_fees?.code || program.currency || ''
   const appFee = program.application_fee ?? attr.application_fee
@@ -94,11 +96,14 @@ export default async function ProgramPage({
   const deadline = attr.earliest_intake?.submission_deadline
   const coopLen = attr.coop_length
   const delivery = attr.delivery_method
-  const language = attr.language_of_instruction || program.language
-  const description = attr.description
-    ? attr.description.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim()
-    : ''
+  const language = program.language_text || attr.language_of_instruction || program.language
+  const description = program.program_description
+    || (attr.description
+      ? attr.description.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim()
+      : '')
   const otherFees: string[] = Array.isArray(attr.other_fees) ? attr.other_fees : []
+  // Куратор-данные: считаем что они есть если программа из curator_gh
+  const hasCuratorBdData = isCurator || program.curator_note || program.scholarships_text || (program.entry_requirements?.length || 0) > 0
 
   function fmt(v: any) {
     if (v == null || v === '') return '—'
@@ -256,7 +261,7 @@ export default async function ProgramPage({
             </div>
           </div>
 
-          {!curatorData && !asClient && (
+          {!curatorData && !hasCuratorBdData && !asClient && (
             <div style={{
               ...cardStyle, textAlign: 'center', padding: 24, marginBottom: 16,
               background: 'rgba(177,94,204,.04)', border: '1px dashed rgba(177,94,204,.3)',
@@ -278,8 +283,42 @@ export default async function ProgramPage({
               }
             `}</style>
 
-            {/* LEFT — описание / admission / pgwp */}
+            {/* LEFT — куратор-блоки + описание + admission + pgwp */}
             <div style={{ display: 'grid', gap: 12 }}>
+              {/* BD-куратор-блоки сверху слева (если есть) */}
+              {isCurator && program.curator_note && (
+                <div style={{ ...cardStyle, borderLeft: '4px solid var(--purple, #B15ECC)' }}>
+                  <div style={sectionTitle}>Заметка куратора</div>
+                  <div style={{ fontSize: 14, lineHeight: 1.6, color: 'var(--text)', whiteSpace: 'pre-wrap' }}>
+                    {program.curator_note}
+                  </div>
+                </div>
+              )}
+              {(program.entry_requirements?.length || 0) > 0 && (
+                <div style={cardStyle}>
+                  <div style={sectionTitle}>Требования к поступлению</div>
+                  <ul style={{ margin: 0, padding: '0 0 0 18px', fontSize: 13, lineHeight: 1.6, color: 'var(--text)' }}>
+                    {program.entry_requirements.map((r: string, i: number) => <li key={i}>{r}</li>)}
+                  </ul>
+                </div>
+              )}
+              {(program.accommodation_options?.length || 0) > 0 && (
+                <div style={cardStyle}>
+                  <div style={sectionTitle}>Варианты проживания</div>
+                  <ul style={{ margin: 0, padding: '0 0 0 18px', fontSize: 13, lineHeight: 1.6, color: 'var(--text)' }}>
+                    {program.accommodation_options.map((r: string, i: number) => <li key={i}>{r}</li>)}
+                  </ul>
+                </div>
+              )}
+              {program.scholarships_text && (
+                <div style={cardStyle}>
+                  <div style={sectionTitle}>Гранты и стипендии</div>
+                  <div style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--text)' }}>
+                    {program.scholarships_text}
+                  </div>
+                </div>
+              )}
+
               {description && (
                 <div style={cardStyle}>
                   <div style={sectionTitle}>Описание программы</div>
@@ -299,12 +338,14 @@ export default async function ProgramPage({
             <div style={{ display: 'grid', gap: 12, alignContent: 'start' }}>
               <SummaryBig
                 levelText={levelText}
-                lengthText={curatorData?.program_length_text || length}
-                intakeText={curatorData?.earliest_intake_label || (intake ? fmtDate(intake) : null)}
-                deadlineText={curatorData?.deadline_label || (deadline ? fmtDate(deadline) : null)}
+                lengthText={curatorData?.program_length_text || program.duration_text || length}
+                intakeText={curatorData?.earliest_intake_label || program.start_date_text || (intake ? fmtDate(intake) : null)}
+                deadlineText={curatorData?.deadline_label || program.deadline_text || (deadline ? fmtDate(deadline) : null)}
                 costOfLiving={curatorData?.cost_of_living_label
+                  || (program.living_cost_text ? `${program.living_cost_text}${program.living_cost_period ? ' ' + program.living_cost_period : ''}` : null)
                   || (school.cost_of_living != null ? `${fmt(school.cost_of_living)} ${currency} / год` : null)}
                 grossTuition={curatorData?.gross_tuition_label
+                  || tuitionText
                   || (tuition != null ? `${fmt(tuition)} ${currency} / год` : null)}
                 applicationFee={curatorData?.application_fee_label
                   || (appFee != null ? `${fmt(appFee)} ${currency}` : null)}

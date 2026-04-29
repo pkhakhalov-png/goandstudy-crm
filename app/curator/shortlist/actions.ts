@@ -45,13 +45,14 @@ export async function addToShortlist(params: {
   const parser = createParserClient()
   const [{ data: school }, { data: program }] = await Promise.all([
     parser.from('schools').select('id, name, country_code, city').eq('id', params.schoolId).maybeSingle(),
-    parser.from('programs').select('id, name, tuition, application_fee, raw_data').eq('id', params.programId).maybeSingle(),
+    parser.from('programs').select('id, name, tuition, application_fee, raw_data, source, specialty_group, language_text, start_date_text, deadline_text, tuition_text, curator_note').eq('id', params.programId).maybeSingle(),
   ])
   if (!school || !program) throw new Error('Вуз или программа не найдены в базе парсера')
 
   const attrs = (program.raw_data as any)?.attributes || {}
   const currency = attrs.currency_of_fees?.code ?? attrs.currency?.code ?? null
-  const language = attrs.language?.name || attrs.language_of_instruction || null
+  // Для BD-программ — куратор-поля как фоллбэк
+  const language = attrs.language?.name || attrs.language_of_instruction || program.language_text || null
   const intake = attrs.earliest_intake?.start_date || null
   const countryCode = (school.country_code || '').toLowerCase()
   const countryLabel = COUNTRY_LABEL[countryCode] || (school.country_code || '').toUpperCase()

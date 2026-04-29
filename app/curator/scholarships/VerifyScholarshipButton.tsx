@@ -67,9 +67,15 @@ export function VerifyScholarshipButton({ id, kind }: Props) {
           cursor: pending ? 'wait' : 'pointer',
           fontFamily: 'inherit',
           whiteSpace: 'nowrap',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 5,
         }}
       >
-        {pending ? '⏳ Проверяем...' : '🤖 Перепроверить'}
+        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8" />
+        </svg>
+        {pending ? `Проверяем…` : 'Перепроверить'}
       </button>
       {toast && (
         <div
