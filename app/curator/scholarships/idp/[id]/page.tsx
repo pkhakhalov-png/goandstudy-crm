@@ -5,6 +5,7 @@ import { createScholarshipsClient, type IdpScholarship } from '@/lib/supabase/sc
 import { CuratorSidebar } from '../../../CuratorSidebar'
 import { AddScholarshipButton } from '../../AddScholarshipButton'
 import { ScholarshipLogo } from '../../ScholarshipLogo'
+import { FillIdpScholarshipButton } from './FillIdpScholarshipButton'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,6 +29,15 @@ const COUNTRY_LABEL: Record<string, string> = {
 
 type IdpRow = IdpScholarship & {
   school?: { id: number; name: string; logo_url: string | null; website: string | null } | null
+}
+
+type CuratorExtras = {
+  gpa_requirement?: string
+  language_requirement?: string
+  renewable?: boolean
+  application_process?: string
+  official_url?: string
+  filled_at?: string
 }
 
 export default async function IdpScholarshipDetailPage({
@@ -90,6 +100,9 @@ export default async function IdpScholarshipDetailPage({
     : row.value_text
   const institution = row.school?.name || row.university_name || '—'
   const countryLabel = row.country_code ? COUNTRY_LABEL[row.country_code.toLowerCase()] : null
+  const extras: CuratorExtras = ((row.raw_data as any)?.curator_extras as CuratorExtras) || {}
+  const isAsClient = asClient
+  const hasFilledData = !!(row.description || row.eligibility || extras.gpa_requirement || extras.application_process)
 
   return (
     <div className="app">
@@ -151,11 +164,17 @@ export default async function IdpScholarshipDetailPage({
             </div>
 
             <div style={{ marginTop: 16, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-              {!asClient && <AddScholarshipButton scholarshipId={row.id} myClients={myClients ?? []} kind="idp" />}
+              {!isAsClient && <AddScholarshipButton scholarshipId={row.id} myClients={myClients ?? []} kind="idp" />}
+              {!isAsClient && <FillIdpScholarshipButton id={row.id} hasData={hasFilledData} />}
               <a href={row.idp_url} target="_blank" rel="noopener" className="btn-s" style={{ fontSize: 12, textDecoration: 'none' }}>
                 View on IDP →
               </a>
-              {row.school?.website && (
+              {extras.official_url && (
+                <a href={extras.official_url} target="_blank" rel="noopener" className="btn-s" style={{ fontSize: 12, textDecoration: 'none' }}>
+                  Страница вуза →
+                </a>
+              )}
+              {row.school?.website && !extras.official_url && (
                 <a href={row.school.website} target="_blank" rel="noopener" className="btn-s" style={{ fontSize: 12, textDecoration: 'none' }}>
                   Сайт вуза →
                 </a>
@@ -175,23 +194,26 @@ export default async function IdpScholarshipDetailPage({
               {row.description ? (
                 <div style={cardStyle}>
                   <div style={sectionTitle}>Описание</div>
-                  <div style={{ fontSize: 13, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{row.description}</div>
+                  <MarkdownDescription text={row.description} />
                 </div>
               ) : (
                 <div style={cardStyle}>
                   <div style={sectionTitle}>Описание</div>
                   <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.5 }}>
-                    IDP не отдаёт описание на листинге — детальный текст на странице стипендии.{' '}
-                    <a href={row.idp_url} target="_blank" rel="noopener" style={{ color: 'var(--purple)' }}>
-                      Открыть на IDP →
-                    </a>
+                    IDP не отдаёт описание на листинге. Нажми «Дополнить через ИИ» в шапке — агент сходит на сайт вуза и подтянет полезную сводку (для кого, что покрывает, как подать, требования).
                   </div>
                 </div>
               )}
               {row.eligibility && (
                 <div style={cardStyle}>
-                  <div style={sectionTitle}>Условия</div>
-                  <div style={{ fontSize: 13, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{row.eligibility}</div>
+                  <div style={sectionTitle}>Условия отбора</div>
+                  <MarkdownDescription text={row.eligibility} />
+                </div>
+              )}
+              {extras.application_process && (
+                <div style={cardStyle}>
+                  <div style={sectionTitle}>Как подать</div>
+                  <div style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--text)' }}>{extras.application_process}</div>
                 </div>
               )}
             </div>
@@ -220,6 +242,33 @@ export default async function IdpScholarshipDetailPage({
                   </div>
                 )}
               </div>
+              {(extras.gpa_requirement || extras.language_requirement || extras.renewable !== undefined) && (
+                <div style={cardStyle}>
+                  <div style={sectionTitle}>Требования</div>
+                  <div style={{ display: 'grid', gap: 10, fontSize: 13 }}>
+                    {extras.gpa_requirement && (
+                      <div>
+                        <div style={{ fontSize: 11, color: 'var(--muted)' }}>GPA</div>
+                        <div style={{ fontWeight: 600, marginTop: 2 }}>{extras.gpa_requirement}</div>
+                      </div>
+                    )}
+                    {extras.language_requirement && (
+                      <div>
+                        <div style={{ fontSize: 11, color: 'var(--muted)' }}>Язык</div>
+                        <div style={{ fontWeight: 600, marginTop: 2 }}>{extras.language_requirement}</div>
+                      </div>
+                    )}
+                    {extras.renewable !== undefined && (
+                      <div>
+                        <div style={{ fontSize: 11, color: 'var(--muted)' }}>Продление</div>
+                        <div style={{ fontWeight: 600, marginTop: 2, color: extras.renewable ? 'var(--green)' : 'var(--text)' }}>
+                          {extras.renewable ? '✓ Продлевается' : 'Только на 1 год'}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
               {row.school?.id && (
                 <div style={cardStyle}>
                   <div style={sectionTitle}>Вуз</div>
@@ -235,6 +284,11 @@ export default async function IdpScholarshipDetailPage({
                 <div style={sectionTitle}>Источник</div>
                 <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.5 }}>
                   IDP Connect — официальный международный агрегатор студентов. Данные обновляются раз в 2-3 месяца.
+                  {extras.filled_at && (
+                    <div style={{ marginTop: 6, fontStyle: 'italic' }}>
+                      Дополнено ИИ: {new Date(extras.filled_at).toLocaleDateString('ru', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -244,3 +298,46 @@ export default async function IdpScholarshipDetailPage({
     </div>
   )
 }
+
+function MarkdownDescription({ text }: { text: string }) {
+  // Парсим: ## Заголовок — h3, - bullet — li, остальное — параграф
+  const lines = text.split(/\r?\n/)
+  const blocks: { type: 'heading' | 'paragraph' | 'list'; content: string | string[] }[] = []
+  let buf: string[] = []
+  let bullets: string[] = []
+  const flushPara = () => { if (buf.length) { blocks.push({ type: 'paragraph', content: buf.join(' ').trim() }); buf = [] } }
+  const flushList = () => { if (bullets.length) { blocks.push({ type: 'list', content: [...bullets] }); bullets = [] } }
+  for (const raw of lines) {
+    const line = raw.trim()
+    if (!line) { flushPara(); flushList(); continue }
+    const h = /^#{1,3}\s+(.+)$/.exec(line)
+    if (h) { flushPara(); flushList(); blocks.push({ type: 'heading', content: h[1].trim() }); continue }
+    const b = /^[-•]\s+(.+)$/.exec(line)
+    if (b) { flushPara(); bullets.push(b[1].trim()); continue }
+    flushList(); buf.push(line)
+  }
+  flushPara(); flushList()
+
+  return (
+    <div style={{ display: 'grid', gap: 10, color: 'var(--text)' }}>
+      {blocks.map((b, i) => {
+        if (b.type === 'heading') return (
+          <div key={i} style={{ fontSize: 13, fontWeight: 700, color: 'var(--purple)', marginTop: i === 0 ? 0 : 6 }}>
+            {b.content as string}
+          </div>
+        )
+        if (b.type === 'list') return (
+          <ul key={i} style={{ margin: 0, paddingLeft: 18, fontSize: 13, lineHeight: 1.6, color: 'var(--text)' }}>
+            {(b.content as string[]).map((it, j) => <li key={j} style={{ marginBottom: 4 }}>{it}</li>)}
+          </ul>
+        )
+        return (
+          <div key={i} style={{ fontSize: 13, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+            {b.content as string}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
