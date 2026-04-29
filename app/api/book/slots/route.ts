@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
-import { mskTodayStr, mskTimeStr, mskAddDays, mskDayOfWeek } from '@/lib/time'
+import { mskTodayStr, mskTimeStr, mskAddDays, mskDayOfWeek, timeToMinutes, MIN_GAP_MINUTES } from '@/lib/time'
 
 export async function GET() {
   const supabase = await createAdminClient()
@@ -37,10 +37,22 @@ export async function GET() {
 
     const times: string[] = []
 
+    // Брони этого дня по продажникам (минуты от полуночи)
+    const dayBookings = (existingBookings ?? []).filter(b => b.booking_date === dateStr)
+    const bookedTimesByUser = new Map<string, number[]>()
+    for (const b of dayBookings) {
+      const arr = bookedTimesByUser.get(b.salesperson_id) || []
+      arr.push(timeToMinutes(b.start_time))
+      bookedTimesByUser.set(b.salesperson_id, arr)
+    }
+
     timeMap.forEach((userIds, time) => {
       if (dateStr === todayStr && time <= nowTime) return
-      const booked = (existingBookings ?? []).filter(b => b.booking_date === dateStr && b.start_time.slice(0, 5) === time)
-      const freeCount = userIds.filter(id => !new Set(booked.map(b => b.salesperson_id)).has(id)).length
+      const tMin = timeToMinutes(time)
+      const freeCount = userIds.filter(id => {
+        const taken = bookedTimesByUser.get(id) || []
+        return !taken.some(b => Math.abs(b - tMin) < MIN_GAP_MINUTES)
+      }).length
       if (freeCount > 0) times.push(time)
     })
 

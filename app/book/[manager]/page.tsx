@@ -1,7 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import { BookingClient } from '../BookingClient'
-import { mskTodayStr, mskTimeStr, mskAddDays, mskDayOfWeek } from '@/lib/time'
+import { mskTodayStr, mskTimeStr, mskAddDays, mskDayOfWeek, timeToMinutes, MIN_GAP_MINUTES } from '@/lib/time'
 
 export const dynamic = 'force-dynamic'
 
@@ -46,12 +46,15 @@ export default async function ManagerBookPage({ params }: { params: Promise<{ ma
 
     const daySlots = (allSlots ?? []).filter(s => s.day_of_week === dayOfWeek)
 
+    const userBookedMinutes = (existingBookings ?? [])
+      .filter(b => b.booking_date === dateStr)
+      .map(b => timeToMinutes(b.start_time))
+
     daySlots.forEach(s => {
       const time = s.start_time.slice(0, 5)
-      const isBooked = (existingBookings ?? []).some(
-        b => b.booking_date === dateStr && b.start_time.slice(0, 5) === time
-      )
-      if (!isBooked) {
+      const tMin = timeToMinutes(time)
+      const conflict = userBookedMinutes.some(b => Math.abs(b - tMin) < MIN_GAP_MINUTES)
+      if (!conflict) {
         const [h, m] = time.split(':').map(Number)
         const endTotal = h * 60 + m + 30
         const endTime = `${String(Math.floor(endTotal / 60)).padStart(2, '0')}:${String(endTotal % 60).padStart(2, '0')}`

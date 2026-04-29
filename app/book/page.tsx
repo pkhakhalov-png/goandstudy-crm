@@ -1,6 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { BookingClient } from './BookingClient'
-import { mskTodayStr, mskTimeStr, mskAddDays, mskDayOfWeek } from '@/lib/time'
+import { mskTodayStr, mskTimeStr, mskAddDays, mskDayOfWeek, timeToMinutes, MIN_GAP_MINUTES } from '@/lib/time'
 
 export const dynamic = 'force-dynamic'
 
@@ -53,19 +53,29 @@ export default async function BookPage() {
       timeMap.get(time)!.push(s.user_id)
     })
 
+    // Брони этого дня — сгруппируем по продажнику
+    const dayBookings = (existingBookings ?? []).filter(b => b.booking_date === dateStr)
+    const bookedTimesByUser = new Map<string, number[]>()
+    for (const b of dayBookings) {
+      const arr = bookedTimesByUser.get(b.salesperson_id) || []
+      arr.push(timeToMinutes(b.start_time))
+      bookedTimesByUser.set(b.salesperson_id, arr)
+    }
+
     // For each time, count how many salespersons are free
     timeMap.forEach((userIds, time) => {
-      const booked = (existingBookings ?? []).filter(
-        b => b.booking_date === dateStr && b.start_time.slice(0, 5) === time
-      )
-      const bookedIds = new Set(booked.map(b => b.salesperson_id))
-      const freeCount = userIds.filter(id => !bookedIds.has(id)).length
+      const tMin = timeToMinutes(time)
+      const freeIds = userIds.filter(id => {
+        const taken = bookedTimesByUser.get(id) || []
+        // блок если есть бронь в пределах ±60 минут (включая то же время)
+        return !taken.some(b => Math.abs(b - tMin) < MIN_GAP_MINUTES)
+      })
 
-      if (freeCount > 0) {
+      if (freeIds.length > 0) {
         const [h, m] = time.split(':').map(Number)
         const endTotal = h * 60 + m + 30
         const endTime = `${String(Math.floor(endTotal / 60)).padStart(2, '0')}:${String(endTotal % 60).padStart(2, '0')}`
-        availableSlots.push({ date: dateStr, start_time: time, end_time: endTime, count: freeCount })
+        availableSlots.push({ date: dateStr, start_time: time, end_time: endTime, count: freeIds.length })
       }
     })
   }

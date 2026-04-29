@@ -53,3 +53,12 @@ export function mskDayOfWeek(dateStr: string): number {
   // d.getUTCDay() даёт 0=Sun..6=Sat; конвертим в 0=Mon..6=Sun
   return (d.getUTCDay() + 6) % 7
 }
+
+/** "HH:MM" → минуты от полуночи. */
+export function timeToMinutes(hhmm: string): number {
+  const [h, m] = hhmm.slice(0, 5).split(':').map(Number)
+  return (h || 0) * 60 + (m || 0)
+}
+
+/** Минимальный зазор между консультациями одного продажника (в минутах). */
+export const MIN_GAP_MINUTES = 60

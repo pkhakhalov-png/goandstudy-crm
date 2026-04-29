@@ -2,6 +2,7 @@
 
 import { createAdminClient } from '@/lib/supabase/server'
 import { normalizePhone } from '@/lib/phone'
+import { timeToMinutes, MIN_GAP_MINUTES } from '@/lib/time'
 
 export async function createBooking(formData: FormData) {
   const supabase = await createAdminClient()
@@ -65,22 +66,8 @@ export async function createBooking(formData: FormData) {
 
   const activeIds = activeUsers.map(u => u.id)
 
-  // 3. Filter out those who already have a booking at this date+time
-  const { data: existingBookings } = await supabase
-    .from('bookings')
-    .select('salesperson_id')
-    .eq('booking_date', date)
-    .in('salesperson_id', activeIds)
-    .neq('status', 'cancelled')
-
-  // Compare times in JS to avoid format issues
-  const bookedIds = new Set(
-    (existingBookings ?? [])
-      .filter(b => (b as any).start_time?.slice(0, 5) === startTime.slice(0, 5))
-      .map(b => b.salesperson_id)
-  )
-
-  // Wait, we need start_time in the bookings query too
+  // 3. Все брони продажников этого дня — отсекаем тех, у кого занят слот
+  //    или есть бронь в пределах ±60 минут (минимальный зазор между консультациями).
   const { data: exactBookings } = await supabase
     .from('bookings')
     .select('salesperson_id, start_time')
@@ -88,15 +75,16 @@ export async function createBooking(formData: FormData) {
     .in('salesperson_id', activeIds)
     .neq('status', 'cancelled')
 
-  const exactBookedIds = new Set(
+  const wantedMin = timeToMinutes(startTime)
+  const conflictIds = new Set(
     (exactBookings ?? [])
-      .filter(b => b.start_time.slice(0, 5) === startTime.slice(0, 5))
+      .filter(b => Math.abs(timeToMinutes(b.start_time) - wantedMin) < MIN_GAP_MINUTES)
       .map(b => b.salesperson_id)
   )
 
-  const freeIds = activeIds.filter(id => !exactBookedIds.has(id))
+  const freeIds = activeIds.filter(id => !conflictIds.has(id))
 
-  console.log('[BOOK] active:', activeIds.length, 'booked:', exactBookedIds.size, 'free:', freeIds.length)
+  console.log('[BOOK] active:', activeIds.length, 'conflict:', conflictIds.size, 'free:', freeIds.length)
 
   if (freeIds.length === 0) {
     return { error: 'Все менеджеры заняты на это время, выберите другое' }
