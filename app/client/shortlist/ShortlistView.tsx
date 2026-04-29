@@ -525,31 +525,6 @@ function UniInfo({ uni, clientId }: { uni: University; clientId?: number }) {
           lineHeight: 1.22,
         }}
       >
-        {schoolHref ? (
-          <Link
-            href={schoolHref}
-            style={{ textDecoration: 'none', color: 'inherit' }}
-            className="ds-link-hover"
-            onClick={(e) => e.stopPropagation()}
-            onMouseDown={(e) => e.stopPropagation()}
-          >
-            {uni.name}
-          </Link>
-        ) : uni.name}
-      </h4>
-      <div style={{ fontSize: 12, color: 'var(--ds-muted)', marginBottom: 8 }}>
-        {uni.city} · {uni.country}
-      </div>
-      <div
-        style={{
-          fontSize: 11,
-          fontWeight: 700,
-          color: 'var(--ds-ink)',
-          textTransform: 'uppercase',
-          letterSpacing: '0.08em',
-          marginBottom: 8,
-        }}
-      >
         {programHref ? (
           <Link
             href={programHref}
@@ -561,6 +536,19 @@ function UniInfo({ uni, clientId }: { uni: University; clientId?: number }) {
             {uni.program}
           </Link>
         ) : uni.program}
+      </h4>
+      <div style={{ fontSize: 12, color: 'var(--ds-muted)', marginBottom: 8 }}>
+        {schoolHref ? (
+          <Link
+            href={schoolHref}
+            style={{ textDecoration: 'none', color: 'inherit' }}
+            className="ds-link-hover"
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            {uni.name}
+          </Link>
+        ) : uni.name} · {uni.city} · {uni.country}
       </div>
       {uni.tuition && (
         <div style={{ fontSize: 12, color: 'var(--ds-ink-dim)', marginBottom: 8 }}>

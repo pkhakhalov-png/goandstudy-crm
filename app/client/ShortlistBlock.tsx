@@ -245,30 +245,18 @@ function UniCard({ uni, rank, clientId }: { uni: University; rank: number; clien
             lineHeight: 1.2,
           }}
         >
-          {schoolHref ? (
-            <Link href={schoolHref} style={{ textDecoration: 'none', color: 'inherit' }} className="ds-link-hover">
-              {uni.name}
-            </Link>
-          ) : uni.name}
-        </h4>
-        <div style={{ fontSize: 12, color: 'var(--ds-muted)', marginBottom: 10 }}>
-          {uni.city} · {uni.country}
-        </div>
-        <div
-          style={{
-            fontSize: 11,
-            fontWeight: 700,
-            color: 'var(--ds-ink)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.08em',
-            marginBottom: 8,
-          }}
-        >
           {uni.programId ? (
             <Link href={programHref} style={{ textDecoration: 'none', color: 'inherit' }} className="ds-link-hover">
               {uni.program}
             </Link>
           ) : uni.program}
+        </h4>
+        <div style={{ fontSize: 12, color: 'var(--ds-muted)', marginBottom: 10 }}>
+          {schoolHref ? (
+            <Link href={schoolHref} style={{ textDecoration: 'none', color: 'inherit' }} className="ds-link-hover">
+              {uni.name}
+            </Link>
+          ) : uni.name} · {uni.city} · {uni.country}
         </div>
         <p style={{ fontSize: 13, color: 'var(--ds-ink-dim)', lineHeight: 1.45, margin: 0, letterSpacing: '-0.005em' }}>
           {uni.reason}

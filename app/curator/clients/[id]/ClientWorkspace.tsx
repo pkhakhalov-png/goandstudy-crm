@@ -1288,17 +1288,18 @@ function UniversityRow({
     if (enrichment.conditional_offer_available) aiFacts.push('Conditional')
   }
 
-  const schoolName = schoolHref ? (
+  const programLabel = uni.program_name || 'Программа'
+  const programTitle = programHref ? (
+    <Link href={programHref} style={{ color: 'inherit', textDecoration: 'none' }} className="ds-link-hover">
+      {programLabel}
+    </Link>
+  ) : programLabel
+
+  const schoolSubtitle = schoolHref ? (
     <Link href={schoolHref} style={{ color: 'inherit', textDecoration: 'none' }} className="ds-link-hover">
       {uni.university_name}
     </Link>
   ) : uni.university_name
-
-  const programName = programHref ? (
-    <Link href={programHref} style={{ color: 'inherit', textDecoration: 'none' }} className="ds-link-hover">
-      {uni.program_name}
-    </Link>
-  ) : (uni.program_name || 'Программа')
 
   return (
     <div
@@ -1317,10 +1318,10 @@ function UniversityRow({
 
       <div style={{ minWidth: 0 }}>
         <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ds-ink)', letterSpacing: '-0.01em' }}>
-          {schoolName}
+          {programTitle}
         </div>
         <div style={{ fontSize: 12, color: 'var(--ds-muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {programName}{[uni.country, uni.city].filter(Boolean).length > 0 ? ' · ' : ''}{[uni.country, uni.city].filter(Boolean).join(' · ')}
+          {schoolSubtitle}{[uni.country, uni.city].filter(Boolean).length > 0 ? ' · ' : ''}{[uni.country, uni.city].filter(Boolean).join(' · ')}
         </div>
         {aiFacts.length > 0 && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
