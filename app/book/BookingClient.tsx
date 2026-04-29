@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { createBooking, createLowBudgetDeal } from './actions'
+import { mskTodayStr } from '@/lib/time'
 
 const MONTHS = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь']
 const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
@@ -61,7 +62,7 @@ export function BookingClient({ availableSlots, managerId, managerName }: Props)
 
   const datesWithSlots = new Set(availableSlots.map(s => s.date))
   const dateSlots = selectedDate ? availableSlots.filter(s => s.date === selectedDate).sort((a, b) => a.start_time.localeCompare(b.start_time)) : []
-  const todayStr = now.toISOString().split('T')[0]
+  const todayStr = mskTodayStr(now)
 
   const firstDay = new Date(viewYear, viewMonth, 1)
   const lastDay = new Date(viewYear, viewMonth + 1, 0)

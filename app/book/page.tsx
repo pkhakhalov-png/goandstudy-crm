@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { BookingClient } from './BookingClient'
+import { mskTodayStr, mskTimeStr, mskAddDays, mskDayOfWeek } from '@/lib/time'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,12 +13,9 @@ export default async function BookPage() {
     .select('user_id, day_of_week, start_time, end_time')
     .eq('is_active', true)
 
-  // Get existing bookings for the next 30 days
-  const today = new Date()
-  const todayStr = today.toISOString().split('T')[0]
-  const futureDate = new Date(today)
-  futureDate.setDate(futureDate.getDate() + 30)
-  const futureStr = futureDate.toISOString().split('T')[0]
+  // Get existing bookings for the next 30 days (по МСК)
+  const todayStr = mskTodayStr()
+  const futureStr = mskAddDays(30)
 
   const { data: existingBookings } = await supabase
     .from('bookings')
@@ -39,10 +37,8 @@ export default async function BookPage() {
   const availableSlots: { date: string; start_time: string; end_time: string; count: number }[] = []
 
   for (let d = 0; d < 30; d++) {
-    const date = new Date(today)
-    date.setDate(today.getDate() + d)
-    const dateStr = date.toISOString().split('T')[0]
-    const dayOfWeek = (date.getDay() + 6) % 7 // Mon=0
+    const dateStr = mskAddDays(d)
+    const dayOfWeek = mskDayOfWeek(dateStr)
 
     // Find all slots for this day of week from active salespersons
     const daySlots = (allSlots ?? []).filter(
@@ -74,8 +70,8 @@ export default async function BookPage() {
     })
   }
 
-  // Skip today's slots that are already in the past
-  const nowTime = `${String(today.getHours()).padStart(2, '0')}:${String(today.getMinutes()).padStart(2, '0')}`
+  // Skip today's slots that are already in the past (по МСК)
+  const nowTime = mskTimeStr()
   const filtered = availableSlots.filter(s => {
     if (s.date === todayStr && s.start_time <= nowTime) return false
     return true

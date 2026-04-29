@@ -1,14 +1,12 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { mskTodayStr, mskTimeStr, mskAddDays, mskDayOfWeek } from '@/lib/time'
 
 export async function GET() {
   const supabase = await createAdminClient()
 
-  const today = new Date()
-  const todayStr = today.toISOString().split('T')[0]
-  const futureDate = new Date(today)
-  futureDate.setDate(futureDate.getDate() + 30)
-  const futureStr = futureDate.toISOString().split('T')[0]
+  const todayStr = mskTodayStr()
+  const futureStr = mskAddDays(30)
 
   const [
     { data: allSlots },
@@ -23,11 +21,11 @@ export async function GET() {
   const activeIds = new Set(activeSalespersons?.map(u => u.id) ?? [])
   const result: Record<string, string[]> = {}
 
+  const nowTime = mskTimeStr()
+
   for (let d = 0; d < 30; d++) {
-    const date = new Date(today)
-    date.setDate(today.getDate() + d)
-    const dateStr = date.toISOString().split('T')[0]
-    const dayOfWeek = (date.getDay() + 6) % 7
+    const dateStr = mskAddDays(d)
+    const dayOfWeek = mskDayOfWeek(dateStr)
 
     const daySlots = (allSlots ?? []).filter(s => s.day_of_week === dayOfWeek && activeIds.has(s.user_id))
     const timeMap = new Map<string, string[]>()
@@ -38,7 +36,6 @@ export async function GET() {
     })
 
     const times: string[] = []
-    const nowTime = `${String(today.getHours()).padStart(2, '0')}:${String(today.getMinutes()).padStart(2, '0')}`
 
     timeMap.forEach((userIds, time) => {
       if (dateStr === todayStr && time <= nowTime) return

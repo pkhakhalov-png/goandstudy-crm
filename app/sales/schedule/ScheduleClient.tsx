@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { saveWeekSlots, updateBookingStatus } from './actions'
+import { mskTodayStr, mskTimeStr } from '@/lib/time'
 
 const DAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
 const HOURS_START = 9
@@ -131,9 +132,9 @@ export function ScheduleClient({ slots: initialSlots, bookings, allStats, userId
 
   const [bookingTab, setBookingTab] = useState<'upcoming' | 'today' | 'archive'>('upcoming')
 
-  // Categorize bookings
-  const today = new Date().toISOString().split('T')[0]
-  const nowTime = `${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}`
+  // Categorize bookings (по МСК — все booking_date/start_time из БД интерпретируются как МСК)
+  const today = mskTodayStr()
+  const nowTime = mskTimeStr()
 
   // Today: all bookings for today (including cancelled — they "burn")
   const todayBookings = bookings.filter(b => b.booking_date === today)
