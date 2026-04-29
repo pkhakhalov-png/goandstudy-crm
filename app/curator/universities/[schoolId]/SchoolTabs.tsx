@@ -85,7 +85,9 @@ export function SchoolTabs({ school, programs, myClients, asClient, clientId }: 
 /* ─── Overview ─── */
 
 function OverviewTab({ school, raw }: { school: any; raw: any }) {
-  const about = school.about || raw.about || school.description
+  // AI saves long-form into `description`; ApplyBoard imports use `about`/`raw.about`
+  const aiDescription: string | null = school.description || null
+  const about = school.about || raw.about
   const topDisc = Array.isArray(school.top_disciplines) ? school.top_disciplines : []
   const programLevelCounts = school.program_level_counts || raw.program_level_counts
   const applicationFeeRange = school.application_fee_range || raw.application_fee_range
@@ -110,10 +112,12 @@ function OverviewTab({ school, raw }: { school: any; raw: any }) {
       <div style={{ display: 'grid', gap: 12 }}>
         <div style={cardStyle}>
           <div style={sectionTitle}>О вузе</div>
-          {about ? (
+          {aiDescription ? (
+            <MarkdownDescription text={aiDescription} />
+          ) : about ? (
             <AboutBlock html={about} />
           ) : (
-            <div style={{ color: 'var(--muted)', fontSize: 13 }}>Описание не добавлено.</div>
+            <div style={{ color: 'var(--muted)', fontSize: 13 }}>Описание не добавлено. Нажми «Дополнить через ИИ» — агент найдёт сильные стороны, стажировки, выпускников.</div>
           )}
         </div>
 
@@ -277,6 +281,88 @@ function ProgramLevelCounts({ counts }: { counts: Record<string, number> | any }
           </div>
         </div>
       ))}
+    </div>
+  )
+}
+
+function MarkdownDescription({ text }: { text: string }) {
+  const [expanded, setExpanded] = useState(false)
+  // Парсим простой markdown: ## Заголовок\nабзац\n
+  const blocks: { type: 'heading' | 'paragraph'; content: string }[] = []
+  const lines = text.split(/\r?\n/)
+  let buf: string[] = []
+  const flush = () => {
+    if (buf.length === 0) return
+    const para = buf.join(' ').trim()
+    if (para) blocks.push({ type: 'paragraph', content: para })
+    buf = []
+  }
+  for (const raw of lines) {
+    const line = raw.trim()
+    if (!line) { flush(); continue }
+    const h = /^#{1,3}\s+(.+)$/.exec(line)
+    if (h) {
+      flush()
+      blocks.push({ type: 'heading', content: h[1].trim() })
+    } else {
+      buf.push(line)
+    }
+  }
+  flush()
+
+  // Если очень длинно — collapse
+  const fullLength = blocks.reduce((n, b) => n + b.content.length, 0)
+  const isLong = fullLength > 1200
+  const visible = expanded || !isLong ? blocks : (() => {
+    const out: typeof blocks = []
+    let used = 0
+    for (const b of blocks) {
+      if (used > 800) break
+      out.push(b); used += b.content.length
+    }
+    return out
+  })()
+
+  return (
+    <div>
+      <div style={{ display: 'grid', gap: 10, color: 'var(--text)' }}>
+        {visible.map((b, i) =>
+          b.type === 'heading' ? (
+            <div
+              key={i}
+              style={{
+                fontSize: 13, fontWeight: 700, color: 'var(--purple)',
+                textTransform: 'none', letterSpacing: 0, marginTop: i === 0 ? 0 : 6,
+              }}
+            >
+              {b.content}
+            </div>
+          ) : (
+            <div
+              key={i}
+              style={{
+                fontSize: 13, lineHeight: 1.6, color: 'var(--text)',
+                whiteSpace: 'pre-wrap',
+              }}
+            >
+              {b.content}
+            </div>
+          )
+        )}
+      </div>
+      {isLong && (
+        <button
+          type="button"
+          onClick={() => setExpanded(v => !v)}
+          style={{
+            marginTop: 12, background: 'none', border: 'none',
+            color: 'var(--purple)', fontSize: 13, fontWeight: 600,
+            cursor: 'pointer', padding: 0, fontFamily: 'inherit',
+          }}
+        >
+          {expanded ? 'Свернуть' : 'Показать больше'}
+        </button>
+      )}
     </div>
   )
 }

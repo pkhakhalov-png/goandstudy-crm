@@ -5,6 +5,7 @@ import { createParserClient, schoolPhotoUrl } from '@/lib/supabase/parser'
 import { CuratorSidebar } from '../../CuratorSidebar'
 import { SchoolTabs } from './SchoolTabs'
 import { FillSchoolButton } from './FillSchoolButton'
+import { SchoolHeaderLogo } from './SchoolHeaderLogo'
 
 const COUNTRY_LABEL: Record<string, string> = {
   ca: 'Канада', au: 'Австралия', gb: 'Великобритания', de: 'Германия', us: 'США',
@@ -84,23 +85,7 @@ export default async function SchoolPage({
             background: 'var(--surf)', border: '1px solid var(--bor)', borderRadius: 14,
             padding: 20, marginBottom: 16, boxShadow: 'var(--sh)',
           }}>
-            {school.logo_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={school.logo_url}
-                alt={school.name}
-                style={{ width: 72, height: 72, borderRadius: 12, objectFit: 'contain', background: '#fff', border: '1px solid var(--bor)', flexShrink: 0 }}
-              />
-            ) : (
-              <div style={{
-                width: 72, height: 72, borderRadius: 12, flexShrink: 0,
-                background: 'var(--purple)', color: '#fff',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 28, fontWeight: 700,
-              }}>
-                {school.name[0]?.toUpperCase() || '?'}
-              </div>
-            )}
+            <SchoolHeaderLogo src={school.logo_url} name={school.name} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, lineHeight: 1.2 }}>{school.name}</h1>
               <div style={{ marginTop: 8, fontSize: 13, color: 'var(--muted)', display: 'flex', gap: 12, flexWrap: 'wrap' }}>

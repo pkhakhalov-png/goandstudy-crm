@@ -11,7 +11,7 @@ export const maxDuration = 300
 const SAVE_TOOL = {
   name: 'save_school_info',
   description:
-    'Сохранить найденную информацию об университете. Поля, которые не удалось найти достоверно — передавай null. ВАЖНО: logo_url должен быть прямой ссылкой на лого с официального сайта или Wikipedia (предпочтительно SVG/PNG с прозрачным фоном). curator_note — короткое резюме (3-5 предложений) на русском, без выдумок.',
+    'Сохранить найденную информацию об университете. Поля, которые не удалось найти достоверно — передавай null. ВАЖНО: logo_url должен быть прямой ссылкой на лого с официального сайта или Wikimedia (PNG/SVG/JPG). description — длинное (8-15 предложений) описание с секциями ## Сильные стороны / ## Стажировки и работа / ## Известные выпускники / ## Финансовая помощь. curator_note — короткий тизер 1-2 предложения для шапки. video_link — embed-ссылка YouTube (формат https://www.youtube.com/embed/XXXX) официального тура/презентации вуза, если найдёшь.',
   input_schema: {
     type: 'object',
     properties: {
@@ -30,7 +30,7 @@ const SAVE_TOOL = {
       },
       logo_url: {
         type: ['string', 'null'],
-        description: 'Прямая ссылка на логотип вуза (PNG/SVG/JPG). Предпочтительно с официального сайта или Wikimedia Commons.',
+        description: 'Прямая ссылка на логотип (PNG/SVG/JPG). Только если уверен что URL рабочий — иначе null. Wikimedia Commons или официальный сайт.',
       },
       website: {
         type: ['string', 'null'],
@@ -38,7 +38,15 @@ const SAVE_TOOL = {
       },
       curator_note: {
         type: ['string', 'null'],
-        description: 'Краткое описание вуза для куратора (3-5 предложений на русском). Сильные стороны, известные факты, особенности. Без выдумок — только проверенное из официальных источников.',
+        description: 'Короткий тизер 1-2 предложения для шапки страницы. Пример: «Один из топ-10 университетов мира, известен факультетом юриспруденции и IT.»',
+      },
+      description: {
+        type: ['string', 'null'],
+        description: 'Длинное описание для вкладки «О вузе» (8-15 предложений на русском). Используй секции в формате Markdown: ## Сильные стороны, ## Стажировки и работа, ## Известные выпускники, ## Финансовая помощь, ## Кампус и атмосфера. Без выдумок — только проверенное.',
+      },
+      video_link: {
+        type: ['string', 'null'],
+        description: 'YouTube embed URL официального видео-тура или промо вуза. Формат: https://www.youtube.com/embed/VIDEO_ID. Если не уверен или нет — null.',
       },
       // Локация
       address: {
@@ -85,6 +93,24 @@ export async function POST(req: NextRequest) {
   }
 }
 
+async function checkUrl(url: string, expectImage = false): Promise<boolean> {
+  try {
+    const r = await fetch(url, {
+      method: 'HEAD',
+      signal: AbortSignal.timeout(8000),
+      redirect: 'follow',
+    })
+    if (!r.ok) return false
+    if (expectImage) {
+      const ct = r.headers.get('content-type') || ''
+      if (!ct.startsWith('image/')) return false
+    }
+    return true
+  } catch {
+    return false
+  }
+}
+
 async function handle(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -106,7 +132,7 @@ async function handle(req: NextRequest) {
   const parser = createParserClient()
   const { data: school } = await parser
     .from('schools')
-    .select('id, name, country_code, city, province, address, postal_code, latitude, longitude, website, qs_rank, university_type, founded_in, logo_url, curator_note')
+    .select('id, name, country_code, city, province, address, postal_code, latitude, longitude, website, qs_rank, university_type, founded_in, logo_url, curator_note, description, video_link')
     .eq('id', schoolId)
     .maybeSingle()
   if (!school) return NextResponse.json({ ok: false, error: 'School not found' }, { status: 404 })
@@ -117,38 +143,45 @@ async function handle(req: NextRequest) {
 Страна: ${(school.country_code || '').toUpperCase()}${school.province ? `, ${school.province}` : ''}${school.city ? `, ${school.city}` : ''}
 Текущий сайт в БД: ${school.website || 'не указан'}
 
-Текущие данные:
-- QS Rank: ${school.qs_rank || 'нет'}
-- Тип: ${school.university_type || 'нет'}
-- Основан: ${school.founded_in || 'нет'}
-- Лого: ${school.logo_url ? 'есть' : 'нет'}
-- Описание: ${school.curator_note ? 'есть' : 'нет'}
-- Адрес: ${school.address || 'нет'}
-- Координаты: ${school.latitude && school.longitude ? `${school.latitude}, ${school.longitude}` : 'нет'}
+Что ИИ нужно найти:
 
-Через web_search найди:
-1. **QS World University Rank** — текущий (последний доступный год). Если unranked — null.
-2. **Тип финансирования**: Государственный или Частный (на русском, точно из этих двух).
+1. **QS World University Rank** — текущий. Unranked — null.
+2. **Тип финансирования**: Государственный или Частный.
 3. **Год основания** (4 цифры).
-4. **Логотип** — прямая ссылка на PNG/SVG/JPG. Лучше всего с официального сайта (favicon недостаточно — нужен реальный лого). Wikimedia Commons тоже подходит.
+4. **Логотип** — прямая ссылка на PNG/SVG/JPG. ВАЖНО: убедись что ссылка реально ведёт на изображение. Лучше проверить через web_search ("название_вуза logo wikimedia commons" или "название_вуза logo png"). Если не уверен — null.
 5. **Официальный сайт** (https://).
-6. **curator_note** — краткое резюме на русском (3-5 предложений): какой это вуз, чем известен, сильные направления, выпускники-знаменитости, рейтинг. Стиль как у консультанта, без воды. Пример: «Один из топ-3 университетов мира. Известен факультетом юриспруденции. Acceptance rate 3%. Выпускники: Обама, Цукерберг, Гейтс. Финансовая помощь покрывает до 100% обучения для семей с доходом ниже $85k.»
-7. **Локация главного кампуса**:
-   - Точный почтовый адрес (улица, дом)
-   - Город / Регион (штат, провинция, земля и т.п.)
-   - Почтовый индекс
-   - **Координаты** (latitude / longitude в decimal, найди в Wikipedia/Google Maps — они нужны для отображения на карте). Пример: latitude 42.3770, longitude -71.1167 для Harvard.
+6. **curator_note** — короткий тизер 1-2 предложения для шапки страницы (НЕ длинное описание).
+7. **description** — ДЛИННОЕ описание (8-15 предложений) с секциями в Markdown:
+   ## Сильные стороны
+   {какие факультеты сильные, рейтинги, признание}
 
-Если не уверен — null. Лучше пустое поле чем выдумка. Координаты только если найдёшь точные на Wikipedia или Google Maps.`
+   ## Стажировки и работа
+   {co-op программы, partnership с компаниями, post-graduation work permit, типичные работодатели выпускников}
+
+   ## Известные выпускники
+   {3-5 знаменитостей если есть}
+
+   ## Финансовая помощь
+   {стипендии, гранты, need-based aid, средняя помощь иностранцам}
+
+   ## Кампус и атмосфера
+   {размер кампуса, инфраструктура, культура, спорт}
+8. **video_link** — официальный YouTube embed URL вуза. Формат должен быть точно https://www.youtube.com/embed/VIDEO_ID. Проверь что видео существует. Если нет — null.
+9. **Локация главного кампуса**:
+   - Точный почтовый адрес (улица, дом)
+   - Город / Регион / Почтовый индекс
+   - Координаты (latitude / longitude в decimal). Возьми из Wikipedia.
+
+Если не уверен — null. Лучше пустое поле чем выдумка.`
 
   let aiInput: any
   try {
     const anthropic = getAnthropic()
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 4096,
+      max_tokens: 8192,
       tools: [
-        { type: 'web_search_20250305', name: 'web_search', max_uses: 5 },
+        { type: 'web_search_20250305', name: 'web_search', max_uses: 6 },
         SAVE_TOOL,
       ] as any,
       messages: [{ role: 'user', content: userMessage }],
@@ -169,7 +202,7 @@ async function handle(req: NextRequest) {
     return NextResponse.json({ ok: false, error: `AI: ${msg}` }, { status: 500 })
   }
 
-  // Сохраняем — переписываем поля только если ИИ что-то нашёл (не затираем пустыми)
+  // Сохраняем — только если ИИ что-то нашёл
   const update: Record<string, unknown> = {}
   if (typeof aiInput.qs_rank === 'number' && aiInput.qs_rank > 0) update.qs_rank = aiInput.qs_rank
   if (aiInput.university_type === 'Государственный' || aiInput.university_type === 'Частный') {
@@ -178,9 +211,27 @@ async function handle(req: NextRequest) {
   if (typeof aiInput.founded_in === 'number' && aiInput.founded_in > 1000 && aiInput.founded_in <= new Date().getFullYear()) {
     update.founded_in = aiInput.founded_in
   }
-  if (aiInput.logo_url && /^https?:\/\//.test(aiInput.logo_url)) update.logo_url = aiInput.logo_url
+
+  // Валидация logo_url HEAD-запросом — не сохраняем 404
+  if (aiInput.logo_url && /^https?:\/\//.test(aiInput.logo_url)) {
+    const ok = await checkUrl(aiInput.logo_url, true)
+    if (ok) update.logo_url = aiInput.logo_url
+    else console.warn('[fill-school] logo_url failed HEAD check:', aiInput.logo_url)
+  }
+
   if (aiInput.website && /^https?:\/\//.test(aiInput.website)) update.website = aiInput.website
-  if (aiInput.curator_note && String(aiInput.curator_note).length > 30) update.curator_note = aiInput.curator_note
+  if (aiInput.curator_note && String(aiInput.curator_note).length > 20) {
+    update.curator_note = String(aiInput.curator_note).trim()
+  }
+  if (aiInput.description && String(aiInput.description).length > 100) {
+    update.description = String(aiInput.description).trim()
+  }
+
+  // YouTube embed: должен начинаться с https://www.youtube.com/embed/ — иначе игнорируем
+  if (aiInput.video_link && /^https:\/\/(www\.)?youtube\.com\/embed\/[\w-]+/.test(aiInput.video_link)) {
+    update.video_link = aiInput.video_link
+  }
+
   // Локация
   if (aiInput.address && String(aiInput.address).trim()) update.address = String(aiInput.address).trim()
   if (aiInput.city && String(aiInput.city).trim()) update.city = String(aiInput.city).trim()
