@@ -64,12 +64,30 @@ function isAggregator(url: string | null | undefined): boolean {
 }
 
 export async function POST(req: NextRequest) {
+  try {
+    return await handleVerify(req)
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : 'Unknown error'
+    console.error('[verify-scholarship] uncaught:', e)
+    return NextResponse.json({ ok: false, error: `Server: ${msg}` }, { status: 500 })
+  }
+}
+
+async function handleVerify(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single()
   if (!['curator', 'admin', 'rop'].includes(profile?.role || '')) {
     return NextResponse.json({ ok: false, error: 'Forbidden' }, { status: 403 })
+  }
+
+  // Проверка ключевых env в самом начале — сразу понятная ошибка
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return NextResponse.json({ ok: false, error: 'ANTHROPIC_API_KEY не настроен в Vercel env' }, { status: 500 })
+  }
+  if (!process.env.SCHOLARSHIPS_SERVICE_ROLE_KEY) {
+    return NextResponse.json({ ok: false, error: 'SCHOLARSHIPS_SERVICE_ROLE_KEY не настроен в Vercel env (после добавления нужен Redeploy)' }, { status: 500 })
   }
 
   let body: { kind?: 'private' | 'government'; id?: number | string } = {}
