@@ -12,6 +12,22 @@ interface Props {
   clientId?: number
 }
 
+const SPECIALTY_GROUPS = new Set([
+  'Бизнес и управление', 'IT и технологии', 'Экономика и финансы', 'Инженерия',
+  'Медицина и здоровье', 'Право', 'Дизайн и искусство', 'Гуманитарные науки',
+  'Естественные науки', 'Социальные науки', 'Образование', 'Медиа и коммуникации',
+  'Туризм и гостиничный', 'Архитектура', 'Языковые курсы', 'Другое',
+])
+
+// Если program_name — placeholder-специальность (BD-импорт),
+// школа становится primary-заголовком, специализация — вторичная строка.
+function pickTitleAndSubtitle(uni: University, programHref: string | null, schoolHref: string | null) {
+  const isPlaceholder = !!uni.program && SPECIALTY_GROUPS.has(uni.program)
+  return isPlaceholder
+    ? { titleHref: schoolHref, titleText: uni.name, subHref: uni.programId ? programHref : null, subText: uni.program }
+    : { titleHref: uni.programId ? programHref : null, titleText: uni.program, subHref: schoolHref, subText: uni.name }
+}
+
 export function ShortlistBlock({ items, total, clientId }: Props) {
   const { state, hydrated } = useClientState()
 
@@ -245,18 +261,28 @@ function UniCard({ uni, rank, clientId }: { uni: University; rank: number; clien
             lineHeight: 1.2,
           }}
         >
-          {uni.programId ? (
-            <Link href={programHref} style={{ textDecoration: 'none', color: 'inherit' }} className="ds-link-hover">
-              {uni.program}
-            </Link>
-          ) : uni.program}
+          {(() => {
+            const { titleHref, titleText } = pickTitleAndSubtitle(uni, programHref, schoolHref)
+            return titleHref ? (
+              <Link href={titleHref} style={{ textDecoration: 'none', color: 'inherit' }} className="ds-link-hover">
+                {titleText}
+              </Link>
+            ) : titleText
+          })()}
         </h4>
         <div style={{ fontSize: 12, color: 'var(--ds-muted)', marginBottom: 10 }}>
-          {schoolHref ? (
-            <Link href={schoolHref} style={{ textDecoration: 'none', color: 'inherit' }} className="ds-link-hover">
-              {uni.name}
-            </Link>
-          ) : uni.name} · {uni.city} · {uni.country}
+          {(() => {
+            const { subHref, subText } = pickTitleAndSubtitle(uni, programHref, schoolHref)
+            return (
+              <>
+                {subHref ? (
+                  <Link href={subHref} style={{ textDecoration: 'none', color: 'inherit' }} className="ds-link-hover">
+                    {subText}
+                  </Link>
+                ) : subText} · {uni.city} · {uni.country}
+              </>
+            )
+          })()}
         </div>
         <p style={{ fontSize: 13, color: 'var(--ds-ink-dim)', lineHeight: 1.45, margin: 0, letterSpacing: '-0.005em' }}>
           {uni.reason}

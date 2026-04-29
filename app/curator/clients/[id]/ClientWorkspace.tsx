@@ -1288,18 +1288,34 @@ function UniversityRow({
     if (enrichment.conditional_offer_available) aiFacts.push('Conditional')
   }
 
-  const programLabel = uni.program_name || 'Программа'
-  const programTitle = programHref ? (
-    <Link href={programHref} style={{ color: 'inherit', textDecoration: 'none' }} className="ds-link-hover">
-      {programLabel}
-    </Link>
-  ) : programLabel
+  // Для BD-импортированных программ name=specialty_group (одна из 16). Если так — школа в заголовке.
+  const SPECIALTY_GROUPS = new Set([
+    'Бизнес и управление', 'IT и технологии', 'Экономика и финансы', 'Инженерия',
+    'Медицина и здоровье', 'Право', 'Дизайн и искусство', 'Гуманитарные науки',
+    'Естественные науки', 'Социальные науки', 'Образование', 'Медиа и коммуникации',
+    'Туризм и гостиничный', 'Архитектура', 'Языковые курсы', 'Другое',
+  ])
+  const isPlaceholderProgramName = !!uni.program_name && SPECIALTY_GROUPS.has(uni.program_name)
+  const titleHref = isPlaceholderProgramName ? schoolHref : (programHref || schoolHref)
+  const titleText = isPlaceholderProgramName
+    ? uni.university_name
+    : (uni.program_name || uni.university_name || 'Программа')
+  const subtitleHref = isPlaceholderProgramName ? programHref : schoolHref
+  const subtitleText = isPlaceholderProgramName
+    ? (uni.program_name || '')
+    : uni.university_name
 
-  const schoolSubtitle = schoolHref ? (
-    <Link href={schoolHref} style={{ color: 'inherit', textDecoration: 'none' }} className="ds-link-hover">
-      {uni.university_name}
+  const titleEl = titleHref ? (
+    <Link href={titleHref} style={{ color: 'inherit', textDecoration: 'none' }} className="ds-link-hover">
+      {titleText}
     </Link>
-  ) : uni.university_name
+  ) : titleText
+
+  const subtitleEl = subtitleHref && subtitleText ? (
+    <Link href={subtitleHref} style={{ color: 'inherit', textDecoration: 'none' }} className="ds-link-hover">
+      {subtitleText}
+    </Link>
+  ) : subtitleText
 
   return (
     <div
@@ -1318,10 +1334,10 @@ function UniversityRow({
 
       <div style={{ minWidth: 0 }}>
         <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ds-ink)', letterSpacing: '-0.01em' }}>
-          {programTitle}
+          {titleEl}
         </div>
         <div style={{ fontSize: 12, color: 'var(--ds-muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {schoolSubtitle}{[uni.country, uni.city].filter(Boolean).length > 0 ? ' · ' : ''}{[uni.country, uni.city].filter(Boolean).join(' · ')}
+          {subtitleEl}{[uni.country, uni.city].filter(Boolean).length > 0 && subtitleText ? ' · ' : ''}{[uni.country, uni.city].filter(Boolean).join(' · ')}
         </div>
         {aiFacts.length > 0 && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
