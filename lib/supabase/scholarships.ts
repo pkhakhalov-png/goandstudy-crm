@@ -62,6 +62,26 @@ export type GovernmentScholarship = {
   updated_at: string
 }
 
+export type IdpScholarship = {
+  id: number
+  idp_url: string
+  name: string
+  university_name: string | null
+  school_id: number | null
+  country_code: string | null
+  level: string | null
+  funding_type: string | null
+  value_amount: number | null
+  value_currency: string | null
+  value_text: string | null
+  application_deadline: string | null
+  description: string | null
+  eligibility: string | null
+  raw_data: any
+  scraped_at: string
+  updated_at: string
+}
+
 export type Scholarship = {
   scholarship_id: number
   title: string

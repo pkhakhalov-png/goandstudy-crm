@@ -1100,6 +1100,15 @@ function ScholarshipsBlock({ scholarships }: { scholarships: any[] }) {
         <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
           {scholarships.map(s => {
             const meta = STATUS[s.status] || STATUS.planned
+            const kind = (s.kind as 'private' | 'government' | 'idp' | undefined) || 'private'
+            const kindHref = kind === 'idp'
+              ? `/curator/scholarships/idp/${s.scholarship_id}`
+              : `/curator/scholarships/${s.scholarship_id}`
+            const kindBadge = kind === 'idp'
+              ? { label: 'IDP', color: '#0088cc', bg: 'rgba(0,136,204,.10)' }
+              : kind === 'government'
+                ? { label: 'Гос.', color: 'var(--ds-purple-deep)', bg: 'var(--ds-purple-soft)' }
+                : null
             return (
               <div
                 key={s.id}
@@ -1112,15 +1121,23 @@ function ScholarshipsBlock({ scholarships }: { scholarships: any[] }) {
                   border: '1px solid var(--ds-border-soft)',
                   borderRadius: 'var(--ds-r-md)',
                   alignItems: 'center',
+                  borderLeft: kind === 'idp' ? '3px solid #0088cc' : kind === 'government' ? '3px solid var(--ds-purple-deep)' : undefined,
                 }}
               >
                 <div style={{ minWidth: 0 }}>
-                  <Link
-                    href={`/curator/scholarships/${s.scholarship_id}`}
-                    style={{ fontSize: 14, fontWeight: 600, color: 'var(--ds-ink)', textDecoration: 'none' }}
-                  >
-                    {s.scholarship_title}
-                  </Link>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <Link
+                      href={kindHref}
+                      style={{ fontSize: 14, fontWeight: 600, color: 'var(--ds-ink)', textDecoration: 'none' }}
+                    >
+                      {s.scholarship_title}
+                    </Link>
+                    {kindBadge && (
+                      <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: kindBadge.color, background: kindBadge.bg, padding: '2px 6px', borderRadius: 4 }}>
+                        {kindBadge.label}
+                      </span>
+                    )}
+                  </div>
                   <div style={{ fontSize: 11, color: 'var(--ds-muted)', marginTop: 2 }}>
                     {s.institution_title || '—'}
                     {s.amount_text ? ` · ${s.amount_text}` : ''}

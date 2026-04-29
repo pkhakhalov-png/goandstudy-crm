@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 
 interface Props {
   id: number
-  kind: 'private' | 'government'
+  kind: 'private' | 'government' | 'idp'
 }
 
 export function VerifyScholarshipButton({ id, kind }: Props) {

@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { redirect, notFound } from 'next/navigation'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { createParserClient, schoolPhotoUrl } from '@/lib/supabase/parser'
+import { createScholarshipsClient } from '@/lib/supabase/scholarships'
 import { CuratorSidebar } from '../../CuratorSidebar'
 import { SchoolTabs } from './SchoolTabs'
 import { FillSchoolButton } from './FillSchoolButton'
@@ -38,6 +39,25 @@ export default async function SchoolPage({
   ])
 
   if (!school) notFound()
+
+  // Стипендии: IDP по school_id + TopUni по institution_title (best-effort, ilike)
+  const sch = createScholarshipsClient()
+  const today = new Date().toISOString().slice(0, 10)
+  const [{ data: idpScholarships }, { data: topuniScholarships }] = await Promise.all([
+    sch.from('idp_scholarships')
+      .select('id, idp_url, name, level, funding_type, value_amount, value_currency, value_text, application_deadline, country_code')
+      .eq('school_id', id)
+      .or(`application_deadline.is.null,application_deadline.gte.${today}`)
+      .order('application_deadline', { ascending: true, nullsFirst: false })
+      .limit(50),
+    sch.from('scholarships_topuni')
+      .select('scholarship_id, title, institution_title, study_levels, amount_text, amount_type, deadline, is_exclusive')
+      .eq('archived', false)
+      .ilike('institution_title', school.name)
+      .or(`deadline.is.null,deadline.gte.${today}`)
+      .order('deadline', { ascending: true, nullsFirst: false })
+      .limit(50),
+  ])
 
   // Клиенты этого куратора — для дропдауна "Добавить клиенту"
   const admin = await createAdminClient()
@@ -149,6 +169,8 @@ export default async function SchoolPage({
             myClients={myClients ?? []}
             asClient={asClient}
             clientId={sp.clientId}
+            idpScholarships={idpScholarships ?? []}
+            topuniScholarships={topuniScholarships ?? []}
           />
         </div>
       </div>

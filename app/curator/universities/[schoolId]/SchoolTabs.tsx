@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { AddToShortlistButton } from './AddToShortlistButton'
+import { AddScholarshipButton } from '../../scholarships/AddScholarshipButton'
 
 interface Props {
   school: any
@@ -10,9 +11,11 @@ interface Props {
   myClients: { id: number; name: string; country?: string | null }[]
   asClient?: boolean
   clientId?: string
+  idpScholarships?: any[]
+  topuniScholarships?: any[]
 }
 
-type Tab = 'overview' | 'features' | 'location' | 'programs'
+type Tab = 'overview' | 'features' | 'location' | 'programs' | 'scholarships'
 
 const cardStyle: React.CSSProperties = {
   background: 'var(--surf)',
@@ -27,15 +30,19 @@ const sectionTitle: React.CSSProperties = {
   letterSpacing: '0.06em', color: 'var(--muted)', marginBottom: 12,
 }
 
-export function SchoolTabs({ school, programs, myClients, asClient, clientId }: Props) {
+export function SchoolTabs({ school, programs, myClients, asClient, clientId, idpScholarships = [], topuniScholarships = [] }: Props) {
   const [tab, setTab] = useState<Tab>('overview')
   const raw = school.raw_data?.attributes || {}
+  const totalScholarships = idpScholarships.length + topuniScholarships.length
 
   const tabs: { key: Tab; label: string; count?: number }[] = [
     { key: 'overview', label: 'Обзор' },
     { key: 'features', label: 'Возможности' },
     { key: 'location', label: 'Локация' },
-    { key: 'programs', label: `Программы`, count: programs.length },
+    { key: 'programs', label: 'Программы', count: programs.length },
+    ...(totalScholarships > 0
+      ? [{ key: 'scholarships' as Tab, label: 'Стипендии', count: totalScholarships }]
+      : []),
   ]
 
   return (
@@ -77,6 +84,134 @@ export function SchoolTabs({ school, programs, myClients, asClient, clientId }: 
       {tab === 'location' && <LocationTab school={school} raw={raw} />}
       {tab === 'programs' && (
         <ProgramsTab school={school} programs={programs} myClients={myClients} asClient={asClient} clientId={clientId} />
+      )}
+      {tab === 'scholarships' && (
+        <ScholarshipsTab
+          idp={idpScholarships}
+          topuni={topuniScholarships}
+          myClients={myClients}
+          asClient={asClient}
+        />
+      )}
+    </div>
+  )
+}
+
+/* ─── Scholarships ─── */
+
+function ScholarshipsTab({ idp, topuni, myClients, asClient }: {
+  idp: any[]
+  topuni: any[]
+  myClients: { id: number; name: string }[]
+  asClient?: boolean
+}) {
+  function fmt(d: string | null) {
+    if (!d) return null
+    try {
+      return new Date(d).toLocaleDateString('ru', { day: 'numeric', month: 'short', year: 'numeric' })
+    } catch { return d }
+  }
+
+  return (
+    <div style={{ display: 'grid', gap: 16 }}>
+      {topuni.length > 0 && (
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 8 }}>
+            QS · {topuni.length}
+          </div>
+          <div style={{ display: 'grid', gap: 10 }}>
+            {topuni.map(s => (
+              <Link
+                key={s.scholarship_id}
+                href={`/curator/scholarships/${s.scholarship_id}`}
+                style={{ ...cardStyle, textDecoration: 'none', color: 'inherit', display: 'block' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, lineHeight: 1.3, flex: 1, minWidth: 0 }}>{s.title}</div>
+                  <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--purple)', background: 'rgba(177,94,204,.10)', padding: '2px 6px', borderRadius: 4 }}>
+                    QS
+                  </span>
+                  {!asClient && (
+                    <span onClick={(e) => e.preventDefault()}>
+                      <AddScholarshipButton scholarshipId={s.scholarship_id} myClients={myClients} kind="private" />
+                    </span>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+                  {(s.study_levels || []).map((lv: string) => (
+                    <span key={lv} className="ctag" style={{ fontSize: 11 }}>{lv}</span>
+                  ))}
+                  {s.amount_text && (
+                    <span className="ctag" style={{ fontSize: 11, background: 'rgba(22,163,97,.08)', color: 'var(--green)', borderColor: 'rgba(22,163,97,.2)' }}>
+                      {s.amount_text}
+                    </span>
+                  )}
+                  {s.deadline && (
+                    <span className="ctag" style={{ fontSize: 11, background: 'rgba(0,136,204,.08)', color: '#0088cc', borderColor: 'rgba(0,136,204,.2)' }}>
+                      до {fmt(s.deadline)}
+                    </span>
+                  )}
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {idp.length > 0 && (
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 8 }}>
+            IDP · {idp.length}
+          </div>
+          <div style={{ display: 'grid', gap: 10 }}>
+            {idp.map(s => {
+              const valueLabel = s.value_amount
+                ? `${Number(s.value_amount).toLocaleString('ru')} ${s.value_currency || ''}`.trim()
+                : s.value_text
+              return (
+                <Link
+                  key={s.id}
+                  href={`/curator/scholarships/idp/${s.id}`}
+                  style={{ ...cardStyle, textDecoration: 'none', color: 'inherit', display: 'block', borderLeft: '3px solid #0088cc' }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, lineHeight: 1.3, flex: 1, minWidth: 0 }}>{s.name}</div>
+                    <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#0088cc', background: 'rgba(0,136,204,.10)', padding: '2px 6px', borderRadius: 4 }}>
+                      IDP
+                    </span>
+                    {!asClient && (
+                      <span onClick={(e) => e.preventDefault()}>
+                        <AddScholarshipButton scholarshipId={s.id} myClients={myClients} kind="idp" />
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+                    {s.level && <span className="ctag" style={{ fontSize: 11 }}>{s.level}</span>}
+                    {s.funding_type && (
+                      <span className="ctag" style={{ fontSize: 11 }}>
+                        {s.funding_type === 'Cash' ? '💰 Cash' : '🎓 Fee waiver'}
+                      </span>
+                    )}
+                    {valueLabel && (
+                      <span className="ctag" style={{ fontSize: 11, background: 'rgba(22,163,97,.08)', color: 'var(--green)', borderColor: 'rgba(22,163,97,.2)' }}>
+                        {valueLabel}
+                      </span>
+                    )}
+                    {s.application_deadline ? (
+                      <span className="ctag" style={{ fontSize: 11, background: 'rgba(0,136,204,.08)', color: '#0088cc', borderColor: 'rgba(0,136,204,.2)' }}>
+                        до {fmt(s.application_deadline)}
+                      </span>
+                    ) : (
+                      <span className="ctag" style={{ fontSize: 11, fontStyle: 'italic', color: 'var(--muted)' }}>
+                        дедлайн уточняется
+                      </span>
+                    )}
+                  </div>
+                </Link>
+              )
+            })}
+          </div>
+        </div>
       )}
     </div>
   )

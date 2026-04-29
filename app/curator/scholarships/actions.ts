@@ -22,9 +22,9 @@ export async function addScholarshipToClient(formData: FormData) {
   if (ctx.error) return { error: ctx.error }
   const clientId = Number(formData.get('client_id'))
   const scholarshipId = Number(formData.get('scholarship_id'))
-  const kind = String(formData.get('kind') || 'private') as 'private' | 'government'
+  const kind = String(formData.get('kind') || 'private') as 'private' | 'government' | 'idp'
   if (!clientId || !scholarshipId) return { error: 'Не передан client_id или scholarship_id' }
-  if (kind !== 'private' && kind !== 'government') return { error: 'Неверный kind' }
+  if (kind !== 'private' && kind !== 'government' && kind !== 'idp') return { error: 'Неверный kind' }
 
   const sb = createScholarshipsClient()
 
@@ -46,6 +46,19 @@ export async function addScholarshipToClient(formData: FormData) {
       ? `${g.monthly_stipend.toLocaleString('ru')} ${g.monthly_stipend_currency || ''}/мес`.trim()
       : null
     deadline = g.application_deadline
+  } else if (kind === 'idp') {
+    const { data: i, error } = await sb
+      .from('idp_scholarships')
+      .select('id, name, university_name, school_id, value_amount, value_currency, value_text, application_deadline, school:schools(name)')
+      .eq('id', scholarshipId)
+      .maybeSingle()
+    if (error || !i) return { error: 'IDP-стипендия не найдена в каталоге' }
+    title = i.name
+    institution = (i as any).school?.name || i.university_name || null
+    amount = i.value_amount
+      ? `${Number(i.value_amount).toLocaleString('ru')} ${i.value_currency || ''}`.trim()
+      : i.value_text
+    deadline = i.application_deadline
   } else {
     const { data: p, error } = await sb
       .from('scholarships_topuni')

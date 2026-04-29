@@ -90,11 +90,11 @@ async function handleVerify(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'SCHOLARSHIPS_SERVICE_ROLE_KEY не настроен в Vercel env (после добавления нужен Redeploy)' }, { status: 500 })
   }
 
-  let body: { kind?: 'private' | 'government'; id?: number | string } = {}
+  let body: { kind?: 'private' | 'government' | 'idp'; id?: number | string } = {}
   try { body = await req.json() } catch {}
   const kind = body.kind
   const id = Number(body.id)
-  if (!id || (kind !== 'private' && kind !== 'government')) {
+  if (!id || (kind !== 'private' && kind !== 'government' && kind !== 'idp')) {
     return NextResponse.json({ ok: false, error: 'Missing kind/id' }, { status: 400 })
   }
 
@@ -129,6 +129,36 @@ async function handleVerify(req: NextRequest) {
 3. **Прямую ссылку на форму заявки** (apply page).
 
 Если application_url или official_url в текущих данных ведёт на агрегатор — обязательно замени.`
+  } else if (kind === 'idp') {
+    const { data, error } = await sb
+      .from('idp_scholarships')
+      .select('id, idp_url, name, university_name, country_code, level, funding_type, value_text, application_deadline, school:schools(name, website)')
+      .eq('id', id)
+      .maybeSingle()
+    if (error || !data) return NextResponse.json({ ok: false, error: 'IDP-стипендия не найдена' }, { status: 404 })
+    row = data
+    const schoolName = (row.school as any)?.name || row.university_name
+    const schoolWebsite = (row.school as any)?.website
+    userMessage = `Перепроверь актуальную информацию об университетской стипендии (источник IDP) и вызови tool save_scholarship_verification ровно один раз.
+
+Стипендия: ${row.name}
+Вуз: ${schoolName || 'unknown'}
+Страна: ${(row.country_code || '').toUpperCase()}
+Уровень: ${row.level || 'unknown'}
+Тип: ${row.funding_type || 'unknown'}
+Текущий сайт вуза: ${schoolWebsite || 'unknown'}
+IDP: ${row.idp_url}
+
+Текущие данные:
+- application_deadline: ${row.application_deadline || 'null'}
+- value: ${row.value_text || 'unknown'}
+
+Через web_search найди:
+1. **Актуальный дедлайн подачи** на сайте вуза в формате YYYY-MM-DD. Если rolling — null + deadline_note.
+2. **Прямая ссылка на страницу стипендии на ОФИЦИАЛЬНОМ сайте вуза** (НЕ idp.com, НЕ агрегаторы). Например, не "idp.com/scholarship/..." а "harvard.edu/scholarships/..." или конкретный поддомен вуза.
+3. **Прямая ссылка на форму заявки** если есть отдельная.
+
+Если на сайте вуза стипендии нет (всё через IDP) — official_url = null, оставь только idp_url из текущих данных.`
   } else {
     const { data, error } = await sb
       .from('scholarships_topuni')
@@ -200,6 +230,11 @@ async function handleVerify(req: NextRequest) {
     if (aiInput.deadline_note) update.application_period = aiInput.deadline_note
 
     const { error } = await admin.from('government_scholarships').update(update).eq('id', id)
+    if (error) return NextResponse.json({ ok: false, error: `DB: ${error.message}` }, { status: 500 })
+  } else if (kind === 'idp') {
+    const update: Record<string, unknown> = { updated_at: now }
+    if (aiInput.application_deadline) update.application_deadline = aiInput.application_deadline
+    const { error } = await admin.from('idp_scholarships').update(update).eq('id', id)
     if (error) return NextResponse.json({ ok: false, error: `DB: ${error.message}` }, { status: 500 })
   } else {
     const update: Record<string, unknown> = { updated_at: now, last_seen_at: now }

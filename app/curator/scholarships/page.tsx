@@ -7,6 +7,22 @@ import { AddScholarshipButton } from './AddScholarshipButton'
 import { ScholarshipLogo } from './ScholarshipLogo'
 import { VerifyScholarshipButton } from './VerifyScholarshipButton'
 
+type IdpRow = {
+  id: number
+  idp_url: string
+  name: string
+  university_name: string | null
+  school_id: number | null
+  country_code: string | null
+  level: string | null
+  funding_type: string | null
+  value_amount: number | null
+  value_currency: string | null
+  value_text: string | null
+  application_deadline: string | null
+  school?: { id: number; name: string; logo_url: string | null } | null
+}
+
 export const dynamic = 'force-dynamic'
 
 const PAGE_SIZE = 30
@@ -22,7 +38,7 @@ const COUNTRY_FLAGS: Record<string, string> = {
 export default async function ScholarshipsCatalogPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; level?: string; type?: string; deadline?: string; page?: string; source?: string }>
+  searchParams: Promise<{ q?: string; level?: string; type?: string; deadline?: string; page?: string; source?: string; country?: string; funding?: string; linked?: string }>
 }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -35,7 +51,10 @@ export default async function ScholarshipsCatalogPage({
   const level = sp.level || ''
   const type = sp.type || ''
   const deadlineFilter = sp.deadline || '' // 'soon' = next 90 days
-  const source = sp.source || '' // '' | 'private' | 'government'
+  const source = sp.source || '' // '' | 'private' | 'government' | 'idp'
+  const country = (sp.country || '').toLowerCase()
+  const funding = sp.funding || '' // 'cash' | 'waiver'
+  const linkedOnly = sp.linked === '1'
   const page = Math.max(1, Number(sp.page) || 1)
   const offset = (page - 1) * PAGE_SIZE
 
@@ -47,7 +66,7 @@ export default async function ScholarshipsCatalogPage({
   let count = 0
   let error: { message: string } | null = null
 
-  if (source !== 'government') {
+  if (source !== 'government' && source !== 'idp') {
     let query = sb
       .from('scholarships_topuni')
       .select('*', { count: 'exact' })
@@ -70,7 +89,7 @@ export default async function ScholarshipsCatalogPage({
   // ─── Government ───
   let govScholarships: GovernmentScholarship[] = []
   let govError: { message: string } | null = null
-  if (source !== 'private') {
+  if (source !== 'private' && source !== 'idp') {
     let gq = sb
       .from('government_scholarships')
       .select('*')
@@ -91,6 +110,45 @@ export default async function ScholarshipsCatalogPage({
     govError = res.error ? { message: res.error.message } : null
   }
 
+  // ─── IDP (university scholarships from idp.com) ───
+  let idpScholarships: IdpRow[] = []
+  let idpCount = 0
+  let idpError: { message: string } | null = null
+  if (source === '' || source === 'idp') {
+    let iq = sb
+      .from('idp_scholarships')
+      .select('id, idp_url, name, university_name, school_id, country_code, level, funding_type, value_amount, value_currency, value_text, application_deadline, school:schools(id, name, logo_url)', { count: 'exact' })
+      .or(`application_deadline.is.null,application_deadline.gte.${today}`)
+    if (q) iq = iq.or(`name.ilike.%${q}%,university_name.ilike.%${q}%`)
+    if (country) iq = iq.eq('country_code', country)
+    if (linkedOnly) iq = iq.not('school_id', 'is', null)
+    if (level) {
+      // IDP levels: Undergraduate / Postgraduate / Foundation / Vocational (VET)
+      const idpLevelMap: Record<string, string> = {
+        Bachelors: 'Undergraduate', Master: 'Postgraduate', PhD: 'Postgraduate', MBA: 'Postgraduate',
+      }
+      const mapped = idpLevelMap[level] || level
+      iq = iq.eq('level', mapped)
+    }
+    if (funding === 'cash') iq = iq.eq('funding_type', 'Cash')
+    else if (funding === 'waiver') iq = iq.eq('funding_type', 'Fee waiver/discount')
+    if (deadlineFilter === 'soon') {
+      const in90 = new Date(Date.now() + 90 * 24 * 3600 * 1000).toISOString().slice(0, 10)
+      iq = iq.not('application_deadline', 'is', null).gte('application_deadline', today).lte('application_deadline', in90)
+    }
+    iq = iq.order('application_deadline', { ascending: true, nullsFirst: false })
+    if (source === 'idp') iq = iq.range(offset, offset + PAGE_SIZE - 1)
+    else iq = iq.limit(20) // в "Все" покажем только превью первых 20
+    const res = await iq
+    const raw = (res.data as any[]) || []
+    idpScholarships = raw.map(r => ({
+      ...r,
+      school: Array.isArray(r.school) ? (r.school[0] || null) : r.school,
+    })) as IdpRow[]
+    idpCount = res.count || 0
+    idpError = res.error ? { message: res.error.message } : null
+  }
+
   // Список клиентов куратора для дропдауна
   const admin = await createAdminClient()
   const { data: curator } = await admin.from('curators').select('id').eq('user_id', user.id).maybeSingle()
@@ -106,7 +164,7 @@ export default async function ScholarshipsCatalogPage({
   const initials = (profile?.name || user.email || 'КР')
     .split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)
 
-  const totalPages = Math.max(1, Math.ceil((count || 0) / PAGE_SIZE))
+  const totalPages = Math.max(1, Math.ceil(((source === 'idp' ? idpCount : count) || 0) / PAGE_SIZE))
 
   return (
     <div className="app">
@@ -116,17 +174,21 @@ export default async function ScholarshipsCatalogPage({
           <div className="pt">Стипендии</div>
           <div className="tbr">
             <span style={{ fontSize: 12, color: 'var(--muted)' }}>
-              {source === 'government' ? `${govScholarships.length} гос.` : source === 'private' ? `${count} частных` : `${count} частных · ${govScholarships.length} гос.`}
+              {source === 'government' && `${govScholarships.length} гос.`}
+              {source === 'private' && `${count} частных`}
+              {source === 'idp' && `${idpCount} IDP`}
+              {source === '' && `${count} частных · ${govScholarships.length} гос. · ${idpCount} IDP`}
             </span>
           </div>
         </div>
 
         <div style={{ padding: '20px 28px 40px' }}>
           {/* Source tabs */}
-          <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
             <SourceTab href={buildUrl({ q, level, type, deadline: deadlineFilter, source: '' })} label="Все" active={source === ''} />
             <SourceTab href={buildUrl({ q, level, type, deadline: deadlineFilter, source: 'private' })} label="Частные · QS" active={source === 'private'} />
             <SourceTab href={buildUrl({ q, level, type, deadline: deadlineFilter, source: 'government' })} label="Государственные" active={source === 'government'} />
+            <SourceTab href={buildUrl({ q, level, type, deadline: deadlineFilter, source: 'idp' })} label="Университетские · IDP" active={source === 'idp'} />
           </div>
 
           {/* Filters */}
@@ -149,7 +211,29 @@ export default async function ScholarshipsCatalogPage({
               <option value="PhD">PhD</option>
               <option value="All">All</option>
             </select>
-            {source !== 'government' && (
+            {source === 'idp' && (
+              <>
+                <select name="country" defaultValue={country} style={selectStyle}>
+                  <option value="">Все страны</option>
+                  <option value="gb">🇬🇧 UK</option>
+                  <option value="ca">🇨🇦 Канада</option>
+                  <option value="au">🇦🇺 Австралия</option>
+                  <option value="us">🇺🇸 США</option>
+                  <option value="nz">🇳🇿 Новая Зеландия</option>
+                  <option value="ie">🇮🇪 Ирландия</option>
+                </select>
+                <select name="funding" defaultValue={funding} style={selectStyle}>
+                  <option value="">Все типы</option>
+                  <option value="cash">💰 Cash</option>
+                  <option value="waiver">🎓 Fee waiver</option>
+                </select>
+                <label style={{ fontSize: 12, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <input type="checkbox" name="linked" value="1" defaultChecked={linkedOnly} />
+                  Только привязанные к вузу
+                </label>
+              </>
+            )}
+            {source !== 'government' && source !== 'idp' && (
               <select name="type" defaultValue={type} style={selectStyle}>
                 <option value="">Все типы суммы</option>
                 <option value="Monetary">Денежная</option>
@@ -161,21 +245,67 @@ export default async function ScholarshipsCatalogPage({
               <option value="soon">Ближайшие 90 дней</option>
             </select>
             <button type="submit" className="btn-p" style={{ fontSize: 12 }}>Применить</button>
-            {(q || level || type || deadlineFilter) && (
+            {(q || level || type || deadlineFilter || country || funding || linkedOnly) && (
               <Link href={buildUrl({ source })} className="btn-s" style={{ fontSize: 12, textDecoration: 'none' }}>
                 Сбросить
               </Link>
             )}
           </form>
 
-          {(error || govError) && (
+          {(error || govError || idpError) && (
             <div style={{ ...cardStyle, padding: 16, color: 'var(--red)', marginBottom: 12 }}>
-              Ошибка загрузки: {(error || govError)?.message}. Проверь env.
+              Ошибка загрузки: {(error || govError || idpError)?.message}. Проверь env.
+            </div>
+          )}
+
+          {/* IDP scholarships block */}
+          {(source === '' || source === 'idp') && idpScholarships.length > 0 && (
+            <>
+              {source === '' && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', margin: '12px 0 8px' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--muted)' }}>
+                    Университетские · IDP · {idpCount}
+                  </div>
+                  {idpCount > 20 && (
+                    <Link href={buildUrl({ source: 'idp' })} style={{ fontSize: 12, color: 'var(--purple)', textDecoration: 'none' }}>
+                      Все {idpCount} →
+                    </Link>
+                  )}
+                </div>
+              )}
+              <div style={{ display: 'grid', gap: 12, marginBottom: source === '' ? 24 : 0 }}>
+                {idpScholarships.map(i => (
+                  <IdpScholarshipRow key={i.id} i={i} myClients={myClients ?? []} />
+                ))}
+              </div>
+              {source === 'idp' && totalPages > 1 && (
+                <div style={{ marginTop: 24, display: 'flex', gap: 8, justifyContent: 'center', alignItems: 'center' }}>
+                  {page > 1 && (
+                    <Link href={buildUrl({ q, level, deadline: deadlineFilter, source, country, funding, linked: linkedOnly ? '1' : '', page: page - 1 })} className="btn-s" style={{ fontSize: 12, textDecoration: 'none' }}>
+                      ← Назад
+                    </Link>
+                  )}
+                  <span style={{ fontSize: 12, color: 'var(--muted)' }}>
+                    Стр. {page} из {totalPages}
+                  </span>
+                  {page < totalPages && (
+                    <Link href={buildUrl({ q, level, deadline: deadlineFilter, source, country, funding, linked: linkedOnly ? '1' : '', page: page + 1 })} className="btn-s" style={{ fontSize: 12, textDecoration: 'none' }}>
+                      Далее →
+                    </Link>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+
+          {source === 'idp' && idpScholarships.length === 0 && !idpError && (
+            <div style={{ ...cardStyle, padding: 24, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
+              IDP-стипендий по фильтрам не найдено.
             </div>
           )}
 
           {/* Government scholarships block */}
-          {source !== 'private' && govScholarships.length > 0 && (
+          {source !== 'private' && source !== 'idp' && govScholarships.length > 0 && (
             <>
               {source === '' && (
                 <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--muted)', margin: '12px 0 8px' }}>
@@ -240,13 +370,16 @@ export default async function ScholarshipsCatalogPage({
   )
 }
 
-function buildUrl(p: { q?: string; level?: string; type?: string; deadline?: string; source?: string; page?: number }) {
+function buildUrl(p: { q?: string; level?: string; type?: string; deadline?: string; source?: string; country?: string; funding?: string; linked?: string; page?: number }) {
   const params = new URLSearchParams()
   if (p.q) params.set('q', p.q)
   if (p.level) params.set('level', p.level)
   if (p.type) params.set('type', p.type)
   if (p.deadline) params.set('deadline', p.deadline)
   if (p.source) params.set('source', p.source)
+  if (p.country) params.set('country', p.country)
+  if (p.funding) params.set('funding', p.funding)
+  if (p.linked === '1') params.set('linked', '1')
   if (p.page && p.page > 1) params.set('page', String(p.page))
   const qs = params.toString()
   return qs ? `/curator/scholarships?${qs}` : '/curator/scholarships'
@@ -445,6 +578,95 @@ function GovScholarshipRow({ g, myClients }: { g: GovernmentScholarship; myClien
             Apply ↗
           </a>
         )}
+      </div>
+    </div>
+  )
+}
+
+function IdpScholarshipRow({ i, myClients }: { i: IdpRow; myClients: { id: number; name: string }[] }) {
+  function fmtDeadline(d: string | null) {
+    if (!d) return null
+    try {
+      return new Date(d).toLocaleDateString('ru', { day: 'numeric', month: 'short', year: 'numeric' })
+    } catch { return d }
+  }
+  function daysLeft(d: string | null): number | null {
+    if (!d) return null
+    const ms = new Date(d).getTime() - Date.now()
+    if (!Number.isFinite(ms)) return null
+    return Math.ceil(ms / (24 * 3600 * 1000))
+  }
+
+  const flag = i.country_code ? COUNTRY_FLAGS[i.country_code.toLowerCase()] : null
+  const valueLabel = i.value_amount
+    ? `${Number(i.value_amount).toLocaleString('ru')} ${i.value_currency || ''}`.trim()
+    : i.value_text
+  const dl = daysLeft(i.application_deadline)
+  const institution = i.school?.name || i.university_name || '—'
+
+  return (
+    <div style={{ ...cardStyle, padding: 16, display: 'grid', gridTemplateColumns: '52px 1fr auto', gap: 14, alignItems: 'flex-start', borderLeft: '3px solid #0088cc' }}>
+      <ScholarshipLogo
+        logoUrl={i.school?.logo_url || null}
+        fallbackUrl={null}
+        title={institution}
+        size={52}
+      />
+
+      <div style={{ minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <Link href={`/curator/scholarships/idp/${i.id}`} style={{ textDecoration: 'none', color: 'var(--text)' }}>
+            <div style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.3 }}>{i.name}</div>
+          </Link>
+          <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#0088cc', background: 'rgba(0,136,204,.10)', padding: '2px 6px', borderRadius: 4 }}>
+            IDP
+          </span>
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
+          {flag && <span style={{ marginRight: 4 }}>{flag}</span>}
+          {i.school?.id ? (
+            <Link href={`/curator/universities/${i.school.id}`} style={{ color: 'var(--purple)', textDecoration: 'none' }}>
+              {institution}
+            </Link>
+          ) : (
+            <span>{institution}</span>
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
+          {i.level && <span className="ctag" style={{ fontSize: 11 }}>{i.level}</span>}
+          {i.funding_type && (
+            <span className="ctag" style={{ fontSize: 11 }}>
+              {i.funding_type === 'Cash' ? '💰' : '🎓'} {i.funding_type === 'Cash' ? 'Cash' : 'Fee waiver'}
+            </span>
+          )}
+          {valueLabel && (
+            <span className="ctag" style={{ fontSize: 11, background: 'rgba(22,163,97,.08)', color: 'var(--green)', borderColor: 'rgba(22,163,97,.2)' }}>
+              {valueLabel}
+            </span>
+          )}
+          {i.application_deadline ? (
+            <span className="ctag" style={{ fontSize: 11, background: 'rgba(0,136,204,.08)', color: '#0088cc', borderColor: 'rgba(0,136,204,.2)' }}>
+              до {fmtDeadline(i.application_deadline)}{dl != null && dl >= 0 && dl <= 90 ? ` · ${dl} дн` : ''}
+            </span>
+          ) : (
+            <span className="ctag" style={{ fontSize: 11, fontStyle: 'italic', color: 'var(--muted)' }}>
+              дедлайн уточняется
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end' }}>
+        <AddScholarshipButton scholarshipId={i.id} myClients={myClients} kind="idp" />
+        <VerifyScholarshipButton id={i.id} kind="idp" />
+        <a
+          href={i.idp_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ fontSize: 11, color: 'var(--purple)', textDecoration: 'none', whiteSpace: 'nowrap' }}
+        >
+          View on IDP ↗
+        </a>
       </div>
     </div>
   )

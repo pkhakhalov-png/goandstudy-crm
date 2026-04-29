@@ -6,7 +6,7 @@ import { addScholarshipToClient } from './actions'
 interface Props {
   scholarshipId: number
   myClients: { id: number; name: string }[]
-  kind?: 'private' | 'government'
+  kind?: 'private' | 'government' | 'idp'
 }
 
 export function AddScholarshipButton({ scholarshipId, myClients, kind = 'private' }: Props) {
