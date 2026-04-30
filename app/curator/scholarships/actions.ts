@@ -83,6 +83,8 @@ export async function addScholarshipToClient(formData: FormData) {
       deadline,
       added_by: ctx.curatorId,
       updated_at: new Date().toISOString(),
+      // Новые row'ы добавляются скрытыми от клиента; раскрываются bulk-кнопкой.
+      // На update upsert не перезатирает unlocked_for_client (передаём только базовые поля).
     },
     { onConflict: 'client_id,kind,scholarship_id' },
   )
@@ -124,5 +126,28 @@ export async function updateScholarshipStatus(formData: FormData) {
   if (error) return { error: error.message }
 
   if (row?.client_id) revalidatePath(`/curator/clients/${row.client_id}`)
+  return { success: true as const }
+}
+
+/**
+ * Bulk-переключатель видимости стипендий клиенту.
+ * После оплаты доп.услуги куратор раскрывает все стипендии одной кнопкой —
+ * клиент видит их в /client/scholarships. До этого — только куратор.
+ */
+export async function setClientScholarshipsVisibility(formData: FormData) {
+  const ctx = await getCuratorContext()
+  if (ctx.error) return { error: ctx.error }
+  const clientId = Number(formData.get('client_id'))
+  const unlocked = formData.get('unlocked') === '1'
+  if (!clientId) return { error: 'Не передан client_id' }
+
+  const { error } = await ctx.admin
+    .from('client_scholarships')
+    .update({ unlocked_for_client: unlocked, updated_at: new Date().toISOString() })
+    .eq('client_id', clientId)
+  if (error) return { error: error.message }
+
+  revalidatePath(`/curator/clients/${clientId}`)
+  revalidatePath('/client', 'layout')
   return { success: true as const }
 }

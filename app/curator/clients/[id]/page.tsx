@@ -1,5 +1,6 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { createParserClient } from '@/lib/supabase/parser'
+import { matchScholarshipsForSchools } from '@/lib/scholarship-match'
 import { redirect, notFound } from 'next/navigation'
 import { CuratorSidebar } from '../../CuratorSidebar'
 import { ClientWorkspace } from './ClientWorkspace'
@@ -117,14 +118,31 @@ export default async function CuratorClientPage({
     }
   }
 
-  // School logos from parser DB
+  // School logos + name + country (для матчера стипендий) из parser DB
   let logoBySchool: Record<number, string | null> = {}
+  let schoolsForMatch: { id: number; name: string; country_code: string | null }[] = []
   if (schoolIds.length > 0) {
     try {
       const parser = createParserClient()
-      const { data: schools } = await parser.from('schools').select('id, logo_url').in('id', Array.from(new Set(schoolIds)))
-      for (const s of schools || []) logoBySchool[s.id as number] = (s as any).logo_url
+      const { data: schools } = await parser
+        .from('schools')
+        .select('id, name, country_code, logo_url')
+        .in('id', Array.from(new Set(schoolIds)))
+      for (const s of schools || []) {
+        logoBySchool[s.id as number] = (s as any).logo_url
+        schoolsForMatch.push({ id: s.id as number, name: (s as any).name, country_code: (s as any).country_code })
+      }
     } catch {}
+  }
+
+  // Стипендии-suggestions: матч по вузам клиента (3 источника)
+  let suggestedScholarships: any[] = []
+  try {
+    suggestedScholarships = schoolsForMatch.length > 0
+      ? await matchScholarshipsForSchools(schoolsForMatch)
+      : []
+  } catch (e) {
+    console.error('[clients/page] matchScholarshipsForSchools failed:', e)
   }
 
   // Fetch catalog data only when Shortlist tab is active (cheaper nav)
@@ -256,6 +274,7 @@ export default async function CuratorClientPage({
         logoBySchool={logoBySchool}
         essays={essays || []}
         scholarships={scholarships || []}
+        suggestedScholarships={suggestedScholarships}
         applications={applications || []}
       />
     </div>

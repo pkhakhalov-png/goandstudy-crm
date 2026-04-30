@@ -18,6 +18,10 @@ import {
   updateShortlistNote,
   updateShortlistStatus,
 } from '@/app/curator/shortlist/actions'
+import {
+  addScholarshipToClient,
+  setClientScholarshipsVisibility,
+} from '@/app/curator/scholarships/actions'
 import { createApplication } from '@/app/curator/applications/actions'
 import { UniversityFilters } from '@/app/curator/universities/UniversityFilters'
 import { ProgramCardInteractive } from '@/app/curator/universities/ProgramCard'
@@ -59,6 +63,7 @@ interface Props {
   logoBySchool?: Record<number, string | null>
   essays?: any[]
   scholarships?: any[]
+  suggestedScholarships?: any[]
   applications?: any[]
 }
 
@@ -165,6 +170,7 @@ export function ClientWorkspace(props: Props) {
             enrichmentByProgram={enrichmentByProgram}
             logoBySchool={logoBySchool}
             scholarships={props.scholarships || []}
+            suggestedScholarships={props.suggestedScholarships || []}
             applications={props.applications || []}
           />
         )}
@@ -916,7 +922,7 @@ function RoadmapTab({
    ═══════════════════════════════════════════════════════════════ */
 
 function ShortlistTab({
-  client, universities, catalog, enrichmentByProgram, logoBySchool, scholarships, applications,
+  client, universities, catalog, enrichmentByProgram, logoBySchool, scholarships, suggestedScholarships, applications,
 }: {
   client: any
   universities: any[]
@@ -924,6 +930,7 @@ function ShortlistTab({
   enrichmentByProgram: Record<number, any>
   logoBySchool: Record<number, string | null>
   scholarships: any[]
+  suggestedScholarships: any[]
   applications: any[]
 }) {
   const router = useRouter()
@@ -1042,7 +1049,7 @@ function ShortlistTab({
       </div>
 
       {/* Стипендии в подборке клиента */}
-      <ScholarshipsBlock scholarships={scholarships} />
+      <ScholarshipsBlock scholarships={scholarships} suggestedScholarships={suggestedScholarships} clientId={client.id} />
 
       {/* Каталог базы вузов — ищем + добавляем в подборку клиента */}
       {catalog && <CatalogPanel client={client} catalog={catalog} />}
@@ -1050,7 +1057,15 @@ function ShortlistTab({
   )
 }
 
-function ScholarshipsBlock({ scholarships }: { scholarships: any[] }) {
+function ScholarshipsBlock({ scholarships, suggestedScholarships, clientId }: {
+  scholarships: any[]
+  suggestedScholarships: any[]
+  clientId: number
+}) {
+  const router = useRouter()
+  const [pending, startTransition] = useTransition()
+  const [toast, setToast] = useState<string | null>(null)
+
   function fmtDate(d: string | null) {
     if (!d) return '—'
     try {
@@ -1064,22 +1079,173 @@ function ScholarshipsBlock({ scholarships }: { scholarships: any[] }) {
     awarded: { label: 'Получили', chip: 'ds-chip-success' },
     rejected: { label: 'Отказ', chip: 'ds-chip-error' },
   }
+
+  const totalUnlocked = scholarships.filter(s => s.unlocked_for_client).length
+  const allUnlocked = scholarships.length > 0 && totalUnlocked === scholarships.length
+
+  // Скрываем подсказки которые уже в подборке (по kind+id)
+  const inShortlistKey = new Set(scholarships.map(s => `${s.kind || 'private'}:${s.scholarship_id}`))
+  const suggestionsFiltered = (suggestedScholarships || []).filter(s => {
+    const id = s.kind === 'idp' ? s.id : s.kind === 'government' ? s.id : s.scholarship_id
+    return !inShortlistKey.has(`${s.kind}:${id}`)
+  })
+
+  function handleAdd(s: any) {
+    const fd = new FormData()
+    fd.append('client_id', String(clientId))
+    fd.append('scholarship_id', String(s.kind === 'private' ? s.scholarship_id : s.id))
+    fd.append('kind', s.kind)
+    startTransition(async () => {
+      const res = await addScholarshipToClient(fd)
+      if ((res as any)?.error) setToast(`Ошибка: ${(res as any).error}`)
+      else setToast('Добавлено в подборку (скрыто от клиента)')
+      setTimeout(() => setToast(null), 2400)
+      router.refresh()
+    })
+  }
+
+  function handleBulkVisibility(unlock: boolean) {
+    if (scholarships.length === 0) return
+    if (unlock && !confirm(`Раскрыть все ${scholarships.length} стипендий клиенту?`)) return
+    if (!unlock && !confirm('Скрыть все стипендии от клиента?')) return
+    const fd = new FormData()
+    fd.append('client_id', String(clientId))
+    fd.append('unlocked', unlock ? '1' : '0')
+    startTransition(async () => {
+      const res = await setClientScholarshipsVisibility(fd)
+      if ((res as any)?.error) setToast(`Ошибка: ${(res as any).error}`)
+      else setToast(unlock ? 'Раскрыто клиенту ✓' : 'Скрыто от клиента ✓')
+      setTimeout(() => setToast(null), 2400)
+      router.refresh()
+    })
+  }
+
   return (
     <div className="ds-card" style={{ padding: 28 }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
         <SectionHead
           eyebrow="Финансы"
           title={`Стипендии · ${scholarships.length}`}
-          description="Подбор стипендий из базы TopUniversities. Добавляй из каталога /curator/scholarships."
+          description={
+            scholarships.length === 0
+              ? 'Куратор подбирает стипендии. Клиент не видит их пока куратор не раскроет (после оплаты доп.услуги).'
+              : allUnlocked
+                ? '👁 Раскрыто клиенту — он видит все стипендии в кабинете.'
+                : totalUnlocked > 0
+                  ? `Частично раскрыто (${totalUnlocked} / ${scholarships.length}). Используй кнопки чтобы синхронизировать.`
+                  : '🔒 Скрыто от клиента. После оплаты доп.услуги нажми «Раскрыть всё клиенту».'
+          }
         />
-        <Link
-          href="/curator/scholarships"
-          className="ds-btn ds-btn-secondary ds-btn-sm"
-          style={{ textDecoration: 'none' }}
-        >
-          Каталог стипендий →
-        </Link>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {scholarships.length > 0 && (
+            allUnlocked ? (
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => handleBulkVisibility(false)}
+                className="ds-btn ds-btn-secondary ds-btn-sm"
+              >
+                🔒 Скрыть от клиента
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => handleBulkVisibility(true)}
+                className="ds-btn ds-btn-primary ds-btn-sm"
+              >
+                👁 Раскрыть всё клиенту
+              </button>
+            )
+          )}
+          <Link
+            href="/curator/scholarships"
+            className="ds-btn ds-btn-secondary ds-btn-sm"
+            style={{ textDecoration: 'none' }}
+          >
+            Каталог →
+          </Link>
+        </div>
       </div>
+
+      {toast && (
+        <div style={{
+          marginTop: 12, padding: '10px 14px',
+          background: 'var(--ds-success-soft)', color: 'var(--ds-success-ink)',
+          borderRadius: 'var(--ds-r-sm)', fontSize: 13, fontWeight: 600,
+        }}>{toast}</div>
+      )}
+
+      {/* Suggestions от matcher'а */}
+      {suggestionsFiltered.length > 0 && (
+        <div style={{ marginTop: 20 }}>
+          <div style={{
+            fontSize: 11, fontWeight: 700, letterSpacing: '0.08em',
+            textTransform: 'uppercase', color: 'var(--ds-muted)', marginBottom: 8,
+            display: 'flex', alignItems: 'center', gap: 8,
+          }}>
+            💡 Доступные по вузам клиента · {suggestionsFiltered.length}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {suggestionsFiltered.slice(0, 12).map((s, idx) => {
+              const id = s.kind === 'private' ? s.scholarship_id : s.id
+              const title = s.kind === 'private' ? s.title : s.name
+              const kindBadge = s.kind === 'idp'
+                ? { label: 'IDP', color: '#0088cc', bg: 'rgba(0,136,204,.10)' }
+                : s.kind === 'government'
+                  ? { label: 'Гос.', color: 'var(--ds-purple-deep)', bg: 'var(--ds-purple-soft)' }
+                  : { label: 'QS', color: 'var(--ds-purple-deep)', bg: 'var(--ds-purple-soft)' }
+              const detailHref = s.kind === 'idp'
+                ? `/curator/scholarships/idp/${id}`
+                : `/curator/scholarships/${id}`
+              const value = s.kind === 'private'
+                ? s.amount_text
+                : s.kind === 'idp'
+                  ? (s.value_amount ? `${Number(s.value_amount).toLocaleString('ru')} ${s.value_currency || ''}`.trim() : s.value_text)
+                  : (s.monthly_stipend ? `${Number(s.monthly_stipend).toLocaleString('ru')} ${s.monthly_stipend_currency || ''}/мес` : null)
+              const deadline = s.kind === 'private' ? s.deadline : s.application_deadline
+              return (
+                <div key={`${s.kind}:${id}:${idx}`} style={{
+                  padding: '12px 14px', display: 'grid',
+                  gridTemplateColumns: '1fr auto', gap: 12, alignItems: 'center',
+                  background: 'var(--ds-bg-alt)',
+                  border: '1px solid var(--ds-border-soft)',
+                  borderRadius: 'var(--ds-r-md)',
+                }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <Link href={detailHref} style={{ fontSize: 13, fontWeight: 600, color: 'var(--ds-ink)', textDecoration: 'none' }}>
+                        {title}
+                      </Link>
+                      <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: kindBadge.color, background: kindBadge.bg, padding: '2px 6px', borderRadius: 4 }}>
+                        {kindBadge.label}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--ds-muted)', marginTop: 2 }}>
+                      по вузу <b>{s.matched_school?.name || '—'}</b>
+                      {value ? ` · ${value}` : ''}
+                      {deadline ? ` · до ${fmtDate(deadline)}` : ''}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={pending}
+                    onClick={() => handleAdd(s)}
+                    className="ds-btn ds-btn-secondary ds-btn-sm"
+                  >
+                    + В подборку
+                  </button>
+                </div>
+              )
+            })}
+            {suggestionsFiltered.length > 12 && (
+              <div style={{ fontSize: 11, color: 'var(--ds-muted)', textAlign: 'center', padding: 6 }}>
+                ещё {suggestionsFiltered.length - 12} — открой <Link href="/curator/scholarships" style={{ color: 'var(--ds-purple-deep)' }}>каталог</Link>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {scholarships.length === 0 ? (
         <div
@@ -1144,9 +1310,22 @@ function ScholarshipsBlock({ scholarships }: { scholarships: any[] }) {
                     {s.deadline ? ` · до ${fmtDate(s.deadline)}` : ''}
                   </div>
                 </div>
-                <span className={`ds-chip ${meta.chip}`} style={{ textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: 10, fontWeight: 700 }}>
-                  {meta.label}
-                </span>
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <span
+                    title={s.unlocked_for_client ? 'Клиент видит' : 'Скрыто от клиента'}
+                    style={{
+                      fontSize: 11, fontWeight: 700,
+                      padding: '3px 7px', borderRadius: 999,
+                      background: s.unlocked_for_client ? 'rgba(22,163,97,.12)' : 'rgba(138,135,150,.12)',
+                      color: s.unlocked_for_client ? 'var(--ds-success-ink)' : 'var(--ds-muted)',
+                    }}
+                  >
+                    {s.unlocked_for_client ? '👁' : '🔒'}
+                  </span>
+                  <span className={`ds-chip ${meta.chip}`} style={{ textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: 10, fontWeight: 700 }}>
+                    {meta.label}
+                  </span>
+                </div>
               </div>
             )
           })}
