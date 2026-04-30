@@ -277,6 +277,60 @@ const VIDEO_WHITELIST_AUTHORS = [
   'goandstudy', 'go and study', 'go & study',
 ]
 
+/**
+ * Поиск видео на нашем канале @Goandstudy по имени вуза.
+ * Скрейпим страницу /@Goandstudy/search?query=... и достаём первый видеорезультат
+ * чьё название пересекается с именем вуза.
+ */
+async function findGoandstudyVideo(schoolName: string): Promise<{ embedUrl: string; title: string } | null> {
+  try {
+    const url = `https://www.youtube.com/@Goandstudy/search?query=${encodeURIComponent(schoolName)}`
+    const r = await fetch(url, {
+      signal: AbortSignal.timeout(10000),
+      headers: {
+        // Без User-Agent YouTube возвращает голый HTML без data
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123 Safari/537.36',
+        'Accept-Language': 'en-US,en;q=0.9',
+      },
+    })
+    if (!r.ok) {
+      console.warn('[fill-school] YouTube search HTTP', r.status)
+      return null
+    }
+    const html = await r.text()
+
+    // Выдёргиваем videoRenderer-блоки. На YouTube все результаты лежат как JSON в HTML
+    // (в скрипте ytInitialData). Простой regex на пары videoId+title.
+    const re = /"videoRenderer":\s*\{\s*"videoId"\s*:\s*"([\w-]{11})"[\s\S]*?"title":\s*\{\s*"runs":\s*\[\s*\{\s*"text":\s*"([^"]+)"/g
+    const candidates: { id: string; title: string }[] = []
+    let m: RegExpExecArray | null
+    while ((m = re.exec(html)) !== null) {
+      candidates.push({ id: m[1], title: m[2] })
+      if (candidates.length >= 20) break
+    }
+    if (candidates.length === 0) {
+      console.warn('[fill-school] @Goandstudy search: 0 videoRenderer-blocks')
+      return null
+    }
+
+    // Сматчиваем по нормализованному имени
+    const tokens = schoolName.toLowerCase().split(/[\s\-,.()/]+/).filter(t => t.length >= 4)
+    for (const c of candidates) {
+      const t = c.title.toLowerCase()
+      const matched = tokens.filter(tok => t.includes(tok))
+      if (matched.length >= Math.min(2, tokens.length)) {
+        // Хотя бы 2 из значимых токенов — достаточно (или все, если их меньше 2)
+        return { embedUrl: `https://www.youtube.com/embed/${c.id}`, title: c.title }
+      }
+    }
+    console.log('[fill-school] @Goandstudy search: ни одно видео не подошло. Кандидаты:', candidates.slice(0, 5).map(c => c.title).join(' | '))
+    return null
+  } catch (e) {
+    console.warn('[fill-school] @Goandstudy search error:', e instanceof Error ? e.message : e)
+    return null
+  }
+}
+
 async function isAcceptableUniversityVideo(embedUrl: string, schoolName: string): Promise<{ ok: boolean; reason: string; author?: string }> {
   const m = /youtube\.com\/embed\/([\w-]+)/.exec(embedUrl)
   if (!m) return { ok: false, reason: 'не youtube embed' }
@@ -475,27 +529,46 @@ async function handle(req: NextRequest) {
     update.description = String(aiInput.description).trim()
   }
 
-  // Видео: формат + проверка через oEmbed (whitelist Goandstudy / канал вуза)
+  // Видео: AI → @Goandstudy search → канал вуза
   const videoDiag: Record<string, string | null> = {
     ai_returned: aiInput.video_link || null,
     accepted: null,
     author: null,
     reason: null,
   }
+  let videoUrl: string | null = null
+
+  // 1. Что вернул AI — пропускаем через фильтр
   if (aiInput.video_link && /^https:\/\/(www\.)?youtube\.com\/embed\/[\w-]+/.test(aiInput.video_link)) {
     const verdict = await isAcceptableUniversityVideo(aiInput.video_link, school.name)
     videoDiag.author = verdict.author || null
     videoDiag.reason = verdict.reason
     if (verdict.ok) {
-      update.video_link = aiInput.video_link
-      videoDiag.accepted = aiInput.video_link
-      console.log('[fill-school] video accepted (', verdict.reason, '):', verdict.author)
+      videoUrl = aiInput.video_link
+      console.log('[fill-school] AI video accepted (', verdict.reason, '):', verdict.author)
     } else {
-      console.warn('[fill-school] video REJECTED:', verdict.reason, '— канал:', verdict.author || 'неизвестен')
+      console.warn('[fill-school] AI video REJECTED:', verdict.reason, '— канал:', verdict.author || 'неизвестен')
     }
   } else if (aiInput.video_link) {
     videoDiag.reason = 'неверный формат URL'
-    console.warn('[fill-school] video bad format:', aiInput.video_link)
+    console.warn('[fill-school] AI video bad format:', aiInput.video_link)
+  }
+
+  // 2. Если AI не дал — серверный поиск по нашему каналу @Goandstudy
+  if (!videoUrl) {
+    console.log('[fill-school] Fallback: ищем на @Goandstudy для', school.name)
+    const found = await findGoandstudyVideo(school.name)
+    if (found) {
+      videoUrl = found.embedUrl
+      videoDiag.author = 'Goandstudy'
+      videoDiag.reason = `найдено наше: «${found.title}»`
+      console.log('[fill-school] @Goandstudy video found:', found.title)
+    }
+  }
+
+  if (videoUrl) {
+    update.video_link = videoUrl
+    videoDiag.accepted = videoUrl
   }
 
   // Локация
