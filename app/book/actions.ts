@@ -106,14 +106,16 @@ export async function createBooking(formData: FormData) {
 
   if (!assignedUser) return { error: 'Менеджер недоступен на это время' }
 
-  // 5. Delete any cancelled bookings for this slot so unique constraint doesn't block
-  await supabase
+  // 5. Зачищаем мёртвые записи (cancelled / no_show) для этого слота, иначе
+  //    UNIQUE(salesperson_id, booking_date, start_time) заблокирует INSERT.
+  const { error: delErr, count: delCount } = await supabase
     .from('bookings')
-    .delete()
+    .delete({ count: 'exact' })
     .eq('salesperson_id', assignedUser.id)
     .eq('booking_date', date)
     .eq('start_time', st)
-    .eq('status', 'cancelled')
+    .in('status', ['cancelled', 'no_show'])
+  console.log('[BOOK] cleanup stale rows for slot:', delCount ?? 0, 'err:', delErr?.message ?? 'none')
 
   // 6. Create booking
   const { data: insertedBooking, error: bookErr } = await supabase.from('bookings').insert({
@@ -127,12 +129,15 @@ export async function createBooking(formData: FormData) {
   }).select('id').single()
 
   if (bookErr) {
-    console.log('[BOOK] insert error:', bookErr.message, bookErr.code)
+    console.error('[BOOK] insert FAILED:', { code: bookErr.code, msg: bookErr.message, salesperson: assignedUser.id, date, time: st })
     if (bookErr.code === '23505') {
+      // Последний шанс: возможно остался некий confirmed-row не от нашего юзера —
+      // вернём чёткое сообщение.
       return { error: 'Это время уже занято, выберите другое' }
     }
     return { error: bookErr.message }
   }
+  console.log('[BOOK] insert OK:', { id: insertedBooking?.id, salesperson: assignedUser.id, date, time: st })
 
   // 6. Increment round-robin counter
   await supabase
@@ -216,6 +221,7 @@ export async function createBooking(formData: FormData) {
     if (quizData.year) quizParts.push(`Год: ${quizData.year}`)
     const quizSummary = quizParts.length > 0 ? quizParts.join(' · ') : null
 
+    console.log('[BOOK] TG notify start:', { salesperson: assignedUser.name, tg: assignedUser.telegram_username, date, time: st })
     await notifyNewBooking({
       salespersonName: assignedUser.name || `User ${assignedUser.id.slice(0, 8)}`,
       salespersonTgUsername: assignedUser.telegram_username,
@@ -227,6 +233,7 @@ export async function createBooking(formData: FormData) {
       clientTelegram,
       quizSummary,
     })
+    console.log('[BOOK] TG notify done')
   } catch (e) {
     console.error('[BOOK] TG notify failed:', e)
   }
