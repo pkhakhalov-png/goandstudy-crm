@@ -24,7 +24,7 @@ export function FillSchoolButton({ schoolId, hasData }: Props) {
 
   useEffect(() => {
     if (!toast) return
-    const t = setTimeout(() => setToast(null), 4000)
+    const t = setTimeout(() => setToast(null), 10000)
     return () => clearTimeout(t)
   }, [toast])
 
@@ -44,7 +44,21 @@ export function FillSchoolButton({ schoolId, hasData }: Props) {
       if (!data.ok) throw new Error(data.error || 'ИИ не смог заполнить')
       const changes = data.data?.changes ?? 0
       const updated = data.data?.updated ?? []
-      setToast(changes > 0 ? `Готово · обновлено: ${updated.join(', ')}` : 'Проверено, новых данных не нашлось')
+      const photo = data.data?.photo
+      const video = data.data?.video
+
+      const parts: string[] = []
+      if (changes > 0) parts.push(`Обновлено: ${updated.join(', ')}`)
+      // Фото-диагностика
+      if (photo?.accepted) parts.push(`Фото: ✓ из ${photo.source}`)
+      else if (photo?.ai_returned) parts.push(`Фото: AI вернул, но не картинка — ${photo.ai_returned.slice(0, 60)}`)
+      else parts.push('Фото: не нашли ни AI ни Wikipedia')
+      // Видео-диагностика
+      if (video?.accepted) parts.push(`Видео: ✓ ${video.author || ''}`)
+      else if (video?.ai_returned) parts.push(`Видео: отклонено (${video.reason || '?'})${video.author ? ' канал ' + video.author : ''}`)
+      else parts.push('Видео: AI ничего не нашёл')
+
+      setToast(parts.join(' · '))
       router.refresh()
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Ошибка')
@@ -93,11 +107,13 @@ export function FillSchoolButton({ schoolId, hasData }: Props) {
       {toast && (
         <div style={{
           position: 'fixed', bottom: 24, right: 24, zIndex: 1000,
-          padding: '10px 16px', borderRadius: 10, fontSize: 13,
-          fontWeight: 600, color: '#fff', background: 'var(--green)',
-          boxShadow: '0 6px 20px rgba(0,0,0,.18)',
+          padding: '12px 16px', borderRadius: 10, fontSize: 12,
+          fontWeight: 500, color: '#fff', background: 'var(--text)',
+          boxShadow: '0 6px 20px rgba(0,0,0,.25)',
+          maxWidth: 460, lineHeight: 1.5,
+          whiteSpace: 'pre-wrap',
         }}>
-          {toast}
+          {toast.replace(/ · /g, '\n· ')}
         </div>
       )}
     </>

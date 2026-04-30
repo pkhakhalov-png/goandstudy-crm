@@ -142,41 +142,79 @@ export async function POST(req: NextRequest) {
   }
 }
 
+/** Получить summary по точному title — вернёт картинку если есть */
+async function getWikipediaSummaryImage(title: string): Promise<string | null> {
+  try {
+    const r = await fetch(
+      `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title.replace(/\s+/g, '_'))}`,
+      {
+        signal: AbortSignal.timeout(8000),
+        headers: { 'User-Agent': 'go-and-study-crm/1.0' },
+      },
+    )
+    if (!r.ok) return null
+    const data = await r.json() as {
+      originalimage?: { source: string }
+      thumbnail?: { source: string }
+      type?: string
+    }
+    if (data.type === 'disambiguation') return null
+    const url = data.originalimage?.source || data.thumbnail?.source
+    if (url && /\.(jpe?g|png|webp)(\?|#|$)/i.test(url)) return url
+    return null
+  } catch { return null }
+}
+
+/** Поиск страниц на en.wiki по запросу — вернёт title первого результата */
+async function searchWikipedia(query: string): Promise<string | null> {
+  try {
+    const r = await fetch(
+      `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&srlimit=3&format=json&origin=*`,
+      {
+        signal: AbortSignal.timeout(8000),
+        headers: { 'User-Agent': 'go-and-study-crm/1.0' },
+      },
+    )
+    if (!r.ok) return null
+    const data = await r.json() as { query?: { search?: Array<{ title: string }> } }
+    return data.query?.search?.[0]?.title || null
+  } catch { return null }
+}
+
 /**
- * Wikipedia REST API: достаём картинку из infobox статьи о вузе.
- * Это самый надёжный путь — у большинства известных вузов в Wiki есть фото
- * главного здания/кампуса.
+ * Достаём картинку вуза из Wikipedia. Стратегия:
+ *   1) Прямой lookup по полному имени
+ *   2) Без скобок и городов-сателлитов (Dubai/London/Milan/etc — берём «материнский» вуз)
+ *   3) Wikipedia search API → берём первый результат → его summary
  */
 async function fetchWikipediaImage(schoolName: string): Promise<string | null> {
-  // Берём первое имя без скобок/городов
-  const cleanName = schoolName.replace(/\(.*?\)/g, '').trim()
-  const variants = [cleanName, schoolName]
-  for (const variant of variants) {
-    try {
-      const title = encodeURIComponent(variant.replace(/\s+/g, '_'))
-      const r = await fetch(
-        `https://en.wikipedia.org/api/rest_v1/page/summary/${title}`,
-        {
-          signal: AbortSignal.timeout(8000),
-          headers: { 'User-Agent': 'go-and-study-crm/1.0' },
-        },
-      )
-      if (!r.ok) continue
-      const data = await r.json() as {
-        originalimage?: { source: string; width: number; height: number }
-        thumbnail?: { source: string }
-        type?: string
-      }
-      if (data.type === 'disambiguation') continue  // страница-перенаправление
-      const url = data.originalimage?.source || data.thumbnail?.source
-      if (url && /\.(jpe?g|png|webp)(\?|#|$)/i.test(url)) {
-        console.log('[fill-school] Wikipedia image found:', url)
-        return url
-      }
-    } catch (e) {
-      console.warn('[fill-school] Wikipedia API error:', e instanceof Error ? e.message : e)
+  const variants = new Set<string>()
+  variants.add(schoolName)
+  // Без скобок: "Курсы X (Berlin)" → "Курсы X"
+  const noBrackets = schoolName.replace(/\(.*?\)/g, '').trim()
+  if (noBrackets !== schoolName) variants.add(noBrackets)
+  // Без городов-филиалов: "Istituto Marangoni Dubai" → "Istituto Marangoni"
+  const noCity = schoolName.replace(/\s+(Dubai|London|Paris|Milan|Florence|Mumbai|Shanghai|Singapore|New York|Berlin|Madrid|Toronto|Vancouver|Sydney|Melbourne|Brisbane)\s*$/i, '').trim()
+  if (noCity && noCity !== schoolName) variants.add(noCity)
+
+  for (const v of variants) {
+    const url = await getWikipediaSummaryImage(v)
+    if (url) {
+      console.log('[fill-school] Wikipedia direct hit:', v, '→', url)
+      return url
     }
   }
+
+  // Search-fallback
+  const found = await searchWikipedia(schoolName)
+  if (found) {
+    const url = await getWikipediaSummaryImage(found)
+    if (url) {
+      console.log('[fill-school] Wikipedia search-fallback:', found, '→', url)
+      return url
+    }
+  }
+  console.log('[fill-school] Wikipedia: ничего не нашли для', schoolName)
   return null
 }
 
@@ -375,8 +413,12 @@ async function handle(req: NextRequest) {
     else console.warn('[fill-school] logo_url failed HEAD check:', aiInput.logo_url)
   }
 
-  // campus_photo_url: сначала пробуем что вернул AI, потом fallback на Wikipedia API
-  console.log('[fill-school] AI вернул campus_photo_url:', aiInput.campus_photo_url || 'null')
+  // campus_photo_url: AI → Wikipedia API → onError на клиенте
+  const photoDiag: Record<string, string | null> = {
+    ai_returned: aiInput.campus_photo_url || null,
+    accepted: null,
+    source: null,
+  }
   let campusPhoto: string | null = null
   if (aiInput.campus_photo_url && /^https?:\/\//.test(aiInput.campus_photo_url)) {
     const url = String(aiInput.campus_photo_url).trim()
@@ -384,16 +426,21 @@ async function handle(req: NextRequest) {
     const isHtmlPage = /\/wiki\/File:|\.html?(\?|#|$)/i.test(url)
     if (isImage && !isHtmlPage) {
       campusPhoto = url
+      photoDiag.source = 'AI'
       console.log('[fill-school] AI photo accepted ✓')
     } else {
-      console.warn('[fill-school] AI photo rejected (не прямая картинка):', url)
+      console.warn('[fill-school] AI photo rejected (не картинка):', url)
     }
   }
   if (!campusPhoto) {
-    console.log('[fill-school] Fallback: пробуем Wikipedia API для', school.name)
+    console.log('[fill-school] Fallback Wikipedia для', school.name)
     campusPhoto = await fetchWikipediaImage(school.name)
+    if (campusPhoto) photoDiag.source = 'Wikipedia'
   }
-  if (campusPhoto) update.campus_photo_url = campusPhoto
+  if (campusPhoto) {
+    update.campus_photo_url = campusPhoto
+    photoDiag.accepted = campusPhoto
+  }
 
   if (aiInput.website && /^https?:\/\//.test(aiInput.website)) update.website = aiInput.website
   if (aiInput.curator_note && String(aiInput.curator_note).length > 20) {
@@ -404,16 +451,26 @@ async function handle(req: NextRequest) {
   }
 
   // Видео: формат + проверка через oEmbed (whitelist Goandstudy / канал вуза)
+  const videoDiag: Record<string, string | null> = {
+    ai_returned: aiInput.video_link || null,
+    accepted: null,
+    author: null,
+    reason: null,
+  }
   if (aiInput.video_link && /^https:\/\/(www\.)?youtube\.com\/embed\/[\w-]+/.test(aiInput.video_link)) {
     const verdict = await isAcceptableUniversityVideo(aiInput.video_link, school.name)
+    videoDiag.author = verdict.author || null
+    videoDiag.reason = verdict.reason
     if (verdict.ok) {
       update.video_link = aiInput.video_link
+      videoDiag.accepted = aiInput.video_link
       console.log('[fill-school] video accepted (', verdict.reason, '):', verdict.author)
     } else {
       console.warn('[fill-school] video REJECTED:', verdict.reason, '— канал:', verdict.author || 'неизвестен')
     }
   } else if (aiInput.video_link) {
-    console.warn('[fill-school] video bad format, ignored:', aiInput.video_link)
+    videoDiag.reason = 'неверный формат URL'
+    console.warn('[fill-school] video bad format:', aiInput.video_link)
   }
 
   // Локация
@@ -492,6 +549,8 @@ async function handle(req: NextRequest) {
       changes: Object.keys(update).length,
       updated: Object.keys(update),
       sources: aiInput.sources || [],
+      photo: photoDiag,
+      video: videoDiag,
     },
   })
 }
