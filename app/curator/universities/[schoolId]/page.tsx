@@ -98,6 +98,25 @@ export default async function SchoolPage({
         </div>
 
         <div style={{ padding: '20px 28px 40px' }}>
+          {/* Hero-фото кампуса от ИИ (только если найдено) */}
+          {school.campus_photo_url && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={school.campus_photo_url}
+              alt={school.name}
+              style={{
+                width: '100%',
+                height: 320,
+                objectFit: 'cover',
+                borderRadius: 14,
+                border: '1px solid var(--bor)',
+                marginBottom: 16,
+                display: 'block',
+                background: 'var(--surf)',
+              }}
+            />
+          )}
+
           {/* Шапка */}
           <div style={{
             display: 'flex', gap: 16, alignItems: 'flex-start',

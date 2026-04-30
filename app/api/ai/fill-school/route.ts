@@ -32,6 +32,10 @@ const SAVE_TOOL = {
         type: ['string', 'null'],
         description: 'Прямая ссылка на логотип (PNG/SVG/JPG). Только если уверен что URL рабочий — иначе null. Wikimedia Commons или официальный сайт.',
       },
+      campus_photo_url: {
+        type: ['string', 'null'],
+        description: 'Прямая ссылка на ОДНУ красивую фотографию кампуса (горизонтальная, JPG/PNG, разрешение от 1200px по ширине). Лучшие источники: Wikipedia infobox, официальный сайт вуза в разделе About. Не PR-постановка с людьми, не логотип, не карта — реальное фото зданий/территории. Если не уверен что URL живой и это именно кампус — null.',
+      },
       website: {
         type: ['string', 'null'],
         description: 'Официальный сайт вуза (https://...).',
@@ -132,7 +136,7 @@ async function handle(req: NextRequest) {
   const parser = createParserClient()
   const { data: school } = await parser
     .from('schools')
-    .select('id, name, country_code, city, province, address, postal_code, latitude, longitude, website, qs_rank, university_type, founded_in, logo_url, curator_note, description, video_link')
+    .select('id, name, country_code, city, province, address, postal_code, latitude, longitude, website, qs_rank, university_type, founded_in, logo_url, campus_photo_url, curator_note, description, video_link')
     .eq('id', schoolId)
     .maybeSingle()
   if (!school) return NextResponse.json({ ok: false, error: 'School not found' }, { status: 404 })
@@ -149,6 +153,7 @@ async function handle(req: NextRequest) {
 2. **Тип финансирования**: Государственный или Частный.
 3. **Год основания** (4 цифры).
 4. **Логотип** — прямая ссылка на PNG/SVG/JPG. ВАЖНО: убедись что ссылка реально ведёт на изображение. Лучше проверить через web_search ("название_вуза logo wikimedia commons" или "название_вуза logo png"). Если не уверен — null.
+4b. **Фото кампуса** (campus_photo_url) — ОДНА горизонтальная фотография кампуса/главного здания вуза, минимум 1200px по ширине. Источники: Wikipedia infobox (например прямая ссылка вида upload.wikimedia.org/wikipedia/commons/...), официальный сайт вуза. НЕ нужны: коллажи, фото с людьми/студентами в постановке, логотипы, карты. Только реальное фото зданий или территории. Если такой картинки не нашёл с уверенностью — null. Лучше пусто, чем кривая.
 5. **Официальный сайт** (https://).
 6. **curator_note** — короткий тизер 1-2 предложения для шапки страницы (НЕ длинное описание).
 7. **description** — ДЛИННОЕ описание (8-15 предложений) с секциями в Markdown:
@@ -217,6 +222,13 @@ async function handle(req: NextRequest) {
     const ok = await checkUrl(aiInput.logo_url, true)
     if (ok) update.logo_url = aiInput.logo_url
     else console.warn('[fill-school] logo_url failed HEAD check:', aiInput.logo_url)
+  }
+
+  // Валидация campus_photo_url
+  if (aiInput.campus_photo_url && /^https?:\/\//.test(aiInput.campus_photo_url)) {
+    const ok = await checkUrl(aiInput.campus_photo_url, true)
+    if (ok) update.campus_photo_url = aiInput.campus_photo_url
+    else console.warn('[fill-school] campus_photo_url failed HEAD check:', aiInput.campus_photo_url)
   }
 
   if (aiInput.website && /^https?:\/\//.test(aiInput.website)) update.website = aiInput.website
