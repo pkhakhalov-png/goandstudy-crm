@@ -34,7 +34,7 @@ const SAVE_TOOL = {
       },
       campus_photo_url: {
         type: ['string', 'null'],
-        description: 'Прямая ссылка на ОДНУ красивую фотографию кампуса (горизонтальная, JPG/PNG, разрешение от 1200px по ширине). Лучшие источники: Wikipedia infobox, официальный сайт вуза в разделе About. Не PR-постановка с людьми, не логотип, не карта — реальное фото зданий/территории. Если не уверен что URL живой и это именно кампус — null.',
+        description: 'Прямая ссылка на ОДНУ горизонтальную фотографию кампуса (JPG/PNG). ОБЯЗАТЕЛЬНО проверь страницу вуза в Wikipedia — там почти всегда есть infobox-image (типичный URL: upload.wikimedia.org/wikipedia/commons/...). Если не нашёл в Wikipedia — фото с официального сайта вуза (главная страница или About). Не подходят: логотипы, коллажи студентов, фото с людьми в постановке, карты. Только реальные снимки зданий/территории.',
       },
       website: {
         type: ['string', 'null'],
@@ -153,7 +153,7 @@ async function handle(req: NextRequest) {
 2. **Тип финансирования**: Государственный или Частный.
 3. **Год основания** (4 цифры).
 4. **Логотип** — прямая ссылка на PNG/SVG/JPG. ВАЖНО: убедись что ссылка реально ведёт на изображение. Лучше проверить через web_search ("название_вуза logo wikimedia commons" или "название_вуза logo png"). Если не уверен — null.
-4b. **Фото кампуса** (campus_photo_url) — ОДНА горизонтальная фотография кампуса/главного здания вуза, минимум 1200px по ширине. Источники: Wikipedia infobox (например прямая ссылка вида upload.wikimedia.org/wikipedia/commons/...), официальный сайт вуза. НЕ нужны: коллажи, фото с людьми/студентами в постановке, логотипы, карты. Только реальное фото зданий или территории. Если такой картинки не нашёл с уверенностью — null. Лучше пусто, чем кривая.
+4b. **Фото кампуса** (campus_photo_url) — ОДНА горизонтальная фотография кампуса/главного здания. ОБЯЗАТЕЛЬНО первым делом открой статью вуза в English Wikipedia — там в правом infobox-блоке почти всегда есть картинка (URL обычно upload.wikimedia.org/wikipedia/commons/thumb/.../1280px-...jpg или такой же без thumb/). Возьми её. Если в Wiki картинки нет — ищи на официальном сайте вуза в разделе About / Campus. Запрещены: логотипы, постановочные фото со студентами, коллажи, карты. Только здания/территория. Если совсем не нашёл — null.
 5. **Официальный сайт** (https://).
 6. **curator_note** — короткий тизер 1-2 предложения для шапки страницы (НЕ длинное описание).
 7. **description** — ДЛИННОЕ описание (8-15 предложений) с секциями в Markdown:
@@ -225,10 +225,15 @@ async function handle(req: NextRequest) {
   }
 
   // Валидация campus_photo_url
+  console.log('[fill-school] AI вернул campus_photo_url:', aiInput.campus_photo_url || 'null')
   if (aiInput.campus_photo_url && /^https?:\/\//.test(aiInput.campus_photo_url)) {
     const ok = await checkUrl(aiInput.campus_photo_url, true)
-    if (ok) update.campus_photo_url = aiInput.campus_photo_url
-    else console.warn('[fill-school] campus_photo_url failed HEAD check:', aiInput.campus_photo_url)
+    if (ok) {
+      update.campus_photo_url = aiInput.campus_photo_url
+      console.log('[fill-school] campus_photo_url passed HEAD ✓')
+    } else {
+      console.warn('[fill-school] campus_photo_url failed HEAD check:', aiInput.campus_photo_url)
+    }
   }
 
   if (aiInput.website && /^https?:\/\//.test(aiInput.website)) update.website = aiInput.website

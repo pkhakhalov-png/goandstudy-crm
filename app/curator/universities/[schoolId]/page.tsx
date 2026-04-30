@@ -202,18 +202,18 @@ function SchoolMap({ latitude, longitude, address, name, city, countryCode }: {
   city: string | null
   countryCode: string | null
 }) {
+  // Везде используем Google Maps (без API-ключа). Если есть точные координаты —
+  // строим запрос по lat,lng (точная точка). Иначе — по адресу/названию + городу.
   let embedUrl: string
   let mapLink: string
 
   if (latitude && longitude) {
-    // OpenStreetMap с маркером по координатам (точное)
     const lat = Number(latitude)
     const lon = Number(longitude)
-    const delta = 0.01
-    embedUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${lon - delta}%2C${lat - delta}%2C${lon + delta}%2C${lat + delta}&layer=mapnik&marker=${lat}%2C${lon}`
-    mapLink = `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}&zoom=16`
+    const q = `${lat},${lon}`
+    embedUrl = `https://www.google.com/maps?q=${q}&z=16&output=embed`
+    mapLink = `https://www.google.com/maps/search/?api=1&query=${q}`
   } else {
-    // Fallback: Google Maps по адресу (геокодинг на стороне Google, без API-ключа)
     const q = encodeURIComponent([address, name, city, countryCode?.toUpperCase()].filter(Boolean).join(', '))
     embedUrl = `https://www.google.com/maps?q=${q}&output=embed`
     mapLink = `https://www.google.com/maps/search/?api=1&query=${q}`
