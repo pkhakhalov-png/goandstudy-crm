@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { redirect, notFound } from 'next/navigation'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
-import { createParserClient, schoolPhotoUrl } from '@/lib/supabase/parser'
+import { createParserClient } from '@/lib/supabase/parser'
 import { createScholarshipsClient } from '@/lib/supabase/scholarships'
 import { CuratorSidebar } from '../../CuratorSidebar'
 import { SchoolTabs } from './SchoolTabs'
@@ -32,9 +32,8 @@ export default async function SchoolPage({
   if (profile?.role !== 'curator' && profile?.role !== 'admin' && profile?.role !== 'rop') redirect('/login')
 
   const parser = createParserClient()
-  const [{ data: school }, { data: photos }, { data: programs }] = await Promise.all([
+  const [{ data: school }, { data: programs }] = await Promise.all([
     parser.from('schools').select('*').eq('id', id).maybeSingle(),
-    parser.from('school_photos').select('id, storage_path, photo_type').eq('school_id', id).limit(5),
     parser.from('programs').select('id, name, tuition, application_fee, raw_data').eq('school_id', id).order('name'),
   ])
 
@@ -158,10 +157,7 @@ export default async function SchoolPage({
             />
           ) : null}
 
-          {/* Галерея */}
-          {(photos ?? []).length > 0 && (
-            <SchoolPhotoGallery photos={(photos ?? []).map(p => ({ id: p.id, url: schoolPhotoUrl(p.storage_path) }))} />
-          )}
+          {/* Галерея фотографий временно убрана — пока AI-шаблон не утверждён */}
 
           <SchoolTabs
             school={school}
@@ -178,43 +174,6 @@ export default async function SchoolPage({
   )
 }
 
-function SchoolPhotoGallery({ photos }: { photos: { id: string; url: string }[] }) {
-  if (photos.length === 0) return null
-  const main = photos[0]
-  const rest = photos.slice(1, 5)
-
-  return (
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: rest.length > 0 ? '2fr 1fr' : '1fr',
-      gap: 8,
-      marginBottom: 16,
-      height: 320,
-    }}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={main.url} alt="" style={{
-        width: '100%', height: '100%', objectFit: 'cover',
-        borderRadius: 14, border: '1px solid var(--bor)',
-      }} />
-      {rest.length > 0 && (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: rest.length >= 2 ? '1fr 1fr' : '1fr',
-          gridTemplateRows: rest.length >= 3 ? '1fr 1fr' : '1fr',
-          gap: 8,
-        }}>
-          {rest.map(p => (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img key={p.id} src={p.url} alt="" style={{
-              width: '100%', height: '100%', objectFit: 'cover',
-              borderRadius: 10, border: '1px solid var(--bor)', minHeight: 0,
-            }} />
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
 
 function SchoolMap({ latitude, longitude, address, name, city, countryCode }: {
   latitude: number | null
