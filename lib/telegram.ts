@@ -120,8 +120,11 @@ export function escHtml(s: string): string {
 
 /**
  * Уведомление о новой записи на консультацию.
- * Молча падает в лог если TELEGRAM_BOT_TOKEN или TELEGRAM_BOOKINGS_CHAT_ID не настроены —
- * чтобы недонастроенный TG не ломал саму запись.
+ * Использует ОТДЕЛЬНЫЙ бот (TELEGRAM_BOOKINGS_BOT_TOKEN) и групповой чат
+ * (TELEGRAM_BOOKINGS_CHAT_ID), чтобы не конфликтовать с основным
+ * TELEGRAM_BOT_TOKEN, который смотрит на Wazzup-сообщения.
+ *
+ * Молча логирует ошибку и не ломает createBooking, если что-то не так.
  */
 export async function notifyNewBooking(params: {
   salespersonName: string
@@ -134,9 +137,10 @@ export async function notifyNewBooking(params: {
   clientTelegram: string | null
   quizSummary?: string | null
 }): Promise<void> {
+  const token = process.env.TELEGRAM_BOOKINGS_BOT_TOKEN
   const chatId = process.env.TELEGRAM_BOOKINGS_CHAT_ID
-  if (!chatId || !process.env.TELEGRAM_BOT_TOKEN) {
-    console.log('[notifyNewBooking] TG не настроен — пропускаем уведомление')
+  if (!chatId || !token) {
+    console.log('[notifyNewBooking] TG не настроен (TELEGRAM_BOOKINGS_BOT_TOKEN / TELEGRAM_BOOKINGS_CHAT_ID) — пропускаем уведомление')
     return
   }
 
@@ -165,7 +169,21 @@ ${tag}
 📞 ${escHtml(params.clientPhone)}${tg}${quiz}`
 
   try {
-    await sendTelegramMessage(chatId, text, { parseMode: 'HTML' })
+    const res = await fetch(`${TG_API}/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text,
+        parse_mode: 'HTML',
+        disable_web_page_preview: true,
+      }),
+      signal: AbortSignal.timeout(8000),
+    })
+    if (!res.ok) {
+      const body = await res.text().catch(() => '')
+      console.error('[notifyNewBooking] TG API error', res.status, body.slice(0, 200))
+    }
   } catch (e: unknown) {
     console.error('[notifyNewBooking] failed:', e instanceof Error ? e.message : e)
   }
