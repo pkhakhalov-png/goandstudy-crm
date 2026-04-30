@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { resolveClientForViewer, getClientUnlockedScholarships, clientHasUnlockedScholarships } from '@/lib/client-data'
+import { resolveClientForViewer, getClientUnlockedScholarships } from '@/lib/client-data'
 import { ClientTopNav } from '../ClientTopNav'
 import { PreviewBanner } from '../PreviewBanner'
 
@@ -55,14 +55,9 @@ export default async function ClientScholarshipsPage({ searchParams }: { searchP
   })
   if (!client) redirect('/client')
 
-  // Если у клиента нет ни одной раскрытой стипендии — отправляем на главную.
-  // По требованию: «у клиента не будет типо стипендии замочек, ничего нет —
-  // оплачивает, куратор включает, появляется».
-  const hasUnlocked = await clientHasUnlockedScholarships(client.id)
-  if (!hasUnlocked) redirect('/client')
-
   const scholarships = await getClientUnlockedScholarships(client.id)
   const isPreview = profile?.role !== 'client'
+  const hasUnlocked = scholarships.length > 0
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--ds-bg)' }}>
@@ -70,7 +65,6 @@ export default async function ClientScholarshipsPage({ searchParams }: { searchP
       <ClientTopNav
         userName={profile?.name || user.email || ''}
         activePage="scholarships"
-        showScholarships
       />
 
       <section style={{ position: 'relative', overflow: 'hidden', borderBottom: '1px solid var(--ds-border-soft)', background: 'var(--ds-bg)' }}>
@@ -116,13 +110,39 @@ export default async function ClientScholarshipsPage({ searchParams }: { searchP
               lineHeight: 1.5, margin: 0, letterSpacing: '-0.005em',
             }}
           >
-            Куратор отобрал <b>{scholarships.length}</b> стипенди{scholarships.length === 1 ? 'ю' : 'й'} под твой проект.
-            Жми на любую — увидишь детали и сможешь подать заявку. По вопросам пиши куратору.
+            {hasUnlocked ? (
+              <>Куратор отобрал <b>{scholarships.length}</b> стипенди{scholarships.length === 1 ? 'ю' : 'й'} под твой проект.
+              Жми на любую — увидишь детали и сможешь подать заявку. По вопросам пиши куратору.</>
+            ) : (
+              <>Стипендии под твой профиль ещё подбираются. Куратор изучает варианты — после оплаты доп.услуги по подбору стипендий здесь появятся карточки с дедлайнами, суммой и инструкцией как подать.</>
+            )}
           </p>
         </div>
       </section>
 
       <main style={{ maxWidth: 1200, margin: '0 auto', padding: '32px 32px 80px' }}>
+        {!hasUnlocked && (
+          <div style={{
+            background: 'var(--ds-bg-alt)',
+            border: '1px dashed var(--ds-border)',
+            borderRadius: 'var(--ds-r-lg)',
+            padding: '60px 40px',
+            textAlign: 'center',
+          }}>
+            <div style={{
+              fontSize: 48, marginBottom: 16,
+              opacity: 0.6,
+            }}>🎓</div>
+            <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--ds-ink)', marginBottom: 8 }}>
+              Стипендии пока не подобраны
+            </div>
+            <div style={{ fontSize: 14, color: 'var(--ds-ink-dim)', maxWidth: 520, margin: '0 auto', lineHeight: 1.5 }}>
+              Куратор подбирает стипендии под твои вузы и профиль.
+              Подбор стипендий — отдельная услуга. По вопросам пиши куратору в разделе «Куратор».
+            </div>
+          </div>
+        )}
+
         <div style={{ display: 'grid', gap: 12 }}>
           {scholarships.map(s => {
             const badge = KIND_LABEL[s.kind] || KIND_LABEL.private
@@ -196,15 +216,17 @@ export default async function ClientScholarshipsPage({ searchParams }: { searchP
           })}
         </div>
 
-        <div style={{
-          marginTop: 32, padding: '20px 24px',
-          background: 'var(--ds-bg-alt)', borderRadius: 'var(--ds-r-md)',
-          fontSize: 13, color: 'var(--ds-ink-dim)', lineHeight: 1.6,
-        }}>
-          <b style={{ color: 'var(--ds-ink)' }}>Что дальше?</b><br />
-          Куратор подскажет какие подать в первую очередь и поможет собрать документы.
-          Если есть вопросы — пиши в личный кабинет → раздел «Куратор».
-        </div>
+        {hasUnlocked && (
+          <div style={{
+            marginTop: 32, padding: '20px 24px',
+            background: 'var(--ds-bg-alt)', borderRadius: 'var(--ds-r-md)',
+            fontSize: 13, color: 'var(--ds-ink-dim)', lineHeight: 1.6,
+          }}>
+            <b style={{ color: 'var(--ds-ink)' }}>Что дальше?</b><br />
+            Куратор подскажет какие подать в первую очередь и поможет собрать документы.
+            Если есть вопросы — пиши в личный кабинет → раздел «Куратор».
+          </div>
+        )}
       </main>
     </div>
   )

@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { resolveClientForViewer, getClientUniversities, clientHasUnlockedScholarships } from '@/lib/client-data'
+import { resolveClientForViewer, getClientUniversities } from '@/lib/client-data'
 import { ClientTopNav } from '../ClientTopNav'
 import { PreviewBanner } from '../PreviewBanner'
 import { ShortlistView } from './ShortlistView'
@@ -29,16 +29,13 @@ export default async function ClientShortlistPage({ searchParams }: { searchPara
   })
   if (!client) redirect('/client')
 
-  const [universities, hasUnlockedScholarships] = await Promise.all([
-    getClientUniversities(client.id),
-    clientHasUnlockedScholarships(client.id),
-  ])
+  const universities = await getClientUniversities(client.id)
   const isPreview = profile?.role !== 'client'
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--ds-bg)' }}>
       {isPreview && <PreviewBanner clientName={client.name || 'клиент'} clientId={client.id} />}
-      <ClientTopNav userName={profile?.name || user.email || ''} activePage="shortlist" showScholarships={hasUnlockedScholarships} />
+      <ClientTopNav userName={profile?.name || user.email || ''} activePage="shortlist" />
 
       <section style={{ position: 'relative', overflow: 'hidden', borderBottom: '1px solid var(--ds-border-soft)', background: 'var(--ds-bg)' }}>
         <div

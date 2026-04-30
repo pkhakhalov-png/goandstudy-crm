@@ -6,24 +6,19 @@ import { logout } from '@/app/login/actions'
 interface Props {
   userName: string
   activePage?: 'home' | 'documents' | 'shortlist' | 'scholarships' | 'curator'
+  /** Не используется — оставлен для обратной совместимости со старыми вызовами. */
   showScholarships?: boolean
 }
 
-const baseNavItems: { key: NonNullable<Props['activePage']>; href: string; label: string }[] = [
+const navItems: { key: NonNullable<Props['activePage']>; href: string; label: string }[] = [
   { key: 'home', href: '/client', label: 'Обзор' },
   { key: 'documents', href: '/client/documents', label: 'Документы' },
   { key: 'shortlist', href: '/client/shortlist', label: 'Вузы' },
+  { key: 'scholarships', href: '/client/scholarships', label: 'Стипендии' },
   { key: 'curator', href: '/client/curator', label: 'Куратор' },
 ]
 
-export function ClientTopNav({ userName, activePage = 'home', showScholarships = false }: Props) {
-  const navItems = showScholarships
-    ? [
-        ...baseNavItems.slice(0, 3),
-        { key: 'scholarships' as const, href: '/client/scholarships', label: 'Стипендии' },
-        baseNavItems[3], // куратор всегда в конце
-      ]
-    : baseNavItems
+export function ClientTopNav({ userName, activePage = 'home' }: Props) {
   const initials = (userName || 'МИ')
     .split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
 
