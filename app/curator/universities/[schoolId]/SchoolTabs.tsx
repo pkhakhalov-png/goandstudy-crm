@@ -228,7 +228,13 @@ function OverviewTab({ school, raw }: { school: any; raw: any }) {
   const applicationFeeRange = school.application_fee_range || raw.application_fee_range
   const avgProgramLength = school.avg_program_length || raw.avg_program_length
   const costOfLivingDetails = school.cost_of_living_details || raw.cost_of_living_details
-  const currency = raw.currency_of_fees?.code || school.currency_of_fees?.code || school.currency || ''
+  // AI-extras (заполнено через fill-school): валюта, кол-во студентов и т.п.
+  const extras = (raw.curator_extras as any) || {}
+  const currency = extras.tuition_currency
+    || raw.currency_of_fees?.code
+    || school.currency_of_fees?.code
+    || school.currency
+    || ''
   const intakesSummary = school.intakes_summary || raw.intakes_summary
   const institutionType = school.institution_type || raw.institution_type
   const foundedIn = school.founded_in || raw.founded_in
@@ -236,6 +242,10 @@ function OverviewTab({ school, raw }: { school: any; raw: any }) {
   const pgwpCount = school.pgwp_programs_count
   const processingTime = school.processing_time || raw.processing_time
   const videoLink = school.video_link || raw.video_link
+  const studentCount: number | null = typeof extras.student_count_total === 'number' ? extras.student_count_total : null
+  const intlShare: number | null = typeof extras.international_students_share === 'number' ? extras.international_students_share : null
+  const acceptanceRate: number | null = typeof extras.acceptance_rate === 'number' ? extras.acceptance_rate : null
+  const accreditations: string[] = Array.isArray(extras.accreditations) ? extras.accreditations : []
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 16 }} className="overview-grid">
@@ -288,21 +298,53 @@ function OverviewTab({ school, raw }: { school: any; raw: any }) {
           {school.school_group_id && <InfoRow k="Группа" v={`#${school.school_group_id}`} />}
         </div>
 
-        <div style={cardStyle}>
-          <div style={sectionTitle}>Стоимость</div>
-          {school.avg_tuition != null && (
-            <InfoRow k="Средняя цена" v={`${Math.round(Number(school.avg_tuition)).toLocaleString('ru')} ${currency}/год`} />
-          )}
-          {applicationFeeRange && (
-            <InfoRow k="Взнос за заявку" v={formatFeeRange(applicationFeeRange, currency)} />
-          )}
-          {school.cost_of_living != null && (
-            <InfoRow k="Жизнь" v={`${Math.round(Number(school.cost_of_living)).toLocaleString('ru')} ${currency}/год`} />
-          )}
-          {costOfLivingDetails && typeof costOfLivingDetails === 'object' && (
-            <CostOfLivingDetails details={costOfLivingDetails} currency={currency} />
-          )}
-        </div>
+        {(school.avg_tuition != null || school.cost_of_living != null || applicationFeeRange) && (
+          <div style={cardStyle}>
+            <div style={sectionTitle}>Стоимость</div>
+            {school.avg_tuition != null && (
+              <InfoRow k="Обучение" v={`${Math.round(Number(school.avg_tuition)).toLocaleString('ru')} ${currency}/год`} />
+            )}
+            {applicationFeeRange && (
+              <InfoRow k="Взнос за заявку" v={formatFeeRange(applicationFeeRange, currency)} />
+            )}
+            {school.cost_of_living != null && (
+              <InfoRow k="Жизнь" v={`${Math.round(Number(school.cost_of_living)).toLocaleString('ru')} ${currency}/год`} />
+            )}
+            {costOfLivingDetails && typeof costOfLivingDetails === 'object' && (
+              <CostOfLivingDetails details={costOfLivingDetails} currency={currency} />
+            )}
+          </div>
+        )}
+
+        {(studentCount != null || intlShare != null) && (
+          <div style={cardStyle}>
+            <div style={sectionTitle}>Студенты</div>
+            {studentCount != null && (
+              <InfoRow k="Всего" v={studentCount.toLocaleString('ru')} />
+            )}
+            {intlShare != null && (
+              <InfoRow k="Иностранцев" v={`${intlShare}%`} />
+            )}
+          </div>
+        )}
+
+        {acceptanceRate != null && (
+          <div style={cardStyle}>
+            <div style={sectionTitle}>Поступление</div>
+            <InfoRow k="Acceptance rate" v={`${acceptanceRate}%`} />
+          </div>
+        )}
+
+        {accreditations.length > 0 && (
+          <div style={cardStyle}>
+            <div style={sectionTitle}>Аккредитации</div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
+              {accreditations.map((a, i) => (
+                <span key={i} className="ctag" style={{ fontSize: 11 }}>{a}</span>
+              ))}
+            </div>
+          </div>
+        )}
 
         {(avgProgramLength || processingTime) && (
           <div style={cardStyle}>

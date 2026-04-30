@@ -77,6 +77,51 @@ const SAVE_TOOL = {
         type: ['number', 'null'],
         description: 'Долгота главного кампуса (decimal, e.g. -71.1167).',
       },
+      // ─── Цифры / факты для правой колонки карточки ───
+      avg_tuition_year_intl: {
+        type: ['number', 'null'],
+        description: 'Средняя стоимость обучения для ИНОСТРАННОГО студента за год, в первичной валюте вуза. Например 25000 для $25k/year. Для bachelor берём типичную цифру; если несколько уровней — для bachelor.',
+      },
+      tuition_currency: {
+        type: ['string', 'null'],
+        enum: ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'AED', 'CHF', 'SEK', 'DKK', 'NOK', 'CZK', 'PLN', 'HUF', 'JPY', 'CNY', 'KRW', null],
+        description: 'Валюта tuition. ISO 4217 (USD/EUR/GBP и т.п.).',
+      },
+      avg_living_cost_year: {
+        type: ['number', 'null'],
+        description: 'Средние расходы на проживание студента за год в той же валюте что tuition (жильё+еда+транспорт).',
+      },
+      avg_application_fee: {
+        type: ['number', 'null'],
+        description: 'Типичный application fee (взнос за заявку), число в той же валюте.',
+      },
+      typical_intakes: {
+        type: ['array', 'null'],
+        description: 'Месяцы старта программ для иностранцев. Пример: ["Сентябрь", "Январь"]. Только реальные intake-окна — не выдумывай.',
+        items: { type: 'string' },
+      },
+      student_count_total: {
+        type: ['integer', 'null'],
+        description: 'Общее число студентов вуза (приблизительно).',
+      },
+      international_students_share: {
+        type: ['number', 'null'],
+        description: 'Доля иностранных студентов в %. Например 23 значит 23%. Если не нашёл — null.',
+      },
+      acceptance_rate: {
+        type: ['number', 'null'],
+        description: 'Процент принятых от подавших, в %. Например 5 = 5% (Harvard). Если selective без точной цифры — null.',
+      },
+      top_specialties: {
+        type: ['array', 'null'],
+        description: 'Топ-5 направлений вуза на русском. Пример: ["Бизнес", "IT", "Дизайн"]. Берём из Wiki или сайта вуза.',
+        items: { type: 'string' },
+      },
+      accreditations: {
+        type: ['array', 'null'],
+        description: 'Список признанных аккредитаций (CAA, EQUIS, AACSB, AMBA, ACBSP, NWCCU и т.п.).',
+        items: { type: 'string' },
+      },
       sources: {
         type: ['array', 'null'],
         description: 'URL-источники откуда взята инфа (для логов).',
@@ -177,7 +222,19 @@ async function handle(req: NextRequest) {
    - Город / Регион / Почтовый индекс
    - Координаты (latitude / longitude в decimal). Возьми из Wikipedia.
 
-Если не уверен — null. Лучше пустое поле чем выдумка.`
+10. **Цифры о вузе** (ВАЖНО — куратору нужно показать клиенту, не ленись искать):
+   - **avg_tuition_year_intl** — типичная стоимость обучения (bachelor) для иностранца за год, число
+   - **tuition_currency** — валюта (USD/EUR/GBP/AED и т.п.)
+   - **avg_living_cost_year** — годовой living cost студента в той же валюте
+   - **avg_application_fee** — взнос за подачу заявки (число)
+   - **typical_intakes** — массив месяцев когда начинаются программы. Например ["Сентябрь"] или ["Сентябрь", "Январь"]
+   - **student_count_total** — общее число студентов
+   - **international_students_share** — % иностранцев (число от 0 до 100)
+   - **acceptance_rate** — % принятых (если selective и есть цифра)
+   - **top_specialties** — массив топ-5 направлений на русском (Бизнес, IT, Дизайн и т.п.)
+   - **accreditations** — массив аккредитаций (CAA, EQUIS, AACSB, AMBA и т.п.)
+
+Если не уверен — null. Лучше пустое поле чем выдумка. Но цифры из официальных источников / Wiki — не пропускай, они важны куратору.`
 
   let aiInput: any
   try {
@@ -256,6 +313,49 @@ async function handle(req: NextRequest) {
   if (aiInput.postal_code && String(aiInput.postal_code).trim()) update.postal_code = String(aiInput.postal_code).trim()
   if (typeof aiInput.latitude === 'number' && aiInput.latitude >= -90 && aiInput.latitude <= 90) update.latitude = aiInput.latitude
   if (typeof aiInput.longitude === 'number' && aiInput.longitude >= -180 && aiInput.longitude <= 180) update.longitude = aiInput.longitude
+
+  // Цифры → пишем частично в существующие колонки + остальное в raw_data.curator_extras
+  if (typeof aiInput.avg_tuition_year_intl === 'number' && aiInput.avg_tuition_year_intl > 0) {
+    update.avg_tuition = aiInput.avg_tuition_year_intl
+  }
+  if (typeof aiInput.avg_living_cost_year === 'number' && aiInput.avg_living_cost_year > 0) {
+    update.cost_of_living = aiInput.avg_living_cost_year
+  }
+  if (typeof aiInput.avg_application_fee === 'number' && aiInput.avg_application_fee >= 0) {
+    update.application_fee_range = { value: aiInput.avg_application_fee }
+  }
+  if (Array.isArray(aiInput.typical_intakes) && aiInput.typical_intakes.length > 0) {
+    update.intakes_summary = aiInput.typical_intakes.join(', ')
+  }
+  if (Array.isArray(aiInput.top_specialties) && aiInput.top_specialties.length > 0) {
+    update.top_disciplines = aiInput.top_specialties.slice(0, 5).map((name: string) => ({ name, count: null }))
+  }
+
+  // Доп.поля в raw_data.curator_extras (мерджим с существующими если есть)
+  const extras: Record<string, unknown> = {}
+  if (aiInput.tuition_currency) extras.tuition_currency = aiInput.tuition_currency
+  if (typeof aiInput.student_count_total === 'number' && aiInput.student_count_total > 0) {
+    extras.student_count_total = aiInput.student_count_total
+  }
+  if (typeof aiInput.international_students_share === 'number' && aiInput.international_students_share > 0 && aiInput.international_students_share <= 100) {
+    extras.international_students_share = aiInput.international_students_share
+  }
+  if (typeof aiInput.acceptance_rate === 'number' && aiInput.acceptance_rate > 0 && aiInput.acceptance_rate <= 100) {
+    extras.acceptance_rate = aiInput.acceptance_rate
+  }
+  if (Array.isArray(aiInput.accreditations) && aiInput.accreditations.length > 0) {
+    extras.accreditations = aiInput.accreditations
+  }
+  if (Object.keys(extras).length > 0) {
+    extras.filled_at = new Date().toISOString()
+    // Получим текущий raw_data чтобы смержить
+    const parserAdmin = createParserAdminClient()
+    const { data: current } = await parserAdmin
+      .from('schools').select('raw_data').eq('id', schoolId).maybeSingle()
+    const existingRaw = (current?.raw_data as any) || {}
+    const existingExtras = existingRaw.curator_extras || {}
+    update.raw_data = { ...existingRaw, curator_extras: { ...existingExtras, ...extras } }
+  }
 
   if (Object.keys(update).length === 0) {
     return NextResponse.json({ ok: true, data: { changes: 0, message: 'ИИ не нашёл новых данных' } })
