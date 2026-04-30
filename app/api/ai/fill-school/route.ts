@@ -136,7 +136,7 @@ async function handle(req: NextRequest) {
   const parser = createParserClient()
   const { data: school } = await parser
     .from('schools')
-    .select('id, name, country_code, city, province, address, postal_code, latitude, longitude, website, qs_rank, university_type, founded_in, logo_url, campus_photo_url, curator_note, description, video_link')
+    .select('id, name, country_code, city, province, address, postal_code, latitude, longitude, website, qs_rank, university_type, founded_in, logo_url, curator_note, description, video_link')
     .eq('id', schoolId)
     .maybeSingle()
   if (!school) return NextResponse.json({ ok: false, error: 'School not found' }, { status: 404 })
@@ -257,7 +257,15 @@ async function handle(req: NextRequest) {
   }
 
   const admin = createParserAdminClient()
-  const { error: dbErr } = await admin.from('schools').update(update).eq('id', schoolId)
+  let { error: dbErr } = await admin.from('schools').update(update).eq('id', schoolId)
+  // Если колонки campus_photo_url нет (миграция не применена) — повторяем без неё.
+  if (dbErr && /campus_photo_url/.test(dbErr.message)) {
+    console.warn('[fill-school] campus_photo_url column missing, retrying without it')
+    const { campus_photo_url, ...rest } = update as Record<string, unknown>
+    void campus_photo_url
+    const r = await admin.from('schools').update(rest).eq('id', schoolId)
+    dbErr = r.error
+  }
   if (dbErr) return NextResponse.json({ ok: false, error: `DB: ${dbErr.message}` }, { status: 500 })
 
   revalidatePath(`/curator/universities/${schoolId}`)
