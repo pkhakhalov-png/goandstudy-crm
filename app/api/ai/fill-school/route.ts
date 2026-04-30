@@ -160,7 +160,29 @@ async function getWikipediaSummaryImage(title: string): Promise<string | null> {
     }
     if (data.type === 'disambiguation') return null
     const url = data.originalimage?.source || data.thumbnail?.source
-    if (url && /\.(jpe?g|png|webp)(\?|#|$)/i.test(url)) return url
+    // Принимаем любую картинку с upload.wikimedia.org даже без явного расширения
+    if (url && (/\.(jpe?g|png|webp|svg)(\?|#|$)/i.test(url) || /upload\.wikimedia\.org/i.test(url))) return url
+    return null
+  } catch { return null }
+}
+
+/** Альтернативный путь: action=query&prop=pageimages — даёт thumbnail страницы */
+async function getWikipediaPageImage(title: string): Promise<string | null> {
+  try {
+    const r = await fetch(
+      `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(title.replace(/\s+/g, '_'))}&prop=pageimages&format=json&pithumbsize=1600&origin=*`,
+      {
+        signal: AbortSignal.timeout(8000),
+        headers: { 'User-Agent': 'go-and-study-crm/1.0' },
+      },
+    )
+    if (!r.ok) return null
+    const data = await r.json() as { query?: { pages?: Record<string, { thumbnail?: { source: string } }> } }
+    const pages = data.query?.pages || {}
+    for (const k of Object.keys(pages)) {
+      const src = pages[k]?.thumbnail?.source
+      if (src) return src
+    }
     return null
   } catch { return null }
 }
@@ -197,8 +219,9 @@ async function fetchWikipediaImage(schoolName: string): Promise<string | null> {
   const noCity = schoolName.replace(/\s+(Dubai|London|Paris|Milan|Florence|Mumbai|Shanghai|Singapore|New York|Berlin|Madrid|Toronto|Vancouver|Sydney|Melbourne|Brisbane)\s*$/i, '').trim()
   if (noCity && noCity !== schoolName) variants.add(noCity)
 
+  // Пробуем все варианты через summary, потом через pageimages
   for (const v of variants) {
-    const url = await getWikipediaSummaryImage(v)
+    const url = (await getWikipediaSummaryImage(v)) || (await getWikipediaPageImage(v))
     if (url) {
       console.log('[fill-school] Wikipedia direct hit:', v, '→', url)
       return url
@@ -208,11 +231,12 @@ async function fetchWikipediaImage(schoolName: string): Promise<string | null> {
   // Search-fallback
   const found = await searchWikipedia(schoolName)
   if (found) {
-    const url = await getWikipediaSummaryImage(found)
+    const url = (await getWikipediaSummaryImage(found)) || (await getWikipediaPageImage(found))
     if (url) {
       console.log('[fill-school] Wikipedia search-fallback:', found, '→', url)
       return url
     }
+    console.log('[fill-school] Wikipedia search нашёл page «' + found + '», но картинки нет')
   }
   console.log('[fill-school] Wikipedia: ничего не нашли для', schoolName)
   return null
@@ -436,6 +460,7 @@ async function handle(req: NextRequest) {
     console.log('[fill-school] Fallback Wikipedia для', school.name)
     campusPhoto = await fetchWikipediaImage(school.name)
     if (campusPhoto) photoDiag.source = 'Wikipedia'
+    else photoDiag.source = 'не найдено в Wikipedia'
   }
   if (campusPhoto) {
     update.campus_photo_url = campusPhoto
