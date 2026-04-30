@@ -34,7 +34,7 @@ const SAVE_TOOL = {
       },
       campus_photo_url: {
         type: ['string', 'null'],
-        description: 'Прямая ссылка на ОДНУ горизонтальную фотографию кампуса (JPG/PNG). ОБЯЗАТЕЛЬНО проверь страницу вуза в Wikipedia — там почти всегда есть infobox-image (типичный URL: upload.wikimedia.org/wikipedia/commons/...). Если не нашёл в Wikipedia — фото с официального сайта вуза (главная страница или About). Не подходят: логотипы, коллажи студентов, фото с людьми в постановке, карты. Только реальные снимки зданий/территории.',
+        description: 'ПРЯМАЯ ссылка на ИЗОБРАЖЕНИЕ кампуса. URL ОБЯЗАН заканчиваться на .jpg/.jpeg/.png/.webp (например upload.wikimedia.org/wikipedia/commons/.../1280px-XXX.jpg). НЕЛЬЗЯ возвращать ссылку на HTML-страницу типа en.wikipedia.org/wiki/File:XXX.jpg или сайт вуза. Только сама картинка. Лучший источник: Wikipedia infobox image. Не подходят: логотипы, постановочные фото со студентами, коллажи, карты. Только здания/территория.',
       },
       website: {
         type: ['string', 'null'],
@@ -50,7 +50,7 @@ const SAVE_TOOL = {
       },
       video_link: {
         type: ['string', 'null'],
-        description: 'YouTube embed URL официального видео-тура или промо вуза. Формат: https://www.youtube.com/embed/VIDEO_ID. Если не уверен или нет — null.',
+        description: 'YouTube embed URL ТОЛЬКО с ОФИЦИАЛЬНОГО канала самого университета. Формат: https://www.youtube.com/embed/VIDEO_ID. КАТЕГОРИЧЕСКИ запрещено брать видео с каналов агентств / образовательных консультантов / посредников (SMAPS, IDP, ApplyBoard, Crimson Education, Hotcourses, KCM Stars, EduGate, Studyportals, Schoolapply и т.п.) — даже если они рекламируют этот вуз. Если канал не принадлежит самому вузу или ты не уверен — null.',
       },
       // Локация
       address: {
@@ -157,6 +157,46 @@ async function checkUrl(url: string, expectImage = false): Promise<boolean> {
     return true
   } catch {
     return false
+  }
+}
+
+/**
+ * YouTube видео можно брать ТОЛЬКО с канала самого вуза.
+ * Через oEmbed получаем author_name и сверяем с именем вуза + блок-листом
+ * образовательных консультантов / агентств.
+ */
+const VIDEO_BLOCKLIST_KEYWORDS = [
+  'smaps', 'idp', 'applyboard', 'crimson', 'hotcourses', 'kcm', 'edugate',
+  'studyportals', 'schoolapply', 'studyabroad', 'edvoy', 'shorelight',
+  'mastersportal', 'unipage', 'navitas', 'agency', 'консалт', 'агентств',
+  'обучен', 'консультант',
+]
+
+async function isOfficialUniversityVideo(embedUrl: string, schoolName: string): Promise<{ ok: boolean; reason: string; author?: string }> {
+  // Извлекаем ID видео из embed URL
+  const m = /youtube\.com\/embed\/([\w-]+)/.exec(embedUrl)
+  if (!m) return { ok: false, reason: 'не youtube embed' }
+  const videoId = m[1]
+  try {
+    const oembed = await fetch(
+      `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`,
+      { signal: AbortSignal.timeout(8000) },
+    )
+    if (!oembed.ok) return { ok: false, reason: `oembed ${oembed.status}` }
+    const data = await oembed.json() as { author_name?: string; title?: string }
+    const author = (data.author_name || '').toLowerCase()
+    if (!author) return { ok: false, reason: 'нет author_name' }
+    // Блок-лист
+    for (const kw of VIDEO_BLOCKLIST_KEYWORDS) {
+      if (author.includes(kw)) return { ok: false, reason: `канал содержит «${kw}»`, author: data.author_name }
+    }
+    // Имя канала должно содержать общую токены с именем вуза
+    const schoolTokens = schoolName.toLowerCase().split(/[\s\-,.()/]+/).filter(t => t.length >= 4)
+    const matched = schoolTokens.some(t => author.includes(t))
+    if (!matched) return { ok: false, reason: 'имя канала не совпадает с вузом', author: data.author_name }
+    return { ok: true, reason: 'ok', author: data.author_name }
+  } catch (e) {
+    return { ok: false, reason: e instanceof Error ? e.message : 'oembed error' }
   }
 }
 
@@ -281,15 +321,19 @@ async function handle(req: NextRequest) {
     else console.warn('[fill-school] logo_url failed HEAD check:', aiInput.logo_url)
   }
 
-  // Валидация campus_photo_url
+  // campus_photo_url — без HEAD (Wikimedia/CDN часто блокируют HEAD).
+  // Сохраняем если URL валидный + ведёт на картинку (по расширению).
+  // Битые ссылки спрячет onError на клиенте.
   console.log('[fill-school] AI вернул campus_photo_url:', aiInput.campus_photo_url || 'null')
   if (aiInput.campus_photo_url && /^https?:\/\//.test(aiInput.campus_photo_url)) {
-    const ok = await checkUrl(aiInput.campus_photo_url, true)
-    if (ok) {
-      update.campus_photo_url = aiInput.campus_photo_url
-      console.log('[fill-school] campus_photo_url passed HEAD ✓')
+    const url = String(aiInput.campus_photo_url).trim()
+    const isImage = /\.(jpe?g|png|webp|svg)(\?|#|$)/i.test(url)
+    const isHtmlPage = /\/wiki\/File:|\.html?(\?|#|$)/i.test(url)
+    if (isImage && !isHtmlPage) {
+      update.campus_photo_url = url
+      console.log('[fill-school] campus_photo_url accepted ✓')
     } else {
-      console.warn('[fill-school] campus_photo_url failed HEAD check:', aiInput.campus_photo_url)
+      console.warn('[fill-school] campus_photo_url rejected (не прямая картинка):', url)
     }
   }
 
@@ -301,9 +345,17 @@ async function handle(req: NextRequest) {
     update.description = String(aiInput.description).trim()
   }
 
-  // YouTube embed: должен начинаться с https://www.youtube.com/embed/ — иначе игнорируем
+  // Видео: формат + проверка через oEmbed что канал принадлежит вузу
   if (aiInput.video_link && /^https:\/\/(www\.)?youtube\.com\/embed\/[\w-]+/.test(aiInput.video_link)) {
-    update.video_link = aiInput.video_link
+    const verdict = await isOfficialUniversityVideo(aiInput.video_link, school.name)
+    if (verdict.ok) {
+      update.video_link = aiInput.video_link
+      console.log('[fill-school] video accepted from channel:', verdict.author)
+    } else {
+      console.warn('[fill-school] video REJECTED:', verdict.reason, '— канал:', verdict.author || 'неизвестен')
+    }
+  } else if (aiInput.video_link) {
+    console.warn('[fill-school] video bad format, ignored:', aiInput.video_link)
   }
 
   // Локация

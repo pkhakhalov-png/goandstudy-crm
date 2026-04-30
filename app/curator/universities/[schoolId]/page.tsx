@@ -7,6 +7,7 @@ import { CuratorSidebar } from '../../CuratorSidebar'
 import { SchoolTabs } from './SchoolTabs'
 import { FillSchoolButton } from './FillSchoolButton'
 import { SchoolHeaderLogo } from './SchoolHeaderLogo'
+import { SchoolHeroPhoto } from './SchoolHeroPhoto'
 
 const COUNTRY_LABEL: Record<string, string> = {
   ca: 'Канада', au: 'Австралия', gb: 'Великобритания', de: 'Германия', us: 'США',
@@ -98,23 +99,9 @@ export default async function SchoolPage({
         </div>
 
         <div style={{ padding: '20px 28px 40px' }}>
-          {/* Hero-фото кампуса от ИИ (только если найдено) */}
+          {/* Hero-фото кампуса от ИИ (если 404 — клиент-компонент сам спрячет) */}
           {school.campus_photo_url && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={school.campus_photo_url}
-              alt={school.name}
-              style={{
-                width: '100%',
-                height: 320,
-                objectFit: 'cover',
-                borderRadius: 14,
-                border: '1px solid var(--bor)',
-                marginBottom: 16,
-                display: 'block',
-                background: 'var(--surf)',
-              }}
-            />
+            <SchoolHeroPhoto src={school.campus_photo_url} name={school.name} />
           )}
 
           {/* Шапка */}
