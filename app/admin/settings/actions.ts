@@ -44,6 +44,16 @@ export async function activateSalesperson(formData: FormData): Promise<void> {
   revalidatePath('/admin/settings')
 }
 
+export async function updateSalespersonTg(formData: FormData): Promise<void> {
+  const supabase = await createClient()
+  const id = formData.get('id') as string
+  const raw = (formData.get('telegram_username') as string || '').trim()
+  // Без префикса @, без пробелов; пустое значение → null
+  const cleaned = raw.replace(/^@/, '').replace(/\s+/g, '') || null
+  await supabase.from('users').update({ telegram_username: cleaned }).eq('id', id)
+  revalidatePath('/admin/settings')
+}
+
 export async function addCurator(formData: FormData): Promise<void> {
   const supabase = await createClient()
   await supabase.from('curators').insert({ name: formData.get('name') as string })

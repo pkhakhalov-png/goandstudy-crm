@@ -2,12 +2,12 @@
 
 import { useState } from 'react'
 import {
-  addSalesperson, deactivateSalesperson, activateSalesperson, resetSalespersonPassword,
+  addSalesperson, deactivateSalesperson, activateSalesperson, resetSalespersonPassword, updateSalespersonTg,
   addCurator, deactivateCurator, activateCurator, updateCuratorName,
   addFixedExpense, updateFixedExpense, toggleFixedExpense, deleteFixedExpense
 } from './actions'
 
-type Salesperson = { id: string; name: string; email: string; is_active: boolean }
+type Salesperson = { id: string; name: string; email: string; is_active: boolean; telegram_username: string | null }
 type Curator = { id: string; name: string; is_active: boolean }
 type FixedExpense = { id: string; name: string; period: string; article: string; is_active: boolean }
 
@@ -93,12 +93,25 @@ export function SettingsClient({ salespersons, curators, fixedExpenses, bookings
           <button type="submit" style={{ padding: '8px 16px', background: '#B15ECC', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' as const }}>+ Добавить</button>
         </form>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead><tr><th style={thStyle}>Имя</th><th style={thStyle}>Email</th><th style={thStyle}>Статус</th><th style={{ ...thStyle, textAlign: 'right' as const }}></th></tr></thead>
+          <thead><tr><th style={thStyle}>Имя</th><th style={thStyle}>Email</th><th style={thStyle}>TG для уведомлений</th><th style={thStyle}>Статус</th><th style={{ ...thStyle, textAlign: 'right' as const }}></th></tr></thead>
           <tbody>
             {salespersons.map(s => (
               <tr key={s.id} style={{ borderBottom: '1px solid rgba(0,0,0,.07)' }}>
                 <td style={{ padding: '12px 20px', fontSize: 13, fontWeight: 600 }}>{s.name}</td>
                 <td style={{ padding: '12px 20px', fontSize: 12, color: '#8a8796' }}>{s.email}</td>
+                <td style={{ padding: '12px 20px' }}>
+                  <form action={updateSalespersonTg} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <input type="hidden" name="id" value={s.id} />
+                    <span style={{ fontSize: 12, color: '#8a8796' }}>@</span>
+                    <input
+                      name="telegram_username"
+                      defaultValue={s.telegram_username || ''}
+                      placeholder="username"
+                      style={{ padding: '5px 8px', border: '1px solid rgba(0,0,0,.12)', borderRadius: 6, fontSize: 12, fontFamily: 'inherit', outline: 'none', width: 140 }}
+                    />
+                    <button type="submit" style={{ padding: '4px 10px', background: '#fff', border: '1px solid rgba(0,0,0,.12)', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer', color: '#B15ECC', fontFamily: 'inherit' }}>OK</button>
+                  </form>
+                </td>
                 <td style={{ padding: '12px 20px' }}>
                   {s.is_active
                     ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 20, fontSize: 10, fontWeight: 600, background: 'rgba(22,163,97,.1)', color: '#16a361' }}>● Активен</span>
@@ -122,7 +135,7 @@ export function SettingsClient({ salespersons, curators, fixedExpenses, bookings
                 </td>
               </tr>
             ))}
-            {salespersons.length === 0 && <tr><td colSpan={4} style={{ padding: '20px', textAlign: 'center', fontSize: 12, color: '#8a8796' }}>Нет продажников</td></tr>}
+            {salespersons.length === 0 && <tr><td colSpan={5} style={{ padding: '20px', textAlign: 'center', fontSize: 12, color: '#8a8796' }}>Нет продажников</td></tr>}
           </tbody>
         </table>
       </div>}

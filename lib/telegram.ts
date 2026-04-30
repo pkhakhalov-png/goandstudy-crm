@@ -92,17 +92,83 @@ export async function getTelegramWebhook() {
   return res.json()
 }
 
-export async function sendTelegramMessage(chatId: number | string, text: string) {
+export async function sendTelegramMessage(
+  chatId: number | string,
+  text: string,
+  opts: { parseMode?: 'HTML' | 'MarkdownV2'; disableWebPreview?: boolean } = {},
+) {
+  const body: Record<string, unknown> = { chat_id: chatId, text }
+  if (opts.parseMode) body.parse_mode = opts.parseMode
+  if (opts.disableWebPreview ?? true) body.disable_web_page_preview = true
+
   const res = await fetch(`${TG_API}/bot${getToken()}/sendMessage`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: chatId, text }),
+    body: JSON.stringify(body),
   })
   if (!res.ok) {
     const err = await res.text()
     throw new Error(`TG send failed: ${res.status} ${err}`)
   }
   return res.json()
+}
+
+/** Экранирование для HTML parse_mode. */
+export function escHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+/**
+ * Уведомление о новой записи на консультацию.
+ * Молча падает в лог если TELEGRAM_BOT_TOKEN или TELEGRAM_BOOKINGS_CHAT_ID не настроены —
+ * чтобы недонастроенный TG не ломал саму запись.
+ */
+export async function notifyNewBooking(params: {
+  salespersonName: string
+  salespersonTgUsername: string | null
+  date: string  // YYYY-MM-DD
+  startTime: string  // HH:MM
+  endTime: string  // HH:MM
+  clientName: string
+  clientPhone: string
+  clientTelegram: string | null
+  quizSummary?: string | null
+}): Promise<void> {
+  const chatId = process.env.TELEGRAM_BOOKINGS_CHAT_ID
+  if (!chatId || !process.env.TELEGRAM_BOT_TOKEN) {
+    console.log('[notifyNewBooking] TG не настроен — пропускаем уведомление')
+    return
+  }
+
+  const tag = params.salespersonTgUsername
+    ? `@${params.salespersonTgUsername.replace(/^@/, '')}`
+    : `<b>${escHtml(params.salespersonName)}</b> (TG не задан)`
+
+  let dateLabel = params.date
+  try {
+    dateLabel = new Date(params.date + 'T12:00:00.000Z').toLocaleDateString('ru', {
+      day: 'numeric', month: 'long', timeZone: 'Europe/Moscow',
+    })
+  } catch {}
+
+  const tg = params.clientTelegram
+    ? `\n💬 TG: ${escHtml(params.clientTelegram.startsWith('@') ? params.clientTelegram : '@' + params.clientTelegram)}`
+    : ''
+
+  const quiz = params.quizSummary ? `\n\n${escHtml(params.quizSummary)}` : ''
+
+  const text = `🆕 <b>Новая запись на консультацию</b>
+${tag}
+
+🗓 ${escHtml(dateLabel)} · ${escHtml(params.startTime)}–${escHtml(params.endTime)} (МСК)
+👤 ${escHtml(params.clientName)}
+📞 ${escHtml(params.clientPhone)}${tg}${quiz}`
+
+  try {
+    await sendTelegramMessage(chatId, text, { parseMode: 'HTML' })
+  } catch (e: unknown) {
+    console.error('[notifyNewBooking] failed:', e instanceof Error ? e.message : e)
+  }
 }
 
 /**

@@ -3,6 +3,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { normalizePhone } from '@/lib/phone'
 import { timeToMinutes, MIN_GAP_MINUTES } from '@/lib/time'
+import { notifyNewBooking } from '@/lib/telegram'
 
 export async function createBooking(formData: FormData) {
   const supabase = await createAdminClient()
@@ -55,7 +56,7 @@ export async function createBooking(formData: FormData) {
   // 2. Check which salespersons are active
   const { data: activeUsers } = await supabase
     .from('users')
-    .select('id, round_robin_count')
+    .select('id, name, round_robin_count, telegram_username')
     .in('id', userIds)
     .eq('is_active', true)
     .eq('role', 'salesperson')
@@ -91,15 +92,16 @@ export async function createBooking(formData: FormData) {
   }
 
   // 4. Pick salesperson: fixed manager or round-robin
-  let assignedUser: { id: string; round_robin_count: number }
+  type AssignedUser = { id: string; name: string | null; round_robin_count: number; telegram_username: string | null }
+  let assignedUser: AssignedUser
 
   if (fixedManagerId && freeIds.includes(fixedManagerId)) {
-    assignedUser = activeUsers.find(u => u.id === fixedManagerId)!
+    assignedUser = activeUsers.find(u => u.id === fixedManagerId)! as AssignedUser
   } else {
     const freeUsers = activeUsers
       .filter(u => freeIds.includes(u.id))
       .sort((a, b) => a.round_robin_count - b.round_robin_count)
-    assignedUser = freeUsers[0]
+    assignedUser = freeUsers[0] as AssignedUser
   }
 
   if (!assignedUser) return { error: 'Менеджер недоступен на это время' }
@@ -204,6 +206,30 @@ export async function createBooking(formData: FormData) {
   } catch {}
 
   console.log('[BOOK] success! assigned to:', assignedUser.id)
+
+  // 8. Уведомление в TG-группу (не блокируем — fire-and-forget с логом ошибок)
+  try {
+    const quizParts: string[] = []
+    if (quizData.country) quizParts.push(`Страна: ${quizData.country}`)
+    if (quizData.degree) quizParts.push(`Уровень: ${quizData.degree}`)
+    if (quizData.budget) quizParts.push(`Бюджет: ${quizData.budget}`)
+    if (quizData.year) quizParts.push(`Год: ${quizData.year}`)
+    const quizSummary = quizParts.length > 0 ? quizParts.join(' · ') : null
+
+    await notifyNewBooking({
+      salespersonName: assignedUser.name || `User ${assignedUser.id.slice(0, 8)}`,
+      salespersonTgUsername: assignedUser.telegram_username,
+      date,
+      startTime: st.slice(0, 5),
+      endTime: et.slice(0, 5),
+      clientName,
+      clientPhone,
+      clientTelegram,
+      quizSummary,
+    })
+  } catch (e) {
+    console.error('[BOOK] TG notify failed:', e)
+  }
 
   return { success: true, bookingId: insertedBooking?.id }
 }
