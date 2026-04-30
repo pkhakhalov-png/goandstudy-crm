@@ -50,7 +50,7 @@ const SAVE_TOOL = {
       },
       video_link: {
         type: ['string', 'null'],
-        description: 'YouTube embed URL ТОЛЬКО с ОФИЦИАЛЬНОГО канала самого университета. Формат: https://www.youtube.com/embed/VIDEO_ID. КАТЕГОРИЧЕСКИ запрещено брать видео с каналов агентств / образовательных консультантов / посредников (SMAPS, IDP, ApplyBoard, Crimson Education, Hotcourses, KCM Stars, EduGate, Studyportals, Schoolapply и т.п.) — даже если они рекламируют этот вуз. Если канал не принадлежит самому вузу или ты не уверен — null.',
+        description: 'YouTube embed URL. Приоритет: 1) канал @Goandstudy (https://www.youtube.com/@Goandstudy/videos) — обязательно сначала проверь там видео про этот вуз. 2) Только если на @Goandstudy ничего нет — официальный канал самого университета. КАТЕГОРИЧЕСКИ запрещено брать видео с каналов агентств / образовательных консультантов / посредников (SMAPS, IDP, ApplyBoard, Crimson Education, Hotcourses, KCM Stars, EduGate, Studyportals, Schoolapply и т.п.). Формат: https://www.youtube.com/embed/VIDEO_ID. Если ни на @Goandstudy ни на канале вуза — null.',
       },
       // Локация
       address: {
@@ -142,6 +142,44 @@ export async function POST(req: NextRequest) {
   }
 }
 
+/**
+ * Wikipedia REST API: достаём картинку из infobox статьи о вузе.
+ * Это самый надёжный путь — у большинства известных вузов в Wiki есть фото
+ * главного здания/кампуса.
+ */
+async function fetchWikipediaImage(schoolName: string): Promise<string | null> {
+  // Берём первое имя без скобок/городов
+  const cleanName = schoolName.replace(/\(.*?\)/g, '').trim()
+  const variants = [cleanName, schoolName]
+  for (const variant of variants) {
+    try {
+      const title = encodeURIComponent(variant.replace(/\s+/g, '_'))
+      const r = await fetch(
+        `https://en.wikipedia.org/api/rest_v1/page/summary/${title}`,
+        {
+          signal: AbortSignal.timeout(8000),
+          headers: { 'User-Agent': 'go-and-study-crm/1.0' },
+        },
+      )
+      if (!r.ok) continue
+      const data = await r.json() as {
+        originalimage?: { source: string; width: number; height: number }
+        thumbnail?: { source: string }
+        type?: string
+      }
+      if (data.type === 'disambiguation') continue  // страница-перенаправление
+      const url = data.originalimage?.source || data.thumbnail?.source
+      if (url && /\.(jpe?g|png|webp)(\?|#|$)/i.test(url)) {
+        console.log('[fill-school] Wikipedia image found:', url)
+        return url
+      }
+    } catch (e) {
+      console.warn('[fill-school] Wikipedia API error:', e instanceof Error ? e.message : e)
+    }
+  }
+  return null
+}
+
 async function checkUrl(url: string, expectImage = false): Promise<boolean> {
   try {
     const r = await fetch(url, {
@@ -161,19 +199,23 @@ async function checkUrl(url: string, expectImage = false): Promise<boolean> {
 }
 
 /**
- * YouTube видео можно брать ТОЛЬКО с канала самого вуза.
- * Через oEmbed получаем author_name и сверяем с именем вуза + блок-листом
- * образовательных консультантов / агентств.
+ * YouTube видео берём только с двух источников:
+ *   1. Канал @Goandstudy (наш собственный) — всегда whitelist
+ *   2. Официальный канал самого вуза (имя канала пересекается с именем вуза)
+ * Каналы агентств и посредников жёстко блокируются.
  */
 const VIDEO_BLOCKLIST_KEYWORDS = [
-  'smaps', 'idp', 'applyboard', 'crimson', 'hotcourses', 'kcm', 'edugate',
+  'smaps', 'idp ', 'idp education', 'applyboard', 'crimson', 'hotcourses', 'kcm', 'edugate',
   'studyportals', 'schoolapply', 'studyabroad', 'edvoy', 'shorelight',
   'mastersportal', 'unipage', 'navitas', 'agency', 'консалт', 'агентств',
   'обучен', 'консультант',
 ]
 
-async function isOfficialUniversityVideo(embedUrl: string, schoolName: string): Promise<{ ok: boolean; reason: string; author?: string }> {
-  // Извлекаем ID видео из embed URL
+const VIDEO_WHITELIST_AUTHORS = [
+  'goandstudy', 'go and study', 'go & study',
+]
+
+async function isAcceptableUniversityVideo(embedUrl: string, schoolName: string): Promise<{ ok: boolean; reason: string; author?: string }> {
   const m = /youtube\.com\/embed\/([\w-]+)/.exec(embedUrl)
   if (!m) return { ok: false, reason: 'не youtube embed' }
   const videoId = m[1]
@@ -186,15 +228,23 @@ async function isOfficialUniversityVideo(embedUrl: string, schoolName: string): 
     const data = await oembed.json() as { author_name?: string; title?: string }
     const author = (data.author_name || '').toLowerCase()
     if (!author) return { ok: false, reason: 'нет author_name' }
-    // Блок-лист
+
+    // 1. Whitelist — наш канал
+    for (const w of VIDEO_WHITELIST_AUTHORS) {
+      if (author.includes(w)) return { ok: true, reason: 'наш канал Goandstudy', author: data.author_name }
+    }
+
+    // 2. Блок-лист агентств
     for (const kw of VIDEO_BLOCKLIST_KEYWORDS) {
       if (author.includes(kw)) return { ok: false, reason: `канал содержит «${kw}»`, author: data.author_name }
     }
-    // Имя канала должно содержать общую токены с именем вуза
+
+    // 3. Канал самого вуза — имя должно пересекаться
     const schoolTokens = schoolName.toLowerCase().split(/[\s\-,.()/]+/).filter(t => t.length >= 4)
     const matched = schoolTokens.some(t => author.includes(t))
     if (!matched) return { ok: false, reason: 'имя канала не совпадает с вузом', author: data.author_name }
-    return { ok: true, reason: 'ok', author: data.author_name }
+
+    return { ok: true, reason: 'канал вуза', author: data.author_name }
   } catch (e) {
     return { ok: false, reason: e instanceof Error ? e.message : 'oembed error' }
   }
@@ -256,7 +306,11 @@ async function handle(req: NextRequest) {
 
    ## Кампус и атмосфера
    {размер кампуса, инфраструктура, культура, спорт}
-8. **video_link** — официальный YouTube embed URL вуза. Формат должен быть точно https://www.youtube.com/embed/VIDEO_ID. Проверь что видео существует. Если нет — null.
+8. **video_link** — YouTube embed. ПОРЯДОК ПОИСКА:
+   1) Сначала проверь канал @Goandstudy → https://www.youtube.com/@Goandstudy/videos. Найди там видео про этот вуз (поиск "@Goandstudy ${school.name}" в google или прямо на канале)
+   2) Если на @Goandstudy нет — официальный канал самого университета
+   3) Если ни там, ни там — null
+   Формат: https://www.youtube.com/embed/VIDEO_ID. НИКОГДА не бери видео от агентств / посредников.
 9. **Локация главного кампуса**:
    - Точный почтовый адрес (улица, дом)
    - Город / Регион / Почтовый индекс
@@ -321,21 +375,25 @@ async function handle(req: NextRequest) {
     else console.warn('[fill-school] logo_url failed HEAD check:', aiInput.logo_url)
   }
 
-  // campus_photo_url — без HEAD (Wikimedia/CDN часто блокируют HEAD).
-  // Сохраняем если URL валидный + ведёт на картинку (по расширению).
-  // Битые ссылки спрячет onError на клиенте.
+  // campus_photo_url: сначала пробуем что вернул AI, потом fallback на Wikipedia API
   console.log('[fill-school] AI вернул campus_photo_url:', aiInput.campus_photo_url || 'null')
+  let campusPhoto: string | null = null
   if (aiInput.campus_photo_url && /^https?:\/\//.test(aiInput.campus_photo_url)) {
     const url = String(aiInput.campus_photo_url).trim()
     const isImage = /\.(jpe?g|png|webp|svg)(\?|#|$)/i.test(url)
     const isHtmlPage = /\/wiki\/File:|\.html?(\?|#|$)/i.test(url)
     if (isImage && !isHtmlPage) {
-      update.campus_photo_url = url
-      console.log('[fill-school] campus_photo_url accepted ✓')
+      campusPhoto = url
+      console.log('[fill-school] AI photo accepted ✓')
     } else {
-      console.warn('[fill-school] campus_photo_url rejected (не прямая картинка):', url)
+      console.warn('[fill-school] AI photo rejected (не прямая картинка):', url)
     }
   }
+  if (!campusPhoto) {
+    console.log('[fill-school] Fallback: пробуем Wikipedia API для', school.name)
+    campusPhoto = await fetchWikipediaImage(school.name)
+  }
+  if (campusPhoto) update.campus_photo_url = campusPhoto
 
   if (aiInput.website && /^https?:\/\//.test(aiInput.website)) update.website = aiInput.website
   if (aiInput.curator_note && String(aiInput.curator_note).length > 20) {
@@ -345,12 +403,12 @@ async function handle(req: NextRequest) {
     update.description = String(aiInput.description).trim()
   }
 
-  // Видео: формат + проверка через oEmbed что канал принадлежит вузу
+  // Видео: формат + проверка через oEmbed (whitelist Goandstudy / канал вуза)
   if (aiInput.video_link && /^https:\/\/(www\.)?youtube\.com\/embed\/[\w-]+/.test(aiInput.video_link)) {
-    const verdict = await isOfficialUniversityVideo(aiInput.video_link, school.name)
+    const verdict = await isAcceptableUniversityVideo(aiInput.video_link, school.name)
     if (verdict.ok) {
       update.video_link = aiInput.video_link
-      console.log('[fill-school] video accepted from channel:', verdict.author)
+      console.log('[fill-school] video accepted (', verdict.reason, '):', verdict.author)
     } else {
       console.warn('[fill-school] video REJECTED:', verdict.reason, '— канал:', verdict.author || 'неизвестен')
     }
