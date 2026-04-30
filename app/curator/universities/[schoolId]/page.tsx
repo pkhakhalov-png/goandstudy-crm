@@ -189,19 +189,24 @@ function SchoolMap({ latitude, longitude, address, name, city, countryCode }: {
   city: string | null
   countryCode: string | null
 }) {
-  // Везде используем Google Maps (без API-ключа). Если есть точные координаты —
-  // строим запрос по lat,lng (точная точка). Иначе — по адресу/названию + городу.
+  // Всегда Google Maps. ВСЕГДА строим запрос по имени вуза + адресу/городу/стране,
+  // даже если есть координаты — так Google показывает «карточку места» (название
+  // на пине, фото, рейтинг), а не просто точку в воздухе.
+  // Координаты используем как уточнение через @lat,lng,zoom если есть.
+  const queryParts = [name, address, city, countryCode?.toUpperCase()].filter(Boolean)
+  const queryStr = queryParts.join(', ')
+  const q = encodeURIComponent(queryStr)
+
   let embedUrl: string
   let mapLink: string
-
   if (latitude && longitude) {
+    // ll= даёт центр карты, q= — поиск места. Google найдёт вуз по имени и поставит маркер,
+    // если имя совпадёт — лучше чем просто точка по lat/lng.
     const lat = Number(latitude)
     const lon = Number(longitude)
-    const q = `${lat},${lon}`
-    embedUrl = `https://www.google.com/maps?q=${q}&z=16&output=embed`
+    embedUrl = `https://www.google.com/maps?q=${q}&ll=${lat},${lon}&z=16&output=embed`
     mapLink = `https://www.google.com/maps/search/?api=1&query=${q}`
   } else {
-    const q = encodeURIComponent([address, name, city, countryCode?.toUpperCase()].filter(Boolean).join(', '))
     embedUrl = `https://www.google.com/maps?q=${q}&output=embed`
     mapLink = `https://www.google.com/maps/search/?api=1&query=${q}`
   }
