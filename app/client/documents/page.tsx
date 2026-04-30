@@ -5,6 +5,7 @@ import {
   resolveClientForViewer,
   getClientDocumentRows,
   getClientEssays,
+  clientHasUnlockedScholarships,
 } from '@/lib/client-data'
 import { ClientTopNav } from '../ClientTopNav'
 import { PreviewBanner } from '../PreviewBanner'
@@ -41,9 +42,10 @@ export default async function ClientDocumentsPage({ searchParams }: { searchPara
   })
   if (!client) redirect('/client')
 
-  const [documentRows, essayRows] = await Promise.all([
+  const [documentRows, essayRows, hasUnlockedScholarships] = await Promise.all([
     getClientDocumentRows(client.id),
     getClientEssays(client.id),
+    clientHasUnlockedScholarships(client.id),
   ])
 
   const resumeEssay = essayRows.find(r => r.type === 'resume')
@@ -89,7 +91,7 @@ export default async function ClientDocumentsPage({ searchParams }: { searchPara
   return (
     <div style={{ minHeight: '100vh', background: 'var(--ds-bg)' }}>
       {isPreview && <PreviewBanner clientName={client.name || 'клиент'} clientId={client.id} />}
-      <ClientTopNav userName={displayName} activePage="documents" />
+      <ClientTopNav userName={displayName} activePage="documents" showScholarships={hasUnlockedScholarships} />
 
       <section style={{ position: 'relative', overflow: 'hidden', borderBottom: '1px solid var(--ds-border-soft)', background: 'var(--ds-bg)' }}>
         <div

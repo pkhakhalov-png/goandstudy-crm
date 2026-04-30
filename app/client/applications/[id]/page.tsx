@@ -8,6 +8,7 @@ import {
   getApplicationEvents,
   getClientDocumentRows,
   getClientEssays,
+  clientHasUnlockedScholarships,
 } from '@/lib/client-data'
 import { ClientTopNav } from '@/app/client/ClientTopNav'
 import { PreviewBanner } from '@/app/client/PreviewBanner'
@@ -43,11 +44,12 @@ export default async function ClientApplicationPage({
   const app = await getApplication(id)
   if (!app || app.client_id !== client.id) notFound()
 
-  const [documents, events, globalDocs, essays] = await Promise.all([
+  const [documents, events, globalDocs, essays, hasUnlockedScholarships] = await Promise.all([
     getApplicationDocuments(id),
     getApplicationEvents(id),
     getClientDocumentRows(client.id),
     getClientEssays(client.id),
+    clientHasUnlockedScholarships(client.id),
   ])
 
   const isPreview = profile?.role !== 'client'
@@ -57,7 +59,7 @@ export default async function ClientApplicationPage({
   return (
     <div style={{ minHeight: '100vh', background: 'var(--ds-bg)' }}>
       {isPreview && <PreviewBanner clientName={client.name || 'клиент'} clientId={client.id} />}
-      <ClientTopNav userName={profile?.name || user.email || ''} activePage="home" />
+      <ClientTopNav userName={profile?.name || user.email || ''} activePage="home" showScholarships={hasUnlockedScholarships} />
 
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 32px 80px' }}>
         <Link

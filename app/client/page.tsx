@@ -10,6 +10,7 @@ import {
   getClientDocumentRows,
   getClientEssays,
   getClientApplications,
+  clientHasUnlockedScholarships,
 } from '@/lib/client-data'
 import { ClientTopNav } from './ClientTopNav'
 import { DashboardHero } from './DashboardHero'
@@ -67,12 +68,13 @@ export default async function ClientHomePage({ searchParams }: { searchParams: P
     )
   }
 
-  const [timeline, universities, documentRows, essayRows, applications] = await Promise.all([
+  const [timeline, universities, documentRows, essayRows, applications, hasUnlockedScholarships] = await Promise.all([
     getClientTimeline(client.id),
     getClientUniversities(client.id),
     getClientDocumentRows(client.id),
     getClientEssays(client.id),
     getClientApplications(client.id),
+    clientHasUnlockedScholarships(client.id),
   ])
 
   // Derive essay state for EssayCards (maps DB status → mock EssayState)
@@ -137,7 +139,7 @@ export default async function ClientHomePage({ searchParams }: { searchParams: P
   return (
     <div style={{ minHeight: '100vh', background: 'var(--ds-bg)' }}>
       {isPreview && <PreviewBanner clientName={client.name || 'клиент'} clientId={client.id} />}
-      <ClientTopNav userName={displayName} activePage="home" />
+      <ClientTopNav userName={displayName} activePage="home" showScholarships={hasUnlockedScholarships} />
 
       <DashboardHero
         ctx={{

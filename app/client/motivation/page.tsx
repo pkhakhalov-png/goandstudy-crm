@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { resolveClientForViewer, getClientEssay } from '@/lib/client-data'
+import { resolveClientForViewer, getClientEssay, clientHasUnlockedScholarships } from '@/lib/client-data'
 import { ClientTopNav } from '../ClientTopNav'
 import { MotivationEditor } from './MotivationEditor'
 import { CLIENT_CTX } from '../mock-data'
@@ -32,6 +32,7 @@ export default async function MotivationBuilderPage({
     requestedClientId,
   })
   const essay = client ? await getClientEssay(client.id, 'motivation') : null
+  const hasUnlockedScholarships = client ? await clientHasUnlockedScholarships(client.id) : false
   const rawContent =
     essay?.status === 'approved' && essay.curator_content
       ? essay.curator_content
@@ -47,7 +48,7 @@ export default async function MotivationBuilderPage({
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--ds-bg)' }}>
-      <ClientTopNav userName={profile?.name || user.email || ''} activePage="home" />
+      <ClientTopNav userName={profile?.name || user.email || ''} activePage="home" showScholarships={hasUnlockedScholarships} />
 
       <section
         style={{

@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { resolveClientForViewer, getClientEssay } from '@/lib/client-data'
+import { resolveClientForViewer, getClientEssay, clientHasUnlockedScholarships } from '@/lib/client-data'
 import { ClientTopNav } from '../ClientTopNav'
 import { ResumeEditor } from './ResumeEditor'
 
@@ -28,6 +28,7 @@ export default async function ResumeBuilderPage({
   })
 
   const essay = client ? await getClientEssay(client.id, 'resume') : null
+  const hasUnlockedScholarships = client ? await clientHasUnlockedScholarships(client.id) : false
   // /client/* is always client-cabinet preview. Curator edits via /curator/clients/[id]/resume.
   // If approved → client sees curator_content (final), else their own content.
   const rawContent =
@@ -49,7 +50,7 @@ export default async function ResumeBuilderPage({
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--ds-bg)' }}>
-      <ClientTopNav userName={profile?.name || user.email || ''} activePage="home" />
+      <ClientTopNav userName={profile?.name || user.email || ''} activePage="home" showScholarships={hasUnlockedScholarships} />
 
       <section style={{ position: 'relative', overflow: 'hidden', borderBottom: '1px solid var(--ds-border-soft)', background: 'var(--ds-bg)' }}>
         <div aria-hidden style={{ position: 'absolute', top: '-30%', left: '-10%', width: 900, height: 500, background: 'radial-gradient(ellipse at center, rgba(181,127,207,0.16) 0%, transparent 65%)', pointerEvents: 'none' }} />

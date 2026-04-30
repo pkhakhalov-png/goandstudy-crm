@@ -458,6 +458,47 @@ export async function getAllApplicationsForCurator(curatorId: string | null): Pr
   }))
 }
 
+export type UnlockedScholarshipRow = {
+  id: string
+  client_id: number
+  kind: 'private' | 'government' | 'idp'
+  scholarship_id: number
+  scholarship_title: string
+  institution_title: string | null
+  amount_text: string | null
+  deadline: string | null
+  status: 'planned' | 'preparing' | 'applying' | 'submitted' | 'awarded' | 'rejected'
+  notes: string | null
+  unlocked_for_client: boolean
+  created_at: string
+  updated_at: string
+}
+
+/** Стипендии, которые куратор раскрыл клиенту. */
+export async function getClientUnlockedScholarships(clientId: number): Promise<UnlockedScholarshipRow[]> {
+  const admin = await createAdminClient()
+  const { data } = await admin
+    .from('client_scholarships')
+    .select('*')
+    .eq('client_id', clientId)
+    .eq('unlocked_for_client', true)
+    .order('deadline', { ascending: true, nullsFirst: false })
+    .then(r => r, () => ({ data: [] }))
+  return (data as UnlockedScholarshipRow[]) || []
+}
+
+/** Есть ли у клиента хотя бы одна раскрытая стипендия (для показа таба в меню). */
+export async function clientHasUnlockedScholarships(clientId: number): Promise<boolean> {
+  const admin = await createAdminClient()
+  const { count } = await admin
+    .from('client_scholarships')
+    .select('id', { count: 'exact', head: true })
+    .eq('client_id', clientId)
+    .eq('unlocked_for_client', true)
+    .then(r => r, () => ({ count: 0 }))
+  return (count || 0) > 0
+}
+
 export async function getClientDocuments(clientId: number): Promise<RequiredDoc[]> {
   const admin = await createAdminClient()
   const { data } = await admin
