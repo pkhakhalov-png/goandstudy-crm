@@ -31,7 +31,8 @@ export default async function SchoolPage({
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
   const { data: profile } = await supabase.from('users').select('name, role').eq('id', user.id).single()
-  if (profile?.role !== 'curator' && profile?.role !== 'admin' && profile?.role !== 'rop') redirect('/login')
+  // Клиенту разрешено заходить на детали школы в read-only (asClient=1)
+  if (profile?.role !== 'curator' && profile?.role !== 'admin' && profile?.role !== 'rop' && profile?.role !== 'client') redirect('/login')
 
   const parser = createParserClient()
   const [{ data: school }, { data: programs }] = await Promise.all([
@@ -85,7 +86,9 @@ export default async function SchoolPage({
 
   return (
     <div className="app">
-      <CuratorSidebar userName={profile?.name || ''} userEmail={user.email || ''} initials={initials} activePage="universities" />
+      {!asClient && (
+        <CuratorSidebar userName={profile?.name || ''} userEmail={user.email || ''} initials={initials} activePage="universities" />
+      )}
       <div className="main">
         <div className="topbar" style={{ gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

@@ -80,7 +80,14 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/curator', request.url))
     }
     if (profile?.role === 'client') {
-      return NextResponse.redirect(new URL('/client', request.url))
+      // Клиент имеет read-only доступ к деталям программ и вузов из подборки
+      // (используются ?asClient=1 — серверная страница сама прячет curator-only кнопки).
+      const isReadOnlyDetail =
+        /^\/curator\/universities\/[^/]+/.test(pathname) ||
+        /^\/curator\/programs\/[^/]+/.test(pathname)
+      if (!isReadOnlyDetail) {
+        return NextResponse.redirect(new URL('/client', request.url))
+      }
     }
   }
 

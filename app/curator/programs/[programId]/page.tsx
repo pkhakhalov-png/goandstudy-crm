@@ -42,7 +42,8 @@ export default async function ProgramPage({
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
   const { data: profile } = await supabase.from('users').select('name, role').eq('id', user.id).single()
-  if (profile?.role !== 'curator' && profile?.role !== 'admin' && profile?.role !== 'rop') redirect('/login')
+  // Клиенту разрешён read-only просмотр программы (asClient=1)
+  if (profile?.role !== 'curator' && profile?.role !== 'admin' && profile?.role !== 'rop' && profile?.role !== 'client') redirect('/login')
 
   const parser = createParserClient()
   const { data: program } = await parser
@@ -131,7 +132,9 @@ export default async function ProgramPage({
 
   return (
     <div className="app">
-      <CuratorSidebar userName={profile?.name || ''} userEmail={user.email || ''} initials={initials} activePage="universities" />
+      {!asClient && (
+        <CuratorSidebar userName={profile?.name || ''} userEmail={user.email || ''} initials={initials} activePage="universities" />
+      )}
       <div className="main">
         <div className="topbar" style={{ gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
