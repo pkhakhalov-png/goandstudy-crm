@@ -6,6 +6,7 @@ import { normalizePhone } from '@/lib/phone'
 import { sendWazzupMessage, getTgapiChannelId, type ChatType } from '@/lib/wazzup'
 import { sendTelegramMessage } from '@/lib/telegram'
 import { suggestSalesReply } from '@/lib/ai'
+import { createClientInvitation } from '@/lib/invitation'
 
 function reval() {
   revalidatePath('/admin/funnel')
@@ -166,6 +167,18 @@ export async function moveDeal(formData: FormData) {
           }
 
           await admin.from('deal_activities').insert({ deal_id: dealId, user_id: user.id, activity_type: 'system', content: 'Клиент оформлен' })
+
+          // Генерируем invite-ссылку для клиента (если есть email).
+          // Если ссылка уже была — createClientInvitation вернёт существующую.
+          try {
+            const invite = await createClientInvitation(clientId, user.id)
+            if (invite.ok) {
+              reval()
+              return { success: true, clientId, inviteUrl: invite.url, emailSent: invite.emailSent }
+            }
+          } catch (e) {
+            console.error('[moveDeal] invite generation error:', e)
+          }
         }
       }
     } catch (e) {

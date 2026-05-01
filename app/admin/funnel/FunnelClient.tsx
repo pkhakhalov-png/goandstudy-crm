@@ -44,6 +44,8 @@ export function FunnelClient({ stages: serverStages, deals: serverDeals, salespe
 
   // Onboarding modal
   const [onboardingModal, setOnboardingModal] = useState<{ dealId: string; stageId: string; stageName: string; oldStageName: string } | null>(null)
+  const [inviteModal, setInviteModal] = useState<{ url: string; emailSent: boolean } | null>(null)
+  const [inviteCopied, setInviteCopied] = useState(false)
   const [obCuratorId, setObCuratorId] = useState('')
   const [obTotalAmount, setObTotalAmount] = useState('')
   const [obMonths, setObMonths] = useState('6')
@@ -260,7 +262,7 @@ export function FunnelClient({ stages: serverStages, deals: serverDeals, salespe
     fd.append('months', obMonths)
     fd.append('first_pay_date', obFirstPayDate)
     if (obGroupChatId) fd.append('group_chat_id', obGroupChatId)
-    await moveDeal(fd)
+    const result = await moveDeal(fd)
 
     setObSaving(false)
     setOnboardingModal(null)
@@ -268,6 +270,14 @@ export function FunnelClient({ stages: serverStages, deals: serverDeals, salespe
     setObTotalAmount('')
     setObMonths('6')
     setObGroupChatId('')
+
+    // Если получили invite-ссылку — открываем модалку для копирования
+    if (result && (result as any).inviteUrl) {
+      setInviteModal({
+        url: (result as any).inviteUrl,
+        emailSent: !!(result as any).emailSent,
+      })
+    }
   }
 
   function resetDrag() {
@@ -970,6 +980,88 @@ export function FunnelClient({ stages: serverStages, deals: serverDeals, salespe
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* INVITE-ссылка после оформления клиента */}
+      {inviteModal && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 1000,
+            background: 'rgba(20,18,30,.55)', backdropFilter: 'blur(8px)',
+            display: 'grid', placeItems: 'center', padding: 24,
+          }}
+          onClick={(e) => { if (e.target === e.currentTarget) { setInviteModal(null); setInviteCopied(false) } }}
+        >
+          <div style={{
+            background: '#fff', borderRadius: 18, maxWidth: 520, width: '100%',
+            padding: 32, boxShadow: '0 24px 60px rgba(20,18,30,.25)',
+            fontFamily: '-apple-system, sans-serif',
+          }}>
+            <div style={{ fontSize: 48, marginBottom: 8, textAlign: 'center' }}>🔗</div>
+            <h2 style={{ fontSize: 20, fontWeight: 700, margin: '0 0 8px', textAlign: 'center' }}>
+              Ссылка для активации кабинета
+            </h2>
+            <p style={{ fontSize: 13, color: '#8a8796', textAlign: 'center', margin: '0 0 20px', lineHeight: 1.5 }}>
+              Срок 30 дней, одноразовая. Отправь клиенту через TG/WhatsApp если email не настроен.
+            </p>
+
+            <div style={{
+              display: 'flex', gap: 6, marginBottom: 12,
+              background: '#F9F8FC', border: '1px solid rgba(0,0,0,.08)',
+              borderRadius: 10, padding: 6,
+            }}>
+              <input
+                type="text" value={inviteModal.url} readOnly
+                onFocus={e => e.currentTarget.select()}
+                style={{
+                  flex: 1, fontSize: 12, fontFamily: 'monospace',
+                  padding: '8px 10px', border: 'none', outline: 'none',
+                  background: 'transparent', color: '#14121e',
+                }}
+              />
+              <button
+                type="button"
+                onClick={async () => {
+                  try { await navigator.clipboard.writeText(inviteModal.url) } catch {}
+                  setInviteCopied(true)
+                  setTimeout(() => setInviteCopied(false), 2000)
+                }}
+                style={{
+                  padding: '8px 16px', fontSize: 12, fontWeight: 600,
+                  background: inviteCopied ? '#16a361' : '#B15ECC', color: '#fff',
+                  border: 'none', borderRadius: 8, cursor: 'pointer',
+                  fontFamily: 'inherit', whiteSpace: 'nowrap',
+                }}
+              >
+                {inviteCopied ? '✓ Скопировано' : 'Копировать'}
+              </button>
+            </div>
+
+            <div style={{
+              padding: '10px 14px',
+              background: inviteModal.emailSent ? 'rgba(22,163,97,.08)' : 'rgba(255,193,7,.08)',
+              border: `1px solid ${inviteModal.emailSent ? 'rgba(22,163,97,.25)' : 'rgba(255,193,7,.3)'}`,
+              borderRadius: 8, fontSize: 12, lineHeight: 1.5, marginBottom: 16,
+            }}>
+              {inviteModal.emailSent ? '✓ Email с ссылкой отправлен клиенту' : '⚠ Email не отправлен — скопируй ссылку и пошли вручную'}
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                onClick={() => { setInviteModal(null); setInviteCopied(false) }}
+                style={{
+                  padding: '10px 20px', fontSize: 13, fontWeight: 600,
+                  background: '#14121e', color: '#fff',
+                  border: 'none', borderRadius: 10, cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
+              >
+                Готово
+              </button>
+            </div>
           </div>
         </div>
       )}
