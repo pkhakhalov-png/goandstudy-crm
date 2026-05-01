@@ -56,8 +56,31 @@ export async function updateSalespersonTg(formData: FormData): Promise<void> {
 
 export async function addCurator(formData: FormData): Promise<void> {
   const supabase = await createClient()
-  await supabase.from('curators').insert({ name: formData.get('name') as string })
+  const name = (formData.get('name') as string)?.trim()
+  const email = (formData.get('email') as string)?.trim() || null
+  await supabase.from('curators').insert({ name, email })
   revalidatePath('/admin/settings')
+}
+
+export async function updateCuratorEmail(formData: FormData): Promise<void> {
+  const supabase = await createClient()
+  const email = (formData.get('email') as string)?.trim() || null
+  await supabase.from('curators').update({ email }).eq('id', formData.get('id') as string)
+  revalidatePath('/admin/settings')
+}
+
+// Сгенерировать invite-ссылку куратору
+export async function generateCuratorInviteAction(curatorId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Не авторизован' }
+  const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single()
+  if (profile?.role !== 'admin') return { error: 'Только админ' }
+
+  const { createCuratorInvitation } = await import('@/lib/curator-invitation')
+  const result = await createCuratorInvitation(curatorId, user.id)
+  if (!result.ok) return { error: result.error }
+  return { success: true, url: result.url, emailSent: result.emailSent, emailError: result.emailError }
 }
 
 export async function deactivateCurator(formData: FormData): Promise<void> {

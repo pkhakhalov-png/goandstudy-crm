@@ -3,12 +3,13 @@
 import { useState } from 'react'
 import {
   addSalesperson, deactivateSalesperson, activateSalesperson, resetSalespersonPassword, updateSalespersonTg,
-  addCurator, deactivateCurator, activateCurator, updateCuratorName,
+  addCurator, deactivateCurator, activateCurator, updateCuratorName, updateCuratorEmail,
   addFixedExpense, updateFixedExpense, toggleFixedExpense, deleteFixedExpense
 } from './actions'
+import { CuratorInviteButton } from './CuratorInviteButton'
 
 type Salesperson = { id: string; name: string; email: string; is_active: boolean; telegram_username: string | null }
-type Curator = { id: string; name: string; is_active: boolean }
+type Curator = { id: string; name: string; is_active: boolean; email?: string | null; user_id?: string | null }
 type FixedExpense = { id: string; name: string; period: string; article: string; is_active: boolean }
 
 const cardStyle = {
@@ -146,12 +147,13 @@ export function SettingsClient({ salespersons, curators, fixedExpenses, bookings
           <div style={{ fontSize: 13, fontWeight: 700 }}>Кураторы</div>
           <div style={{ fontSize: 11, color: '#8a8796' }}>{curators.length} чел.</div>
         </div>
-        <form action={addCurator} style={{ padding: '14px 20px', background: '#F9F8FC', borderBottom: '1px solid rgba(0,0,0,.07)', display: 'flex', gap: 8 }}>
+        <form action={addCurator} style={{ padding: '14px 20px', background: '#F9F8FC', borderBottom: '1px solid rgba(0,0,0,.07)', display: 'flex', gap: 8, flexWrap: 'wrap' as const }}>
           <input name="name" required placeholder="Имя куратора" style={inputStyle} />
+          <input name="email" type="email" placeholder="Email (для входа в кабинет)" style={inputStyle} />
           <button type="submit" style={{ padding: '8px 16px', background: '#B15ECC', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' as const }}>+ Добавить</button>
         </form>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead><tr><th style={thStyle}>Имя</th><th style={thStyle}>Статус</th><th style={{ ...thStyle, textAlign: 'right' as const }}></th></tr></thead>
+          <thead><tr><th style={thStyle}>Имя</th><th style={thStyle}>Email</th><th style={thStyle}>Кабинет</th><th style={thStyle}>Статус</th><th style={{ ...thStyle, textAlign: 'right' as const }}></th></tr></thead>
           <tbody>
             {curators.map(c => (
               <tr key={c.id} style={{ borderBottom: '1px solid rgba(0,0,0,.07)' }}>
@@ -166,6 +168,27 @@ export function SettingsClient({ salespersons, curators, fixedExpenses, bookings
                   ) : (
                     <span style={{ fontSize: 13, fontWeight: 600 }}>{c.name}</span>
                   )}
+                </td>
+                <td style={{ padding: '12px 20px' }}>
+                  <form action={updateCuratorEmail} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <input type="hidden" name="id" value={c.id} />
+                    <input
+                      name="email"
+                      type="email"
+                      defaultValue={c.email || ''}
+                      placeholder="email@example.com"
+                      style={{ padding: '5px 8px', border: '1px solid rgba(0,0,0,.12)', borderRadius: 6, fontSize: 12, fontFamily: 'inherit', outline: 'none', width: 180 }}
+                    />
+                    <button type="submit" style={{ padding: '4px 10px', background: '#fff', border: '1px solid rgba(0,0,0,.12)', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer', color: '#B15ECC', fontFamily: 'inherit' }}>OK</button>
+                  </form>
+                </td>
+                <td style={{ padding: '12px 20px' }}>
+                  <CuratorInviteButton
+                    curatorId={c.id}
+                    curatorName={c.name}
+                    hasEmail={!!c.email}
+                    hasUserId={!!c.user_id}
+                  />
                 </td>
                 <td style={{ padding: '12px 20px' }}>
                   {c.is_active
@@ -186,7 +209,7 @@ export function SettingsClient({ salespersons, curators, fixedExpenses, bookings
                 </td>
               </tr>
             ))}
-            {curators.length === 0 && <tr><td colSpan={3} style={{ padding: '20px', textAlign: 'center', fontSize: 12, color: '#8a8796' }}>Нет кураторов</td></tr>}
+            {curators.length === 0 && <tr><td colSpan={5} style={{ padding: '20px', textAlign: 'center', fontSize: 12, color: '#8a8796' }}>Нет кураторов</td></tr>}
           </tbody>
         </table>
       </div>}
