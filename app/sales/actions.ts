@@ -56,3 +56,29 @@ export async function completeTask(formData: FormData) {
   revalidatePath('/rop')
   return { success: true }
 }
+
+
+// Сгенерировать invite-ссылку для клиента залогиненным продажником.
+// Доступно если клиент привязан к этому продажнику (или роль admin/rop).
+export async function generateInviteForOwnClient(clientId: number) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: "Не авторизован" }
+
+  const { data: profile } = await supabase.from("users").select("role").eq("id", user.id).single()
+  const isPrivileged = profile?.role === "admin" || profile?.role === "rop"
+
+  if (!isPrivileged) {
+    // Продажник — проверяем что клиент его
+    const admin = await createAdminClient()
+    const { data: client } = await admin.from("clients").select("salesperson_id").eq("id", clientId).maybeSingle()
+    if (!client) return { error: "Клиент не найден" }
+    if (client.salesperson_id !== user.id) return { error: "Этот клиент не у вас" }
+  }
+
+  const { createClientInvitation } = await import("@/lib/invitation")
+  const result = await createClientInvitation(clientId, user.id)
+  if (!result.ok) return { error: result.error }
+  return { success: true, url: result.url, emailSent: result.emailSent, emailError: result.emailError }
+}
+

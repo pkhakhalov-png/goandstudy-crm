@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { markPaymentPaidSales, unmarkPaymentPaidSales } from './actions'
+import { SalesInviteButton } from './SalesInviteButton'
 
 interface Props {
   clients: any[]
@@ -332,6 +333,8 @@ export function SalesPage({ clients, expenses }: Props) {
                       <div style={{height:'100%',width:`${selPct}%`,background:'linear-gradient(90deg,var(--green),#5fd6a4)',borderRadius:20}}/>
                     </div>
                   </div>
+
+                  <SalesInviteButton clientId={sel.id} clientEmail={sel.email} clientName={sel.name} />
 
                   <div style={{fontSize:10,textTransform:'uppercase',letterSpacing:'0.08em',color:'var(--muted2)',fontWeight:600,margin:'16px 0 8px'}}>
                     График платежей
