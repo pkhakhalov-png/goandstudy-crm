@@ -82,3 +82,27 @@ export async function generateInviteForOwnClient(clientId: number) {
   return { success: true, url: result.url, emailSent: result.emailSent, emailError: result.emailError }
 }
 
+
+
+// Проставить email клиенту перед генерацией invite (если его нет).
+export async function setClientEmail(clientId: number, email: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: "Не авторизован" }
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: "Некорректный email" }
+
+  const { data: profile } = await supabase.from("users").select("role").eq("id", user.id).single()
+  const isPrivileged = profile?.role === "admin" || profile?.role === "rop"
+
+  const admin = await createAdminClient()
+  if (!isPrivileged) {
+    const { data: client } = await admin.from("clients").select("salesperson_id").eq("id", clientId).maybeSingle()
+    if (!client) return { error: "Клиент не найден" }
+    if (client.salesperson_id !== user.id) return { error: "Этот клиент не у вас" }
+  }
+  const { error } = await admin.from("clients").update({ email }).eq("id", clientId)
+  if (error) return { error: error.message }
+  revalidatePath("/sales")
+  return { success: true }
+}
+
