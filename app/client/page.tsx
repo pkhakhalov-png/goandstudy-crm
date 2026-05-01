@@ -146,15 +146,17 @@ export default async function ClientHomePage({ searchParams }: { searchParams: P
       {showOnboarding && <OnboardingTour clientId={client.id} />}
       <ClientTopNav userName={displayName} activePage="home" />
 
-      <DashboardHero
-        ctx={{
-          ...CLIENT_CTX,
-          parentName: client.name || CLIENT_CTX.parentName,
-          childFirstName: (client.name || '').split(' ')[0] || CLIENT_CTX.childFirstName,
-          childFullName: client.name || CLIENT_CTX.childFullName,
-        }}
-        stages={timeline}
-      />
+      <div data-tour="timeline">
+        <DashboardHero
+          ctx={{
+            ...CLIENT_CTX,
+            parentName: client.name || CLIENT_CTX.parentName,
+            childFirstName: (client.name || '').split(' ')[0] || CLIENT_CTX.childFirstName,
+            childFullName: client.name || CLIENT_CTX.childFullName,
+          }}
+          stages={timeline}
+        />
+      </div>
 
       <main
         style={{
@@ -167,15 +169,21 @@ export default async function ClientHomePage({ searchParams }: { searchParams: P
         }}
       >
         <ProjectAndRoadmap project={STUDENT_PROJECT} roadmap={ROADMAP} />
-        <ShortlistBlock items={universities} total={universities.length} clientId={client.id} />
+        <div data-tour="shortlist">
+          <ShortlistBlock items={universities} total={universities.length} clientId={client.id} />
+        </div>
         <ApplicationsBlock applications={applications} previewQuery={previewId} />
-        <EssayCards essays={essaysWithState} />
-        <DocumentsSection
-          required={requiredDocs}
-          optionalUploads={optionalUploads}
-          clientId={client.id}
-          requiredRowsByType={Object.fromEntries(documentRows.filter(d => d.doc_type !== 'optional').map(d => [d.doc_type, d]))}
-        />
+        <div data-tour="essays">
+          <EssayCards essays={essaysWithState} />
+        </div>
+        <div data-tour="documents">
+          <DocumentsSection
+            required={requiredDocs}
+            optionalUploads={optionalUploads}
+            clientId={client.id}
+            requiredRowsByType={Object.fromEntries(documentRows.filter(d => d.doc_type !== 'optional').map(d => [d.doc_type, d]))}
+          />
+        </div>
       </main>
     </div>
   )
