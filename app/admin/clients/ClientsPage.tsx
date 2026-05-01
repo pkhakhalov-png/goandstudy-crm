@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { assignCurator, updatePaymentSum, updateClientTotal, getAvailableGroups, linkClientGroup, unlinkClientGroup, refundAndDeleteClient } from './actions'
+import { InviteClientButton } from './InviteClientButton'
 
 interface Props {
   clients: any[]
@@ -319,6 +320,8 @@ export function ClientsPage({ clients, salespersons, curators }: Props) {
                     <span style={{ fontWeight: 600 }}>{expPaid.toLocaleString('ru')} ₽</span>
                   </div>
                 </>}
+
+                <InviteClientButton client={sel} />
 
                 {sel.status !== 'refunded' && (
                   <RefundClientButton client={sel} onDone={() => { setSelected(null) }} />

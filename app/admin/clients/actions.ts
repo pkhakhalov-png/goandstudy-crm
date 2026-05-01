@@ -311,3 +311,16 @@ export async function unlinkClientGroup(clientId: number) {
   revalidatePath(`/curator/clients/${clientId}`)
   return { success: true }
 }
+
+
+// Сгенерировать (или достать существующую) invite-ссылку для клиента.
+export async function generateClientInviteAction(clientId: number) {
+  const { supabase, error: authErr } = await assertAdmin()
+  if (authErr) return { error: authErr }
+  const { data: { user } } = await supabase.auth.getUser()
+  const { createClientInvitation } = await import("@/lib/invitation")
+  const result = await createClientInvitation(clientId, user?.id)
+  if (!result.ok) return { error: result.error }
+  return { success: true, url: result.url, emailSent: result.emailSent, emailError: result.emailError }
+}
+
