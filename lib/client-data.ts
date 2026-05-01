@@ -350,6 +350,7 @@ export type ApplicationRow = {
   id: string
   client_id: number
   shortlist_id: string | null
+  profile_id: string | null
   university_name: string
   program_name: string | null
   country: string | null
@@ -368,6 +369,93 @@ export type ApplicationRow = {
   notes: string | null
   created_at: string
   updated_at: string
+}
+
+export type ProfileFieldDef = {
+  key: string
+  label: string
+  type: 'text' | 'date' | 'number' | 'select' | 'phone' | 'textarea'
+  required: boolean
+  group?: string
+  options?: string[]
+  notes?: string
+}
+
+export type DocumentReqDef = {
+  key: string
+  label: string
+  format?: string
+  max_mb?: number
+  language?: string
+  required: boolean
+  notes?: string
+}
+
+export type EssayReqDef = {
+  key: string
+  label: string
+  prompt: string
+  min_words?: number
+  max_words?: number
+  required: boolean
+  notes?: string
+}
+
+export type ExternalStepDef = {
+  key: string
+  label: string
+  url?: string
+  required: boolean
+  notes?: string
+}
+
+export type IntakeDef = {
+  name: string
+  deadline_intl?: string
+  deadline_uae?: string
+  start_date?: string
+  status?: string
+  notes?: string
+}
+
+export type SchoolApplicationProfileRow = {
+  id: string
+  school_id: number | null
+  school_name: string
+  country_code: string | null
+  level: 'bachelor' | 'master' | 'phd'
+  portal_url: string
+  registration_url: string | null
+  application_fee_amount: number | null
+  application_fee_currency: string | null
+  profile_fields_required: ProfileFieldDef[]
+  documents_required: DocumentReqDef[]
+  essays_required: EssayReqDef[]
+  external_steps: ExternalStepDef[]
+  intakes: IntakeDef[]
+  is_active: boolean
+}
+
+export async function getApplicationProfile(profileId: string): Promise<SchoolApplicationProfileRow | null> {
+  const admin = await createAdminClient()
+  const { data } = await admin
+    .from('school_application_profiles')
+    .select('*')
+    .eq('id', profileId)
+    .maybeSingle()
+    .then(r => r, () => ({ data: null }))
+  return (data as SchoolApplicationProfileRow) || null
+}
+
+export async function getApplicationProfileData(applicationId: string): Promise<Record<string, string>> {
+  const admin = await createAdminClient()
+  const { data } = await admin
+    .from('application_profile_data')
+    .select('data')
+    .eq('application_id', applicationId)
+    .maybeSingle()
+    .then(r => r, () => ({ data: null }))
+  return (data?.data as Record<string, string>) || {}
 }
 
 export type ApplicationDocumentRow = {

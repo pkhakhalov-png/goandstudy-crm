@@ -236,6 +236,39 @@ export function ApplicationView({
         )}
       </div>
 
+      {/* Wizard CTA — показываем когда есть привязка к паспорту вуза */}
+      {app.profile_id && !isCurator && (
+        <Link
+          href={`/client/applications/${app.id}/wizard${previewQuery}`}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 16,
+            padding: '20px 24px',
+            background: app.stage === 'submitted'
+              ? 'var(--ds-success-soft)'
+              : 'linear-gradient(135deg, rgba(181,127,207,0.10) 0%, rgba(181,127,207,0.18) 100%)',
+            border: `1px solid ${app.stage === 'submitted' ? 'rgba(52,199,89,0.32)' : 'var(--ds-purple)'}`,
+            borderRadius: 'var(--ds-r-md)',
+            textDecoration: 'none',
+            color: 'var(--ds-ink)',
+          }}
+        >
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.10em', textTransform: 'uppercase', color: 'var(--ds-purple)', marginBottom: 4 }}>
+              {app.stage === 'submitted' ? 'Заявка отправлена' : 'Заполнение заявки'}
+            </div>
+            <div style={{ fontSize: 15, fontWeight: 600 }}>
+              {app.stage === 'submitted'
+                ? 'Куратор готовит подачу на портале вуза'
+                : 'Заполни профиль, документы и эссе → отправь нам на подачу'}
+            </div>
+          </div>
+          <div style={{ fontSize: 20, color: 'var(--ds-purple)' }}>→</div>
+        </Link>
+      )}
+
       {/* Общие документы — серый «утопленный» (reference) */}
       <div style={{
         padding: 28,
