@@ -5,6 +5,7 @@ import { createParserClient } from '@/lib/supabase/parser'
 import { CuratorSidebar } from '../../CuratorSidebar'
 import { AddToShortlistButton } from '../../universities/[schoolId]/AddToShortlistButton'
 import { FillProgramButton } from './FillProgramButton'
+import { BackButton } from '../../universities/[schoolId]/BackButton'
 
 const COUNTRY_LABEL: Record<string, string> = {
   ca: 'Канада', au: 'Австралия', gb: 'Великобритания', de: 'Германия',
@@ -134,9 +135,7 @@ export default async function ProgramPage({
       <div className="main">
         <div className="topbar" style={{ gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
-            <Link href="/curator/universities" style={{ color: 'var(--muted)', textDecoration: 'none', fontSize: 13, whiteSpace: 'nowrap' }}>
-              &larr; База программ
-            </Link>
+            <BackButton fallbackHref="/curator/universities" label="← База программ" />
             <span style={{ color: 'var(--bor2)' }}>/</span>
             <Link
               href={`/curator/universities/${school.id}`}

@@ -8,6 +8,7 @@ import { SchoolTabs } from './SchoolTabs'
 import { FillSchoolButton } from './FillSchoolButton'
 import { SchoolHeaderLogo } from './SchoolHeaderLogo'
 import { SchoolHeroPhoto } from './SchoolHeroPhoto'
+import { BackButton } from './BackButton'
 
 const COUNTRY_LABEL: Record<string, string> = {
   ca: 'Канада', au: 'Австралия', gb: 'Великобритания', de: 'Германия', us: 'США',
@@ -88,9 +89,7 @@ export default async function SchoolPage({
       <div className="main">
         <div className="topbar" style={{ gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <Link href="/curator/universities" style={{ color: 'var(--muted)', textDecoration: 'none', fontSize: 13 }}>
-              &larr; База вузов
-            </Link>
+            <BackButton fallbackHref="/curator/universities" label="← База вузов" />
             <span style={{ color: 'var(--bor2)' }}>/</span>
             <span className="pt" style={{
               display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', overflow: 'hidden',
