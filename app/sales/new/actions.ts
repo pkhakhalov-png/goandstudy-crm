@@ -58,5 +58,11 @@ export async function createClientSales(formData: FormData): Promise<void> {
     }
   }
 
+  // Если у клиента есть email — сразу редиректим на страницу с invite-ссылкой
+  // (там же кнопка copy + индикатор отправки email).
+  const email = (formData.get('email') as string) || ''
+  if (newClient && email) {
+    redirect(`/sales/new/success?clientId=${newClient.id}`)
+  }
   redirect('/sales')
 }

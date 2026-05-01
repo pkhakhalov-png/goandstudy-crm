@@ -31,10 +31,11 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl
 
-  // Публичные маршруты (webhook'и, booking, tbank callback)
+  // Публичные маршруты (webhook'и, booking, tbank callback, invite)
   const isPublic =
     pathname === '/login' ||
     pathname.startsWith('/book') ||
+    pathname.startsWith('/invite') ||
     pathname.startsWith('/api/book') ||
     pathname.startsWith('/api/wazzup') ||
     pathname.startsWith('/api/telegram') ||

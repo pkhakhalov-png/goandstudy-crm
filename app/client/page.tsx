@@ -13,6 +13,7 @@ import {
 } from '@/lib/client-data'
 import { ClientTopNav } from './ClientTopNav'
 import { DashboardHero } from './DashboardHero'
+import { OnboardingTour } from './OnboardingTour'
 import { ProjectAndRoadmap } from './ProjectAndRoadmap'
 import { ShortlistBlock } from './ShortlistBlock'
 import { ApplicationsBlock } from './ApplicationsBlock'
@@ -33,7 +34,7 @@ function formatBytes(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} МБ`
 }
 
-export default async function ClientHomePage({ searchParams }: { searchParams: Promise<{ clientId?: string }> }) {
+export default async function ClientHomePage({ searchParams }: { searchParams: Promise<{ clientId?: string; onboarding?: string }> }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
@@ -134,9 +135,15 @@ export default async function ClientHomePage({ searchParams }: { searchParams: P
   const displayName = client.name || user.email || CLIENT_CTX.parentName
   const isPreview = role !== 'client'
 
+  // Онбординг показываем если: 1) клиент сам не прошёл (clients.onboarded=false)
+  //   и 2) это его настоящий вход (не preview-куратор/админ).
+  //   ?onboarding=1 в URL форсит показ (пришёл с /invite активации).
+  const showOnboarding = !isPreview && (params.onboarding === '1' || !client.onboarded)
+
   return (
     <div style={{ minHeight: '100vh', background: 'var(--ds-bg)' }}>
       {isPreview && <PreviewBanner clientName={client.name || 'клиент'} clientId={client.id} />}
+      {showOnboarding && <OnboardingTour clientId={client.id} />}
       <ClientTopNav userName={displayName} activePage="home" />
 
       <DashboardHero
