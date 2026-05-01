@@ -1,7 +1,8 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useTransition } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { MAIN_PAGE_PRIORITY_LIMIT, type University } from '../mock-data'
 import {
   useClientState,
@@ -10,10 +11,18 @@ import {
   reorderPriority,
   movePriority,
 } from '../shared-store'
+import { applyFromShortlist } from './actions'
+
+export type ShortlistAppStatus = {
+  id: string
+  stage: 'created' | 'docs_collected' | 'fee_paid' | 'submitted' | 'decision'
+  hasWizard: boolean
+}
 
 interface Props {
   items: University[]
   clientId?: number
+  applicationsBySchool?: Record<string, ShortlistAppStatus>
 }
 
 const SPECIALTY_GROUPS = new Set([
@@ -30,7 +39,14 @@ function pickTitleAndSubtitle(uni: University, programHref: string | null, schoo
     : { titleHref: uni.programId ? programHref : null, titleText: uni.program, subHref: schoolHref, subText: uni.name }
 }
 
-export function ShortlistView({ items, clientId }: Props) {
+function lookupAppForUni(uni: University, apps?: Record<string, ShortlistAppStatus>): ShortlistAppStatus | null {
+  if (!apps) return null
+  if (uni.schoolId && apps[`id:${uni.schoolId}`]) return apps[`id:${uni.schoolId}`]
+  const nameKey = uni.name.trim().toLowerCase()
+  return apps[`name:${nameKey}`] ?? null
+}
+
+export function ShortlistView({ items, clientId, applicationsBySchool }: Props) {
   const { state, update, hydrated } = useClientState()
   const [dragFromIdx, setDragFromIdx] = useState<number | null>(null)
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null)
@@ -194,6 +210,7 @@ export function ShortlistView({ items, clientId }: Props) {
                 onRemove={() => update(s => togglePriority(s, uni.key))}
                 hydrated={hydrated}
                 clientId={clientId}
+                app={lookupAppForUni(uni, applicationsBySchool)}
               />
             ))}
           </div>
@@ -223,6 +240,7 @@ export function ShortlistView({ items, clientId }: Props) {
                 onToggle={() => update(s => togglePriority(s, uni.key))}
                 hydrated={hydrated}
                 clientId={clientId}
+                app={lookupAppForUni(uni, applicationsBySchool)}
               />
             ))}
           </div>
@@ -286,7 +304,7 @@ function PriorityCard({
   isDragging, isDragOver,
   onDragStart, onDragOver, onDrop, onDragEnd,
   onMoveUp, onMoveDown, onRemove,
-  hydrated, clientId,
+  hydrated, clientId, app,
 }: {
   uni: University
   rank: number
@@ -303,6 +321,7 @@ function PriorityCard({
   onRemove: () => void
   hydrated: boolean
   clientId?: number
+  app?: ShortlistAppStatus | null
 }) {
   return (
     <article
@@ -465,7 +484,7 @@ function PriorityCard({
 
         <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
           <UniLogo uni={uni} size={48} />
-          <UniInfo uni={uni} clientId={clientId} />
+          <UniInfo uni={uni} clientId={clientId} app={app} />
         </div>
       </div>
     </article>
@@ -476,7 +495,7 @@ function PriorityCard({
    RestCard — для невыбранных (+ В приоритет)
    ═══════════════════════════════════════════════════════════════ */
 
-function RestCard({ uni, onToggle, hydrated, clientId }: { uni: University; onToggle: () => void; hydrated: boolean; clientId?: number }) {
+function RestCard({ uni, onToggle, hydrated, clientId, app }: { uni: University; onToggle: () => void; hydrated: boolean; clientId?: number; app?: ShortlistAppStatus | null }) {
   return (
     <article
       style={{
@@ -506,7 +525,7 @@ function RestCard({ uni, onToggle, hydrated, clientId }: { uni: University; onTo
         </div>
       </div>
 
-      <UniInfo uni={uni} clientId={clientId} />
+      <UniInfo uni={uni} clientId={clientId} app={app} />
 
       <button
         type="button"
@@ -523,7 +542,90 @@ function RestCard({ uni, onToggle, hydrated, clientId }: { uni: University; onTo
 
 /* ─── Shared content block — uni info ─── */
 
-function UniInfo({ uni, clientId }: { uni: University; clientId?: number }) {
+function ApplyButton({
+  uni,
+  app,
+  disabled,
+}: {
+  uni: University
+  app: ShortlistAppStatus | null
+  disabled: boolean
+}) {
+  const router = useRouter()
+  const [pending, startTransition] = useTransition()
+  const [err, setErr] = useState<string | null>(null)
+
+  const handleApply = () => {
+    setErr(null)
+    startTransition(async () => {
+      const r = await applyFromShortlist({
+        schoolId: uni.schoolId ?? null,
+        schoolName: uni.name,
+        programId: uni.programId ?? null,
+        programName: uni.program,
+        country: uni.country,
+        level: 'bachelor',
+      })
+      if (!r.ok) { setErr(r.error); return }
+      const url = r.hasWizard
+        ? `/client/applications/${r.applicationId}/wizard`
+        : `/client/applications/${r.applicationId}`
+      router.push(url)
+    })
+  }
+
+  if (app) {
+    const labels: Record<ShortlistAppStatus['stage'], string> = {
+      created: 'Открыть заявку',
+      docs_collected: 'Открыть заявку',
+      fee_paid: 'Открыть заявку',
+      submitted: 'Заявка отправлена',
+      decision: 'Решение получено',
+    }
+    const isOpen = app.stage === 'created' || app.stage === 'docs_collected' || app.stage === 'fee_paid'
+    const url = (isOpen && app.hasWizard)
+      ? `/client/applications/${app.id}/wizard`
+      : `/client/applications/${app.id}`
+    return (
+      <Link
+        href={url}
+        style={{
+          display: 'inline-flex', alignItems: 'center', gap: 8,
+          padding: '8px 14px',
+          background: app.stage === 'submitted' || app.stage === 'decision'
+            ? 'var(--ds-success-soft)' : 'var(--ds-purple-soft)',
+          border: `1px solid ${app.stage === 'submitted' || app.stage === 'decision' ? 'rgba(52,199,89,0.32)' : 'var(--ds-purple)'}`,
+          color: 'var(--ds-ink)',
+          borderRadius: 8,
+          fontSize: 12,
+          fontWeight: 600,
+          textDecoration: 'none',
+          marginTop: 10,
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        {app.stage === 'submitted' && '✓ '}{labels[app.stage]}
+      </Link>
+    )
+  }
+
+  return (
+    <div style={{ marginTop: 10 }}>
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); handleApply() }}
+        disabled={disabled || pending}
+        className="ds-btn ds-btn-primary ds-btn-sm"
+        style={{ fontSize: 12, padding: '8px 14px' }}
+      >
+        {pending ? 'Создаём...' : 'Подать заявку'}
+      </button>
+      {err && <div style={{ fontSize: 11, color: 'var(--ds-error)', marginTop: 4 }}>{err}</div>}
+    </div>
+  )
+}
+
+function UniInfo({ uni, clientId, app }: { uni: University; clientId?: number; app?: ShortlistAppStatus | null }) {
   const qs = `?asClient=1${clientId ? `&clientId=${clientId}` : ''}`
   const programHref = uni.programId ? `/curator/programs/${uni.programId}${qs}` : null
   const schoolHref = uni.schoolId ? `/curator/universities/${uni.schoolId}${qs}` : null
@@ -594,6 +696,9 @@ function UniInfo({ uni, clientId }: { uni: University; clientId?: number }) {
             </span>
           ))}
         </div>
+      )}
+      {app !== undefined && (
+        <ApplyButton uni={uni} app={app} disabled={false} />
       )}
     </div>
   )

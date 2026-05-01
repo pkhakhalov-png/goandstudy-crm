@@ -1,10 +1,10 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { resolveClientForViewer, getClientUniversities } from '@/lib/client-data'
+import { resolveClientForViewer, getClientUniversities, getClientApplications } from '@/lib/client-data'
 import { ClientTopNav } from '../ClientTopNav'
 import { PreviewBanner } from '../PreviewBanner'
-import { ShortlistView } from './ShortlistView'
+import { ShortlistView, type ShortlistAppStatus } from './ShortlistView'
 import { MAIN_PAGE_PRIORITY_LIMIT } from '../mock-data'
 
 export default async function ClientShortlistPage({ searchParams }: { searchParams: Promise<{ clientId?: string }> }) {
@@ -29,7 +29,23 @@ export default async function ClientShortlistPage({ searchParams }: { searchPara
   })
   if (!client) redirect('/client')
 
-  const universities = await getClientUniversities(client.id)
+  const [universities, applications] = await Promise.all([
+    getClientUniversities(client.id),
+    getClientApplications(client.id),
+  ])
+
+  // Карта заявок по школам — индексируем и по school_id и по lower(university_name)
+  const applicationsBySchool: Record<string, ShortlistAppStatus> = {}
+  for (const app of applications) {
+    const status: ShortlistAppStatus = {
+      id: app.id,
+      stage: app.stage,
+      hasWizard: !!app.profile_id,
+    }
+    if (app.school_id) applicationsBySchool[`id:${app.school_id}`] = status
+    applicationsBySchool[`name:${app.university_name.trim().toLowerCase()}`] = status
+  }
+
   const isPreview = profile?.role !== 'client'
 
   return (
@@ -111,7 +127,7 @@ export default async function ClientShortlistPage({ searchParams }: { searchPara
       </section>
 
       <main style={{ maxWidth: 1200, margin: '0 auto', padding: '32px 32px 80px' }}>
-        <ShortlistView items={universities} clientId={client.id} />
+        <ShortlistView items={universities} clientId={client.id} applicationsBySchool={applicationsBySchool} />
       </main>
     </div>
   )
