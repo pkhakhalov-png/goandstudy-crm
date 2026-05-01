@@ -5,16 +5,17 @@ import { useState, useTransition, useRef } from 'react'
 import {
   saveApplicationProfileData,
   markApplicationReadyForCurator,
+  linkGlobalDocToApplication,
 } from './actions'
 import {
   uploadApplicationDocument,
   deleteApplicationDocument,
   getApplicationDocumentDownloadUrl,
-  addApplicationDocument,
 } from '@/app/curator/applications/actions'
 import type {
   ApplicationRow,
   ApplicationDocumentRow,
+  ClientDocumentRow,
   SchoolApplicationProfileRow,
   ProfileFieldDef,
   DocumentReqDef,
@@ -31,6 +32,7 @@ type Props = {
   profile: SchoolApplicationProfileRow
   profileData: Record<string, string>
   documents: ApplicationDocumentRow[]
+  globalDocs: ClientDocumentRow[]
   essays: EssayRow[]
   clientName: string
   clientEmail: string
@@ -142,6 +144,7 @@ export function WizardView(props: Props) {
             clientId={props.app.client_id}
             requirements={props.profile.documents_required}
             documents={props.documents}
+            globalDocs={props.globalDocs}
             disabled={props.isPreview}
           />
         )}
@@ -358,26 +361,30 @@ function StepDocuments({
   clientId,
   requirements,
   documents,
+  globalDocs,
   disabled,
 }: {
   applicationId: string
   clientId: number
   requirements: DocumentReqDef[]
   documents: ApplicationDocumentRow[]
+  globalDocs: ClientDocumentRow[]
   disabled: boolean
 }) {
   const docsByKey = new Map(documents.map(d => [d.doc_type, d]))
+  const globalByKey = new Map(globalDocs.filter(g => g.storage_path).map(g => [g.doc_type, g]))
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div style={{ fontSize: 13, color: 'var(--ds-muted)', marginBottom: 4 }}>
-        Загрузи каждый документ. Все файлы будут автоматически переданы куратору при подаче.
+        Документы из раздела «Документы» уже отмечены ✓ — загружать заново не нужно. Уникальные требования вуза грузим здесь.
       </div>
       {requirements.map(req => (
         <DocRow
           key={req.key}
           req={req}
           existing={docsByKey.get(req.key)}
+          globalDoc={globalByKey.get(req.key)}
           applicationId={applicationId}
           clientId={clientId}
           disabled={disabled}
@@ -390,12 +397,14 @@ function StepDocuments({
 function DocRow({
   req,
   existing,
+  globalDoc,
   applicationId,
   clientId,
   disabled,
 }: {
   req: DocumentReqDef
   existing?: ApplicationDocumentRow
+  globalDoc?: ClientDocumentRow
   applicationId: string
   clientId: number
   disabled: boolean
@@ -403,6 +412,10 @@ function DocRow({
   const inputRef = useRef<HTMLInputElement>(null)
   const [pending, startTransition] = useTransition()
   const [err, setErr] = useState<string | null>(null)
+
+  const linkedFromGlobal = !!existing?.global_doc_id
+  const status: 'app_uploaded' | 'global_only' | 'missing' =
+    existing ? 'app_uploaded' : (globalDoc ? 'global_only' : 'missing')
 
   const handleFile = (file: File | null) => {
     if (!file) return
@@ -420,9 +433,23 @@ function DocRow({
     })
   }
 
+  const handleUseGlobal = () => {
+    if (!globalDoc) return
+    setErr(null)
+    startTransition(async () => {
+      const r = await linkGlobalDocToApplication({
+        applicationId,
+        docType: req.key,
+        globalDocId: globalDoc.id,
+        title: req.label,
+      })
+      if (!r.ok) setErr(r.error)
+    })
+  }
+
   const handleDelete = () => {
     if (!existing) return
-    if (!confirm('Удалить файл?')) return
+    if (!confirm('Удалить файл из этой заявки?')) return
     startTransition(async () => {
       const r = await deleteApplicationDocument({ documentId: existing.id, applicationId, clientId })
       if ('error' in r && r.error) setErr(r.error)
@@ -436,23 +463,18 @@ function DocRow({
     else if ('error' in r) setErr(r.error)
   }
 
-  // Авто-добавляем требование в БД при первой загрузке (через addApplicationDocument)
-  // вообще не нужно — uploadApplicationDocument умеет создавать row сам.
+  const indicatorColor = status === 'app_uploaded' ? '#16A34A' : status === 'global_only' ? '#F59E0B' : 'var(--ds-muted)'
+  const indicatorBg = status === 'app_uploaded' ? '#DCFCE7' : status === 'global_only' ? '#FEF3C7' : 'var(--ds-bg)'
 
   return (
     <div className="ds-card" style={{ padding: 16, display: 'flex', alignItems: 'center', gap: 14 }}>
       <div style={{
-        width: 36,
-        height: 36,
-        borderRadius: 8,
-        background: existing ? '#DCFCE7' : 'var(--ds-bg)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        flexShrink: 0,
-        color: existing ? '#16A34A' : 'var(--ds-muted)',
+        width: 36, height: 36, borderRadius: 8,
+        background: indicatorBg, color: indicatorColor,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexShrink: 0, fontSize: 16, fontWeight: 700,
       }}>
-        {existing ? '✓' : '○'}
+        {status === 'missing' ? '○' : '✓'}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ds-text)' }}>
@@ -461,16 +483,22 @@ function DocRow({
         {req.notes && (
           <div style={{ fontSize: 11, color: 'var(--ds-muted)', marginTop: 2 }}>{req.notes}</div>
         )}
-        {req.format && (
+        {req.format && status === 'missing' && (
           <div style={{ fontSize: 11, color: 'var(--ds-muted)', marginTop: 2 }}>
             Формат: {req.format}{req.max_mb && ` · до ${req.max_mb} МБ`}
           </div>
         )}
-        {existing && (
+        {status === 'app_uploaded' && existing && (
           <div style={{ fontSize: 11, color: 'var(--ds-purple)', marginTop: 4 }}>
+            {linkedFromGlobal && <span style={{ color: 'var(--ds-muted)', marginRight: 6 }}>Из общих:</span>}
             <button onClick={handleDownload} style={{ background: 'none', border: 'none', color: 'var(--ds-purple)', cursor: 'pointer', padding: 0, fontSize: 11, textDecoration: 'underline' }}>
               {existing.file_name}
             </button>
+          </div>
+        )}
+        {status === 'global_only' && globalDoc && (
+          <div style={{ fontSize: 11, color: '#92400E', marginTop: 4 }}>
+            В общих документах: <b>{globalDoc.file_name}</b> — нажми «Использовать» чтобы прикрепить к заявке
           </div>
         )}
         {err && <div style={{ fontSize: 11, color: '#DC2626', marginTop: 4 }}>{err}</div>}
@@ -482,7 +510,17 @@ function DocRow({
         onChange={e => handleFile(e.target.files?.[0] || null)}
       />
       <div style={{ display: 'flex', gap: 6 }}>
-        {existing && (
+        {status === 'global_only' && (
+          <button
+            onClick={handleUseGlobal}
+            disabled={disabled || pending}
+            className="ds-btn-primary"
+            style={{ fontSize: 12, padding: '6px 12px' }}
+          >
+            {pending ? '...' : 'Использовать'}
+          </button>
+        )}
+        {status === 'app_uploaded' && (
           <button onClick={handleDelete} disabled={disabled || pending} style={{ fontSize: 12, padding: '6px 10px', border: '1px solid var(--ds-border)', borderRadius: 6, background: 'transparent', cursor: 'pointer', color: '#DC2626' }}>
             Удалить
           </button>
@@ -490,10 +528,10 @@ function DocRow({
         <button
           onClick={() => inputRef.current?.click()}
           disabled={disabled || pending}
-          className={existing ? 'ds-btn-ghost' : 'ds-btn-primary'}
+          className={status === 'app_uploaded' ? 'ds-btn-ghost' : status === 'global_only' ? 'ds-btn-ghost' : 'ds-btn-primary'}
           style={{ fontSize: 12, padding: '6px 12px' }}
         >
-          {pending ? '...' : existing ? 'Заменить' : 'Загрузить'}
+          {pending ? '...' : status === 'app_uploaded' ? 'Заменить' : status === 'global_only' ? 'Другой файл' : 'Загрузить'}
         </button>
       </div>
     </div>

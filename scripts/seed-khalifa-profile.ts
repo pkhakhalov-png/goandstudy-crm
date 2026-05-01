@@ -61,16 +61,19 @@ const PROFILE_FIELDS = [
   { key: 'intended_major_3', label: 'Третий вариант (опционально)', type: 'text', required: false, group: 'program' },
 ]
 
+// Канонические ключи (passport, attestat, transcript, ielts, recommendation)
+// совпадают с client_documents.doc_type для переиспользования глобального пула.
+// Уникальные требования вуза получают свой префикс (например khalifa_*).
 const DOCUMENTS_REQUIRED = [
   { key: 'passport', label: 'Копия паспорта', format: 'pdf', max_mb: 5, language: 'EN', required: true, notes: 'Страница с фото + страница с подписью' },
+  { key: 'attestat', label: 'Аттестат школы (заверенный)', format: 'pdf', max_mb: 10, language: 'EN', required: true, notes: 'Должен быть переведён на английский и заверен (apostille для не-UAE документов)' },
+  { key: 'transcript', label: 'Транскрипт оценок', format: 'pdf', max_mb: 10, language: 'EN', required: true, notes: 'Полные оценки по всем годам обучения' },
+  { key: 'ielts', label: 'Сертификат IELTS / TOEFL', format: 'pdf', max_mb: 5, language: 'EN', required: true, notes: 'IELTS ≥ 6.0 или TOEFL iBT ≥ 79' },
   { key: 'passport_photo', label: 'Фото на паспорт', format: 'jpg|png', max_mb: 2, required: true, notes: 'Белый фон, лицо в центре, без головных уборов кроме религиозных' },
-  { key: 'high_school_diploma_attested', label: 'Аттестат школы (заверенный)', format: 'pdf', max_mb: 10, language: 'EN', required: true, notes: 'Должен быть переведён на английский и заверен (apostille для не-UAE документов)' },
-  { key: 'high_school_transcript', label: 'Транскрипт оценок', format: 'pdf', max_mb: 10, language: 'EN', required: true, notes: 'Полные оценки по всем годам обучения' },
-  { key: 'english_test_certificate', label: 'Сертификат IELTS / TOEFL', format: 'pdf', max_mb: 5, language: 'EN', required: true, notes: 'IELTS ≥ 6.0 или TOEFL iBT ≥ 79' },
-  { key: 'good_conduct_certificate', label: 'Справка о благонадёжности (Good Conduct Certificate)', format: 'pdf', max_mb: 5, language: 'EN', required: true, notes: 'Из полиции страны проживания, переведённая на английский' },
-  { key: 'video_interview', label: 'Видео-интервью', format: 'mp4|mov', max_mb: 200, required: true, notes: '2–3 минуты на английском: представься, расскажи почему Khalifa и почему именно эта специальность' },
-  { key: 'sat_certificate', label: 'Сертификат SAT (опционально)', format: 'pdf', max_mb: 3, required: false, notes: 'Усиливает заявку, особенно SAT Math 700+' },
-  { key: 'emirates_id', label: 'Emirates ID', format: 'pdf', max_mb: 3, required: false, notes: 'Только для граждан/резидентов UAE' },
+  { key: 'khalifa_good_conduct', label: 'Справка о благонадёжности (Good Conduct Certificate)', format: 'pdf', max_mb: 5, language: 'EN', required: true, notes: 'Из полиции страны проживания, переведённая на английский' },
+  { key: 'khalifa_video_interview', label: 'Видео-интервью', format: 'mp4|mov', max_mb: 200, required: true, notes: '2–3 минуты на английском: представься, расскажи почему Khalifa и почему именно эта специальность' },
+  { key: 'khalifa_sat', label: 'Сертификат SAT (опционально)', format: 'pdf', max_mb: 3, required: false, notes: 'Усиливает заявку, особенно SAT Math 700+' },
+  { key: 'khalifa_emirates_id', label: 'Emirates ID', format: 'pdf', max_mb: 3, required: false, notes: 'Только для граждан/резидентов UAE' },
 ]
 
 const ESSAYS_REQUIRED = [

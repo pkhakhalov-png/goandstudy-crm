@@ -54,6 +54,145 @@ export async function saveApplicationProfileData(opts: {
   return { ok: true }
 }
 
+/**
+ * Авто-привязка всех совпадающих глобальных документов к заявке.
+ * Идемпотентно — пропускает уже привязанные. Вызывается при первом
+ * открытии wizard'а (server-side из page.tsx) и после Apply-кнопки.
+ */
+export async function autoLinkGlobalDocs(applicationId: string): Promise<void> {
+  const admin = await createAdminClient()
+
+  const { data: app } = await admin
+    .from('client_applications')
+    .select('id, client_id, profile_id')
+    .eq('id', applicationId)
+    .maybeSingle()
+  if (!app?.profile_id) return
+
+  const { data: profile } = await admin
+    .from('school_application_profiles')
+    .select('documents_required')
+    .eq('id', app.profile_id)
+    .maybeSingle()
+  const required = (profile?.documents_required as { key: string; label: string }[]) || []
+  if (required.length === 0) return
+
+  const keys = required.map(r => r.key)
+
+  const [globalRes, appRes] = await Promise.all([
+    admin.from('client_documents')
+      .select('id, doc_type, file_name, file_size_bytes, mime_type, storage_path')
+      .eq('client_id', app.client_id)
+      .in('doc_type', keys)
+      .not('storage_path', 'is', null),
+    admin.from('application_documents')
+      .select('doc_type')
+      .eq('application_id', applicationId),
+  ])
+
+  const alreadyLinked = new Set((appRes.data || []).map(r => r.doc_type))
+
+  const toInsert = (globalRes.data || [])
+    .filter(g => !alreadyLinked.has(g.doc_type))
+    .map(g => ({
+      application_id: applicationId,
+      doc_type: g.doc_type,
+      title: required.find(r => r.key === g.doc_type)?.label || null,
+      required: false,
+      status: 'in_review' as const,
+      global_doc_id: g.id,
+      file_name: g.file_name,
+      file_size_bytes: g.file_size_bytes,
+      mime_type: g.mime_type,
+      uploaded_at: new Date().toISOString(),
+    }))
+
+  if (toInsert.length > 0) {
+    await admin.from('application_documents').insert(toInsert)
+  }
+}
+
+/**
+ * Привязать глобальный документ клиента к заявке без перезагрузки файла.
+ * Создаёт application_documents row с global_doc_id ссылкой.
+ */
+export async function linkGlobalDocToApplication(opts: {
+  applicationId: string
+  docType: string
+  globalDocId: string
+  title?: string
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const ctx = await checkAccess(opts.applicationId)
+  if (!ctx.ok) return { ok: false, error: ctx.error }
+
+  // Проверяем что global doc принадлежит тому же клиенту
+  const { data: globalDoc } = await ctx.admin
+    .from('client_documents')
+    .select('id, client_id, doc_type, file_name, file_size_bytes, mime_type, storage_path')
+    .eq('id', opts.globalDocId)
+    .maybeSingle()
+  if (!globalDoc) return { ok: false, error: 'Документ не найден' }
+  if (globalDoc.client_id !== ctx.app.client_id) return { ok: false, error: 'Документ другого клиента' }
+
+  // Если уже есть application_documents для этого doc_type — обновляем, иначе создаём
+  const { data: existing } = await ctx.admin
+    .from('application_documents')
+    .select('id, storage_path')
+    .eq('application_id', opts.applicationId)
+    .eq('doc_type', opts.docType)
+    .maybeSingle()
+
+  if (existing) {
+    // Если был свой файл — удаляем из storage чтобы не плодить мусор
+    if (existing.storage_path) {
+      await ctx.admin.storage.from('client-docs').remove([existing.storage_path])
+    }
+    const { error } = await ctx.admin
+      .from('application_documents')
+      .update({
+        global_doc_id: opts.globalDocId,
+        storage_path: null,
+        file_name: globalDoc.file_name,
+        file_size_bytes: globalDoc.file_size_bytes,
+        mime_type: globalDoc.mime_type,
+        title: opts.title || null,
+        status: 'in_review',
+        uploaded_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', existing.id)
+    if (error) return { ok: false, error: error.message }
+  } else {
+    const { error } = await ctx.admin
+      .from('application_documents')
+      .insert({
+        application_id: opts.applicationId,
+        doc_type: opts.docType,
+        title: opts.title || null,
+        required: false,
+        status: 'in_review',
+        global_doc_id: opts.globalDocId,
+        file_name: globalDoc.file_name,
+        file_size_bytes: globalDoc.file_size_bytes,
+        mime_type: globalDoc.mime_type,
+        uploaded_by: ctx.user.id,
+        uploaded_at: new Date().toISOString(),
+      })
+    if (error) return { ok: false, error: error.message }
+  }
+
+  await ctx.admin.from('application_events').insert({
+    application_id: opts.applicationId,
+    event_type: 'doc_uploaded',
+    content: opts.title || opts.docType,
+    payload: { document_type: opts.docType, source: 'global_pool', global_doc_id: opts.globalDocId },
+    author_id: ctx.user.id,
+  })
+
+  revalidatePath(`/client/applications/${opts.applicationId}/wizard`)
+  return { ok: true }
+}
+
 export async function markApplicationReadyForCurator(opts: {
   applicationId: string
 }): Promise<{ ok: true } | { ok: false; error: string }> {

@@ -8,10 +8,12 @@ import {
   getApplicationProfile,
   getApplicationProfileData,
   getClientEssays,
+  getClientDocumentRows,
 } from '@/lib/client-data'
 import { ClientTopNav } from '@/app/client/ClientTopNav'
 import { PreviewBanner } from '@/app/client/PreviewBanner'
 import { WizardView } from './WizardView'
+import { autoLinkGlobalDocs } from './actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -51,11 +53,16 @@ export default async function ApplicationWizardPage({
     )
   }
 
-  const [profileDef, profileData, documents, essays] = await Promise.all([
+  // Автопривязка глобальных документов к заявке (идемпотентно).
+  // Делается до fetch'а application_documents чтобы линкованные сразу попали в UI.
+  await autoLinkGlobalDocs(id)
+
+  const [profileDef, profileData, documents, essays, globalDocs] = await Promise.all([
     getApplicationProfile(app.profile_id),
     getApplicationProfileData(id),
     getApplicationDocuments(id),
     getClientEssays(client.id),
+    getClientDocumentRows(client.id),
   ])
 
   if (!profileDef) notFound()
@@ -92,6 +99,7 @@ export default async function ApplicationWizardPage({
           profile={profileDef}
           profileData={profileData}
           documents={documents}
+          globalDocs={globalDocs}
           essays={essays}
           clientName={client.name || ''}
           clientEmail={client.email || ''}
