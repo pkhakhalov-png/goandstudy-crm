@@ -28,6 +28,18 @@ export function FillSchoolButton({ schoolId, hasData }: Props) {
     return () => clearTimeout(t)
   }, [toast])
 
+  // После hard-reload показываем сохранённый тост, чтобы пользователь видел
+  // что именно обновилось AI-агентом.
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem('fill-school-toast')
+      if (saved) {
+        setToast(saved)
+        sessionStorage.removeItem('fill-school-toast')
+      }
+    } catch {}
+  }, [])
+
   async function run() {
     if (busy) return
     setBusy(true); setError(null)
@@ -59,7 +71,13 @@ export function FillSchoolButton({ schoolId, hasData }: Props) {
       else parts.push('Видео: AI ничего не нашёл')
 
       setToast(parts.join(' · '))
-      router.refresh()
+      // Полный hard-reload: router.refresh() не всегда подхватывает данные
+      // из parser-Supabase которые мы только что обновили. Сохраняем тост
+      // в sessionStorage чтобы он показался после перезагрузки.
+      try {
+        sessionStorage.setItem('fill-school-toast', parts.join(' · '))
+      } catch {}
+      setTimeout(() => window.location.reload(), 800)
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Ошибка')
     } finally {
