@@ -6,6 +6,7 @@ import { CuratorSidebar } from '../../../CuratorSidebar'
 import { AddScholarshipButton } from '../../AddScholarshipButton'
 import { ScholarshipLogo } from '../../ScholarshipLogo'
 import { FillIdpScholarshipButton } from './FillIdpScholarshipButton'
+import { BackButton } from '../../../universities/[schoolId]/BackButton'
 
 export const dynamic = 'force-dynamic'
 
@@ -110,9 +111,7 @@ export default async function IdpScholarshipDetailPage({
       <div className="main">
         <div className="topbar" style={{ gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
-            <Link href="/curator/scholarships?source=idp" style={{ color: 'var(--muted)', textDecoration: 'none', fontSize: 13 }}>
-              ← Стипендии
-            </Link>
+            <BackButton fallbackHref="/curator/scholarships?source=idp" label="← Стипендии" />
             <span style={{ color: 'var(--bor2)' }}>/</span>
             <span className="pt" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {row.name}
