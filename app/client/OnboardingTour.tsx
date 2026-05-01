@@ -8,50 +8,109 @@ interface Step {
   selector: string | null
   title: string
   body: string
-  emoji: string
+  Icon: React.ComponentType
+}
+
+// Линейные SVG-иконки в стиле резюме/мотивашки — single color, stroke 1.6.
+function IconHand() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 11V5a2 2 0 1 1 4 0v6" />
+      <path d="M13 11V4a2 2 0 1 1 4 0v9" />
+      <path d="M17 11V6a2 2 0 1 1 4 0v9c0 4-3 7-7 7h-2c-3 0-5-2-6-5l-2-5a2 2 0 1 1 3.4-2.1L9 13" />
+    </svg>
+  )
+}
+function IconRoute() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="6" cy="19" r="2" />
+      <circle cx="18" cy="5" r="2" />
+      <path d="M8 19h6a4 4 0 0 0 0-8h-4a4 4 0 0 1 0-8h6" />
+    </svg>
+  )
+}
+function IconCap() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2 9l10-5 10 5-10 5L2 9z" />
+      <path d="M6 11v5a6 4 0 0 0 12 0v-5" />
+      <line x1="22" y1="9" x2="22" y2="14" />
+    </svg>
+  )
+}
+function IconFolder() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
+    </svg>
+  )
+}
+function IconPen() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 4l6 6L8 22H2v-6z" />
+      <path d="M14 4l-2 2 6 6 2-2" />
+    </svg>
+  )
+}
+function IconChat() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 11.5a8.4 8.4 0 0 1-1 4 8.5 8.5 0 0 1-7.5 4.5 8.4 8.4 0 0 1-4-1L3 21l2-5.5a8.4 8.4 0 0 1-1-4 8.5 8.5 0 0 1 4.5-7.5 8.4 8.4 0 0 1 4-1h.5a8.5 8.5 0 0 1 8 8z" />
+    </svg>
+  )
+}
+function IconCheck() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <path d="M9 12l2 2 4-4" />
+    </svg>
+  )
 }
 
 const STEPS: Step[] = [
   {
     selector: null,
-    emoji: '👋',
+    Icon: IconHand,
     title: 'Добро пожаловать',
     body: 'Это твой личный кабинет. Покажу за минуту что где — для каждого блока подсвечу ту часть экрана о которой говорю.',
   },
   {
     selector: '[data-tour="timeline"]',
-    emoji: '🗺',
+    Icon: IconRoute,
     title: 'Сроки и этапы',
     body: 'Вот таймлайн твоего проекта. Видишь на каком ты этапе и что куратор уже сделал.',
   },
   {
     selector: '[data-tour="shortlist"]',
-    emoji: '🎓',
+    Icon: IconCap,
     title: 'Подборка вузов',
     body: 'Куратор отбирает программы под твой профиль. Тут — топ-3, полный список открывается через меню «Вузы».',
   },
   {
     selector: '[data-tour="documents"]',
-    emoji: '📂',
+    Icon: IconFolder,
     title: 'Документы',
     body: 'Загружай сюда сканы — паспорт, аттестат, сертификаты. Видно статус каждого документа.',
   },
   {
     selector: '[data-tour="essays"]',
-    emoji: '✍️',
+    Icon: IconPen,
     title: 'Резюме и мотивашка',
     body: 'CV и motivation letter — заполняешь сам, куратор финалит. Открой карточку чтобы начать.',
   },
   {
     selector: '[data-tour="curator-link"]',
-    emoji: '💬',
+    Icon: IconChat,
     title: 'Куратор',
     body: 'Все вопросы — куратору в этом разделе. Отвечает в течение рабочего дня.',
   },
   {
     selector: null,
-    emoji: '🚀',
-    title: 'Готово!',
+    Icon: IconCheck,
+    title: 'Готово',
     body: 'Изучай кабинет, заполняй документы. Чем раньше начнём — тем проще будет дальше.',
   },
 ]
@@ -168,7 +227,7 @@ export function OnboardingTour({ clientId }: { clientId: number }) {
         rect={isCenter ? null : rect}
         step={step}
         total={STEPS.length}
-        emoji={current.emoji}
+        Icon={current.Icon}
         title={current.title}
         body={current.body}
         isLast={isLast}
@@ -185,7 +244,7 @@ interface TooltipProps {
   rect: DOMRect | null
   step: number
   total: number
-  emoji: string
+  Icon: React.ComponentType
   title: string
   body: string
   isLast: boolean
@@ -197,7 +256,7 @@ interface TooltipProps {
 import { forwardRef } from 'react'
 
 const Tooltip = forwardRef<HTMLDivElement, TooltipProps>(function Tooltip(props, ref) {
-  const { rect, step, total, emoji, title, body, isLast, onSkip, onPrev, onNext } = props
+  const { rect, step, total, Icon, title, body, isLast, onSkip, onPrev, onNext } = props
 
   // Если rect нет — центрируем модалку
   let style: React.CSSProperties = {}
@@ -236,8 +295,14 @@ const Tooltip = forwardRef<HTMLDivElement, TooltipProps>(function Tooltip(props,
       animation: 'fade-in 0.2s ease',
     }}>
       <style>{`@keyframes fade-in { from { opacity: 0; transform: translate(-50%, -48%) } to { opacity: 1; transform: translate(-50%, -50%) } }`}</style>
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 12 }}>
-        <div style={{ fontSize: 28, lineHeight: 1, flexShrink: 0 }}>{emoji}</div>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: 14 }}>
+        <div style={{
+          width: 44, height: 44, borderRadius: 10,
+          background: 'rgba(177,94,204,0.10)', color: '#B15ECC',
+          display: 'grid', placeItems: 'center', flexShrink: 0,
+        }}>
+          <Icon />
+        </div>
         <div>
           <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#B15ECC', marginBottom: 4 }}>
             Шаг {step + 1} из {total}
