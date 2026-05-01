@@ -1,7 +1,7 @@
 'use server'
 
 import { createAdminClient, createClient as createSsrClient } from '@/lib/supabase/server'
-import { lookupInvitation } from '@/lib/invitation'
+import { lookupInvitation, sendClientWelcomeEmail } from '@/lib/invitation'
 
 export type ActivateResult = { ok: true } | { ok: false; error: string }
 
@@ -75,6 +75,21 @@ export async function activateClientAccount(params: {
   })
   if (signInErr) {
     return { ok: false, error: `Аккаунт создан, но автологин не удался: ${signInErr.message}. Попробуй войти через /login.` }
+  }
+
+  // 6. Welcome-письмо (fire-and-forget — не ломаем регистрацию если email
+  //    не отправился, сервер просто залогирует ошибку).
+  try {
+    const { data: client } = await admin
+      .from('clients').select('name').eq('id', inv.client_id).maybeSingle()
+    sendClientWelcomeEmail({
+      to: inv.email,
+      clientName: client?.name || 'клиент',
+    }).then(r => {
+      if (!r.ok) console.warn('[invite] welcome email failed:', r.error)
+    })
+  } catch (e) {
+    console.warn('[invite] welcome email exception:', e)
   }
 
   return { ok: true }

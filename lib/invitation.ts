@@ -164,6 +164,64 @@ async function sendInvitationEmail(params: {
   }
 }
 
+/**
+ * Welcome-письмо клиенту после успешной активации кабинета.
+ * НЕ содержит пароль — только ссылку на /login и /client.
+ */
+export async function sendClientWelcomeEmail(params: {
+  to: string
+  clientName: string
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const apiKey = process.env.RESEND_API_KEY
+  if (!apiKey) return { ok: false, error: 'RESEND_API_KEY не настроен' }
+  const fromAddress = process.env.RESEND_FROM_ADDRESS || 'Go And Study <noreply@goandstudy.com>'
+  const cabinetUrl = `${APP_URL}/client`
+  const loginUrl = `${APP_URL}/login`
+
+  const html = `<!DOCTYPE html>
+<html lang="ru"><head><meta charset="utf-8"></head>
+<body style="font-family: -apple-system, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px; color: #14121e;">
+  <h1 style="font-size: 24px; margin: 0 0 16px;">Привет, ${params.clientName}!</h1>
+  <p style="font-size: 15px; line-height: 1.5; color: #443f56;">
+    Кабинет создан, пароль сохранён. Можешь входить когда удобно — теперь у тебя
+    в одном месте подборка вузов, документы, эссе и связь с куратором.
+  </p>
+  <p style="margin: 28px 0;">
+    <a href="${cabinetUrl}" style="display: inline-block; background: #B15ECC; color: #fff; padding: 14px 28px; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 15px;">
+      Открыть кабинет
+    </a>
+  </p>
+  <p style="font-size: 13px; color: #8a8796; line-height: 1.6;">
+    <b style="color: #14121e;">Email для входа:</b> ${params.to}<br>
+    <b style="color: #14121e;">Страница входа:</b> <a href="${loginUrl}" style="color: #B15ECC;">${loginUrl}</a><br>
+    <br>
+    Пароль ты задал сам — он зашифрован и в письмо не попадает (стандартная
+    практика безопасности). Если забудешь — напиши куратору, он сбросит.
+  </p>
+</body></html>`
+
+  try {
+    const r = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from: fromAddress,
+        to: [params.to],
+        subject: 'Кабинет Go & Study готов — добро пожаловать!',
+        html,
+      }),
+      signal: AbortSignal.timeout(10000),
+    })
+    if (!r.ok) {
+      const body = await r.text().catch(() => '')
+      return { ok: false, error: `Resend ${r.status}: ${body.slice(0, 200)}` }
+    }
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Network error' }
+  }
+}
+
 /** Найти invitation по токену + проверить срок и used_at. */
 export type LookupResult =
   | { ok: false; error: string }

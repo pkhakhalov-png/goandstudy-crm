@@ -1,7 +1,7 @@
 'use server'
 
 import { createAdminClient, createClient as createSsrClient } from '@/lib/supabase/server'
-import { lookupCuratorInvitation } from '@/lib/curator-invitation'
+import { lookupCuratorInvitation, sendCuratorWelcomeEmail } from '@/lib/curator-invitation'
 
 export type ActivateResult = { ok: true } | { ok: false; error: string }
 
@@ -66,6 +66,20 @@ export async function activateCuratorAccount(params: {
   })
   if (signInErr) {
     return { ok: false, error: `Аккаунт создан, но автологин не удался: ${signInErr.message}. Войди вручную через /login.` }
+  }
+
+  // Welcome-письмо куратору
+  try {
+    const { data: c } = await admin
+      .from('curators').select('name').eq('id', inv.curator_id).maybeSingle()
+    sendCuratorWelcomeEmail({
+      to: inv.email,
+      curatorName: c?.name || 'куратор',
+    }).then(r => {
+      if (!r.ok) console.warn('[invite/curator] welcome email failed:', r.error)
+    })
+  } catch (e) {
+    console.warn('[invite/curator] welcome email exception:', e)
   }
 
   return { ok: true }
