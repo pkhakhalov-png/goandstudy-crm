@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { moveDeal, addDealNote, updateDeal, createDealTask, toggleDealTask, deleteDealTask, linkDealToClient, searchClients, sendDealMessage, sendDealFile, suggestReply } from '../actions'
 import { uploadDealFile, deleteDealFile } from './fileActions'
 import { createClient } from '@/lib/supabase/client'
+import { SalesInviteButton } from '@/app/sales/SalesInviteButton'
 
 interface Stage { id: string; name: string; color: string; position: number; stage_type: string }
 
@@ -534,13 +535,18 @@ export function DealCard({ deal, stages, activities, salespersons, clientData, b
           <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--bor2)' }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Клиент в CRM</div>
             {clientData ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div style={{ flex: 1, padding: '8px 12px', borderRadius: 8, background: 'rgba(52,199,89,.06)', border: '1px solid rgba(52,199,89,.15)', fontSize: 12 }}>
-                  <span style={{ fontWeight: 700, color: 'var(--green)' }}>{clientData.name}</span>
-                  <span style={{ marginLeft: 8, color: 'var(--muted)' }}>{clientData.country}</span>
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ flex: 1, padding: '8px 12px', borderRadius: 8, background: 'rgba(52,199,89,.06)', border: '1px solid rgba(52,199,89,.15)', fontSize: 12 }}>
+                    <span style={{ fontWeight: 700, color: 'var(--green)' }}>{clientData.name}</span>
+                    <span style={{ marginLeft: 8, color: 'var(--muted)' }}>{clientData.country}</span>
+                  </div>
+                  <button onClick={handleUnlinkClient} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 12 }} title="Отвязать">×</button>
                 </div>
-                <button onClick={handleUnlinkClient} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 12 }} title="Отвязать">×</button>
-              </div>
+                <div style={{ marginTop: 8 }}>
+                  <SalesInviteButton clientId={clientData.id} clientEmail={clientData.email || null} clientName={clientData.name} />
+                </div>
+              </>
             ) : (
               <>
                 {showClientSearch ? (
