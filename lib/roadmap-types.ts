@@ -38,16 +38,16 @@ export function formatRoadmapMonth(month?: string): string {
 // Дефолтный шаблон — наполняется при первом открытии (если roadmap_data пуст).
 // Куратор всё может удалить/переименовать/добавить.
 export const DEFAULT_ROADMAP_TEMPLATE: { title: string; items: { title: string }[] }[] = [
-  { title: 'Проф.Ориентация',           items: [] },
-  { title: 'Стратегическая сессия',     items: [] },
-  { title: 'Дорожная карта',            items: [] },
-  { title: 'Подбор университетов',      items: [] },
-  { title: 'Презентация и выбор вузов', items: [] },
-  { title: 'Документы',                 items: [] },
-  { title: 'Подача заявок',             items: [] },
-  { title: 'Оффер',                     items: [] },
-  { title: 'Зачисление',                items: [] },
-  { title: 'Проживание',                items: [] },
-  { title: 'Виза',                      items: [] },
-  { title: 'Подготовка к поездке',      items: [] },
+  { title: 'Профориентация',  items: [] },
+  { title: 'Стратсессия',     items: [] },
+  { title: 'Дорожная карта',  items: [] },
+  { title: 'Подбор вузов',    items: [] },
+  { title: 'Презентация',     items: [] },
+  { title: 'Документы',       items: [] },
+  { title: 'Подача',          items: [] },
+  { title: 'Оффер',           items: [] },
+  { title: 'Зачисление',      items: [] },
+  { title: 'Жильё',           items: [] },
+  { title: 'Виза',            items: [] },
+  { title: 'Поездка',         items: [] },
 ]
