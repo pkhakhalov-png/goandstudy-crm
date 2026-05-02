@@ -11,7 +11,7 @@ import {
   getClientEssays,
   getClientApplications,
   getClientProject,
-  getClientRoadmapItems,
+  getClientRoadmapData,
 } from '@/lib/client-data'
 import { ClientTopNav } from './ClientTopNav'
 import { DashboardHero } from './DashboardHero'
@@ -75,7 +75,7 @@ export default async function ClientHomePage({ searchParams }: { searchParams: P
     getClientEssays(client.id),
     getClientApplications(client.id),
     getClientProject(client.id),
-    getClientRoadmapItems(client.id),
+    getClientRoadmapData(client.id),
   ])
 
   // Derive essay state for EssayCards (maps DB status → mock EssayState)

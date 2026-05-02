@@ -2,18 +2,18 @@
 
 import { CollapsibleCard } from './CollapsibleCard'
 import { RoadmapBlock } from '@/app/_shared/RoadmapBlock'
-import type { RoadmapItemRow } from '@/lib/roadmap-types'
+import type { RoadmapData } from '@/lib/roadmap-types'
 
 interface Props {
   clientId: number
-  items: RoadmapItemRow[]
+  data: RoadmapData
   approvedAt: string | null
   approvedBy: string | null
 }
 
-export function RoadmapCard({ clientId, items, approvedAt, approvedBy }: Props) {
-  const total = items.length
-  const done = items.filter(i => i.done).length
+export function RoadmapCard({ clientId, data, approvedAt, approvedBy }: Props) {
+  const total = data.stages.reduce((acc, s) => acc + s.items.length, 0)
+  const done = data.stages.reduce((acc, s) => acc + s.items.filter(i => i.done).length, 0)
   const isApproved = !!approvedAt
 
   return (
@@ -35,7 +35,7 @@ export function RoadmapCard({ clientId, items, approvedAt, approvedBy }: Props) 
     >
       <RoadmapBlock
         clientId={clientId}
-        initial={items}
+        initial={data}
         approvedAt={approvedAt}
         approvedBy={approvedBy}
         canEdit={false}

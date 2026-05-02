@@ -1,5 +1,5 @@
 import type { StudentProjectData } from '@/lib/student-project-types'
-import type { RoadmapItemRow } from '@/lib/roadmap-types'
+import type { RoadmapData } from '@/lib/roadmap-types'
 import { ProjectStudentCard } from './ProjectStudentCard'
 import { RoadmapCard } from './RoadmapCard'
 
@@ -7,7 +7,7 @@ interface Props {
   clientId: number
   project: StudentProjectData
   roadmap: {
-    items: RoadmapItemRow[]
+    data: RoadmapData
     approvedAt: string | null
     approvedBy: string | null
   }
@@ -34,7 +34,7 @@ export function ProjectAndRoadmap({ clientId, project, roadmap }: Props) {
       <ProjectStudentCard clientId={clientId} initial={project} />
       <RoadmapCard
         clientId={clientId}
-        items={roadmap.items}
+        data={roadmap.data}
         approvedAt={roadmap.approvedAt}
         approvedBy={roadmap.approvedBy}
       />

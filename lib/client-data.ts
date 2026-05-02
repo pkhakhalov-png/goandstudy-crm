@@ -285,10 +285,10 @@ const DOC_STATUS_MAP: Record<DocRow['status'], DocStatus> = {
 // Поля «Проект студента» — экспортируется из отдельного файла без server-only кода
 export { STUDENT_PROJECT_FIELDS } from './student-project-types'
 export type { StudentProjectFieldKey, StudentProjectData } from './student-project-types'
-export type { RoadmapItemRow } from './roadmap-types'
+export type { RoadmapData, RoadmapStage, RoadmapItem } from './roadmap-types'
 
 import type { StudentProjectData } from './student-project-types'
-import type { RoadmapItemRow } from './roadmap-types'
+import type { RoadmapData } from './roadmap-types'
 
 export async function getClientProject(clientId: number): Promise<StudentProjectData> {
   const admin = await createAdminClient()
@@ -296,71 +296,29 @@ export async function getClientProject(clientId: number): Promise<StudentProject
   return (data?.project_data as StudentProjectData) || {}
 }
 
-export async function getClientRoadmapItems(clientId: number): Promise<{
-  items: RoadmapItemRow[]
+export async function getClientRoadmapData(clientId: number): Promise<{
+  data: RoadmapData
   approvedAt: string | null
   approvedBy: string | null
 }> {
   const admin = await createAdminClient()
-  const { data } = await admin
+  const { data: row } = await admin
     .from('clients')
     .select('roadmap_data, roadmap_approved_at, roadmap_approved_by_name')
     .eq('id', clientId)
     .maybeSingle()
+  const raw = row?.roadmap_data
+  // Поддержка старого формата (массив) — отдаём пустые stages
+  const parsed: RoadmapData = Array.isArray(raw) ? { stages: [] } : ((raw as RoadmapData) || { stages: [] })
   return {
-    items: ((data?.roadmap_data as RoadmapItemRow[]) || []).filter(Boolean),
-    approvedAt: (data?.roadmap_approved_at as string | null) ?? null,
-    approvedBy: (data?.roadmap_approved_by_name as string | null) ?? null,
+    data: parsed,
+    approvedAt: (row?.roadmap_approved_at as string | null) ?? null,
+    approvedBy: (row?.roadmap_approved_by_name as string | null) ?? null,
   }
 }
 
-/**
- * Засеивает roadmap_data клиента из шаблона curator_stage_checklist.
- * Идемпотентно: если roadmap_data не пуст или утверждён — ничего не делает.
- * Вызывается при первом открытии куратором таба «Дорожная карта».
- */
-export async function ensureRoadmapSeededFromTemplate(clientId: number): Promise<void> {
-  const admin = await createAdminClient()
-  const { data: client } = await admin
-    .from('clients')
-    .select('roadmap_data, roadmap_approved_at')
-    .eq('id', clientId)
-    .maybeSingle()
-  if (!client) return
-
-  const items = (client.roadmap_data as any[]) || []
-  if (items.length > 0 || client.roadmap_approved_at) return
-
-  const [{ data: stages }, { data: checklist }] = await Promise.all([
-    admin.from('curator_stages').select('id, code').order('position'),
-    admin.from('curator_stage_checklist').select('stage_id, text, position').order('position'),
-  ])
-  if (!stages || !checklist) return
-
-  const stageCodeById = new Map<string, string>()
-  for (const s of stages) stageCodeById.set(s.id as string, s.code as string)
-
-  const validStages = new Set([
-    'profo', 'strategy_session', 'roadmap_presentation', 'presentation_review',
-    'documents', 'uni_applications', 'offer_housing_visa', 'arrival_prep', 'enrollment_done',
-  ])
-
-  const seeded: RoadmapItemRow[] = []
-  for (const c of checklist) {
-    const stageCode = stageCodeById.get(c.stage_id as string)
-    if (!stageCode || !validStages.has(stageCode)) continue
-    seeded.push({
-      id: crypto.randomUUID(),
-      stage: stageCode as any,
-      title: c.text as string,
-      done: false,
-    })
-  }
-
-  if (seeded.length > 0) {
-    await admin.from('clients').update({ roadmap_data: seeded }).eq('id', clientId)
-  }
-}
+// (deleted: старый ensureRoadmapSeededFromTemplate. Теперь шаблон засеивается
+//  через server action seedRoadmapTemplate в lib/roadmap-actions.ts.)
 
 const LOCKED_DOC_TYPES = new Set(['cv', 'motivation_letter'])
 

@@ -165,7 +165,11 @@ export function ClientWorkspace(props: Props) {
             <div style={{ marginTop: 20 }}>
               <RoadmapBlock
                 clientId={client.id}
-                initial={(client.roadmap_data as any[]) || []}
+                initial={(() => {
+                  const raw = client.roadmap_data as any
+                  if (Array.isArray(raw)) return { stages: [] }
+                  return raw || { stages: [] }
+                })()}
                 approvedAt={(client.roadmap_approved_at as string | null) ?? null}
                 approvedBy={(client.roadmap_approved_by_name as string | null) ?? null}
                 canEdit
