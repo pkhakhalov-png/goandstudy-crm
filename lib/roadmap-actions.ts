@@ -230,8 +230,7 @@ export async function approveRoadmap(opts: { clientId: number }): Promise<Action
   if (!CURATOR_ROLES.has(ctx.role || '')) return { ok: false, error: 'Только куратор' }
 
   const data = await readRoadmap(opts.clientId, ctx.admin)
-  const totalItems = data.stages.reduce((acc, s) => acc + s.items.length, 0)
-  if (totalItems === 0) return { ok: false, error: 'Сначала добавь хотя бы один пункт' }
+  if (data.stages.length === 0) return { ok: false, error: 'Сначала добавь хотя бы один этап' }
 
   const { error } = await ctx.admin.from('clients').update({
     roadmap_approved_at: new Date().toISOString(),

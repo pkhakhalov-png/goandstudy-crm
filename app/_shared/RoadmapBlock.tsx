@@ -229,7 +229,7 @@ export function RoadmapBlock({ clientId, initial, approvedAt: approvedAtProp, ap
               Снять утверждение
             </button>
           ) : (
-            <button type="button" disabled={pending || totalItems === 0} onClick={onApprove} className="ds-btn ds-btn-primary" style={{ fontSize: 13, padding: '8px 20px', fontWeight: 600 }}>
+            <button type="button" disabled={pending || data.stages.length === 0} onClick={onApprove} className="ds-btn ds-btn-primary" style={{ fontSize: 13, padding: '8px 20px', fontWeight: 600 }}>
               ✓ Утвердить дорожную карту
             </button>
           )}
