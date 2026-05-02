@@ -46,7 +46,12 @@ function revalidate(clientId: number) {
   revalidatePath('/client')
 }
 
-/** Засеять шаблон. Идемпотентно — пропускает если стадии уже есть. */
+/**
+ * Засеивает шаблон. Тянет стадии из curator_stages + дефолтные пункты
+ * из curator_stage_checklist — это держит дорожную карту в синхроне с
+ * пайплайном куратора.
+ * Идемпотентно — пропускает если стадии уже есть.
+ */
 export async function seedRoadmapTemplate(opts: { clientId: number }): Promise<ActionResult> {
   const ctx = await checkAccess(opts.clientId)
   if (!ctx.ok) return { ok: false, error: ctx.error }
@@ -55,15 +60,35 @@ export async function seedRoadmapTemplate(opts: { clientId: number }): Promise<A
   const data = await readRoadmap(opts.clientId, ctx.admin)
   if (data.stages.length > 0) return { ok: true }
 
-  const stages: RoadmapStage[] = DEFAULT_ROADMAP_TEMPLATE.map(t => ({
-    id: randomUUID(),
-    title: t.title,
-    items: t.items.map(it => ({
+  const [{ data: dbStages }, { data: dbChecklist }] = await Promise.all([
+    ctx.admin.from('curator_stages').select('id, code, title').order('position'),
+    ctx.admin.from('curator_stage_checklist').select('stage_id, text, position').order('position'),
+  ])
+
+  let stages: RoadmapStage[]
+  if (dbStages && dbStages.length > 0) {
+    const itemsByStage = new Map<string, { text: string; position: number }[]>()
+    for (const c of (dbChecklist || [])) {
+      const arr = itemsByStage.get(c.stage_id as string) || []
+      arr.push({ text: c.text as string, position: (c.position as number) || 0 })
+      itemsByStage.set(c.stage_id as string, arr)
+    }
+    stages = dbStages.map(s => ({
       id: randomUUID(),
-      title: it.title,
-      done: false,
-    })),
-  }))
+      title: s.title as string,
+      items: (itemsByStage.get(s.id as string) || [])
+        .sort((a, b) => a.position - b.position)
+        .map(it => ({ id: randomUUID(), title: it.text })),
+    }))
+  } else {
+    // Fallback — хардкод-шаблон, если curator_stages пустой
+    stages = DEFAULT_ROADMAP_TEMPLATE.map(t => ({
+      id: randomUUID(),
+      title: t.title,
+      items: t.items.map(it => ({ id: randomUUID(), title: it.title })),
+    }))
+  }
+
   const { error } = await writeRoadmap(opts.clientId, { stages }, ctx.admin)
   if (error) return { ok: false, error: error.message }
   revalidate(opts.clientId)

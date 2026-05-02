@@ -29,7 +29,6 @@ export function RoadmapBlock({ clientId, initial, approvedAt: approvedAtProp, ap
   const [addingStage, setAddingStage] = useState(false)
 
   const totalItems = data.stages.reduce((acc, s) => acc + s.items.length, 0)
-  const doneItems = data.stages.reduce((acc, s) => acc + s.items.filter(i => i.done).length, 0)
   const isApproved = !!approvedAt
   const canEditStructure = canEdit && !isApproved
 
@@ -168,7 +167,7 @@ export function RoadmapBlock({ clientId, initial, approvedAt: approvedAtProp, ap
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, gap: 12, flexWrap: 'wrap' }}>
         <div style={{ fontSize: 12, color: 'var(--ds-muted)' }}>
-          {totalItems > 0 && <>{doneItems} / {totalItems} выполнено</>}
+          Ориентир по этапам — что нужно сделать. Для отслеживания прогресса используй стрепер выше.
         </div>
         <ApprovalChip approvedAt={approvedAt} approvedBy={approvedBy} />
       </div>
@@ -183,7 +182,6 @@ export function RoadmapBlock({ clientId, initial, approvedAt: approvedAtProp, ap
               key={stage.id}
               stage={stage}
               canEditStructure={canEditStructure}
-              canToggleDone={canEdit}
               disabled={pending}
               isAdding={showAddFor === stage.id}
               onStartAdd={() => setShowAddFor(stage.id)}
@@ -242,26 +240,24 @@ export function RoadmapBlock({ clientId, initial, approvedAt: approvedAtProp, ap
 }
 
 function StageBlock({
-  stage, canEditStructure, canToggleDone, disabled,
+  stage, canEditStructure, disabled,
   isAdding, onStartAdd, onCancelAdd, onAddItem,
   onPatchStage, onDeleteStage,
   onPatchItem, onDeleteItem,
 }: {
   stage: RoadmapStage
   canEditStructure: boolean
-  canToggleDone: boolean
   disabled: boolean
   isAdding: boolean
   onStartAdd: () => void
   onCancelAdd: () => void
   onAddItem: (title: string, month: string, comment: string) => void
-  onPatchStage: (p: Partial<Pick<RoadmapStage, 'title' | 'month' | 'done'>>) => void
+  onPatchStage: (p: Partial<Pick<RoadmapStage, 'title' | 'month'>>) => void
   onDeleteStage: () => void
   onPatchItem: (itemId: string, patch: Partial<RoadmapItem>) => void
   onDeleteItem: (itemId: string) => void
 }) {
   const [renaming, setRenaming] = useState(false)
-  const done = stage.items.filter(i => i.done).length
   const total = stage.items.length
 
   return (
@@ -300,7 +296,6 @@ function StageBlock({
                   {formatRoadmapMonth(stage.month)}
                 </span>
               ) : null}
-              {total > 0 && <span style={{ fontSize: 11, color: 'var(--ds-muted)', fontWeight: 600 }}>{done}/{total}</span>}
               {canEditStructure && (
                 <button
                   type="button"
@@ -324,7 +319,6 @@ function StageBlock({
             item={item}
             isLast={idx === stage.items.length - 1 && !isAdding}
             canEditStructure={canEditStructure}
-            canToggleDone={canToggleDone}
             disabled={disabled}
             onPatch={(p) => onPatchItem(item.id, p)}
             onDelete={() => onDeleteItem(item.id)}
@@ -408,12 +402,11 @@ function ApprovalChip({ approvedAt, approvedBy }: { approvedAt: string | null; a
 }
 
 function ItemRow({
-  item, isLast, canEditStructure, canToggleDone, disabled, onPatch, onDelete,
+  item, isLast, canEditStructure, disabled, onPatch, onDelete,
 }: {
   item: RoadmapItem
   isLast: boolean
   canEditStructure: boolean
-  canToggleDone: boolean
   disabled: boolean
   onPatch: (p: Partial<RoadmapItem>) => void
   onDelete: () => void
@@ -431,13 +424,10 @@ function ItemRow({
       borderBottom: isLast ? 'none' : '1px solid var(--ds-border-soft)',
     }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, fontSize: 13 }}>
-        <input
-          type="checkbox"
-          checked={!!item.done}
-          disabled={!canToggleDone || disabled}
-          onChange={(e) => onPatch({ done: e.target.checked })}
-          style={{ width: 18, height: 18, accentColor: 'var(--ds-purple)', cursor: canToggleDone ? 'pointer' : 'default', marginTop: 2 }}
-        />
+        <span style={{
+          width: 6, height: 6, borderRadius: '50%',
+          background: 'var(--ds-purple)', marginTop: 7, flexShrink: 0,
+        }} />
 
         <div style={{ flex: 1, minWidth: 0 }}>
           {editing ? (
@@ -457,10 +447,7 @@ function ItemRow({
               }}
               onClick={() => canEditStructure && setEditing(true)}
             >
-              <span style={{
-                color: item.done ? 'var(--ds-muted)' : 'var(--ds-ink)',
-                textDecoration: item.done ? 'line-through' : 'none',
-              }}>
+              <span style={{ color: 'var(--ds-ink)' }}>
                 {item.title}
               </span>
               <span style={{ fontSize: 11, color: 'var(--ds-muted)', whiteSpace: 'nowrap' }}>
@@ -485,7 +472,7 @@ function ItemRow({
 
       {!editing && item.comment && item.comment.trim() && (
         <div style={{
-          marginLeft: 30, fontSize: 12, color: 'var(--ds-muted)',
+          marginLeft: 18, fontSize: 12, color: 'var(--ds-muted)',
           padding: '6px 10px', background: 'var(--ds-bg-alt)',
           borderRadius: 6, lineHeight: 1.4, fontStyle: 'italic',
         }}>
