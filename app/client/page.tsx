@@ -10,6 +10,7 @@ import {
   getClientDocumentRows,
   getClientEssays,
   getClientApplications,
+  getClientProject,
 } from '@/lib/client-data'
 import { ClientTopNav } from './ClientTopNav'
 import { DashboardHero } from './DashboardHero'
@@ -23,7 +24,6 @@ import { PreviewBanner } from './PreviewBanner'
 import {
   CLIENT_CTX,
   ROADMAP,
-  STUDENT_PROJECT,
   ESSAYS,
   REQUIRED_DOCS,
 } from './mock-data'
@@ -68,12 +68,13 @@ export default async function ClientHomePage({ searchParams }: { searchParams: P
     )
   }
 
-  const [timeline, universities, documentRows, essayRows, applications] = await Promise.all([
+  const [timeline, universities, documentRows, essayRows, applications, projectData] = await Promise.all([
     getClientTimeline(client.id),
     getClientUniversities(client.id),
     getClientDocumentRows(client.id),
     getClientEssays(client.id),
     getClientApplications(client.id),
+    getClientProject(client.id),
   ])
 
   // Derive essay state for EssayCards (maps DB status → mock EssayState)
@@ -168,7 +169,7 @@ export default async function ClientHomePage({ searchParams }: { searchParams: P
           gap: 56,
         }}
       >
-        <ProjectAndRoadmap project={STUDENT_PROJECT} roadmap={ROADMAP} />
+        <ProjectAndRoadmap clientId={client.id} project={projectData} roadmap={ROADMAP} />
         <div data-tour="shortlist">
           <ShortlistBlock items={universities} total={universities.length} clientId={client.id} />
         </div>

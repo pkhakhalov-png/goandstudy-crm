@@ -1,0 +1,71 @@
+'use server'
+
+import { revalidatePath } from 'next/cache'
+import { createAdminClient, createClient as createSsrClient } from './supabase/server'
+
+type ActionResult = { ok: true } | { ok: false; error: string }
+
+async function checkAccess(clientId: number) {
+  const ssr = await createSsrClient()
+  const { data: { user } } = await ssr.auth.getUser()
+  if (!user) return { ok: false as const, error: 'Не авторизован' }
+
+  const admin = await createAdminClient()
+  const { data: profile } = await admin.from('users').select('id, name, role').eq('id', user.id).single()
+
+  const { data: client } = await admin.from('clients').select('id, email, curator_id').eq('id', clientId).maybeSingle()
+  if (!client) return { ok: false as const, error: 'Клиент не найден' }
+
+  const role = profile?.role
+  if (role === 'admin' || role === 'rop') {
+    // допуск без ограничений
+  } else if (role === 'curator') {
+    // куратор видит только своих
+    const { data: cur } = await admin.from('curators').select('id').eq('user_id', user.id).maybeSingle()
+    if (!cur || cur.id !== client.curator_id) return { ok: false as const, error: 'Не твой клиент' }
+  } else if (role === 'client') {
+    // клиент только свой профиль
+    if (client.email?.toLowerCase() !== user.email?.toLowerCase()) {
+      return { ok: false as const, error: 'Нет доступа к чужому клиенту' }
+    }
+  } else {
+    return { ok: false as const, error: 'Нет роли с доступом' }
+  }
+
+  return { ok: true as const, admin, user, profile, client }
+}
+
+export async function saveProjectField(opts: {
+  clientId: number
+  key: string
+  value: string
+}): Promise<ActionResult> {
+  const ctx = await checkAccess(opts.clientId)
+  if (!ctx.ok) return { ok: false, error: ctx.error }
+
+  // Подгружаем текущий JSONB и мерджим
+  const { data: row } = await ctx.admin.from('clients').select('project_data').eq('id', opts.clientId).single()
+  const current = (row?.project_data as Record<string, any>) || {}
+  const updated = {
+    ...current,
+    [opts.key]: opts.value,
+    updated_at: new Date().toISOString(),
+    updated_by_name: ctx.profile?.name || ctx.user.email || null,
+  }
+
+  const { error } = await ctx.admin.from('clients')
+    .update({ project_data: updated, updated_at: new Date().toISOString() })
+    .eq('id', opts.clientId)
+  if (error) return { ok: false, error: error.message }
+
+  revalidatePath(`/curator/clients/${opts.clientId}`)
+  revalidatePath('/client')
+  return { ok: true }
+}
+
+export async function saveProjectNote(opts: {
+  clientId: number
+  note: string
+}): Promise<ActionResult> {
+  return saveProjectField({ clientId: opts.clientId, key: 'note', value: opts.note })
+}

@@ -26,6 +26,7 @@ import { createApplication } from '@/app/curator/applications/actions'
 import { UniversityFilters } from '@/app/curator/universities/UniversityFilters'
 import { ProgramCardInteractive } from '@/app/curator/universities/ProgramCard'
 import { ApplicationsTab } from './ApplicationsTab'
+import { StudentProjectBlock } from '@/app/_shared/StudentProjectBlock'
 
 /* ═══════════════════════════════════════════════════════════════
    PROPS + ШЛЯПА — props структуры из Supabase (пока any, чтобы
@@ -519,13 +520,13 @@ function TabBar({
    ═══════════════════════════════════════════════════════════════ */
 
 function ProjectTab({ client }: { client: any }) {
-  const fields: { key: string; label: string; placeholder?: string }[] = [
-    { key: 'country', label: 'Страна', placeholder: 'UK, Нидерланды, Германия…' },
-    { key: 'university', label: 'Целевой вуз / программа', placeholder: 'University of Edinburgh, BSc CS' },
+  const contactFields: { key: string; label: string; placeholder?: string }[] = [
     { key: 'email', label: 'Email' },
     { key: 'phone', label: 'Телефон' },
     { key: 'telegram', label: 'Telegram', placeholder: '@username' },
   ]
+
+  const projectData = (client.project_data as Record<string, any>) || {}
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 24, alignItems: 'start' }} className="project-grid">
@@ -533,30 +534,30 @@ function ProjectTab({ client }: { client: any }) {
         @media (max-width: 980px) { .project-grid { grid-template-columns: 1fr !important; } }
       `}</style>
 
-      {/* Структурированный контекст */}
+      {/* Структурированный «Проект студента» — те же 8 полей что и у клиента */}
       <div className="ds-card" style={{ padding: 28 }}>
-        <SectionHead
-          eyebrow="Контекст клиента"
-          title="Проект студента"
-          description="Основные поля сохраняются в БД. Клиент видит их read-only."
-        />
-        <div style={{ display: 'flex', flexDirection: 'column', marginTop: 20 }}>
-          {fields.map((f, idx) => (
-            <EditableField
-              key={f.key}
-              clientId={client.id}
-              fieldKey={f.key}
-              label={f.label}
-              value={client[f.key] ?? ''}
-              placeholder={f.placeholder}
-              isFirst={idx === 0}
-            />
-          ))}
-        </div>
+        <StudentProjectBlock clientId={client.id} initial={projectData} />
       </div>
 
-      {/* Сводка */}
+      {/* Контакты + ключевая инфа в правой колонке */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div className="ds-card" style={{ padding: 24 }}>
+          <SectionHead eyebrow="Контакты" title="Связь с клиентом" />
+          <div style={{ display: 'flex', flexDirection: 'column', marginTop: 20 }}>
+            {contactFields.map((f, idx) => (
+              <EditableField
+                key={f.key}
+                clientId={client.id}
+                fieldKey={f.key}
+                label={f.label}
+                value={client[f.key] ?? ''}
+                placeholder={f.placeholder}
+                isFirst={idx === 0}
+              />
+            ))}
+          </div>
+        </div>
+
         <div className="ds-card" style={{ padding: 24 }}>
           <SectionHead eyebrow="Статус" title="Ключевая инфа" />
           <dl style={{ display: 'flex', flexDirection: 'column', gap: 10, margin: '18px 0 0' }}>
@@ -565,20 +566,6 @@ function ProjectTab({ client }: { client: any }) {
             <InfoRow label="Создан" value={client.created_at ? formatDate(client.created_at) : '—'} />
             <InfoRow label="Обновлён" value={client.updated_at ? formatDate(client.updated_at) : '—'} />
           </dl>
-        </div>
-
-        <div
-          className="ds-card"
-          style={{
-            padding: 24,
-            background: 'var(--ds-bg-alt)',
-            border: '1px dashed var(--ds-border)',
-          }}
-        >
-          <SectionHead eyebrow="Синхрон" title="Связка с ЛК клиента" />
-          <div style={{ fontSize: 13, color: 'var(--ds-ink-dim)', lineHeight: 1.5, marginTop: 12, letterSpacing: '-0.005em' }}>
-            В следующей итерации поля стратсессии (уровень / специальность / локация / бюджет / английский / образование / иное) будут жить отдельной таблицей и синхронизироваться с <b>/client</b> напрямую. Пока они хранятся в <code>localStorage</code> у клиента для превью.
-          </div>
         </div>
       </div>
     </div>

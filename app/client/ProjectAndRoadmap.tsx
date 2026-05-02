@@ -1,13 +1,15 @@
-import type { RoadmapStage, StudentProject } from './mock-data'
+import type { RoadmapStage } from './mock-data'
+import type { StudentProjectData } from '@/lib/client-data'
 import { ProjectStudentCard } from './ProjectStudentCard'
 import { RoadmapCard } from './RoadmapCard'
 
 interface Props {
-  project: StudentProject
+  clientId: number
+  project: StudentProjectData
   roadmap: RoadmapStage[]
 }
 
-export function ProjectAndRoadmap({ project, roadmap }: Props) {
+export function ProjectAndRoadmap({ clientId, project, roadmap }: Props) {
   return (
     <div
       className="project-roadmap-grid"
@@ -25,7 +27,7 @@ export function ProjectAndRoadmap({ project, roadmap }: Props) {
         .project-roadmap-grid > * { min-width: 0; }
       `}</style>
 
-      <ProjectStudentCard initial={project} />
+      <ProjectStudentCard clientId={clientId} initial={project} />
       <RoadmapCard roadmap={roadmap} />
     </div>
   )
