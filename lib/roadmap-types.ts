@@ -14,6 +14,7 @@ export type RoadmapStage = {
   id: string
   title: string
   month?: string         // YYYY-MM — общая дата этапа (опционально)
+  done?: boolean         // этап выполнен целиком
   items: RoadmapItem[]
 }
 

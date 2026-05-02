@@ -48,7 +48,7 @@ export function RoadmapBlock({ clientId, initial, approvedAt: approvedAtProp, ap
     })
   }
 
-  const onPatchStage = (stageId: string, patch: Partial<Pick<RoadmapStage, 'title' | 'month'>>) => {
+  const onPatchStage = (stageId: string, patch: Partial<Pick<RoadmapStage, 'title' | 'month' | 'done'>>) => {
     setData(d => ({ stages: d.stages.map(s => s.id === stageId ? { ...s, ...patch } : s) }))
     startTransition(async () => {
       const r = await updateRoadmapStage({ clientId, stageId, patch })
@@ -255,7 +255,7 @@ function StageBlock({
   onStartAdd: () => void
   onCancelAdd: () => void
   onAddItem: (title: string, month: string, comment: string) => void
-  onPatchStage: (p: Partial<Pick<RoadmapStage, 'title' | 'month'>>) => void
+  onPatchStage: (p: Partial<Pick<RoadmapStage, 'title' | 'month' | 'done'>>) => void
   onDeleteStage: () => void
   onPatchItem: (itemId: string, patch: Partial<RoadmapItem>) => void
   onDeleteItem: (itemId: string) => void
@@ -276,16 +276,27 @@ function StageBlock({
           />
         ) : (
           <>
-            <h4
-              onClick={() => canEditStructure && setRenaming(true)}
-              style={{
-                fontSize: 14, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em',
-                color: total > 0 ? 'var(--ds-ink)' : 'var(--ds-muted)', margin: 0,
-                cursor: canEditStructure ? 'pointer' : 'default', flex: 1, minWidth: 200,
-              }}
-            >
-              {stage.title}
-            </h4>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 200 }}>
+              <input
+                type="checkbox"
+                checked={!!stage.done}
+                disabled={!canToggleDone || disabled}
+                onChange={(e) => onPatchStage({ done: e.target.checked })}
+                style={{ width: 18, height: 18, accentColor: 'var(--ds-purple)', cursor: canToggleDone ? 'pointer' : 'default', flexShrink: 0 }}
+                title="Этап выполнен"
+              />
+              <h4
+                onClick={() => canEditStructure && setRenaming(true)}
+                style={{
+                  fontSize: 14, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em',
+                  color: stage.done ? 'var(--ds-muted)' : (total > 0 ? 'var(--ds-ink)' : 'var(--ds-muted)'),
+                  textDecoration: stage.done ? 'line-through' : 'none',
+                  margin: 0, cursor: canEditStructure ? 'pointer' : 'default',
+                }}
+              >
+                {stage.title}
+              </h4>
+            </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               {canEditStructure ? (
                 <MonthYearPicker

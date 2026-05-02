@@ -88,7 +88,7 @@ export async function addRoadmapStage(opts: { clientId: number; title: string })
 export async function updateRoadmapStage(opts: {
   clientId: number
   stageId: string
-  patch: Partial<Pick<RoadmapStage, 'title' | 'month'>>
+  patch: Partial<Pick<RoadmapStage, 'title' | 'month' | 'done'>>
 }): Promise<ActionResult> {
   const ctx = await checkAccess(opts.clientId)
   if (!ctx.ok) return { ok: false, error: ctx.error }
@@ -100,6 +100,7 @@ export async function updateRoadmapStage(opts: {
         ...s,
         ...(opts.patch.title !== undefined ? { title: opts.patch.title.trim() } : {}),
         ...(opts.patch.month !== undefined ? { month: opts.patch.month?.trim() || undefined } : {}),
+        ...(opts.patch.done !== undefined ? { done: opts.patch.done } : {}),
       }
     : s
   )
