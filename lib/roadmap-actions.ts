@@ -42,6 +42,7 @@ async function writeRoadmap(clientId: number, items: RoadmapItemRow[], admin: Aw
 export async function addRoadmapItem(opts: {
   clientId: number
   stage: RoadmapStageKey
+  substage?: string
   title: string
   month?: string
   comment?: string
@@ -56,6 +57,7 @@ export async function addRoadmapItem(opts: {
   items.push({
     id: randomUUID(),
     stage: opts.stage,
+    substage: opts.substage || undefined,
     title: opts.title.trim(),
     month: opts.month?.trim() || undefined,
     comment: opts.comment?.trim() || undefined,
