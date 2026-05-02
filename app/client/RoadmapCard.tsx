@@ -12,8 +12,6 @@ interface Props {
 }
 
 export function RoadmapCard({ clientId, data, approvedAt, approvedBy }: Props) {
-  const total = data.stages.reduce((acc, s) => acc + s.items.length, 0)
-  const done = data.stages.reduce((acc, s) => acc + s.items.filter(i => i.done).length, 0)
   const isApproved = !!approvedAt
 
   return (
@@ -23,14 +21,12 @@ export function RoadmapCard({ clientId, data, approvedAt, approvedBy }: Props) {
       summary={
         !isApproved
           ? 'Куратор готовит план — появится после утверждения'
-          : `${done} / ${total} задач выполнено`
+          : 'План работ от куратора'
       }
       chip={
         !isApproved
           ? <span className="ds-chip ds-chip-neutral" style={{ textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700, fontSize: 10 }}>в работе</span>
-          : <span style={{ fontFamily: 'var(--ds-font-display-stack)', fontWeight: 700, fontSize: 13, color: 'var(--ds-purple-deep)', fontVariantNumeric: 'tabular-nums' }}>
-              {done} / {total}
-            </span>
+          : <span className="ds-chip ds-chip-success" style={{ textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700, fontSize: 10 }}>✓ утверждено</span>
       }
     >
       <RoadmapBlock

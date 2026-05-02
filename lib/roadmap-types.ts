@@ -27,14 +27,12 @@ const RU_MONTH_SHORT: Record<string, string> = {
   '07': 'июл', '08': 'авг', '09': 'сен', '10': 'окт', '11': 'ноя', '12': 'дек',
 }
 
-const CURRENT_YEAR = new Date().getFullYear()
-
 export function formatRoadmapMonth(month?: string): string {
   if (!month) return ''
   const [y, m] = month.split('-')
   if (!y || !m) return month
   const ym = RU_MONTH_SHORT[m] || m
-  return Number(y) === CURRENT_YEAR ? ym : `${ym} ${y}`
+  return `${ym} ${y}`
 }
 
 // Дефолтный шаблон — наполняется при первом открытии (если roadmap_data пуст).
