@@ -54,7 +54,7 @@ export async function saveProjectField(opts: {
   }
 
   const { error } = await ctx.admin.from('clients')
-    .update({ project_data: updated, updated_at: new Date().toISOString() })
+    .update({ project_data: updated })
     .eq('id', opts.clientId)
   if (error) return { ok: false, error: error.message }
 
