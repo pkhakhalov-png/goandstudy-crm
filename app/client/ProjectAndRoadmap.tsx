@@ -1,5 +1,5 @@
 import type { RoadmapStage } from './mock-data'
-import type { StudentProjectData } from '@/lib/client-data'
+import type { StudentProjectData } from '@/lib/student-project-types'
 import { ProjectStudentCard } from './ProjectStudentCard'
 import { RoadmapCard } from './RoadmapCard'
 

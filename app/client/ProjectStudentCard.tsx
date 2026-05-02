@@ -2,7 +2,7 @@
 
 import { CollapsibleCard } from './CollapsibleCard'
 import { StudentProjectBlock } from '@/app/_shared/StudentProjectBlock'
-import type { StudentProjectData } from '@/lib/client-data'
+import type { StudentProjectData } from '@/lib/student-project-types'
 
 interface Props {
   clientId: number

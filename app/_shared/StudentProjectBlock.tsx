@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { saveProjectField, saveProjectNote } from '@/lib/student-project-actions'
-import { STUDENT_PROJECT_FIELDS, type StudentProjectData } from '@/lib/client-data'
+import { STUDENT_PROJECT_FIELDS, type StudentProjectData } from '@/lib/student-project-types'
 
 interface Props {
   clientId: number
