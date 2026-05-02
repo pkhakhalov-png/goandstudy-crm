@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createAdminClient, createClient as createSsrClient } from '@/lib/supabase/server'
-import { autoLinkGlobalDocs } from '@/app/client/applications/[id]/wizard/actions'
+import { autoLinkGlobalDocs } from '@/app/client/applications/[id]/wizard/auto-link-helper'
 
 type ApplyResult =
   | { ok: true; applicationId: string; hasWizard: boolean }

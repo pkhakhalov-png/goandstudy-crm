@@ -13,7 +13,7 @@ import {
 import { ClientTopNav } from '@/app/client/ClientTopNav'
 import { PreviewBanner } from '@/app/client/PreviewBanner'
 import { WizardView } from './WizardView'
-import { autoLinkGlobalDocs } from './actions'
+import { autoLinkGlobalDocs } from './auto-link-helper'
 
 export const dynamic = 'force-dynamic'
 
