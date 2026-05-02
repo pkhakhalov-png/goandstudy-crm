@@ -153,7 +153,7 @@ export function ClientWorkspace(props: Props) {
       }} />
 
       {/* ═══ CONTENT ═══ */}
-      <main style={{ maxWidth: 1200, margin: '0 auto', padding: '32px 32px 80px' }}>
+      <main style={{ maxWidth: tab === 'roadmap' ? '100%' : 1200, margin: '0 auto', padding: '32px 32px 80px' }}>
         {tab === 'project' && <ProjectTab client={client} />}
         {tab === 'roadmap' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -753,8 +753,8 @@ function ClientStageStepper({ client, stages }: { client: any; stages: any[] }) 
     <div style={{
       marginTop: 24,
       display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
-      gap: 6,
+      gridTemplateColumns: 'repeat(12, 1fr)',
+      gap: 8,
     }}>
       {stages.map((stage, idx) => {
         const done = idx < currentIdx
