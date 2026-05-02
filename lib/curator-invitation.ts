@@ -87,7 +87,7 @@ export async function createCuratorInvitation(
 async function sendCuratorInviteEmail(params: { to: string; curatorName: string; url: string }): Promise<{ ok: true } | { ok: false; error: string }> {
   const apiKey = process.env.RESEND_API_KEY
   if (!apiKey) return { ok: false, error: 'RESEND_API_KEY не настроен' }
-  const fromAddress = process.env.RESEND_FROM_ADDRESS || 'GoAndStudy <onboarding@resend.dev>'
+  const fromAddress = process.env.RESEND_FROM_ADDRESS || 'GoAndStudy <noreply@goandstudy.com>'
 
   const html = `<!DOCTYPE html>
 <html lang="ru"><head><meta charset="utf-8"></head>
@@ -136,7 +136,7 @@ export async function sendCuratorWelcomeEmail(params: {
 }): Promise<{ ok: true } | { ok: false; error: string }> {
   const apiKey = process.env.RESEND_API_KEY
   if (!apiKey) return { ok: false, error: 'RESEND_API_KEY не настроен' }
-  const fromAddress = process.env.RESEND_FROM_ADDRESS || 'GoAndStudy <onboarding@resend.dev>'
+  const fromAddress = process.env.RESEND_FROM_ADDRESS || 'GoAndStudy <noreply@goandstudy.com>'
   const cabinetUrl = `${APP_URL}/curator`
   const loginUrl = `${APP_URL}/login`
 

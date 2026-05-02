@@ -116,7 +116,7 @@ async function sendInvitationEmail(params: {
   if (!apiKey) {
     return { ok: false, error: 'RESEND_API_KEY не настроен — email не отправлен' }
   }
-  const fromAddress = process.env.RESEND_FROM_ADDRESS || 'GoAndStudy <onboarding@resend.dev>'
+  const fromAddress = process.env.RESEND_FROM_ADDRESS || 'GoAndStudy <noreply@goandstudy.com>'
 
   const html = `<!DOCTYPE html>
 <html lang="ru">
@@ -174,7 +174,7 @@ export async function sendClientWelcomeEmail(params: {
 }): Promise<{ ok: true } | { ok: false; error: string }> {
   const apiKey = process.env.RESEND_API_KEY
   if (!apiKey) return { ok: false, error: 'RESEND_API_KEY не настроен' }
-  const fromAddress = process.env.RESEND_FROM_ADDRESS || 'GoAndStudy <onboarding@resend.dev>'
+  const fromAddress = process.env.RESEND_FROM_ADDRESS || 'GoAndStudy <noreply@goandstudy.com>'
   const cabinetUrl = `${APP_URL}/client`
   const loginUrl = `${APP_URL}/login`
 
