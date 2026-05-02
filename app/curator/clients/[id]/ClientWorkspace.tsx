@@ -156,24 +156,37 @@ export function ClientWorkspace(props: Props) {
       <main style={{ maxWidth: 1200, margin: '0 auto', padding: '32px 32px 80px' }}>
         {tab === 'project' && <ProjectTab client={client} />}
         {tab === 'roadmap' && (
-          <div className="ds-card" style={{ padding: 28 }}>
-            <SectionHead
-              eyebrow="План работы"
-              title="Дорожная карта"
-              description="Добавляй пункты по этапам, проставляй месяц, опционально комментарии. После «Утвердить» клиент увидит план. Дальше отмечай галочками что выполнено."
-            />
-            <div style={{ marginTop: 20 }}>
-              <RoadmapBlock
-                clientId={client.id}
-                initial={(() => {
-                  const raw = client.roadmap_data as any
-                  if (Array.isArray(raw)) return { stages: [] }
-                  return raw || { stages: [] }
-                })()}
-                approvedAt={(client.roadmap_approved_at as string | null) ?? null}
-                approvedBy={(client.roadmap_approved_by_name as string | null) ?? null}
-                canEdit
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+            {/* Переключатель текущего этапа клиента (gradient stepper) */}
+            <div className="ds-card" style={{ padding: 28 }}>
+              <SectionHead
+                eyebrow="Этапы работы"
+                title="Текущий этап клиента"
+                description="Нажми на этап чтобы переключить статус клиента. Клиент увидит изменение в таймлайне."
               />
+              <ClientStageStepper client={client} stages={stages} />
+            </div>
+
+            {/* Кастомная дорожная карта — план с пунктами и датами */}
+            <div className="ds-card" style={{ padding: 28 }}>
+              <SectionHead
+                eyebrow="План работы"
+                title="Дорожная карта"
+                description="Добавляй пункты по этапам, проставляй месяц, опционально комментарии. После «Утвердить» клиент увидит план. Дальше отмечай галочками что выполнено."
+              />
+              <div style={{ marginTop: 20 }}>
+                <RoadmapBlock
+                  clientId={client.id}
+                  initial={(() => {
+                    const raw = client.roadmap_data as any
+                    if (Array.isArray(raw)) return { stages: [] }
+                    return raw || { stages: [] }
+                  })()}
+                  approvedAt={(client.roadmap_approved_at as string | null) ?? null}
+                  approvedBy={(client.roadmap_approved_by_name as string | null) ?? null}
+                  canEdit
+                />
+              </div>
             </div>
           </div>
         )}
@@ -723,6 +736,66 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 /* ═══════════════════════════════════════════════════════════════
    TAB · Дорожная карта — stages + checklist
    ═══════════════════════════════════════════════════════════════ */
+
+function ClientStageStepper({ client, stages }: { client: any; stages: any[] }) {
+  const [pending, startTransition] = useTransition()
+  const currentIdx = stages.findIndex(s => s.code === client.current_stage_code)
+
+  function setStage(code: string) {
+    if (code === client.current_stage_code || pending) return
+    const fd = new FormData()
+    fd.append('client_id', String(client.id))
+    fd.append('stage_code', code)
+    startTransition(() => { advanceStage(fd) })
+  }
+
+  return (
+    <div style={{
+      marginTop: 24,
+      display: 'grid',
+      gridTemplateColumns: `repeat(${Math.max(1, stages.length)}, 1fr)`,
+      gap: 4,
+    }}>
+      {stages.map((stage, idx) => {
+        const done = idx < currentIdx
+        const current = idx === currentIdx
+        // Градиент: чем дальше пройденный этап — тем плотнее purple
+        const t = currentIdx > 0 ? Math.max(0, Math.min(1, idx / Math.max(1, currentIdx))) : 0
+        const doneBg = done ? `rgba(181, 127, 207, ${0.10 + t * 0.20})` : 'transparent'
+        return (
+          <button
+            key={stage.code}
+            type="button"
+            onClick={() => setStage(stage.code)}
+            disabled={pending}
+            style={{
+              background: current
+                ? 'linear-gradient(135deg, var(--ds-purple) 0%, var(--ds-purple-deep) 100%)'
+                : doneBg,
+              color: current ? '#fff' : done ? 'var(--ds-ink)' : 'var(--ds-muted)',
+              border: `1px solid ${current ? 'var(--ds-purple)' : done ? 'var(--ds-border)' : 'var(--ds-border-soft)'}`,
+              borderRadius: 'var(--ds-r-sm)',
+              padding: '10px',
+              fontSize: 11,
+              fontWeight: current ? 700 : 500,
+              letterSpacing: '0.04em',
+              textTransform: 'uppercase',
+              cursor: 'pointer',
+              transition: 'all 150ms',
+              textAlign: 'center',
+              lineHeight: 1.2,
+              boxShadow: current ? '0 4px 12px -4px rgba(181,127,207,0.45)' : 'none',
+            }}
+            title={stage.title}
+          >
+            {done && '✓ '}
+            {stage.title}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
 
 function RoadmapTab({
   client, stages, clientStages, checklist, checklistProgress,
