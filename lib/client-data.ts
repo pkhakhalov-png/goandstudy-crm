@@ -314,6 +314,54 @@ export async function getClientRoadmapItems(clientId: number): Promise<{
   }
 }
 
+/**
+ * Засеивает roadmap_data клиента из шаблона curator_stage_checklist.
+ * Идемпотентно: если roadmap_data не пуст или утверждён — ничего не делает.
+ * Вызывается при первом открытии куратором таба «Дорожная карта».
+ */
+export async function ensureRoadmapSeededFromTemplate(clientId: number): Promise<void> {
+  const admin = await createAdminClient()
+  const { data: client } = await admin
+    .from('clients')
+    .select('roadmap_data, roadmap_approved_at')
+    .eq('id', clientId)
+    .maybeSingle()
+  if (!client) return
+
+  const items = (client.roadmap_data as any[]) || []
+  if (items.length > 0 || client.roadmap_approved_at) return
+
+  const [{ data: stages }, { data: checklist }] = await Promise.all([
+    admin.from('curator_stages').select('id, code').order('position'),
+    admin.from('curator_stage_checklist').select('stage_id, text, position').order('position'),
+  ])
+  if (!stages || !checklist) return
+
+  const stageCodeById = new Map<string, string>()
+  for (const s of stages) stageCodeById.set(s.id as string, s.code as string)
+
+  const validStages = new Set([
+    'profo', 'strategy_session', 'roadmap_presentation', 'presentation_review',
+    'documents', 'uni_applications', 'offer_housing_visa', 'arrival_prep', 'enrollment_done',
+  ])
+
+  const seeded: RoadmapItemRow[] = []
+  for (const c of checklist) {
+    const stageCode = stageCodeById.get(c.stage_id as string)
+    if (!stageCode || !validStages.has(stageCode)) continue
+    seeded.push({
+      id: crypto.randomUUID(),
+      stage: stageCode as any,
+      title: c.text as string,
+      done: false,
+    })
+  }
+
+  if (seeded.length > 0) {
+    await admin.from('clients').update({ roadmap_data: seeded }).eq('id', clientId)
+  }
+}
+
 const LOCKED_DOC_TYPES = new Set(['cv', 'motivation_letter'])
 
 export type EssayRow = {

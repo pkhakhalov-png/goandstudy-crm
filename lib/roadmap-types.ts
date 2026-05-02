@@ -1,11 +1,16 @@
 // Дорожная карта клиента — типы и константы (без server-only кода).
 
+// Стадии синхронизированы с curator_stages — те же 9 этапов от ProfO до Зачисления.
 export const ROADMAP_STAGES = [
-  { key: 'intro',     label: 'Знакомство' },
-  { key: 'shortlist', label: 'Подбор вузов' },
-  { key: 'documents', label: 'Документы' },
-  { key: 'apply',     label: 'Подача заявок' },
-  { key: 'offers',    label: 'Офферы и визы' },
+  { key: 'profo',                label: 'Профориентация' },
+  { key: 'strategy_session',     label: 'Стратегическая сессия' },
+  { key: 'roadmap_presentation', label: 'Дорожная карта и презентация' },
+  { key: 'presentation_review',  label: 'Разбор и выбор приоритетов' },
+  { key: 'documents',            label: 'Документы' },
+  { key: 'uni_applications',     label: 'Подачи в вузы' },
+  { key: 'offer_housing_visa',   label: 'Оффер, жильё, виза' },
+  { key: 'arrival_prep',         label: 'Подготовка к приезду' },
+  { key: 'enrollment_done',      label: 'Легализация и зачисление' },
 ] as const
 
 export type RoadmapStageKey = typeof ROADMAP_STAGES[number]['key']

@@ -57,6 +57,16 @@ export default async function CuratorClientPage({
 
   if (!client) notFound()
 
+  // Если у клиента ещё нет дорожной карты и не утверждена — заполнить шаблоном.
+  // Идемпотентно: повторный вызов ничего не делает.
+  if (((client.roadmap_data as any[]) || []).length === 0 && !client.roadmap_approved_at) {
+    const { ensureRoadmapSeededFromTemplate } = await import('@/lib/client-data')
+    await ensureRoadmapSeededFromTemplate(clientId)
+    // Перечитаем client с обновлённым roadmap_data
+    const { data: refreshed } = await admin.from('clients').select('*').eq('id', clientId).single()
+    if (refreshed) Object.assign(client, refreshed)
+  }
+
   const [
     { data: stages },
     { data: clientStages },
