@@ -285,13 +285,21 @@ const DOC_STATUS_MAP: Record<DocRow['status'], DocStatus> = {
 // Поля «Проект студента» — экспортируется из отдельного файла без server-only кода
 export { STUDENT_PROJECT_FIELDS } from './student-project-types'
 export type { StudentProjectFieldKey, StudentProjectData } from './student-project-types'
+export type { RoadmapItemRow } from './roadmap-types'
 
 import type { StudentProjectData } from './student-project-types'
+import type { RoadmapItemRow } from './roadmap-types'
 
 export async function getClientProject(clientId: number): Promise<StudentProjectData> {
   const admin = await createAdminClient()
   const { data } = await admin.from('clients').select('project_data').eq('id', clientId).maybeSingle()
   return (data?.project_data as StudentProjectData) || {}
+}
+
+export async function getClientRoadmapItems(clientId: number): Promise<RoadmapItemRow[]> {
+  const admin = await createAdminClient()
+  const { data } = await admin.from('clients').select('roadmap_data').eq('id', clientId).maybeSingle()
+  return ((data?.roadmap_data as RoadmapItemRow[]) || []).filter(Boolean)
 }
 
 const LOCKED_DOC_TYPES = new Set(['cv', 'motivation_letter'])

@@ -27,6 +27,7 @@ import { UniversityFilters } from '@/app/curator/universities/UniversityFilters'
 import { ProgramCardInteractive } from '@/app/curator/universities/ProgramCard'
 import { ApplicationsTab } from './ApplicationsTab'
 import { StudentProjectBlock } from '@/app/_shared/StudentProjectBlock'
+import { RoadmapBlock } from '@/app/_shared/RoadmapBlock'
 
 /* ═══════════════════════════════════════════════════════════════
    PROPS + ШЛЯПА — props структуры из Supabase (пока any, чтобы
@@ -534,9 +535,21 @@ function ProjectTab({ client }: { client: any }) {
         @media (max-width: 980px) { .project-grid { grid-template-columns: 1fr !important; } }
       `}</style>
 
-      {/* Структурированный «Проект студента» — те же 8 полей что и у клиента */}
-      <div className="ds-card" style={{ padding: 28 }}>
-        <StudentProjectBlock clientId={client.id} initial={projectData} />
+      {/* Структурированный «Проект студента» + «Дорожная карта» — общая колонка */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div className="ds-card" style={{ padding: 28 }}>
+          <StudentProjectBlock clientId={client.id} initial={projectData} />
+        </div>
+        <div className="ds-card" style={{ padding: 28 }}>
+          <SectionHead
+            eyebrow="План работы"
+            title="Дорожная карта"
+            description="Добавляй пункты по этапам, проставляй месяц, отмечай выполнение. Клиент видит то же самое в своём кабинете."
+          />
+          <div style={{ marginTop: 20 }}>
+            <RoadmapBlock clientId={client.id} initial={(client.roadmap_data as any[]) || []} canEdit />
+          </div>
+        </div>
       </div>
 
       {/* Контакты + ключевая инфа в правой колонке */}

@@ -1,12 +1,12 @@
-import type { RoadmapStage } from './mock-data'
 import type { StudentProjectData } from '@/lib/student-project-types'
+import type { RoadmapItemRow } from '@/lib/roadmap-types'
 import { ProjectStudentCard } from './ProjectStudentCard'
 import { RoadmapCard } from './RoadmapCard'
 
 interface Props {
   clientId: number
   project: StudentProjectData
-  roadmap: RoadmapStage[]
+  roadmap: RoadmapItemRow[]
 }
 
 export function ProjectAndRoadmap({ clientId, project, roadmap }: Props) {
@@ -28,7 +28,7 @@ export function ProjectAndRoadmap({ clientId, project, roadmap }: Props) {
       `}</style>
 
       <ProjectStudentCard clientId={clientId} initial={project} />
-      <RoadmapCard roadmap={roadmap} />
+      <RoadmapCard clientId={clientId} items={roadmap} />
     </div>
   )
 }
