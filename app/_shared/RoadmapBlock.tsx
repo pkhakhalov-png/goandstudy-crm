@@ -176,7 +176,9 @@ export function RoadmapBlock({ clientId, initial, approvedAt: approvedAtProp, ap
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
         {data.stages.map(stage => {
-          if (!canEditStructure && stage.items.length === 0) return null
+          // Клиенту прячем стадию только если она «совсем пустая» — без даты И без пунктов.
+          // Если есть дата или пункты — показываем.
+          if (!canEditStructure && stage.items.length === 0 && !stage.month) return null
           return (
             <StageBlock
               key={stage.id}
