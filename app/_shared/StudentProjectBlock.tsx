@@ -25,6 +25,10 @@ export function StudentProjectBlock({ clientId, initial, isClient = false, readO
   const allFilled = filledCount === FIELDS.length
   const isConfirmed = !!data.confirmed_at
 
+  // После подтверждения клиент больше не может редактировать поля.
+  // Куратор/админ — могут всегда.
+  const fieldsReadOnly = readOnly || (isClient && isConfirmed)
+
   const persistField = (key: string, value: string) => {
     setErr(null)
     startTransition(async () => {
@@ -88,13 +92,19 @@ export function StudentProjectBlock({ clientId, initial, isClient = false, readO
             multiline={f.multiline}
             isFirst={idx === 0}
             isEditing={editingKey === f.key}
-            disabled={readOnly || pending}
+            disabled={fieldsReadOnly || pending}
             onStart={() => setEditingKey(f.key)}
             onCancel={() => setEditingKey(null)}
             onSave={(v) => persistField(f.key, v)}
           />
         ))}
       </div>
+
+      {isClient && isConfirmed && (
+        <div style={{ padding: '12px', background: 'var(--ds-success-soft)', borderRadius: 'var(--ds-r-md)', border: '1px solid rgba(52,199,89,0.32)', fontSize: 12, color: 'var(--ds-ink)', lineHeight: 1.5, marginBottom: 12 }}>
+          Проект подтверждён. Изменения вносит только куратор. Если что-то нужно поправить — напиши ему.
+        </div>
+      )}
 
       {/* Кнопка подтверждения для клиента */}
       {isClient && !isConfirmed && allFilled && !readOnly && (
