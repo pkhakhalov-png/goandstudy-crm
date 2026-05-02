@@ -14,8 +14,14 @@ export type RoadmapItemRow = {
   id: string
   stage: RoadmapStageKey
   title: string
-  month?: string  // YYYY-MM, например "2026-05"
+  month?: string     // YYYY-MM, например "2026-05"
+  comment?: string   // опциональный комментарий куратора
   done?: boolean
+}
+
+export type RoadmapApproval = {
+  approved_at: string | null
+  approved_by_name: string | null
 }
 
 const RU_MONTH_SHORT: Record<string, string> = {

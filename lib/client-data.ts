@@ -296,10 +296,22 @@ export async function getClientProject(clientId: number): Promise<StudentProject
   return (data?.project_data as StudentProjectData) || {}
 }
 
-export async function getClientRoadmapItems(clientId: number): Promise<RoadmapItemRow[]> {
+export async function getClientRoadmapItems(clientId: number): Promise<{
+  items: RoadmapItemRow[]
+  approvedAt: string | null
+  approvedBy: string | null
+}> {
   const admin = await createAdminClient()
-  const { data } = await admin.from('clients').select('roadmap_data').eq('id', clientId).maybeSingle()
-  return ((data?.roadmap_data as RoadmapItemRow[]) || []).filter(Boolean)
+  const { data } = await admin
+    .from('clients')
+    .select('roadmap_data, roadmap_approved_at, roadmap_approved_by_name')
+    .eq('id', clientId)
+    .maybeSingle()
+  return {
+    items: ((data?.roadmap_data as RoadmapItemRow[]) || []).filter(Boolean),
+    approvedAt: (data?.roadmap_approved_at as string | null) ?? null,
+    approvedBy: (data?.roadmap_approved_by_name as string | null) ?? null,
+  }
 }
 
 const LOCKED_DOC_TYPES = new Set(['cv', 'motivation_letter'])

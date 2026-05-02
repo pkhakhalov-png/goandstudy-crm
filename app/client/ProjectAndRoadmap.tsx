@@ -6,7 +6,11 @@ import { RoadmapCard } from './RoadmapCard'
 interface Props {
   clientId: number
   project: StudentProjectData
-  roadmap: RoadmapItemRow[]
+  roadmap: {
+    items: RoadmapItemRow[]
+    approvedAt: string | null
+    approvedBy: string | null
+  }
 }
 
 export function ProjectAndRoadmap({ clientId, project, roadmap }: Props) {
@@ -28,7 +32,12 @@ export function ProjectAndRoadmap({ clientId, project, roadmap }: Props) {
       `}</style>
 
       <ProjectStudentCard clientId={clientId} initial={project} />
-      <RoadmapCard clientId={clientId} items={roadmap} />
+      <RoadmapCard
+        clientId={clientId}
+        items={roadmap.items}
+        approvedAt={roadmap.approvedAt}
+        approvedBy={roadmap.approvedBy}
+      />
     </div>
   )
 }

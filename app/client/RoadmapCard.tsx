@@ -7,30 +7,39 @@ import type { RoadmapItemRow } from '@/lib/roadmap-types'
 interface Props {
   clientId: number
   items: RoadmapItemRow[]
+  approvedAt: string | null
+  approvedBy: string | null
 }
 
-export function RoadmapCard({ clientId, items }: Props) {
+export function RoadmapCard({ clientId, items, approvedAt, approvedBy }: Props) {
   const total = items.length
   const done = items.filter(i => i.done).length
+  const isApproved = !!approvedAt
 
   return (
     <CollapsibleCard
       eyebrow="Детально по шагам"
       title="Дорожная карта"
       summary={
-        total === 0
-          ? 'Куратор пока не наполнил план'
+        !isApproved
+          ? 'Куратор готовит план — появится после утверждения'
           : `${done} / ${total} задач выполнено`
       }
       chip={
-        total === 0
-          ? <span className="ds-chip ds-chip-neutral" style={{ textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700, fontSize: 10 }}>пусто</span>
+        !isApproved
+          ? <span className="ds-chip ds-chip-neutral" style={{ textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700, fontSize: 10 }}>в работе</span>
           : <span style={{ fontFamily: 'var(--ds-font-display-stack)', fontWeight: 700, fontSize: 13, color: 'var(--ds-purple-deep)', fontVariantNumeric: 'tabular-nums' }}>
               {done} / {total}
             </span>
       }
     >
-      <RoadmapBlock clientId={clientId} initial={items} canEdit={false} />
+      <RoadmapBlock
+        clientId={clientId}
+        initial={items}
+        approvedAt={approvedAt}
+        approvedBy={approvedBy}
+        canEdit={false}
+      />
     </CollapsibleCard>
   )
 }

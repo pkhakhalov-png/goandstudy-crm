@@ -5,6 +5,8 @@ import { createAdminClient, createClient as createSsrClient } from './supabase/s
 import type { RoadmapItemRow, RoadmapStageKey } from './roadmap-types'
 import { randomUUID } from 'crypto'
 
+const CURATOR_ROLES = new Set(['curator', 'admin', 'rop'])
+
 type ActionResult = { ok: true } | { ok: false; error: string }
 
 async function checkAccess(clientId: number) {
@@ -42,11 +44,11 @@ export async function addRoadmapItem(opts: {
   stage: RoadmapStageKey
   title: string
   month?: string
+  comment?: string
 }): Promise<ActionResult> {
   const ctx = await checkAccess(opts.clientId)
   if (!ctx.ok) return { ok: false, error: ctx.error }
-  // Только курaтор/админ создаёт пункты
-  if (ctx.role !== 'curator' && ctx.role !== 'admin' && ctx.role !== 'rop') {
+  if (!CURATOR_ROLES.has(ctx.role || '')) {
     return { ok: false, error: 'Добавлять пункты может только куратор' }
   }
 
@@ -56,10 +58,50 @@ export async function addRoadmapItem(opts: {
     stage: opts.stage,
     title: opts.title.trim(),
     month: opts.month?.trim() || undefined,
+    comment: opts.comment?.trim() || undefined,
     done: false,
   })
 
   const { error } = await writeRoadmap(opts.clientId, items, ctx.admin)
+  if (error) return { ok: false, error: error.message }
+  revalidatePath(`/curator/clients/${opts.clientId}`)
+  revalidatePath('/client')
+  return { ok: true }
+}
+
+export async function approveRoadmap(opts: { clientId: number }): Promise<ActionResult> {
+  const ctx = await checkAccess(opts.clientId)
+  if (!ctx.ok) return { ok: false, error: ctx.error }
+  if (!CURATOR_ROLES.has(ctx.role || '')) {
+    return { ok: false, error: 'Утверждать может только куратор' }
+  }
+
+  const items = await readRoadmap(opts.clientId, ctx.admin)
+  if (items.length === 0) {
+    return { ok: false, error: 'Сначала добавь хотя бы один пункт' }
+  }
+
+  const { error } = await ctx.admin.from('clients').update({
+    roadmap_approved_at: new Date().toISOString(),
+    roadmap_approved_by_name: ctx.profile?.name || ctx.user.email || null,
+  }).eq('id', opts.clientId)
+  if (error) return { ok: false, error: error.message }
+  revalidatePath(`/curator/clients/${opts.clientId}`)
+  revalidatePath('/client')
+  return { ok: true }
+}
+
+export async function unapproveRoadmap(opts: { clientId: number }): Promise<ActionResult> {
+  const ctx = await checkAccess(opts.clientId)
+  if (!ctx.ok) return { ok: false, error: ctx.error }
+  if (!CURATOR_ROLES.has(ctx.role || '')) {
+    return { ok: false, error: 'Только куратор' }
+  }
+
+  const { error } = await ctx.admin.from('clients').update({
+    roadmap_approved_at: null,
+    roadmap_approved_by_name: null,
+  }).eq('id', opts.clientId)
   if (error) return { ok: false, error: error.message }
   revalidatePath(`/curator/clients/${opts.clientId}`)
   revalidatePath('/client')
@@ -73,7 +115,7 @@ export async function updateRoadmapItem(opts: {
 }): Promise<ActionResult> {
   const ctx = await checkAccess(opts.clientId)
   if (!ctx.ok) return { ok: false, error: ctx.error }
-  if (ctx.role !== 'curator' && ctx.role !== 'admin' && ctx.role !== 'rop') {
+  if (!CURATOR_ROLES.has(ctx.role || '')) {
     return { ok: false, error: 'Только куратор' }
   }
 
@@ -93,7 +135,7 @@ export async function deleteRoadmapItem(opts: {
 }): Promise<ActionResult> {
   const ctx = await checkAccess(opts.clientId)
   if (!ctx.ok) return { ok: false, error: ctx.error }
-  if (ctx.role !== 'curator' && ctx.role !== 'admin' && ctx.role !== 'rop') {
+  if (!CURATOR_ROLES.has(ctx.role || '')) {
     return { ok: false, error: 'Только куратор' }
   }
 

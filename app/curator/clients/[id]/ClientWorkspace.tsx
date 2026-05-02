@@ -547,7 +547,13 @@ function ProjectTab({ client }: { client: any }) {
             description="Добавляй пункты по этапам, проставляй месяц, отмечай выполнение. Клиент видит то же самое в своём кабинете."
           />
           <div style={{ marginTop: 20 }}>
-            <RoadmapBlock clientId={client.id} initial={(client.roadmap_data as any[]) || []} canEdit />
+            <RoadmapBlock
+              clientId={client.id}
+              initial={(client.roadmap_data as any[]) || []}
+              approvedAt={(client.roadmap_approved_at as string | null) ?? null}
+              approvedBy={(client.roadmap_approved_by_name as string | null) ?? null}
+              canEdit
+            />
           </div>
         </div>
       </div>
