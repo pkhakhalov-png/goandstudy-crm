@@ -156,13 +156,22 @@ export function ClientWorkspace(props: Props) {
       <main style={{ maxWidth: 1200, margin: '0 auto', padding: '32px 32px 80px' }}>
         {tab === 'project' && <ProjectTab client={client} />}
         {tab === 'roadmap' && (
-          <RoadmapTab
-            client={client}
-            stages={stages}
-            clientStages={clientStages}
-            checklist={checklist}
-            checklistProgress={checklistProgress}
-          />
+          <div className="ds-card" style={{ padding: 28 }}>
+            <SectionHead
+              eyebrow="План работы"
+              title="Дорожная карта"
+              description="Добавляй пункты по этапам, проставляй месяц, опционально комментарии. После «Утвердить» клиент увидит план. Дальше отмечай галочками что выполнено."
+            />
+            <div style={{ marginTop: 20 }}>
+              <RoadmapBlock
+                clientId={client.id}
+                initial={(client.roadmap_data as any[]) || []}
+                approvedAt={(client.roadmap_approved_at as string | null) ?? null}
+                approvedBy={(client.roadmap_approved_by_name as string | null) ?? null}
+                canEdit
+              />
+            </div>
+          </div>
         )}
         {tab === 'shortlist' && (
           <ShortlistTab
@@ -535,27 +544,9 @@ function ProjectTab({ client }: { client: any }) {
         @media (max-width: 980px) { .project-grid { grid-template-columns: 1fr !important; } }
       `}</style>
 
-      {/* Структурированный «Проект студента» + «Дорожная карта» — общая колонка */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <div className="ds-card" style={{ padding: 28 }}>
-          <StudentProjectBlock clientId={client.id} initial={projectData} />
-        </div>
-        <div className="ds-card" style={{ padding: 28 }}>
-          <SectionHead
-            eyebrow="План работы"
-            title="Дорожная карта"
-            description="Добавляй пункты по этапам, проставляй месяц, отмечай выполнение. Клиент видит то же самое в своём кабинете."
-          />
-          <div style={{ marginTop: 20 }}>
-            <RoadmapBlock
-              clientId={client.id}
-              initial={(client.roadmap_data as any[]) || []}
-              approvedAt={(client.roadmap_approved_at as string | null) ?? null}
-              approvedBy={(client.roadmap_approved_by_name as string | null) ?? null}
-              canEdit
-            />
-          </div>
-        </div>
+      {/* Структурированный «Проект студента» — те же 8 полей что и у клиента */}
+      <div className="ds-card" style={{ padding: 28 }}>
+        <StudentProjectBlock clientId={client.id} initial={projectData} />
       </div>
 
       {/* Контакты + ключевая инфа в правой колонке */}
