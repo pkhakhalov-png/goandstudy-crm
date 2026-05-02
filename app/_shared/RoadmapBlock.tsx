@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import {
-  addRoadmapStage, renameRoadmapStage, deleteRoadmapStage,
+  addRoadmapStage, updateRoadmapStage, deleteRoadmapStage,
   addRoadmapItem, updateRoadmapItem, deleteRoadmapItem,
   approveRoadmap, unapproveRoadmap, seedRoadmapTemplate,
 } from '@/lib/roadmap-actions'
@@ -10,6 +10,7 @@ import {
   formatRoadmapMonth,
   type RoadmapData, type RoadmapStage, type RoadmapItem,
 } from '@/lib/roadmap-types'
+import { MonthYearPicker } from './MonthYearPicker'
 
 interface Props {
   clientId: number
@@ -47,11 +48,10 @@ export function RoadmapBlock({ clientId, initial, approvedAt: approvedAtProp, ap
     })
   }
 
-  const onRenameStage = (stageId: string, title: string) => {
-    if (!title.trim()) return
-    setData(d => ({ stages: d.stages.map(s => s.id === stageId ? { ...s, title: title.trim() } : s) }))
+  const onPatchStage = (stageId: string, patch: Partial<Pick<RoadmapStage, 'title' | 'month'>>) => {
+    setData(d => ({ stages: d.stages.map(s => s.id === stageId ? { ...s, ...patch } : s) }))
     startTransition(async () => {
-      const r = await renameRoadmapStage({ clientId, stageId, title })
+      const r = await updateRoadmapStage({ clientId, stageId, patch })
       if (!r.ok) showError(r.error)
     })
   }
@@ -189,7 +189,7 @@ export function RoadmapBlock({ clientId, initial, approvedAt: approvedAtProp, ap
               onStartAdd={() => setShowAddFor(stage.id)}
               onCancelAdd={() => setShowAddFor(null)}
               onAddItem={(t, m, c) => onAddItem(stage.id, t, m, c)}
-              onRenameStage={(t) => onRenameStage(stage.id, t)}
+              onPatchStage={(p) => onPatchStage(stage.id, p)}
               onDeleteStage={() => onDeleteStage(stage.id)}
               onPatchItem={(itemId, patch) => onPatchItem(stage.id, itemId, patch)}
               onDeleteItem={(itemId) => onDeleteItem(stage.id, itemId)}
@@ -244,7 +244,7 @@ export function RoadmapBlock({ clientId, initial, approvedAt: approvedAtProp, ap
 function StageBlock({
   stage, canEditStructure, canToggleDone, disabled,
   isAdding, onStartAdd, onCancelAdd, onAddItem,
-  onRenameStage, onDeleteStage,
+  onPatchStage, onDeleteStage,
   onPatchItem, onDeleteItem,
 }: {
   stage: RoadmapStage
@@ -255,7 +255,7 @@ function StageBlock({
   onStartAdd: () => void
   onCancelAdd: () => void
   onAddItem: (title: string, month: string, comment: string) => void
-  onRenameStage: (title: string) => void
+  onPatchStage: (p: Partial<Pick<RoadmapStage, 'title' | 'month'>>) => void
   onDeleteStage: () => void
   onPatchItem: (itemId: string, patch: Partial<RoadmapItem>) => void
   onDeleteItem: (itemId: string) => void
@@ -266,11 +266,11 @@ function StageBlock({
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8, flexWrap: 'wrap' }}>
         {renaming ? (
           <StageTitleEditor
             initial={stage.title}
-            onSave={(t) => { onRenameStage(t); setRenaming(false) }}
+            onSave={(t) => { onPatchStage({ title: t }); setRenaming(false) }}
             onCancel={() => setRenaming(false)}
             disabled={disabled}
           />
@@ -280,13 +280,26 @@ function StageBlock({
               onClick={() => canEditStructure && setRenaming(true)}
               style={{
                 fontSize: 14, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em',
-                color: total > 0 ? 'var(--ds-ink)' : 'var(--ds-muted)', margin: 0, flex: 1,
-                cursor: canEditStructure ? 'pointer' : 'default',
+                color: total > 0 ? 'var(--ds-ink)' : 'var(--ds-muted)', margin: 0,
+                cursor: canEditStructure ? 'pointer' : 'default', flex: 1, minWidth: 200,
               }}
             >
               {stage.title}
             </h4>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {canEditStructure ? (
+                <MonthYearPicker
+                  value={stage.month}
+                  onChange={(m) => onPatchStage({ month: m })}
+                  size="sm"
+                  placeholder="дата"
+                  disabled={disabled}
+                />
+              ) : stage.month ? (
+                <span style={{ fontSize: 12, color: 'var(--ds-muted)', fontWeight: 600 }}>
+                  {formatRoadmapMonth(stage.month)}
+                </span>
+              ) : null}
               {total > 0 && <span style={{ fontSize: 11, color: 'var(--ds-muted)', fontWeight: 600 }}>{done}/{total}</span>}
               {canEditStructure && (
                 <button
@@ -516,23 +529,12 @@ function ItemEditor({
         onChange={(e) => setTitle(e.target.value)}
         style={{ ...inputStyle, width: '100%' }}
       />
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-        <input
-          type="month"
-          value={month}
-          onChange={(e) => setMonth(e.target.value)}
-          style={{ ...inputStyle, width: 180 }}
-        />
-        {month && (
-          <button
-            type="button"
-            onClick={() => setMonth('')}
-            style={{ background: 'transparent', border: 'none', color: 'var(--ds-muted)', fontSize: 11, cursor: 'pointer', textDecoration: 'underline' }}
-          >
-            очистить
-          </button>
-        )}
-      </div>
+      <MonthYearPicker
+        value={month}
+        onChange={setMonth}
+        placeholder="Выбрать дату"
+        disabled={disabled}
+      />
       <textarea
         value={comment}
         onChange={(e) => setComment(e.target.value)}

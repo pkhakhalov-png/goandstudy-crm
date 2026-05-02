@@ -85,13 +85,24 @@ export async function addRoadmapStage(opts: { clientId: number; title: string })
   return { ok: true }
 }
 
-export async function renameRoadmapStage(opts: { clientId: number; stageId: string; title: string }): Promise<ActionResult> {
+export async function updateRoadmapStage(opts: {
+  clientId: number
+  stageId: string
+  patch: Partial<Pick<RoadmapStage, 'title' | 'month'>>
+}): Promise<ActionResult> {
   const ctx = await checkAccess(opts.clientId)
   if (!ctx.ok) return { ok: false, error: ctx.error }
   if (!CURATOR_ROLES.has(ctx.role || '')) return { ok: false, error: 'Только куратор' }
 
   const data = await readRoadmap(opts.clientId, ctx.admin)
-  data.stages = data.stages.map(s => s.id === opts.stageId ? { ...s, title: opts.title.trim() } : s)
+  data.stages = data.stages.map(s => s.id === opts.stageId
+    ? {
+        ...s,
+        ...(opts.patch.title !== undefined ? { title: opts.patch.title.trim() } : {}),
+        ...(opts.patch.month !== undefined ? { month: opts.patch.month?.trim() || undefined } : {}),
+      }
+    : s
+  )
   const { error } = await writeRoadmap(opts.clientId, data, ctx.admin)
   if (error) return { ok: false, error: error.message }
   revalidate(opts.clientId)

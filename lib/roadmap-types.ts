@@ -13,6 +13,7 @@ export type RoadmapItem = {
 export type RoadmapStage = {
   id: string
   title: string
+  month?: string         // YYYY-MM — общая дата этапа (опционально)
   items: RoadmapItem[]
 }
 
