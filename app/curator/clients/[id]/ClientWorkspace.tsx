@@ -753,13 +753,12 @@ function ClientStageStepper({ client, stages }: { client: any; stages: any[] }) 
     <div style={{
       marginTop: 24,
       display: 'grid',
-      gridTemplateColumns: `repeat(${Math.max(1, stages.length)}, 1fr)`,
-      gap: 4,
+      gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+      gap: 6,
     }}>
       {stages.map((stage, idx) => {
         const done = idx < currentIdx
         const current = idx === currentIdx
-        // Градиент: чем дальше пройденный этап — тем плотнее purple
         const t = currentIdx > 0 ? Math.max(0, Math.min(1, idx / Math.max(1, currentIdx))) : 0
         const doneBg = done ? `rgba(181, 127, 207, ${0.10 + t * 0.20})` : 'transparent'
         return (
@@ -775,21 +774,25 @@ function ClientStageStepper({ client, stages }: { client: any; stages: any[] }) 
               color: current ? '#fff' : done ? 'var(--ds-ink)' : 'var(--ds-muted)',
               border: `1px solid ${current ? 'var(--ds-purple)' : done ? 'var(--ds-border)' : 'var(--ds-border-soft)'}`,
               borderRadius: 'var(--ds-r-sm)',
-              padding: '10px',
+              padding: '10px 8px',
               fontSize: 11,
               fontWeight: current ? 700 : 500,
-              letterSpacing: '0.04em',
-              textTransform: 'uppercase',
+              letterSpacing: '0.02em',
               cursor: 'pointer',
               transition: 'all 150ms',
               textAlign: 'center',
-              lineHeight: 1.2,
+              lineHeight: 1.25,
               boxShadow: current ? '0 4px 12px -4px rgba(181,127,207,0.45)' : 'none',
+              minHeight: 44,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              wordBreak: 'break-word',
+              hyphens: 'auto',
             }}
             title={stage.title}
           >
-            {done && '✓ '}
-            {stage.title}
+            <span>{done && '✓ '}{stage.title}</span>
           </button>
         )
       })}
