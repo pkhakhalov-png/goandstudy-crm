@@ -15,7 +15,9 @@ export const STUDENT_PROJECT_FIELDS = [
 export type StudentProjectFieldKey = typeof STUDENT_PROJECT_FIELDS[number]['key']
 
 export type StudentProjectData = Partial<Record<StudentProjectFieldKey, string>> & {
-  note?: string
+  note?: string                  // legacy — больше не используется в UI
   updated_at?: string
   updated_by_name?: string
+  confirmed_at?: string          // когда клиент подтвердил («Зафиксировано»)
+  confirmed_by_name?: string
 }

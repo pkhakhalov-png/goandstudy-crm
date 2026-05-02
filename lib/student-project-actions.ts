@@ -69,3 +69,56 @@ export async function saveProjectNote(opts: {
 }): Promise<ActionResult> {
   return saveProjectField({ clientId: opts.clientId, key: 'note', value: opts.note })
 }
+
+/**
+ * Клиент подтверждает «Проект студента» — фиксируем дату + имя.
+ * Только клиент может ставить эту отметку (себе).
+ */
+export async function confirmProject(opts: {
+  clientId: number
+}): Promise<ActionResult> {
+  const ctx = await checkAccess(opts.clientId)
+  if (!ctx.ok) return { ok: false, error: ctx.error }
+  if (ctx.profile?.role !== 'client') {
+    return { ok: false, error: 'Только клиент может подтвердить проект' }
+  }
+
+  const { data: row } = await ctx.admin.from('clients').select('project_data').eq('id', opts.clientId).single()
+  const current = (row?.project_data as Record<string, any>) || {}
+  const updated = {
+    ...current,
+    confirmed_at: new Date().toISOString(),
+    confirmed_by_name: ctx.profile?.name || ctx.user.email || null,
+  }
+
+  const { error } = await ctx.admin.from('clients')
+    .update({ project_data: updated })
+    .eq('id', opts.clientId)
+  if (error) return { ok: false, error: error.message }
+
+  revalidatePath(`/curator/clients/${opts.clientId}`)
+  revalidatePath('/client')
+  return { ok: true }
+}
+
+/** Куратор/админ снимает подтверждение если хочет переписать поля. */
+export async function unconfirmProject(opts: {
+  clientId: number
+}): Promise<ActionResult> {
+  const ctx = await checkAccess(opts.clientId)
+  if (!ctx.ok) return { ok: false, error: ctx.error }
+
+  const { data: row } = await ctx.admin.from('clients').select('project_data').eq('id', opts.clientId).single()
+  const current = (row?.project_data as Record<string, any>) || {}
+  const { confirmed_at: _, confirmed_by_name: __, ...rest } = current
+  const updated = rest
+
+  const { error } = await ctx.admin.from('clients')
+    .update({ project_data: updated })
+    .eq('id', opts.clientId)
+  if (error) return { ok: false, error: error.message }
+
+  revalidatePath(`/curator/clients/${opts.clientId}`)
+  revalidatePath('/client')
+  return { ok: true }
+}
