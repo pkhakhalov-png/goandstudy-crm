@@ -8,18 +8,20 @@ import { PreviewBanner } from '../PreviewBanner'
 export const dynamic = 'force-dynamic'
 
 const TYPE_META: Record<string, { emoji: string; label: string }> = {
-  stage_change:        { emoji: '🚦', label: 'Этап' },
-  essay_approved:      { emoji: '✅', label: 'Эссе утверждено' },
-  essay_unapproved:    { emoji: '↩️', label: 'Эссе на доработке' },
-  roadmap_approved:    { emoji: '🗺️', label: 'Дорожная карта' },
-  roadmap_unapproved:  { emoji: '↩️', label: 'Дорожная карта' },
-  shortlist_added:     { emoji: '🎓', label: 'Подборка вузов' },
-  shortlist_removed:   { emoji: '🗑️', label: 'Подборка вузов' },
-  shortlist_published: { emoji: '📤', label: 'Подборка отправлена' },
-  scholarship_added:   { emoji: '⭐', label: 'Стипендия' },
+  stage_change:           { emoji: '🚦', label: 'Этап' },
+  essay_approved:         { emoji: '✅', label: 'Эссе утверждено' },
+  essay_unapproved:       { emoji: '↩️', label: 'Эссе на доработке' },
+  roadmap_approved:       { emoji: '🗺️', label: 'Дорожная карта' },
+  roadmap_unapproved:     { emoji: '↩️', label: 'Дорожная карта' },
+  shortlist_added:        { emoji: '🎓', label: 'Подборка вузов' },
+  shortlist_removed:      { emoji: '🗑️', label: 'Подборка вузов' },
+  shortlist_published:    { emoji: '📤', label: 'Подборка отправлена' },
+  scholarship_added:      { emoji: '⭐', label: 'Стипендия' },
   scholarship_visibility: { emoji: '🔓', label: 'Доступ' },
-  application_created: { emoji: '📝', label: 'Заявка' },
-  note:                { emoji: '💬', label: 'Заметка' },
+  application_created:    { emoji: '📝', label: 'Заявка создана' },
+  application_stage_change: { emoji: '🚀', label: 'Заявка' },
+  application_decision:   { emoji: '🏆', label: 'Решение по заявке' },
+  note:                   { emoji: '💬', label: 'Заметка' },
 }
 
 function fmtDateTime(d: string) {

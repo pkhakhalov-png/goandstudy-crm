@@ -19,6 +19,8 @@ export type ActivityType =
   | 'scholarship_added'
   | 'scholarship_visibility'
   | 'application_created'
+  | 'application_stage_change'
+  | 'application_decision'
 
 export async function logActivity(
   admin: any,

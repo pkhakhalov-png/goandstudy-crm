@@ -2,6 +2,7 @@
 
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { logActivity } from '@/lib/client-activity'
 
 const BUCKET = 'client-docs'
 const MAX_BYTES = 15 * 1024 * 1024
@@ -109,6 +110,14 @@ export async function createApplication(opts: {
     author_id: ctx.user.id,
   })
 
+  await logActivity(ctx.admin, {
+    clientId: ctx.client.id,
+    userId: ctx.user.id,
+    type: 'application_created',
+    content: `Куратор создал заявку: ${opts.universityName}${opts.programName ? ` — ${opts.programName}` : ''}`,
+    metadata: { application_id: data.id, university_name: opts.universityName, program_name: opts.programName },
+  })
+
   revalidateAll(ctx.client.id, data.id)
   return { success: true as const, id: data.id }
 }
@@ -143,6 +152,20 @@ export async function updateApplicationStage(opts: { applicationId: string; stag
     author_id: ctx.user.id,
   })
 
+  // Заявку с её именем для лога
+  const { data: app } = await ctx.admin
+    .from('client_applications')
+    .select('university_name')
+    .eq('id', opts.applicationId)
+    .maybeSingle()
+  await logActivity(ctx.admin, {
+    clientId: ctx.client.id,
+    userId: ctx.user.id,
+    type: 'application_stage_change',
+    content: `Заявка${app?.university_name ? ` (${app.university_name})` : ''}: ${STAGE_LABELS[opts.stage]}`,
+    metadata: { application_id: opts.applicationId, stage: opts.stage },
+  })
+
   revalidateAll(ctx.client.id, opts.applicationId)
   return { success: true as const }
 }
@@ -175,6 +198,19 @@ export async function setApplicationDecision(opts: {
     content: opts.notes ? `${DECISION_LABELS[opts.decision]} — ${opts.notes}` : DECISION_LABELS[opts.decision],
     payload: { decision: opts.decision },
     author_id: ctx.user.id,
+  })
+
+  const { data: app2 } = await ctx.admin
+    .from('client_applications')
+    .select('university_name')
+    .eq('id', opts.applicationId)
+    .maybeSingle()
+  await logActivity(ctx.admin, {
+    clientId: ctx.client.id,
+    userId: ctx.user.id,
+    type: 'application_decision',
+    content: `Решение по заявке${app2?.university_name ? ` (${app2.university_name})` : ''}: ${DECISION_LABELS[opts.decision]}`,
+    metadata: { application_id: opts.applicationId, decision: opts.decision },
   })
 
   revalidateAll(ctx.client.id, opts.applicationId)
