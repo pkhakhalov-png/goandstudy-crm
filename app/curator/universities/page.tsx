@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { createParserClient } from '@/lib/supabase/parser'
+import { applyLevelFilter, applyIntakeFilter } from '@/lib/catalog-filters'
 import { CuratorSidebar } from '../CuratorSidebar'
 import { UniversityFilters } from './UniversityFilters'
 import { ProgramCardInteractive } from './ProgramCard'
@@ -89,54 +90,8 @@ export default async function UniversitiesPage({
   else if (budget === 'mid1') query = query.gte('tuition', 10000).lt('tuition', 25000)
   else if (budget === 'mid2') query = query.gte('tuition', 25000).lt('tuition', 50000)
   else if (budget === 'high') query = query.gte('tuition', 50000)
-  // Уровень программы — кроссисточниковый фильтр.
-  // applyboard заполняет raw_data.attributes.level стандартными кодами,
-  // daad/curator_gh — нет. Поэтому делаем OR: structured-level OR name-heuristic.
-  if (levels.length > 0) {
-    const LEVEL_MAP: Record<string, { raw: string[]; nameKeywords: string[] }> = {
-      bachelor: {
-        raw: ['bachelors', '3_year_bachelors', 'integrated_masters', 'topup_degree', 'certificate', 'diploma', 'advanced_diploma'],
-        nameKeywords: ['bachelor', 'undergrad', 'b.sc', 'b.a.', 'bsc', 'bachelorstudiengang'],
-      },
-      master: {
-        raw: ['masters_degree', 'post_graduate_certificate', 'post_graduate_diploma'],
-        nameKeywords: ['master', 'm.sc', 'm.a.', 'msc', 'mba', 'masterstudiengang'],
-      },
-      phd: {
-        raw: ['doctoral_phd'],
-        nameKeywords: ['phd', 'doctor', 'doctoral', 'promotion'],
-      },
-      language: {
-        raw: ['english', 'non_credential'],
-        nameKeywords: ['english', 'language course', 'esl'],
-      },
-    }
-    const allRaw = new Set<string>()
-    const allKw = new Set<string>()
-    for (const l of levels) {
-      const m = LEVEL_MAP[l]
-      if (m) { m.raw.forEach(r => allRaw.add(r)); m.nameKeywords.forEach(k => allKw.add(k)) }
-      else allRaw.add(l) // backwards-compat для старых URL
-    }
-    const orParts: string[] = []
-    for (const r of allRaw) orParts.push(`raw_data->attributes->>level.eq.${r}`)
-    for (const kw of allKw) orParts.push(`name.ilike.*${kw}*`)
-    // Permissive: программы без структурного level И без name-keyword
-    // (например, curator_gh специализации-бакеты в DE/AE) тоже включаем,
-    // чтобы целые страны не выпадали из фильтра. По согласованию с PM.
-    orParts.push(`raw_data->attributes->>level.is.null`)
-    if (orParts.length > 0) query = query.or(orParts.join(','))
-  }
-  // Intake год — startsWith по JSONB пути; multi-год собираем через .or.
-  // Permissive: программы без структурного intake (curator_gh, daad) тоже
-  // попадают в выдачу — иначе целые страны выпадают из фильтра только
-  // потому что у источника нет ISO-даты в JSONB.
-  if (intakeYears.length > 0) {
-    const yearParts = intakeYears
-      .map(y => `raw_data->attributes->earliest_intake->>start_date.like.${y}*`)
-    const nullPart = `raw_data->attributes->earliest_intake->>start_date.is.null`
-    query = query.or([nullPart, ...yearParts].join(','))
-  }
+  query = applyLevelFilter(query, levels)
+  query = applyIntakeFilter(query, intakeYears)
 
   // Подгружаем все школы постранично (Supabase лимит 1000 на запрос) — для дропдауна вузов
   const allSchoolsForFilters: { id: number; name: string; country_code: string | null }[] = []
@@ -161,9 +116,7 @@ export default async function UniversitiesPage({
   const countryCounts: Record<string, number> = {}
   for (const r of countResults) countryCounts[r.code] = r.count
 
-  const { data: programs, count, error: queryErr } = await query
-  if (queryErr) console.error('[catalog/query] error:', queryErr.message)
-  console.log('[catalog/query] params:', { country, levels, specialty, intakeYears, count, error: queryErr?.message })
+  const { data: programs, count } = await query
   // Список стран — сначала те что в нашем COUNTRY_LABEL (известный порядок), потом остальные
   const known = Object.keys(COUNTRY_LABEL).filter(c => countryCounts[c])
   const others = Object.keys(countryCounts).filter(c => !COUNTRY_LABEL[c]).sort()
@@ -198,7 +151,7 @@ export default async function UniversitiesPage({
     .split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)
 
   return (
-    <div className="app" data-debug-build="9ddac81+" data-debug-count={count ?? 'null'} data-debug-err={queryErr?.message || ''}>
+    <div className="app">
       <CuratorSidebar userName={profile?.name || ''} userEmail={user.email || ''} initials={initials} activePage="universities" />
       <div className="main">
         <section className="ds-hero">

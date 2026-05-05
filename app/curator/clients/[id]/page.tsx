@@ -1,6 +1,7 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { createParserClient } from '@/lib/supabase/parser'
 import { matchScholarshipsForSchools } from '@/lib/scholarship-match'
+import { applyLevelFilter, applyIntakeFilter } from '@/lib/catalog-filters'
 import { redirect, notFound } from 'next/navigation'
 import { CuratorSidebar } from '../../CuratorSidebar'
 import { ClientWorkspace } from './ClientWorkspace'
@@ -198,11 +199,8 @@ export default async function CuratorClientPage({
     else if (budget === 'mid1') query = query.gte('tuition', 10000).lt('tuition', 25000)
     else if (budget === 'mid2') query = query.gte('tuition', 25000).lt('tuition', 50000)
     else if (budget === 'high') query = query.gte('tuition', 50000)
-    if (levels.length > 0) query = query.in('raw_data->attributes->>level', levels)
-    if (intakeYears.length > 0) {
-      const orExpr = intakeYears.map(y => `raw_data->attributes->earliest_intake->>start_date.like.${y}%`).join(',')
-      query = query.or(orExpr)
-    }
+    query = applyLevelFilter(query, levels)
+    query = applyIntakeFilter(query, intakeYears)
 
     // Подгружаем все школы постранично для дропдауна и счётчиков стран
     const allSchools: { id: number; name: string; country_code: string | null }[] = []
