@@ -40,6 +40,16 @@ export async function createClientInvitation(
   if (clientErr || !client) return { ok: false, error: 'Клиент не найден' }
   if (!client.email) return { ok: false, error: 'У клиента не указан email' }
 
+  // Проверяем не активирован ли уже клиент (есть public.users с role=client и этим email)
+  const { data: existingUser } = await admin
+    .from('users').select('id, role')
+    .ilike('email', client.email)
+    .eq('role', 'client')
+    .maybeSingle()
+  if (existingUser) {
+    return { ok: false, error: 'Кабинет уже активирован. Если клиент забыл пароль — сбросить может только админ.' }
+  }
+
   // Проверяем, есть ли уже активная ссылка
   const now = new Date()
   const { data: existing } = await admin
