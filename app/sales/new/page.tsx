@@ -66,7 +66,7 @@ export default async function NewClientPage({ searchParams }: { searchParams: Pr
                 <circle cx="7" cy="5" r="3" /><path d="M2 12c0-2.8 2.2-5 5-5s5 2.2 5 5" />
               </svg>
             </div>
-            <div className="lt">Go & Study</div>
+            <div className="lt">GoAndStudy</div>
           </div>
           <div className="ls">Кабинет продажника</div>
         </div>

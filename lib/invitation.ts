@@ -124,7 +124,7 @@ async function sendInvitationEmail(params: {
 <body style="font-family: -apple-system, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px; color: #14121e;">
   <h1 style="font-size: 24px; margin: 0 0 16px;">Привет, ${params.clientName}!</h1>
   <p style="font-size: 15px; line-height: 1.5; color: #443f56;">
-    Команда Go &amp; Study подготовила для тебя личный кабинет — здесь ты увидишь
+    Команда GoAndStudy подготовила для тебя личный кабинет — здесь ты увидишь
     подборку вузов, задачи, документы и сможешь общаться с куратором.
   </p>
   <p style="margin: 28px 0;">
@@ -149,7 +149,7 @@ async function sendInvitationEmail(params: {
       body: JSON.stringify({
         from: fromAddress,
         to: [params.to],
-        subject: 'Доступ в личный кабинет Go & Study',
+        subject: 'Доступ в личный кабинет GoAndStudy',
         html,
       }),
       signal: AbortSignal.timeout(10000),
@@ -207,7 +207,7 @@ export async function sendClientWelcomeEmail(params: {
       body: JSON.stringify({
         from: fromAddress,
         to: [params.to],
-        subject: 'Кабинет Go & Study готов — добро пожаловать!',
+        subject: 'Кабинет GoAndStudy готов — добро пожаловать!',
         html,
       }),
       signal: AbortSignal.timeout(10000),

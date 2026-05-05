@@ -94,7 +94,7 @@ async function sendCuratorInviteEmail(params: { to: string; curatorName: string;
 <body style="font-family: -apple-system, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px; color: #14121e;">
   <h1 style="font-size: 24px; margin: 0 0 16px;">Привет, ${params.curatorName}!</h1>
   <p style="font-size: 15px; line-height: 1.5; color: #443f56;">
-    Тебя пригласили работать куратором в Go &amp; Study CRM. Перейди по ссылке
+    Тебя пригласили работать куратором в GoAndStudy CRM. Перейди по ссылке
     чтобы задать пароль и попасть в кабинет.
   </p>
   <p style="margin: 28px 0;">
@@ -115,7 +115,7 @@ async function sendCuratorInviteEmail(params: { to: string; curatorName: string;
       body: JSON.stringify({
         from: fromAddress,
         to: [params.to],
-        subject: 'Кабинет куратора Go & Study',
+        subject: 'Кабинет куратора GoAndStudy',
         html,
       }),
       signal: AbortSignal.timeout(10000),
@@ -166,7 +166,7 @@ export async function sendCuratorWelcomeEmail(params: {
       headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         from: fromAddress, to: [params.to],
-        subject: 'Кабинет куратора Go & Study готов',
+        subject: 'Кабинет куратора GoAndStudy готов',
         html,
       }),
       signal: AbortSignal.timeout(10000),

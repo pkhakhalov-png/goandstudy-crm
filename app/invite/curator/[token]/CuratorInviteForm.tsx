@@ -43,7 +43,7 @@ export function CuratorInviteForm({ token, email }: { token: string; email: stri
         fontFamily: 'Oswald, sans-serif', fontSize: 14, fontWeight: 700,
         letterSpacing: '0.16em', textTransform: 'uppercase',
         color: '#B15ECC', marginBottom: 12, textAlign: 'center',
-      }}>Go &amp; Study</div>
+      }}>GoAndStudy</div>
       <h1 style={{ fontSize: 24, fontWeight: 700, margin: '0 0 8px', textAlign: 'center', letterSpacing: '-0.01em' }}>
         Кабинет куратора
       </h1>

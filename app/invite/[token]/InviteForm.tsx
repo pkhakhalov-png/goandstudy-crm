@@ -50,7 +50,7 @@ export function InviteForm({ token, email }: { token: string; email: string }) {
         letterSpacing: '0.16em', textTransform: 'uppercase',
         color: '#B15ECC', marginBottom: 12, textAlign: 'center',
       }}>
-        Go &amp; Study
+        GoAndStudy
       </div>
       <h1 style={{ fontSize: 24, fontWeight: 700, margin: '0 0 8px', textAlign: 'center', letterSpacing: '-0.01em' }}>
         Активация кабинета
