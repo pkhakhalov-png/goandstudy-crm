@@ -7,6 +7,8 @@ import { generateInviteForOwnClient, setClientEmail } from './actions'
 interface Props {
   clientId: number
   clientEmail: string | null
+  /** Если у клиента нет email, попытаемся подставить отсюда (например из сделки) и сохранить. */
+  fallbackEmail?: string | null
   clientName: string | null
 }
 
@@ -16,7 +18,7 @@ type State =
   | { kind: 'asking-email' }
   | { kind: 'showing'; url: string; emailSent: boolean; emailError?: string }
 
-export function SalesInviteButton({ clientId, clientEmail, clientName }: Props) {
+export function SalesInviteButton({ clientId, clientEmail, fallbackEmail, clientName }: Props) {
   const router = useRouter()
   const [state, setState] = useState<State>({ kind: 'idle' })
   const [error, setError] = useState<string | null>(null)
@@ -24,11 +26,13 @@ export function SalesInviteButton({ clientId, clientEmail, clientName }: Props) 
   const [copied, setCopied] = useState(false)
 
   async function generate(emailOverride?: string) {
-    const emailToUse = emailOverride || clientEmail
+    // Email берём по приоритету: явный override → email клиента → fallback (например из сделки)
+    const emailToUse = emailOverride || clientEmail || fallbackEmail
     if (!emailToUse) { setState({ kind: 'asking-email' }); return }
     setState({ kind: 'loading' }); setError(null)
-    if (emailOverride) {
-      const r = await setClientEmail(clientId, emailOverride)
+    // Если email клиента ещё не сохранён в БД — сохраняем (override или fallback)
+    if (emailOverride || (!clientEmail && fallbackEmail)) {
+      const r = await setClientEmail(clientId, emailToUse)
       if (!r.success) { setError(r.error || 'Не удалось сохранить email'); setState({ kind: 'asking-email' }); return }
     }
     const res = await generateInviteForOwnClient(clientId)
@@ -38,7 +42,7 @@ export function SalesInviteButton({ clientId, clientEmail, clientName }: Props) 
       return
     }
     setState({ kind: 'showing', url: res.url!, emailSent: !!res.emailSent, emailError: res.emailError })
-    if (emailOverride) router.refresh()
+    if (emailOverride || (!clientEmail && fallbackEmail)) router.refresh()
   }
 
   async function copy() {

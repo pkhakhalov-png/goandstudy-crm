@@ -555,7 +555,7 @@ export function DealCard({ deal, stages, activities, salespersons, clientData, b
                   <button onClick={handleUnlinkClient} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 12 }} title="Отвязать">×</button>
                 </div>
                 <div style={{ marginTop: 8 }}>
-                  <SalesInviteButton clientId={clientData.id} clientEmail={clientData.email || deal.contact_email || null} clientName={clientData.name} />
+                  <SalesInviteButton clientId={clientData.id} clientEmail={clientData.email || null} fallbackEmail={deal.contact_email || null} clientName={clientData.name} />
                 </div>
               </>
             ) : (
