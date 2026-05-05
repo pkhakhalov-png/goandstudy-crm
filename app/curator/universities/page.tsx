@@ -159,7 +159,9 @@ export default async function UniversitiesPage({
   const countryCounts: Record<string, number> = {}
   for (const r of countResults) countryCounts[r.code] = r.count
 
-  const { data: programs, count } = await query
+  const { data: programs, count, error: queryErr } = await query
+  if (queryErr) console.error('[catalog/query] error:', queryErr.message)
+  console.log('[catalog/query] params:', { country, levels, specialty, intakeYears, count, error: queryErr?.message })
   // Список стран — сначала те что в нашем COUNTRY_LABEL (известный порядок), потом остальные
   const known = Object.keys(COUNTRY_LABEL).filter(c => countryCounts[c])
   const others = Object.keys(countryCounts).filter(c => !COUNTRY_LABEL[c]).sort()
@@ -194,7 +196,7 @@ export default async function UniversitiesPage({
     .split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)
 
   return (
-    <div className="app">
+    <div className="app" data-debug-build="9ddac81+" data-debug-count={count ?? 'null'} data-debug-err={queryErr?.message || ''}>
       <CuratorSidebar userName={profile?.name || ''} userEmail={user.email || ''} initials={initials} activePage="universities" />
       <div className="main">
         <section className="ds-hero">
