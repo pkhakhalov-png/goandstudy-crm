@@ -121,12 +121,15 @@ export default async function UniversitiesPage({
     for (const kw of allKw) orParts.push(`name.ilike.*${kw}*`)
     if (orParts.length > 0) query = query.or(orParts.join(','))
   }
-  // Intake год — startsWith по JSONB пути; multi-год собираем через .or
+  // Intake год — startsWith по JSONB пути; multi-год собираем через .or.
+  // Permissive: программы без структурного intake (curator_gh, daad) тоже
+  // попадают в выдачу — иначе целые страны выпадают из фильтра только
+  // потому что у источника нет ISO-даты в JSONB.
   if (intakeYears.length > 0) {
-    const orExpr = intakeYears
-      .map(y => `raw_data->attributes->earliest_intake->>start_date.like.${y}%`)
-      .join(',')
-    query = query.or(orExpr)
+    const yearParts = intakeYears
+      .map(y => `raw_data->attributes->earliest_intake->>start_date.like.${y}*`)
+    const nullPart = `raw_data->attributes->earliest_intake->>start_date.is.null`
+    query = query.or([nullPart, ...yearParts].join(','))
   }
 
   // Подгружаем все школы постранично (Supabase лимит 1000 на запрос) — для дропдауна вузов
