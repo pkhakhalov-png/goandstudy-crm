@@ -113,8 +113,12 @@ export default async function NewClientPage() {
               </div>
               <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:16}}>
                 <div>
-                  <div style={{fontSize:11, color:'var(--muted)', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:4}}>Имя и фамилия *</div>
-                  <input name="name" required placeholder="Алина Петрова" style={{width:'100%', padding:'10px 13px', border:'1px solid var(--bor2)', borderRadius:9, fontSize:13, fontFamily:'inherit', outline:'none', background:'var(--surf)', color:'var(--text)'}}/>
+                  <div style={{fontSize:11, color:'var(--muted)', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:4}}>Имя *</div>
+                  <input name="first_name" required placeholder="Алина" style={{width:'100%', padding:'10px 13px', border:'1px solid var(--bor2)', borderRadius:9, fontSize:13, fontFamily:'inherit', outline:'none', background:'var(--surf)', color:'var(--text)'}}/>
+                </div>
+                <div>
+                  <div style={{fontSize:11, color:'var(--muted)', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:4}}>Фамилия *</div>
+                  <input name="last_name" required placeholder="Петрова" style={{width:'100%', padding:'10px 13px', border:'1px solid var(--bor2)', borderRadius:9, fontSize:13, fontFamily:'inherit', outline:'none', background:'var(--surf)', color:'var(--text)'}}/>
                 </div>
                 <div>
                   <div style={{fontSize:11, color:'var(--muted)', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:4}}>Телефон *</div>

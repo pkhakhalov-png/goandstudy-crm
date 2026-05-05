@@ -153,7 +153,7 @@ export default async function ClientHomePage({ searchParams }: { searchParams: P
           ctx={{
             ...CLIENT_CTX,
             parentName: client.name || CLIENT_CTX.parentName,
-            childFirstName: (client.name || '').split(' ')[0] || CLIENT_CTX.childFirstName,
+            childFirstName: (client as any).first_name || (client.name || '').split(' ')[0] || CLIENT_CTX.childFirstName,
             childFullName: client.name || CLIENT_CTX.childFullName,
           }}
           stages={timeline}

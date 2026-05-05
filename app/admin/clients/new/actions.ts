@@ -23,7 +23,9 @@ export async function createClient_action(formData: FormData): Promise<void> {
   const firstPayDate = formData.get('first_pay_date') as string
   const phone = formData.get('phone') as string
   const curatorId = (formData.get('curator_id') as string) || null
-  const clientName = formData.get('name') as string
+  const firstName = ((formData.get('first_name') as string) || '').trim()
+  const lastName = ((formData.get('last_name') as string) || '').trim()
+  const clientName = [firstName, lastName].filter(Boolean).join(' ') || (formData.get('name') as string)
 
   const { error } = await supabase.rpc('create_client_with_payments', {
     p_name: clientName,
@@ -58,6 +60,8 @@ export async function createClient_action(formData: FormData): Promise<void> {
     const normalized = normalizePhone(phone)
     const updates: Record<string, any> = {}
     if (normalized) updates.phone_normalized = normalized
+    if (firstName) updates.first_name = firstName
+    if (lastName) updates.last_name = lastName
     if (curatorId) {
       updates.current_stage_code = 'strategy_session'
       updates.curator_assigned_at = new Date().toISOString()

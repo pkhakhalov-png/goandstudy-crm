@@ -124,7 +124,11 @@ export default async function NewClientPage({ searchParams }: { searchParams: Pr
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                 <div>
                   <label style={labelStyle}>Имя *</label>
-                  <input name="name" required placeholder="Иван Иванов" style={inputStyle} />
+                  <input name="first_name" required placeholder="Иван" style={inputStyle} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Фамилия *</label>
+                  <input name="last_name" required placeholder="Иванов" style={inputStyle} />
                 </div>
                 <div>
                   <label style={labelStyle}>Телефон *</label>
