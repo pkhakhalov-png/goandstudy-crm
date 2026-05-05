@@ -34,9 +34,9 @@ export interface SearchProgramsResult {
   error?: string
 }
 
-/** Дефолтный cap для каталога — экран всё равно показывает 24 за раз,
- *  считать точно 80k программ нет смысла. */
-export const DEFAULT_COUNT_CAP = 5000
+/** Cap отключён — продакт хочет видеть реальное число программ.
+ *  Если будут жалобы на скорость — снизим до 50000. */
+export const DEFAULT_COUNT_CAP = null
 
 export async function searchPrograms(params: SearchProgramsParams): Promise<SearchProgramsResult> {
   const parser = createParserClient()
