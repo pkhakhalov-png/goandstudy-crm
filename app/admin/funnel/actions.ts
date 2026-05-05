@@ -195,15 +195,17 @@ export async function createDeal(formData: FormData) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Не авторизован' }
 
-  const title = (formData.get('title') as string)?.trim()
   const contactName = (formData.get('contact_name') as string)?.trim()
+  const titleRaw = (formData.get('title') as string)?.trim()
+  const title = titleRaw || contactName  // fallback: title = ФИО
   const contactPhone = (formData.get('contact_phone') as string)?.trim() || null
+  const contactEmail = (formData.get('contact_email') as string)?.trim() || null
   const contactTelegram = (formData.get('contact_telegram') as string)?.trim() || null
   const stageId = formData.get('stage_id') as string
   const salespersonId = formData.get('salesperson_id') as string || user.id
   const budget = Number(formData.get('budget') || 0)
 
-  if (!title || !contactName) return { error: 'Заполните название и имя контакта' }
+  if (!contactName) return { error: 'Заполните ФИО клиента' }
 
   // Check for duplicate by phone (indexed lookup)
   const normalized = normalizePhone(contactPhone)
@@ -240,6 +242,7 @@ export async function createDeal(formData: FormData) {
     salesperson_id: salespersonId,
     contact_name: contactName,
     contact_phone: contactPhone,
+    contact_email: contactEmail,
     contact_telegram: contactTelegram,
     phone_normalized: normalized,
     budget,

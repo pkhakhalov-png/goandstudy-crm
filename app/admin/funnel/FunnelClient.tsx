@@ -468,12 +468,12 @@ export function FunnelClient({ stages: serverStages, deals: serverDeals, salespe
         <div style={{ padding: '14px 28px', borderBottom: '1px solid var(--bor2)', background: 'var(--surf)' }}>
           <form onSubmit={handleNewDeal} style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
             <div>
-              <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 600, marginBottom: 3 }}>Название</div>
-              <input name="title" required placeholder="Заявка от..." style={{ padding: '7px 10px', border: '1px solid var(--bor2)', borderRadius: 8, fontSize: 12, fontFamily: 'inherit', outline: 'none', background: 'var(--bg)', width: 160 }} />
+              <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 600, marginBottom: 3 }}>ФИО клиента</div>
+              <input name="contact_name" required placeholder="Иван Иванов" style={{ padding: '7px 10px', border: '1px solid var(--bor2)', borderRadius: 8, fontSize: 12, fontFamily: 'inherit', outline: 'none', background: 'var(--bg)', width: 180 }} />
             </div>
             <div>
-              <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 600, marginBottom: 3 }}>Контакт</div>
-              <input name="contact_name" required placeholder="Имя" style={{ padding: '7px 10px', border: '1px solid var(--bor2)', borderRadius: 8, fontSize: 12, fontFamily: 'inherit', outline: 'none', background: 'var(--bg)', width: 130 }} />
+              <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 600, marginBottom: 3 }}>Email</div>
+              <input name="contact_email" type="email" placeholder="email@example.com" style={{ padding: '7px 10px', border: '1px solid var(--bor2)', borderRadius: 8, fontSize: 12, fontFamily: 'inherit', outline: 'none', background: 'var(--bg)', width: 180 }} />
             </div>
             <div>
               <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 600, marginBottom: 3 }}>Телефон</div>
