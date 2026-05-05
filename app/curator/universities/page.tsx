@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { createParserClient } from '@/lib/supabase/parser'
-import { applyLevelFilter, applyIntakeFilter } from '@/lib/catalog-filters'
+import { searchPrograms } from '@/lib/catalog-search'
 import { CuratorSidebar } from '../CuratorSidebar'
 import { UniversityFilters } from './UniversityFilters'
 import { ProgramCardInteractive } from './ProgramCard'
@@ -59,39 +59,21 @@ export default async function UniversitiesPage({
 
   const offset = (page - 1) * PAGE_SIZE
 
-  // !inner нужен, чтобы фильтровать по school.country_code (у programs.country_code почти везде null)
-  let query = parser
-    .from('programs')
-    .select(
-      `
-      id, name, tuition, application_fee, raw_data, school_id, specialty_group, source,
-      degree_text, program_description, language_text, duration_text, start_date_text, deadline_text,
-      tuition_text, living_cost_text, living_cost_period, scholarships_text, curator_note,
-      school:schools!inner(id, name, logo_url, country_code, city, institution_type, qs_rank, university_type, curator_note)
-      `,
-      { count: 'exact' }
-    )
-    .range(offset, offset + PAGE_SIZE - 1)
-
-  if (sort === 'price_asc') query = query.order('tuition', { ascending: true, nullsFirst: false })
-  else if (sort === 'price_desc') query = query.order('tuition', { ascending: false, nullsFirst: false })
-  else if (sort === 'recent') query = query.order('updated_at', { ascending: false })
-  else query = query.order('name')
-
-  // Страна — фильтр по embedded school (inner join)
-  if (country) query = query.eq('school.country_code', country)
-  if (schoolFilter) query = query.eq('school_id', Number(schoolFilter))
-  if (q) query = query.ilike('name', `%${q}%`)
-  if (specialty) query = query.eq('specialty_group', specialty)
-  if (uniType) query = query.eq('school.university_type', uniType)
-  // Бюджет (по программному tuition)
-  if (budget === 'free') query = query.lt('tuition', 1000)
-  else if (budget === 'low') query = query.lt('tuition', 10000).gte('tuition', 0)
-  else if (budget === 'mid1') query = query.gte('tuition', 10000).lt('tuition', 25000)
-  else if (budget === 'mid2') query = query.gte('tuition', 25000).lt('tuition', 50000)
-  else if (budget === 'high') query = query.gte('tuition', 50000)
-  query = applyLevelFilter(query, levels)
-  query = applyIntakeFilter(query, intakeYears)
+  // RPC search_programs — единый Postgres-запрос с total + rows.
+  // (см. supabase/parser-search-rpc.sql)
+  const searchResult = await searchPrograms({
+    country: country || undefined,
+    schoolId: schoolFilter ? Number(schoolFilter) : undefined,
+    specialty: specialty || undefined,
+    uniType: uniType || undefined,
+    budget: budget || undefined,
+    levels,
+    intakeYears,
+    search: q || undefined,
+    sort,
+    limit: PAGE_SIZE,
+    offset,
+  })
 
   // Подгружаем все школы постранично (Supabase лимит 1000 на запрос) — для дропдауна вузов
   const allSchoolsForFilters: { id: number; name: string; country_code: string | null }[] = []
@@ -116,7 +98,8 @@ export default async function UniversitiesPage({
   const countryCounts: Record<string, number> = {}
   for (const r of countResults) countryCounts[r.code] = r.count
 
-  const { data: programs, count } = await query
+  const programs = searchResult.rows
+  const count = searchResult.total
   // Список стран — сначала те что в нашем COUNTRY_LABEL (известный порядок), потом остальные
   const known = Object.keys(COUNTRY_LABEL).filter(c => countryCounts[c])
   const others = Object.keys(countryCounts).filter(c => !COUNTRY_LABEL[c]).sort()
