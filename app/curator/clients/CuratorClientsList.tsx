@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 
 interface Props {
   clients: any[]
@@ -19,9 +19,11 @@ const badgeColors: Record<string, { bg: string; color: string }> = {
 }
 
 export function CuratorClientsList({ clients, stages, universities }: Props) {
+  const router = useRouter()
   const [search, setSearch] = useState('')
   const [filterStage, setFilterStage] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
+  const [hoverId, setHoverId] = useState<number | null>(null)
 
   const stageMap = Object.fromEntries(stages.map(s => [s.code, s]))
 
@@ -74,11 +76,20 @@ export function CuratorClientsList({ clients, stages, universities }: Props) {
                 .sort((a: any, b: any) => a.deadline.localeCompare(b.deadline))[0]
 
               return (
-                <tr key={c.id} style={{ borderBottom: '1px solid var(--bor)' }}>
+                <tr
+                  key={c.id}
+                  onClick={() => router.push(`/curator/clients/${c.id}`)}
+                  onMouseEnter={() => setHoverId(c.id)}
+                  onMouseLeave={() => setHoverId(null)}
+                  style={{
+                    borderBottom: '1px solid var(--bor)',
+                    cursor: 'pointer',
+                    background: hoverId === c.id ? 'rgba(177,94,204,.05)' : 'transparent',
+                    transition: 'background 0.12s',
+                  }}
+                >
                   <td style={{ padding: '14px 16px' }}>
-                    <Link href={`/curator/clients/${c.id}`} style={{ fontWeight: 600, color: 'var(--text)', textDecoration: 'none' }}>
-                      {c.name}
-                    </Link>
+                    <div style={{ fontWeight: 600, color: 'var(--text)' }}>{c.name}</div>
                     {c.telegram && <div style={{ fontSize: 10, color: 'var(--purple)', marginTop: 2 }}>{c.telegram}</div>}
                   </td>
                   <td style={{ padding: '14px 12px', color: 'var(--muted)', fontSize: 12 }}>{c.country || '—'}</td>
