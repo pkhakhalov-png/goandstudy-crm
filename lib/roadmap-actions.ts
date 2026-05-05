@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createAdminClient, createClient as createSsrClient } from './supabase/server'
 import type { RoadmapData, RoadmapStage, RoadmapItem } from './roadmap-types'
 import { DEFAULT_ROADMAP_TEMPLATE } from './roadmap-types'
+import { logActivity } from './client-activity'
 import { randomUUID } from 'crypto'
 
 type ActionResult = { ok: true } | { ok: false; error: string }
@@ -237,6 +238,12 @@ export async function approveRoadmap(opts: { clientId: number }): Promise<Action
     roadmap_approved_by_name: ctx.profile?.name || ctx.user.email || null,
   }).eq('id', opts.clientId)
   if (error) return { ok: false, error: error.message }
+  await logActivity(ctx.admin, {
+    clientId: opts.clientId,
+    userId: ctx.user.id,
+    type: 'roadmap_approved',
+    content: 'Куратор утвердил дорожную карту',
+  })
   revalidate(opts.clientId)
   return { ok: true }
 }
@@ -251,6 +258,12 @@ export async function unapproveRoadmap(opts: { clientId: number }): Promise<Acti
     roadmap_approved_by_name: null,
   }).eq('id', opts.clientId)
   if (error) return { ok: false, error: error.message }
+  await logActivity(ctx.admin, {
+    clientId: opts.clientId,
+    userId: ctx.user.id,
+    type: 'roadmap_unapproved',
+    content: 'Куратор снял утверждение дорожной карты',
+  })
   revalidate(opts.clientId)
   return { ok: true }
 }

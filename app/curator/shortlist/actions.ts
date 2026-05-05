@@ -3,6 +3,7 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { createParserClient } from '@/lib/supabase/parser'
 import { revalidatePath } from 'next/cache'
+import { logActivity } from '@/lib/client-activity'
 
 async function requireCuratorId(): Promise<string> {
   const supabase = await createClient()
@@ -87,6 +88,13 @@ export async function addToShortlist(params: {
     notes: JSON.stringify({ school_id: school.id, program_id: program.id }),
   })
   if (error) throw new Error(error.message)
+
+  await logActivity(admin, {
+    clientId: params.clientId,
+    type: 'shortlist_added',
+    content: `Куратор добавил вуз: ${school.name} — ${program.name}`,
+    metadata: { school_id: school.id, program_id: program.id, school_name: school.name, program_name: program.name },
+  })
 
   revalidatePath(`/curator/clients/${params.clientId}`)
   revalidatePath('/curator')

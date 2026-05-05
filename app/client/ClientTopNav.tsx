@@ -5,7 +5,7 @@ import { logout } from '@/app/login/actions'
 
 interface Props {
   userName: string
-  activePage?: 'home' | 'documents' | 'shortlist' | 'scholarships'
+  activePage?: 'home' | 'documents' | 'shortlist' | 'scholarships' | 'updates'
   /** Не используется — оставлен для обратной совместимости со старыми вызовами. */
   showScholarships?: boolean
 }
@@ -15,6 +15,7 @@ const navItems: { key: NonNullable<Props['activePage']>; href: string; label: st
   { key: 'documents', href: '/client/documents', label: 'Документы' },
   { key: 'shortlist', href: '/client/shortlist', label: 'Вузы' },
   { key: 'scholarships', href: '/client/scholarships', label: 'Стипендии' },
+  { key: 'updates', href: '/client/updates', label: 'Обновления' },
 ]
 
 export function ClientTopNav({ userName, activePage = 'home' }: Props) {

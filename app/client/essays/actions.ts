@@ -2,6 +2,7 @@
 
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { logActivity } from '@/lib/client-activity'
 
 type EssayType = 'resume' | 'motivation'
 
@@ -147,6 +148,14 @@ export async function approveEssay(opts: { clientId: number; type: EssayType }) 
     .eq('client_id', opts.clientId)
     .eq('type', opts.type)
   if (error) return { error: error.message }
+
+  await logActivity(admin, {
+    clientId: opts.clientId,
+    userId: v.userId,
+    type: 'essay_approved',
+    content: opts.type === 'resume' ? 'Куратор утвердил резюме' : 'Куратор утвердил мотивационное письмо',
+    metadata: { essay_type: opts.type },
+  })
 
   revalidatePath(`/curator/clients/${opts.clientId}`)
   revalidatePath('/client', 'layout')

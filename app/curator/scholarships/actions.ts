@@ -3,6 +3,7 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { createScholarshipsClient } from '@/lib/supabase/scholarships'
 import { revalidatePath } from 'next/cache'
+import { logActivity } from '@/lib/client-activity'
 
 async function getCuratorContext() {
   const supabase = await createClient()
@@ -90,6 +91,13 @@ export async function addScholarshipToClient(formData: FormData) {
   )
   if (error) return { error: error.message }
 
+  await logActivity(ctx.admin, {
+    clientId,
+    type: 'scholarship_added',
+    content: `Куратор добавил стипендию: ${title}${institution ? ` (${institution})` : ''}`,
+    metadata: { scholarship_id: scholarshipId, kind, title },
+  })
+
   revalidatePath(`/curator/clients/${clientId}`)
   revalidatePath('/client', 'layout')
   return { success: true as const }
@@ -146,6 +154,13 @@ export async function setClientScholarshipsVisibility(formData: FormData) {
     .update({ unlocked_for_client: unlocked, updated_at: new Date().toISOString() })
     .eq('client_id', clientId)
   if (error) return { error: error.message }
+
+  await logActivity(ctx.admin, {
+    clientId,
+    type: 'scholarship_visibility',
+    content: unlocked ? 'Куратор открыл доступ к стипендиям' : 'Куратор закрыл доступ к стипендиям',
+    metadata: { unlocked },
+  })
 
   revalidatePath(`/curator/clients/${clientId}`)
   revalidatePath('/client', 'layout')
