@@ -442,9 +442,20 @@ export function DealCard({ deal, stages, activities, salespersons, clientData, b
                 </a>
               )}
               {deal.contact_email && (
-                <a href={`mailto:${deal.contact_email}`} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', borderRadius: 8, background: 'rgba(0,0,0,.03)', border: '1px solid var(--bor2)', color: 'var(--muted)', textDecoration: 'none', fontSize: 12, fontWeight: 600 }}>
-                  ✉️ {deal.contact_email}
-                </a>
+                <span
+                  title="Двойной клик — выделить и скопировать"
+                  onDoubleClick={(e) => {
+                    const range = document.createRange()
+                    range.selectNodeContents(e.currentTarget as Node)
+                    const sel = window.getSelection()
+                    sel?.removeAllRanges()
+                    sel?.addRange(range)
+                    navigator.clipboard?.writeText(deal.contact_email!).catch(() => {})
+                  }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', borderRadius: 8, background: 'rgba(0,0,0,.03)', border: '1px solid var(--bor2)', color: 'var(--muted)', fontSize: 12, fontWeight: 600, userSelect: 'text', cursor: 'text' }}
+                >
+                  ✉️ <a href={`mailto:${deal.contact_email}`} style={{ color: 'inherit', textDecoration: 'none', userSelect: 'text' }}>{deal.contact_email}</a>
+                </span>
               )}
             </div>
           </div>
@@ -544,7 +555,7 @@ export function DealCard({ deal, stages, activities, salespersons, clientData, b
                   <button onClick={handleUnlinkClient} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 12 }} title="Отвязать">×</button>
                 </div>
                 <div style={{ marginTop: 8 }}>
-                  <SalesInviteButton clientId={clientData.id} clientEmail={clientData.email || null} clientName={clientData.name} />
+                  <SalesInviteButton clientId={clientData.id} clientEmail={clientData.email || deal.contact_email || null} clientName={clientData.name} />
                 </div>
               </>
             ) : (
