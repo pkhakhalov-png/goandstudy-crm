@@ -119,6 +119,10 @@ export default async function UniversitiesPage({
     const orParts: string[] = []
     for (const r of allRaw) orParts.push(`raw_data->attributes->>level.eq.${r}`)
     for (const kw of allKw) orParts.push(`name.ilike.*${kw}*`)
+    // Permissive: программы без структурного level И без name-keyword
+    // (например, curator_gh специализации-бакеты в DE/AE) тоже включаем,
+    // чтобы целые страны не выпадали из фильтра. По согласованию с PM.
+    orParts.push(`raw_data->attributes->>level.is.null`)
     if (orParts.length > 0) query = query.or(orParts.join(','))
   }
   // Intake год — startsWith по JSONB пути; multi-год собираем через .or.
