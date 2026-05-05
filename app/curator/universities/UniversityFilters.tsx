@@ -48,20 +48,15 @@ const SORT_OPTIONS: { key: string; label: string }[] = [
   { key: 'recent', label: 'Недавно обновлено' },
 ]
 
-// Значения совпадают с raw_data.attributes.level
-const LEVEL_OPTIONS: { value: string; label: string; group: string }[] = [
-  { value: 'english', label: 'ESL / English', group: 'Языковые' },
-  { value: 'certificate', label: '1-Year Post-Secondary Certificate', group: 'Undergraduate' },
-  { value: 'diploma', label: '2-Year Undergraduate Diploma', group: 'Undergraduate' },
-  { value: 'advanced_diploma', label: '3-Year Advanced Diploma', group: 'Undergraduate' },
-  { value: '3_year_bachelors', label: "3-Year Bachelor's Degree", group: 'Undergraduate' },
-  { value: 'bachelors', label: "4-Year Bachelor's Degree", group: 'Undergraduate' },
-  { value: 'integrated_masters', label: 'Integrated Masters', group: 'Undergraduate' },
-  { value: 'post_graduate_certificate', label: 'Postgraduate Certificate', group: 'Post-graduate' },
-  { value: 'post_graduate_diploma', label: 'Postgraduate Diploma', group: 'Post-graduate' },
-  { value: 'masters_degree', label: "Master's Degree", group: 'Post-graduate' },
-  { value: 'doctoral_phd', label: 'Doctoral / PhD', group: 'Post-graduate' },
-  { value: 'non_credential', label: 'Non-Credential', group: 'Прочее' },
+// 3 укрупнённые группы — работают через mapping на сервере.
+// Раньше были 12 вариантов из applyboard, но они пустые для daad/curator_gh
+// → фильтр давал 0 результатов по DE/AE. Теперь группа = OR по нескольким
+// raw-уровням + name-heuristic для источников без структурного level.
+const LEVEL_OPTIONS: { value: string; label: string; group?: string }[] = [
+  { value: 'bachelor', label: 'Бакалавриат' },
+  { value: 'master',   label: 'Магистратура' },
+  { value: 'phd',      label: 'PhD / Доктор' },
+  { value: 'language', label: 'Языковые' },
 ]
 
 const INTAKE_YEARS = ['2026', '2027', '2028']

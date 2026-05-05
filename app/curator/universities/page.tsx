@@ -87,9 +87,39 @@ export default async function UniversitiesPage({
   else if (budget === 'mid1') query = query.gte('tuition', 10000).lt('tuition', 25000)
   else if (budget === 'mid2') query = query.gte('tuition', 25000).lt('tuition', 50000)
   else if (budget === 'high') query = query.gte('tuition', 50000)
-  // Уровень программы — через JSONB path
+  // Уровень программы — кроссисточниковый фильтр.
+  // applyboard заполняет raw_data.attributes.level стандартными кодами,
+  // daad/curator_gh — нет. Поэтому делаем OR: structured-level OR name-heuristic.
   if (levels.length > 0) {
-    query = query.in('raw_data->attributes->>level', levels)
+    const LEVEL_MAP: Record<string, { raw: string[]; nameKeywords: string[] }> = {
+      bachelor: {
+        raw: ['bachelors', '3_year_bachelors', 'integrated_masters', 'topup_degree', 'certificate', 'diploma', 'advanced_diploma'],
+        nameKeywords: ['bachelor', 'undergrad', 'b.sc', 'b.a.', 'bsc', 'bachelorstudiengang'],
+      },
+      master: {
+        raw: ['masters_degree', 'post_graduate_certificate', 'post_graduate_diploma'],
+        nameKeywords: ['master', 'm.sc', 'm.a.', 'msc', 'mba', 'masterstudiengang'],
+      },
+      phd: {
+        raw: ['doctoral_phd'],
+        nameKeywords: ['phd', 'doctor', 'doctoral', 'promotion'],
+      },
+      language: {
+        raw: ['english', 'non_credential'],
+        nameKeywords: ['english', 'language course', 'esl'],
+      },
+    }
+    const allRaw = new Set<string>()
+    const allKw = new Set<string>()
+    for (const l of levels) {
+      const m = LEVEL_MAP[l]
+      if (m) { m.raw.forEach(r => allRaw.add(r)); m.nameKeywords.forEach(k => allKw.add(k)) }
+      else allRaw.add(l) // backwards-compat для старых URL
+    }
+    const orParts: string[] = []
+    for (const r of allRaw) orParts.push(`raw_data->attributes->>level.eq.${r}`)
+    for (const kw of allKw) orParts.push(`name.ilike.*${kw}*`)
+    if (orParts.length > 0) query = query.or(orParts.join(','))
   }
   // Intake год — startsWith по JSONB пути; multi-год собираем через .or
   if (intakeYears.length > 0) {
