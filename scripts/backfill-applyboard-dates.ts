@@ -70,10 +70,11 @@ async function main() {
         continue
       }
       tasks.push(
-        sb.from('programs').update(patch).eq('id', p.id).then(r => {
+        (async () => {
+          const r = await sb.from('programs').update(patch).eq('id', p.id)
           if (r.error) console.error(`  id=${p.id} update error:`, r.error.message)
           else updated++
-        }),
+        })(),
       )
       // Throttle parallelism
       if (tasks.length >= PARALLEL) {
