@@ -457,7 +457,7 @@ function DocumentModal({ doc, onClose, clientId, existingRow }: { doc: RequiredD
                 >
                   Нужна помощь?
                 </div>
-                Напиши куратору Анне — поможет заполнить шаблон за 5 минут на звонке.
+                Напиши куратору — поможет заполнить шаблон за 5 минут на звонке.
               </div>
             </div>
           </div>
