@@ -130,9 +130,115 @@ export function ShortlistBlock({ items, total, clientId }: Props) {
 }
 
 function EmptyState({ total }: { total: number }) {
+  // Когда куратор уже подобрал (total > 0), но клиент ещё не посмотрел —
+  // визуально это «новая подборка», а не пустое состояние. Solid purple
+  // фон + значок NEW + крупная CTA-кнопка.
+  const hasCuratorPicks = total > 0
+  if (hasCuratorPicks) {
+    return (
+      <Link
+        href="/client/shortlist"
+        style={{
+          display: 'block',
+          position: 'relative',
+          padding: '40px 32px',
+          background: 'linear-gradient(135deg, var(--ds-purple-soft) 0%, rgba(177,94,204,0.04) 100%)',
+          border: '1.5px solid var(--ds-purple)',
+          borderRadius: 'var(--ds-r-lg)',
+          textDecoration: 'none',
+          color: 'var(--ds-ink)',
+          overflow: 'hidden',
+          transition: 'all 150ms',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.transform = 'translateY(-2px)'
+          e.currentTarget.style.boxShadow = '0 12px 32px -8px rgba(177,94,204,0.35)'
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform = 'translateY(0)'
+          e.currentTarget.style.boxShadow = 'none'
+        }}
+      >
+        {/* «NEW» бейдж в углу */}
+        <div
+          style={{
+            position: 'absolute',
+            top: 16,
+            right: 16,
+            background: 'var(--ds-purple)',
+            color: '#fff',
+            padding: '4px 10px',
+            borderRadius: 100,
+            fontSize: 10,
+            fontWeight: 800,
+            letterSpacing: '0.12em',
+            textTransform: 'uppercase',
+          }}
+        >
+          ✨ Новая
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
+          <div
+            style={{
+              width: 64,
+              height: 64,
+              borderRadius: 16,
+              background: 'var(--ds-purple)',
+              color: '#fff',
+              display: 'grid',
+              placeItems: 'center',
+              fontSize: 30,
+              flexShrink: 0,
+              boxShadow: '0 8px 24px -6px rgba(177,94,204,0.5)',
+            }}
+          >
+            🎓
+          </div>
+          <div style={{ flex: 1, minWidth: 200 }}>
+            <div
+              style={{
+                fontFamily: 'var(--ds-font-display-stack)',
+                fontWeight: 700,
+                fontSize: 22,
+                textTransform: 'uppercase',
+                letterSpacing: '0.04em',
+                color: 'var(--ds-ink)',
+                marginBottom: 4,
+              }}
+            >
+              Подборка готова — {total} программ
+            </div>
+            <div style={{ fontSize: 14, color: 'var(--ds-ink-dim)', lineHeight: 1.5 }}>
+              Куратор подобрал вузы под твой профиль. Открой, изучи и отметь
+              приоритетные — на главной покажем первые {MAIN_PAGE_PRIORITY_LIMIT}.
+            </div>
+          </div>
+          <div
+            style={{
+              flexShrink: 0,
+              padding: '14px 24px',
+              background: 'var(--ds-purple)',
+              color: '#fff',
+              borderRadius: 12,
+              fontFamily: 'var(--ds-font-display-stack)',
+              fontWeight: 700,
+              fontSize: 14,
+              textTransform: 'uppercase',
+              letterSpacing: '0.06em',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            Открыть →
+          </div>
+        </div>
+      </Link>
+    )
+  }
+
+  // Реальное пустое — куратор ещё не подобрал
   return (
-    <Link
-      href="/client/shortlist"
+    <div
       style={{
         display: 'grid',
         placeItems: 'center',
@@ -140,64 +246,26 @@ function EmptyState({ total }: { total: number }) {
         border: '2px dashed var(--ds-border)',
         borderRadius: 'var(--ds-r-lg)',
         textAlign: 'center',
-        textDecoration: 'none',
-        color: 'var(--ds-ink)',
+        color: 'var(--ds-muted)',
         gap: 10,
-        transition: 'all 150ms',
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.borderColor = 'var(--ds-purple)'
-        e.currentTarget.style.background = 'var(--ds-purple-soft)'
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.borderColor = 'var(--ds-border)'
-        e.currentTarget.style.background = 'transparent'
       }}
     >
       <div
         style={{
-          width: 56,
-          height: 56,
-          borderRadius: '50%',
-          background: 'var(--ds-purple-soft)',
-          color: 'var(--ds-purple-deep)',
-          display: 'grid',
-          placeItems: 'center',
-          fontFamily: 'var(--ds-font-display-stack)',
-          fontSize: 24,
-          fontWeight: 700,
+          width: 56, height: 56, borderRadius: '50%',
+          background: 'var(--ds-bg-alt)', color: 'var(--ds-muted)',
+          display: 'grid', placeItems: 'center', fontSize: 24,
         }}
       >
-        ★
+        ⏳
       </div>
-      <div
-        style={{
-          fontFamily: 'var(--ds-font-display-stack)',
-          fontWeight: 700,
-          fontSize: 16,
-          textTransform: 'uppercase',
-          letterSpacing: '0.04em',
-          color: 'var(--ds-ink)',
-        }}
-      >
-        Выбрать приоритетные
+      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ds-ink)' }}>
+        Куратор ещё подбирает программы
       </div>
-      <div style={{ fontSize: 13, color: 'var(--ds-muted)', maxWidth: 420 }}>
-        Куратор собрал {total} программ под профиль Игоря. Отметь сколько угодно — на главной покажутся первые {MAIN_PAGE_PRIORITY_LIMIT}.
+      <div style={{ fontSize: 13, color: 'var(--ds-muted)', maxWidth: 360 }}>
+        Скоро здесь появится подборка под твой профиль. Дадим знать.
       </div>
-      <div
-        style={{
-          marginTop: 6,
-          fontSize: 11,
-          fontWeight: 700,
-          color: 'var(--ds-purple)',
-          letterSpacing: '0.12em',
-          textTransform: 'uppercase',
-        }}
-      >
-        Открыть подборку →
-      </div>
-    </Link>
+    </div>
   )
 }
 
