@@ -5,7 +5,7 @@ import { logout } from '@/app/login/actions'
 
 interface Props {
   userName: string
-  activePage?: 'home' | 'documents' | 'shortlist' | 'scholarships' | 'curator'
+  activePage?: 'home' | 'documents' | 'shortlist' | 'scholarships'
   /** Не используется — оставлен для обратной совместимости со старыми вызовами. */
   showScholarships?: boolean
 }
@@ -15,7 +15,6 @@ const navItems: { key: NonNullable<Props['activePage']>; href: string; label: st
   { key: 'documents', href: '/client/documents', label: 'Документы' },
   { key: 'shortlist', href: '/client/shortlist', label: 'Вузы' },
   { key: 'scholarships', href: '/client/scholarships', label: 'Стипендии' },
-  { key: 'curator', href: '/client/curator', label: 'Куратор' },
 ]
 
 export function ClientTopNav({ userName, activePage = 'home' }: Props) {
@@ -72,7 +71,6 @@ export function ClientTopNav({ userName, activePage = 'home' }: Props) {
             <Link
               key={item.key}
               href={item.href}
-              data-tour={item.key === 'curator' ? 'curator-link' : undefined}
               style={{
                 fontSize: 12,
                 fontWeight: 600,

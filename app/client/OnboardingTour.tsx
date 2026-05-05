@@ -54,13 +54,6 @@ function IconPen() {
     </svg>
   )
 }
-function IconChat() {
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21 11.5a8.4 8.4 0 0 1-1 4 8.5 8.5 0 0 1-7.5 4.5 8.4 8.4 0 0 1-4-1L3 21l2-5.5a8.4 8.4 0 0 1-1-4 8.5 8.5 0 0 1 4.5-7.5 8.4 8.4 0 0 1 4-1h.5a8.5 8.5 0 0 1 8 8z" />
-    </svg>
-  )
-}
 function IconCheck() {
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
@@ -100,12 +93,6 @@ const STEPS: Step[] = [
     Icon: IconPen,
     title: 'Резюме и мотивашка',
     body: 'CV и motivation letter — заполняешь сам, куратор финалит. Открой карточку чтобы начать.',
-  },
-  {
-    selector: '[data-tour="curator-link"]',
-    Icon: IconChat,
-    title: 'Куратор',
-    body: 'Все вопросы — куратору в этом разделе. Отвечает в течение рабочего дня.',
   },
   {
     selector: null,
