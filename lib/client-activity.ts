@@ -31,14 +31,17 @@ export async function logActivity(
   },
 ) {
   try {
-    await admin.from('client_activities').insert({
+    const { error } = await admin.from('client_activities').insert({
       client_id: params.clientId,
       user_id: params.userId || null,
       activity_type: params.type,
       content: params.content,
       metadata: params.metadata || null,
     })
+    if (error) {
+      console.error('[client-activity] insert failed:', error.message, { type: params.type, clientId: params.clientId })
+    }
   } catch (e) {
-    console.warn('[client-activity] logActivity failed:', e)
+    console.error('[client-activity] logActivity threw:', e)
   }
 }
