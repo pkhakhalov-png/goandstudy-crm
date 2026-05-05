@@ -28,6 +28,7 @@ import { ProgramCardInteractive } from '@/app/curator/universities/ProgramCard'
 import { ApplicationsTab } from './ApplicationsTab'
 import { StudentProjectBlock } from '@/app/_shared/StudentProjectBlock'
 import { RoadmapBlock } from '@/app/_shared/RoadmapBlock'
+import { getDocumentDownloadUrl } from '@/app/client/documents/actions'
 
 /* ═══════════════════════════════════════════════════════════════
    PROPS + ШЛЯПА — props структуры из Supabase (пока any, чтобы
@@ -88,6 +89,25 @@ const DOC_STATUS: Record<string, { label: string; chipClass: string }> = {
   translated: { label: 'Переведён', chipClass: 'ds-chip-info' },
   notarized: { label: 'Заверен', chipClass: 'ds-chip-success' },
   uploaded_to_uni: { label: 'Загружен в вуз', chipClass: 'ds-chip-purple' },
+}
+
+const DOC_TYPE_LABEL: Record<string, string> = {
+  passport: 'Паспорт',
+  diploma: 'Диплом',
+  transcript: 'Транскрипт',
+  attestat: 'Аттестат',
+  ielts: 'IELTS / TOEFL',
+  recommendation: 'Рекомендательное письмо',
+  resume: 'Резюме',
+  motivation: 'Мотивационное письмо',
+  optional: 'Дополнительный',
+}
+
+function formatBytes(bytes: number) {
+  if (!bytes) return ''
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} КБ`
+  return `${(bytes / 1024 / 1024).toFixed(1)} МБ`
 }
 
 const UNI_STATUS: Record<string, { label: string; chipClass: string }> = {
@@ -209,7 +229,7 @@ export function ClientWorkspace(props: Props) {
             shortlist={universities}
           />
         )}
-        {tab === 'documents' && <DocumentsTab documents={documents} />}
+        {tab === 'documents' && <DocumentsTab documents={documents} clientId={client.id} />}
         {tab === 'essays' && <EssaysTab client={client} essays={props.essays || []} />}
         {tab === 'notes' && <NotesTab client={client} activities={activities} />}
       </main>
@@ -1888,7 +1908,7 @@ function CatalogPanel({ client, catalog }: { client: any; catalog: CatalogData }
    TAB · Документы
    ═══════════════════════════════════════════════════════════════ */
 
-function DocumentsTab({ documents }: { documents: any[] }) {
+function DocumentsTab({ documents, clientId }: { documents: any[]; clientId: number }) {
   return (
     <div className="ds-card" style={{ padding: 28 }}>
       <SectionHead
@@ -1913,41 +1933,111 @@ function DocumentsTab({ documents }: { documents: any[] }) {
         </div>
       ) : (
         <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {documents.map((doc) => {
-            const status = DOC_STATUS[doc.status] || { label: doc.status, chipClass: 'ds-chip-neutral' }
-            return (
-              <div
-                key={doc.id}
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr auto auto',
-                  alignItems: 'center',
-                  gap: 12,
-                  padding: '14px 16px',
-                  background: 'var(--ds-bg)',
-                  border: '1px solid var(--ds-border-soft)',
-                  borderRadius: 'var(--ds-r-md)',
-                }}
-              >
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ds-ink)' }}>
-                    {doc.name || doc.document_type || 'Без названия'}
-                  </div>
-                  {doc.notes && (
-                    <div style={{ fontSize: 12, color: 'var(--ds-muted)', marginTop: 2 }}>{doc.notes}</div>
-                  )}
-                </div>
-                <span className="ds-mono" style={{ fontSize: 11, color: 'var(--ds-muted)' }}>
-                  {doc.created_at ? formatDate(doc.created_at) : '—'}
-                </span>
-                <span className={`ds-chip ${status.chipClass}`} style={{ textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: 10, fontWeight: 700 }}>
-                  {status.label}
-                </span>
-              </div>
-            )
-          })}
+          {documents.map((doc) => (
+            <DocumentRow key={doc.id} doc={doc} clientId={clientId} />
+          ))}
         </div>
       )}
+    </div>
+  )
+}
+
+function DocumentRow({ doc, clientId }: { doc: any; clientId: number }) {
+  const [busy, setBusy] = useState<'view' | 'download' | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const status = DOC_STATUS[doc.status] || { label: doc.status, chipClass: 'ds-chip-neutral' }
+  const title = doc.title || DOC_TYPE_LABEL[doc.doc_type] || doc.doc_type || 'Без названия'
+  const fileName = doc.file_name || ''
+  const fileSize = doc.file_size_bytes ? formatBytes(doc.file_size_bytes) : ''
+  const hasFile = !!doc.storage_path
+
+  async function open(mode: 'view' | 'download') {
+    setBusy(mode)
+    setError(null)
+    try {
+      const r = await getDocumentDownloadUrl({ id: doc.id, clientId })
+      if ('error' in r && r.error) {
+        setError(r.error)
+        return
+      }
+      if ('url' in r && r.url) {
+        if (mode === 'view') window.open(r.url, '_blank', 'noopener,noreferrer')
+        else {
+          const a = document.createElement('a')
+          a.href = r.url
+          a.download = fileName || title
+          document.body.appendChild(a)
+          a.click()
+          a.remove()
+        }
+      }
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  return (
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: '1fr auto auto',
+        alignItems: 'center',
+        gap: 12,
+        padding: '14px 16px',
+        background: 'var(--ds-bg)',
+        border: '1px solid var(--ds-border-soft)',
+        borderRadius: 'var(--ds-r-md)',
+      }}
+    >
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ds-ink)' }}>{title}</div>
+        {fileName && (
+          <div style={{ fontSize: 12, color: 'var(--ds-muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {fileName}{fileSize ? ` · ${fileSize}` : ''}
+          </div>
+        )}
+        {doc.notes && (
+          <div style={{ fontSize: 12, color: 'var(--ds-muted)', marginTop: 2 }}>{doc.notes}</div>
+        )}
+        {error && (
+          <div style={{ fontSize: 11, color: 'var(--ds-error-ink)', marginTop: 4 }}>{error}</div>
+        )}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span className="ds-mono" style={{ fontSize: 11, color: 'var(--ds-muted)' }}>
+          {doc.created_at ? formatDate(doc.created_at) : '—'}
+        </span>
+        <span className={`ds-chip ${status.chipClass}`} style={{ textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: 10, fontWeight: 700 }}>
+          {status.label}
+        </span>
+      </div>
+      <div style={{ display: 'flex', gap: 6 }}>
+        {hasFile ? (
+          <>
+            <button
+              type="button"
+              onClick={() => open('view')}
+              disabled={!!busy}
+              className="ds-btn ds-btn-ghost"
+              style={{ fontSize: 11, padding: '6px 10px' }}
+              title="Открыть в новой вкладке"
+            >
+              {busy === 'view' ? '…' : 'Просмотр'}
+            </button>
+            <button
+              type="button"
+              onClick={() => open('download')}
+              disabled={!!busy}
+              className="ds-btn ds-btn-primary"
+              style={{ fontSize: 11, padding: '6px 10px' }}
+            >
+              {busy === 'download' ? '…' : 'Скачать'}
+            </button>
+          </>
+        ) : (
+          <span style={{ fontSize: 11, color: 'var(--ds-muted)' }}>Файл не загружен</span>
+        )}
+      </div>
     </div>
   )
 }

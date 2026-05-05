@@ -279,7 +279,7 @@ function getStatusMeta(status: RequiredDoc['status']) {
     case 'missing':
       return { ch: '+', bg: 'var(--ds-purple-soft)', fg: 'var(--ds-purple-deep)', chipClass: 'ds-chip-error', chipText: 'нужен' }
     case 'pending':
-      return { ch: '⏳', bg: 'var(--ds-info-soft)', fg: 'var(--ds-info)', chipClass: 'ds-chip-info', chipText: 'в работе' }
+      return { ch: '⏳', bg: 'var(--ds-amber-soft)', fg: '#8A6D1E', chipClass: 'ds-chip-warning', chipText: 'в работе' }
     case 'locked':
       return { ch: '🔒', bg: 'var(--ds-bg-alt)', fg: 'var(--ds-muted)', chipClass: 'ds-chip-neutral', chipText: 'не активен' }
     default:
