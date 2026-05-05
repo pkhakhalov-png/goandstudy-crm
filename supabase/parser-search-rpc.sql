@@ -22,7 +22,8 @@ CREATE OR REPLACE FUNCTION public.search_programs(
   p_search        text   DEFAULT NULL,
   p_sort          text   DEFAULT 'name_asc',
   p_limit         int    DEFAULT 24,
-  p_offset        int    DEFAULT 0
+  p_offset        int    DEFAULT 0,
+  p_count_cap     int    DEFAULT NULL    -- capped count (Google-style "1000+"). NULL = exact
 )
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -57,6 +58,9 @@ BEGIN
   END IF;
 
   -- ─── 1) Total count (без LIMIT) ───
+  -- Capped count: если p_count_cap=5000 и совпадений ≥5000, считаем
+  -- ровно 5000 и UI показывает «5000+». Скорость х10-100 на широких
+  -- выборках — Postgres останавливает скан как только набрано N.
   WITH filtered AS (
     SELECT 1
     FROM public.programs p
@@ -92,6 +96,7 @@ BEGIN
           WHERE p.raw_data->'attributes'->'earliest_intake'->>'start_date' LIKE y || '%'
         )
       )
+    LIMIT CASE WHEN p_count_cap IS NULL THEN NULL ELSE p_count_cap END
   )
   SELECT COUNT(*) INTO v_total FROM filtered;
 
@@ -163,5 +168,5 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.search_programs(
-  text, bigint, text, text, text, text[], text[], text, text, int, int
+  text, bigint, text, text, text, text[], text[], text, text, int, int, int
 ) TO anon, authenticated, service_role;

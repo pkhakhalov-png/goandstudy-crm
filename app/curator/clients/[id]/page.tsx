@@ -154,6 +154,7 @@ export default async function CuratorClientPage({
     countryCounts: Record<string, number>
     specialtyOptions: string[]
     total: number
+    totalCapped?: boolean
     page: number
     pageSize: number
     filters: Search
@@ -228,6 +229,7 @@ export default async function CuratorClientPage({
       countryCounts,
       specialtyOptions: SPECIALTY_OPTIONS,
       total: count ?? 0,
+      totalCapped: searchResult.totalCapped,
       page,
       pageSize: CATALOG_PAGE_SIZE,
       filters: { q, country, school: schoolFilter, levels: levels.join(','), intakes: intakeYears.join(','), sort, specialty, uniType, budget },

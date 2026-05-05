@@ -100,6 +100,7 @@ export default async function UniversitiesPage({
 
   const programs = searchResult.rows
   const count = searchResult.total
+  const totalCapped = searchResult.totalCapped || false
   // Список стран — сначала те что в нашем COUNTRY_LABEL (известный порядок), потом остальные
   const known = Object.keys(COUNTRY_LABEL).filter(c => countryCounts[c])
   const others = Object.keys(countryCounts).filter(c => !COUNTRY_LABEL[c]).sort()
@@ -148,7 +149,7 @@ export default async function UniversitiesPage({
             </p>
             <div className="ds-hero-stats">
               <div>
-                <span className="ds-stat-num">{total.toLocaleString('ru')}</span>
+                <span className="ds-stat-num">{total.toLocaleString('ru')}{totalCapped ? '+' : ''}</span>
                 <span className="ds-stat-label">
                   {total === 1 ? 'программа найдена' : total >= 2 && total <= 4 ? 'программы найдено' : 'программ найдено'}
                 </span>

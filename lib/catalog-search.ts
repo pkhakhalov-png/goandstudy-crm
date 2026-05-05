@@ -21,16 +21,26 @@ export interface SearchProgramsParams {
   sort?: string
   limit?: number
   offset?: number
+  /** Capped count для скорости: при cap=5000 широкие фильтры останавливаются
+   *  на 5000-м row. UI показывает «5000+» если total === cap. NULL = exact. */
+  countCap?: number | null
 }
 
 export interface SearchProgramsResult {
   rows: any[]
   total: number
+  /** true если total === countCap (т.е. реальное число ≥ cap). UI рисует «N+». */
+  totalCapped?: boolean
   error?: string
 }
 
+/** Дефолтный cap для каталога — экран всё равно показывает 24 за раз,
+ *  считать точно 80k программ нет смысла. */
+export const DEFAULT_COUNT_CAP = 5000
+
 export async function searchPrograms(params: SearchProgramsParams): Promise<SearchProgramsResult> {
   const parser = createParserClient()
+  const cap = params.countCap === null ? null : (params.countCap ?? DEFAULT_COUNT_CAP)
   const { data, error } = await parser.rpc('search_programs', {
     p_country: params.country || null,
     p_school_id: params.schoolId ?? null,
@@ -43,14 +53,17 @@ export async function searchPrograms(params: SearchProgramsParams): Promise<Sear
     p_sort: params.sort || 'name_asc',
     p_limit: params.limit ?? 24,
     p_offset: params.offset ?? 0,
+    p_count_cap: cap,
   })
   if (error) {
     console.error('[searchPrograms] rpc error:', error.message)
     return { rows: [], total: 0, error: error.message }
   }
   const payload = data as { rows: any[]; total: number } | null
+  const total = payload?.total || 0
   return {
     rows: payload?.rows || [],
-    total: payload?.total || 0,
+    total,
+    totalCapped: cap !== null && total === cap,
   }
 }

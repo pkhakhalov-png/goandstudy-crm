@@ -1832,7 +1832,7 @@ function CatalogPanel({ client, catalog }: { client: any; catalog: CatalogData }
     <div className="ds-card" style={{ padding: 28 }}>
       <SectionHead
         eyebrow="Каталог базы вузов"
-        title={`Всего программ · ${catalog.total.toLocaleString('ru')}`}
+        title={`Всего программ · ${catalog.total.toLocaleString('ru')}${(catalog as any).totalCapped ? '+' : ''}`}
         description="Ищи программу в полной базе и добавляй в подборку этого клиента одним кликом."
       />
 
