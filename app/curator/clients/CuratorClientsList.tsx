@@ -30,7 +30,8 @@ export function CuratorClientsList({ clients, stages, universities }: Props) {
   const filtered = clients.filter(c => {
     if (search) {
       const q = search.toLowerCase()
-      if (!c.name?.toLowerCase().includes(q) && !c.country?.toLowerCase().includes(q) && !c.phone?.includes(q)) return false
+      const country = c.project_data?.location || c.country || ''
+      if (!c.name?.toLowerCase().includes(q) && !country.toLowerCase().includes(q) && !c.phone?.includes(q)) return false
     }
     if (filterStage && c.current_stage_code !== filterStage) return false
     if (filterStatus && c.status !== filterStatus) return false
@@ -92,7 +93,7 @@ export function CuratorClientsList({ clients, stages, universities }: Props) {
                     <div style={{ fontWeight: 600, color: 'var(--text)' }}>{c.name}</div>
                     {c.telegram && <div style={{ fontSize: 10, color: 'var(--purple)', marginTop: 2 }}>{c.telegram}</div>}
                   </td>
-                  <td style={{ padding: '14px 12px', color: 'var(--muted)', fontSize: 12 }}>{c.country || '—'}</td>
+                  <td style={{ padding: '14px 12px', color: 'var(--muted)', fontSize: 12 }}>{c.project_data?.location || c.country || '—'}</td>
                   <td style={{ padding: '14px 12px' }}>
                     {stage ? (
                       <span style={{ padding: '3px 10px', borderRadius: 6, fontSize: 10, fontWeight: 600, background: colors.bg, color: colors.color }}>

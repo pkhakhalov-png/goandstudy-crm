@@ -21,7 +21,7 @@ export default async function CuratorClientsPage() {
     { data: stages },
     { data: universities },
   ] = await Promise.all([
-    admin.from('clients').select('id, name, phone, email, telegram, country, status, curator_id, current_stage_code, created_at, curator_assigned_at').eq('curator_id', curatorId || '').order('created_at', { ascending: false }),
+    admin.from('clients').select('id, name, phone, email, telegram, country, status, curator_id, current_stage_code, created_at, curator_assigned_at, project_data').eq('curator_id', curatorId || '').order('created_at', { ascending: false }),
     admin.from('curator_stages').select('id, code, title, position, badge').order('position'),
     admin.from('client_universities').select('id, client_id, deadline, status'),
   ])
