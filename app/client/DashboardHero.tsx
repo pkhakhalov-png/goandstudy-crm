@@ -5,6 +5,13 @@ interface Props {
   stages: TimelineStage[]
 }
 
+// Берём только имя: первое слово из ФИО. Без склонений (используем
+// текст в именительном падеже: «Путь Анастасии» сложно склонять для
+// произвольного имени → пишем «Путь Анастасия» — нейтрально).
+function firstNameOnly(full: string): string {
+  return (full || '').trim().split(/\s+/)[0] || ''
+}
+
 export function DashboardHero({ ctx, stages }: Props) {
   const currentStage = stages.find(s => s.state === 'current')
   const doneCount = stages.filter(s => s.state === 'done').length
@@ -81,19 +88,6 @@ export function DashboardHero({ ctx, stages }: Props) {
           padding: '56px 32px 48px',
         }}
       >
-        <div
-          style={{
-            fontSize: 12,
-            color: 'var(--ds-purple)',
-            fontWeight: 700,
-            letterSpacing: '0.14em',
-            textTransform: 'uppercase',
-            marginBottom: 14,
-          }}
-        >
-          Поступление {ctx.intakeYear} · с {ctx.startedAt} · куратор Анна Петрова
-        </div>
-
         <h1
           style={{
             fontFamily: 'var(--ds-font-display-stack)',
@@ -101,26 +95,12 @@ export function DashboardHero({ ctx, stages }: Props) {
             fontSize: 'clamp(36px, 5vw, 64px)',
             letterSpacing: '0.01em',
             lineHeight: 1,
-            margin: '0 0 16px 0',
+            margin: '0 0 24px 0',
             textTransform: 'uppercase',
           }}
         >
-          Путь {ctx.childFirstName} <span className="ds-hl">к&nbsp;поступлению</span>
+          Путь {firstNameOnly(ctx.childFirstName)} <span className="ds-hl">к&nbsp;поступлению</span>
         </h1>
-
-        <p
-          style={{
-            fontSize: 17,
-            color: 'var(--ds-ink-dim)',
-            lineHeight: 1.5,
-            maxWidth: 680,
-            margin: '0 0 32px 0',
-            letterSpacing: '-0.01em',
-          }}
-        >
-          {ctx.parentFirstName}, вы на этапе «{currentStage?.title.toLowerCase() || 'не начат'}» —{' '}
-          {progress}% пути пройдено{withinStage > 0 ? `, в этапе ${withinStage}% чек-листа` : ''}.
-        </p>
 
         {/* Прогресс — крупный % + метка */}
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 16, marginBottom: 32 }}>
