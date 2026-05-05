@@ -176,11 +176,12 @@ async function sendInvitationEmail(params: {
 
 /**
  * Welcome-письмо клиенту после успешной активации кабинета.
- * НЕ содержит пароль — только ссылку на /login и /client.
+ * Содержит email + пароль (для удобства, чтобы клиент мог сохранить).
  */
 export async function sendClientWelcomeEmail(params: {
   to: string
   clientName: string
+  password?: string
 }): Promise<{ ok: true } | { ok: false; error: string }> {
   const apiKey = process.env.RESEND_API_KEY
   if (!apiKey) return { ok: false, error: 'RESEND_API_KEY не настроен' }
@@ -203,10 +204,10 @@ export async function sendClientWelcomeEmail(params: {
   </p>
   <p style="font-size: 13px; color: #8a8796; line-height: 1.6;">
     <b style="color: #14121e;">Email для входа:</b> ${params.to}<br>
+    ${params.password ? `<b style="color: #14121e;">Пароль:</b> <code style="background:#f4f3f8;padding:2px 6px;border-radius:4px;font-size:13px;color:#14121e;">${params.password}</code><br>` : ''}
     <b style="color: #14121e;">Страница входа:</b> <a href="${loginUrl}" style="color: #B15ECC;">${loginUrl}</a><br>
     <br>
-    Пароль ты задал сам — он зашифрован и в письмо не попадает (стандартная
-    практика безопасности). Если забудешь — напиши куратору, он сбросит.
+    Сохрани это письмо — здесь твои данные для входа. Если потеряешь пароль — напиши куратору, он сбросит.
   </p>
 </body></html>`
 

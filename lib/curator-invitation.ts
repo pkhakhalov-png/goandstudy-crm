@@ -130,9 +130,9 @@ async function sendCuratorInviteEmail(params: { to: string; curatorName: string;
   }
 }
 
-/** Welcome-письмо куратору после активации. Без пароля. */
+/** Welcome-письмо куратору после активации. С паролем. */
 export async function sendCuratorWelcomeEmail(params: {
-  to: string; curatorName: string
+  to: string; curatorName: string; password?: string
 }): Promise<{ ok: true } | { ok: false; error: string }> {
   const apiKey = process.env.RESEND_API_KEY
   if (!apiKey) return { ok: false, error: 'RESEND_API_KEY не настроен' }
@@ -154,9 +154,10 @@ export async function sendCuratorWelcomeEmail(params: {
   </p>
   <p style="font-size: 13px; color: #8a8796; line-height: 1.6;">
     <b style="color: #14121e;">Email:</b> ${params.to}<br>
+    ${params.password ? `<b style="color: #14121e;">Пароль:</b> <code style="background:#f4f3f8;padding:2px 6px;border-radius:4px;font-size:13px;color:#14121e;">${params.password}</code><br>` : ''}
     <b style="color: #14121e;">Вход:</b> <a href="${loginUrl}" style="color: #B15ECC;">${loginUrl}</a><br>
-    Пароль ты задал сам — он зашифрован и в письме не пересылается. Если
-    забудешь — попроси админа сбросить.
+    <br>
+    Сохрани это письмо — здесь твои данные для входа. Если потеряешь пароль — попроси админа сбросить.
   </p>
 </body></html>`
 

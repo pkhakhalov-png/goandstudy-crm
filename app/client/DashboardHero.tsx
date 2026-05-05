@@ -99,7 +99,7 @@ export function DashboardHero({ ctx, stages }: Props) {
             textTransform: 'uppercase',
           }}
         >
-          Путь {firstNameOnly(ctx.childFirstName)} <span className="ds-hl">к&nbsp;поступлению</span>
+          Прогресс <span className="ds-hl">поступления</span>
         </h1>
 
         {/* Прогресс — крупный % + метка */}

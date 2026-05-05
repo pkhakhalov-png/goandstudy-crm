@@ -85,6 +85,7 @@ export async function activateClientAccount(params: {
     sendClientWelcomeEmail({
       to: inv.email,
       clientName: client?.name || 'клиент',
+      password: params.password,
     }).then(r => {
       if (!r.ok) console.warn('[invite] welcome email failed:', r.error)
     })

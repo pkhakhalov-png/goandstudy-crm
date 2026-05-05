@@ -75,6 +75,7 @@ export async function activateCuratorAccount(params: {
     sendCuratorWelcomeEmail({
       to: inv.email,
       curatorName: c?.name || 'куратор',
+      password: params.password,
     }).then(r => {
       if (!r.ok) console.warn('[invite/curator] welcome email failed:', r.error)
     })
