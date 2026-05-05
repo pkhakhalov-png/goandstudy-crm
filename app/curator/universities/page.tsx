@@ -29,6 +29,8 @@ type Search = {
   budget?: string
 }
 
+export const dynamic = 'force-dynamic'
+
 export default async function UniversitiesPage({
   searchParams,
 }: {
