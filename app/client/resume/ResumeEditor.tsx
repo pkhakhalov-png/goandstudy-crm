@@ -215,7 +215,13 @@ export function ResumeEditor({ initialResume, clientId, status = 'draft', viewer
     const isOver = dragOverKey === sectionKey && draggingKey !== sectionKey
     return (
       <div
-        // Drop-target: вся секция принимает drop, чтобы можно было кинуть куда угодно
+        draggable
+        onDragStart={(e) => {
+          e.dataTransfer.setData('text/plain', sectionKey)
+          e.dataTransfer.effectAllowed = 'move'
+          setDraggingKey(sectionKey)
+        }}
+        onDragEnd={() => { setDraggingKey(null); setDragOverKey(null) }}
         onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (dragOverKey !== sectionKey) setDragOverKey(sectionKey) }}
         onDragLeave={() => { if (dragOverKey === sectionKey) setDragOverKey(null) }}
         onDrop={(e) => {
@@ -225,55 +231,19 @@ export function ResumeEditor({ initialResume, clientId, status = 'draft', viewer
           setDraggingKey(null)
           if (sourceKey) reorderSections(sourceKey, sectionKey)
         }}
+        // userSelect:none на wrapper чтобы первый mousedown не уходил в
+        // выделение текста — drag начинается сразу. Внутренние input/
+        // textarea сами разрешают редактирование (нативный input behavior).
         style={{
           order,
           opacity: isDragging ? 0.4 : 1,
           transition: 'opacity 120ms',
           boxShadow: isOver ? '0 0 0 2px var(--ds-purple)' : 'none',
           borderRadius: 14,
-          position: 'relative',
+          userSelect: 'none',
+          WebkitUserSelect: 'none',
         }}
       >
-        {/* Drag handle: ТОЛЬКО он draggable, чтобы зажал и сразу тащил без двойного клика */}
-        <div
-          draggable
-          onDragStart={(e) => {
-            e.stopPropagation()
-            e.dataTransfer.setData('text/plain', sectionKey)
-            e.dataTransfer.effectAllowed = 'move'
-            const wrapper = (e.currentTarget as HTMLDivElement).parentElement
-            if (wrapper) {
-              const r = wrapper.getBoundingClientRect()
-              e.dataTransfer.setDragImage(wrapper, e.clientX - r.left, e.clientY - r.top)
-            }
-            setDraggingKey(sectionKey)
-          }}
-          onDragEnd={() => { setDraggingKey(null); setDragOverKey(null) }}
-          title="Перенести секцию"
-          aria-label="Перенести секцию"
-          style={{
-            position: 'absolute',
-            top: 14,
-            left: -28,
-            width: 24,
-            height: 32,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'grab',
-            color: 'var(--ds-muted)',
-            fontSize: 14,
-            userSelect: 'none',
-            opacity: 0.55,
-            transition: 'opacity 120ms',
-            zIndex: 2,
-            background: 'transparent',
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.opacity = '1' }}
-          onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.55' }}
-        >
-          ⋮⋮
-        </div>
         {children}
       </div>
     )
