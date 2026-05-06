@@ -13,20 +13,29 @@ interface Props {
 
 export function RoadmapCard({ clientId, data, approvedAt, approvedBy }: Props) {
   const isApproved = !!approvedAt
+  const isSent = !!data.sent_at
+  // Карта отправлена куратором, но клиент ещё не подтвердил → подсвечиваем
+  const needsAction = isSent && !isApproved
 
   return (
     <CollapsibleCard
       eyebrow="Детально по шагам"
       title="Дорожная карта"
+      highlight={needsAction}
+      initiallyOpen={needsAction}
       summary={
-        !isApproved
-          ? 'Куратор готовит план — появится после утверждения'
-          : 'План работ от куратора'
+        isApproved
+          ? 'План работ от куратора'
+          : needsAction
+            ? 'Куратор отправил карту — открой и подтверди'
+            : 'Куратор готовит план — появится после отправки'
       }
       chip={
-        !isApproved
-          ? <span className="ds-chip ds-chip-neutral" style={{ textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700, fontSize: 10 }}>в работе</span>
-          : <span className="ds-chip ds-chip-success" style={{ textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700, fontSize: 10 }}>✓ утверждено</span>
+        isApproved
+          ? <span className="ds-chip ds-chip-success" style={{ textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700, fontSize: 10 }}>✓ утверждено</span>
+          : needsAction
+            ? <span className="ds-chip" style={{ textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700, fontSize: 10, background: 'var(--ds-purple-soft)', color: 'var(--ds-purple-deep)', padding: '4px 10px', borderRadius: 999 }}>Подтверди</span>
+            : <span className="ds-chip ds-chip-neutral" style={{ textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700, fontSize: 10 }}>в работе</span>
       }
     >
       <RoadmapBlock

@@ -8,10 +8,13 @@ interface Props {
   summary: string
   chip?: React.ReactNode
   initiallyOpen?: boolean
+  /** Подсвечивает карточку (purple-обводка + лёгкий гради​ент) — для случая
+   *  когда от клиента нужно действие (подтвердить и т.п.). */
+  highlight?: boolean
   children: React.ReactNode
 }
 
-export function CollapsibleCard({ eyebrow, title, summary, chip, initiallyOpen = false, children }: Props) {
+export function CollapsibleCard({ eyebrow, title, summary, chip, initiallyOpen = false, highlight = false, children }: Props) {
   const [open, setOpen] = useState(initiallyOpen)
 
   return (
@@ -24,6 +27,11 @@ export function CollapsibleCard({ eyebrow, title, summary, chip, initiallyOpen =
         height: 'fit-content',
         overflow: 'hidden',
         transition: 'box-shadow 150ms ease-out, border-color 150ms ease-out',
+        ...(highlight ? {
+          borderColor: 'var(--ds-purple)',
+          boxShadow: '0 0 0 4px rgba(177,94,204,0.12), 0 12px 28px -10px rgba(177,94,204,0.35)',
+          background: 'linear-gradient(180deg, var(--ds-purple-soft) 0%, transparent 60%)',
+        } : {}),
       }}
     >
       <button
