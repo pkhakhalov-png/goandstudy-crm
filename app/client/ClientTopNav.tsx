@@ -72,6 +72,7 @@ export function ClientTopNav({ userName, activePage = 'home' }: Props) {
             <Link
               key={item.key}
               href={item.href}
+              data-tour={item.key === 'updates' ? 'updates-link' : undefined}
               style={{
                 fontSize: 12,
                 fontWeight: 600,
