@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { formatRoadmapMonth } from '@/lib/roadmap-types'
 
 const MONTHS_RU = [
@@ -23,15 +24,50 @@ export function MonthYearPicker({ value, onChange, placeholder = 'Выбрать
     return y ? Number(y) : new Date().getFullYear()
   })
   const wrapRef = useRef<HTMLDivElement>(null)
+  const popupRef = useRef<HTMLDivElement>(null)
+  const [popupPos, setPopupPos] = useState<{ top: number; left: number } | null>(null)
 
-  // Закрываем по клику вне
+  // Закрываем по клику вне триггера и попапа
   useEffect(() => {
     if (!open) return
     const onClick = (e: MouseEvent) => {
-      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false)
+      const t = e.target as Node
+      if (wrapRef.current?.contains(t) || popupRef.current?.contains(t)) return
+      setOpen(false)
     }
     document.addEventListener('mousedown', onClick)
     return () => document.removeEventListener('mousedown', onClick)
+  }, [open])
+
+  // Position в координатах document, с clamp к viewport
+  useLayoutEffect(() => {
+    if (!open) { setPopupPos(null); return }
+    function update() {
+      const r = wrapRef.current?.getBoundingClientRect()
+      if (!r) return
+      const POPUP_W = 280
+      const POPUP_H = 260
+      let left = r.left + window.scrollX
+      // Если попап вылезает справа — выравниваем по правому краю триггера
+      if (left + POPUP_W > window.scrollX + window.innerWidth - 8) {
+        left = r.right + window.scrollX - POPUP_W
+      }
+      // И никогда не уходим левее экрана
+      if (left < window.scrollX + 8) left = window.scrollX + 8
+      let top = r.bottom + window.scrollY + 4
+      if (top + POPUP_H > window.scrollY + window.innerHeight - 8) {
+        // Открываем вверх если снизу не хватает
+        top = r.top + window.scrollY - POPUP_H - 4
+      }
+      setPopupPos({ top, left })
+    }
+    update()
+    window.addEventListener('resize', update)
+    window.addEventListener('scroll', update, true)
+    return () => {
+      window.removeEventListener('resize', update)
+      window.removeEventListener('scroll', update, true)
+    }
   }, [open])
 
   const selectedYear = (value || '').split('-')[0] || ''
@@ -64,13 +100,14 @@ export function MonthYearPicker({ value, onChange, placeholder = 'Выбрать
         <span style={{ fontSize: 11, opacity: 0.6 }}>📅</span>
       </button>
 
-      {open && (
+      {open && popupPos && typeof document !== 'undefined' && createPortal(
         <div
+          ref={popupRef}
           style={{
             position: 'absolute',
-            top: 'calc(100% + 4px)',
-            left: 0,
-            zIndex: 50,
+            top: popupPos.top,
+            left: popupPos.left,
+            zIndex: 9999,
             background: '#fff',
             border: '1px solid var(--ds-border)',
             borderRadius: 8,
@@ -154,7 +191,8 @@ export function MonthYearPicker({ value, onChange, placeholder = 'Выбрать
               </button>
             </div>
           )}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )
