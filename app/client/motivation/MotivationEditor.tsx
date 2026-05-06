@@ -215,7 +215,7 @@ export function MotivationEditor({ authorName, initialLetter, clientId, status =
             type="text"
             value={letter.authorName ?? ''}
             onChange={(e) => setLetter(l => ({ ...l, authorName: e.target.value }))}
-            placeholder={authorName}
+            placeholder={authorName || 'Name Lastname'}
             className="ds-input"
             style={{ fontSize: 15 }}
           />

@@ -26,23 +26,15 @@ export type MotivationLetter = {
 export const MAX_CHARS = 4000
 
 export const INITIAL_LETTER: MotivationLetter = {
-  authorName: 'Yulia Pozdnukhova',
-  whyApplying:
-    "I am applying for International Relations because the past four years of MUN, youth-diplomacy summits and a Final Statement at the UN CND in Vienna convinced me that the policy questions which fascinate me are best understood inside a rigorous academic programme rather than purely from the outside.",
-  whyInterest:
-    "What draws me to IR is the way a single negotiation table can compress economics, history and human psychology into a few hours of decision-making. Reading «Diplomacy» by Kissinger at fifteen rewired the way I watch the news — I started seeing structure where before I saw noise.",
-  whySuitable:
-    "Speaking Russian natively, English at C1 and French at B2 lets me read primary sources in three languages. Holding a 5.0 GPA at Primakov School while leading the school press club proved I can pair academic discipline with public output. Independent research on UN Sustainable Development Goal 17 sharpened my ability to defend a thesis under questioning.",
-  studiesRelated:
-    "Beyond the standard curriculum I completed the MGIMO School of Youth Diplomacy programme, two leadership academies in Switzerland, and a Gordonstoun creative-writing summer school. Each forced me to argue with people whose worldview was nothing like mine — exactly the muscle an IR degree trains every day.",
-  skills:
-    "Public speaking under time pressure, comparative reading across English and Russian sources, structured note-taking from live debate. I treat persuasion as a craft that improves with deliberate practice — every TED-Ed Student Talk recording goes back into my notes the same evening.",
-  otherAchievements:
-    "Prize-holder at the Lomonosov MSU English Olympiad and the National High School Olympiad in English; «Student of the Year» 2020-2023 at Primakov School; volunteer with the National Anti-Drug Union — running prevention lectures for younger students and helping coordinate the annual Moscow camp.",
-  workExperience:
-    "As a junior editor at the school press club I produced weekly English-language news roundups, interviewed visiting speakers and edited copy from younger students. Volunteering at rehab centres taught me to listen before forming an opinion — a habit I now apply to academic writing.",
-  futurePlans:
-    "After the bachelor's I want to specialise in international institutional reform — particularly how mid-sized states use the UN system to widen their negotiating room. The plan is a master's in international policy, then early-career work either at an embassy desk or inside a think tank that publishes in English.",
+  authorName: '',
+  whyApplying: '',
+  whyInterest: '',
+  whySuitable: '',
+  studiesRelated: '',
+  skills: '',
+  otherAchievements: '',
+  workExperience: '',
+  futurePlans: '',
 }
 
 export type SectionKey = 'course' | 'skills' | 'work'
@@ -71,21 +63,29 @@ export const QUESTIONS: Record<SectionKey, Question[]> = {
     {
       key: 'whyApplying',
       label: 'Why are you applying for your chosen course(s)?',
+      intro:
+        'Объясните что именно толкнуло вас выбрать эту программу: конкретный момент, проект или человек. Покажите осознанность выбора, а не общие фразы.',
       placeholder: 'Почему вы подаёте заявку именно на эту программу? Что именно привлекло?',
     },
     {
       key: 'whyInterest',
       label: 'Why does the subject interest you?',
+      intro:
+        'Расскажите о вашем личном интересе к предмету: книги, курсы, события которые повлияли. Приёмная комиссия хочет понять что за интересом стоит реальный опыт.',
       placeholder: 'Что в этом предмете вас по-настоящему захватывает? Когда вы впервые им увлеклись?',
     },
     {
       key: 'whySuitable',
       label: "Why do you think you're suitable for the course(s)?",
+      intro:
+        'Перечислите ваши сильные стороны и подкрепите конкретикой — оценки, языки, проекты, результаты. Без «я ответственный» — только факты.',
       placeholder: 'Какие ваши качества и подготовка делают вас хорошим кандидатом для этой программы?',
     },
     {
       key: 'studiesRelated',
       label: 'Do your current or previous studies relate to the course(s) that you have chosen?',
+      intro:
+        'Свяжите ваше текущее и прошлое обучение с выбранной программой. Курсы, олимпиады, школьные проекты — что подготовило вас к этому шагу.',
       placeholder: 'Как текущие и прошлые занятия (школа, курсы, проекты) связаны с выбранной программой?',
     },
   ],
