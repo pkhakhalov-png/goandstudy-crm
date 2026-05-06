@@ -106,17 +106,24 @@ export function togglePriority(state: ClientSharedState, uniKey: string): Client
   return { ...state, priorityUniKeys: [...existing, uniKey] }
 }
 
+/**
+ * Drop A на B → честный swap (A и B меняются местами).
+ * Раньше был splice/insert, что для коротких списков из 3 пунктов давало
+ * странное поведение: drop 1→3 двигало 1-й в конец, а 2-й и 3-й сдвигались
+ * наверх. Пользователь ждал «поменять местами», а получал «вставить».
+ */
 export function reorderPriority(state: ClientSharedState, fromIdx: number, toIdx: number): ClientSharedState {
   if (fromIdx === toIdx) return state
   if (fromIdx < 0 || fromIdx >= state.priorityUniKeys.length) return state
   if (toIdx < 0 || toIdx >= state.priorityUniKeys.length) return state
   const arr = [...state.priorityUniKeys]
-  const [item] = arr.splice(fromIdx, 1)
-  arr.splice(toIdx, 0, item)
+  const tmp = arr[fromIdx]
+  arr[fromIdx] = arr[toIdx]
+  arr[toIdx] = tmp
   return { ...state, priorityUniKeys: arr }
 }
 
-/** Переместить уже приоритетный вуз на конкретную позицию (для up/down кнопок). */
+/** Переместить вуз на одну позицию вверх/вниз — обмен с соседом. */
 export function movePriority(state: ClientSharedState, uniKey: string, direction: 'up' | 'down'): ClientSharedState {
   const idx = state.priorityUniKeys.indexOf(uniKey)
   if (idx < 0) return state

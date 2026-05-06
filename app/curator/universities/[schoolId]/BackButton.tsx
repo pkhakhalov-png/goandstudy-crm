@@ -6,16 +6,18 @@ import { useEffect, useState } from 'react'
 interface Props {
   fallbackHref: string
   label: string
+  /** Если true — клиент-режим: НЕ ходить через router.back / referrer
+   *  (могут увести в curator URLs которые клиент не имеет права видеть).
+   *  Всегда используем fallbackHref. */
+  clientMode?: boolean
 }
 
-export function BackButton({ fallbackHref, label }: Props) {
+export function BackButton({ fallbackHref, label, clientMode = false }: Props) {
   const router = useRouter()
   const [referrer, setReferrer] = useState<string | null>(null)
 
-  // На монтировании запоминаем document.referrer (источник навигации).
-  // Это позволяет «Назад» вернуться на ту же отфильтрованную страницу
-  // даже если history по какой-то причине очистился (refresh, прямая ссылка).
   useEffect(() => {
+    if (clientMode) return
     if (typeof document === 'undefined') return
     const ref = document.referrer
     if (!ref) return
@@ -23,17 +25,20 @@ export function BackButton({ fallbackHref, label }: Props) {
       const u = new URL(ref)
       if (u.origin === window.location.origin) setReferrer(ref)
     } catch {}
-  }, [])
+  }, [clientMode])
 
   function handleClick(e: React.MouseEvent) {
     e.preventDefault()
-    // 1) Если есть referrer с того же домена — идём туда напрямую,
-    //    сохраняя query-string (фильтры каталога).
+    // Клиент-режим: всегда возвращаем в /client/* — иначе попадёт в
+    // curator-страницы где не залогинен / нет прав.
+    if (clientMode) {
+      window.location.href = fallbackHref
+      return
+    }
     if (referrer) {
       window.location.href = referrer
       return
     }
-    // 2) Иначе обычный back, иначе fallback.
     if (typeof window !== 'undefined' && window.history.length > 1) {
       router.back()
     } else {

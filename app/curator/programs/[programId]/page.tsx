@@ -138,7 +138,7 @@ export default async function ProgramPage({
       <div className="main">
         <div className="topbar" style={{ gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
-            <BackButton fallbackHref="/curator/universities" label="← База программ" />
+            <BackButton fallbackHref={asClient ? '/client/shortlist' : '/curator/universities'} label={asClient ? '← К моей подборке' : '← База программ'} clientMode={asClient} />
             <span style={{ color: 'var(--bor2)' }}>/</span>
             <Link
               href={`/curator/universities/${school.id}`}
