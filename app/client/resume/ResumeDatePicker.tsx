@@ -9,7 +9,8 @@
  * Бэквард-совместим: если value неузнаваем — показывает as-is.
  */
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useLayoutEffect } from 'react'
+import { createPortal } from 'react-dom'
 
 const MONTHS_EN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
@@ -42,14 +43,36 @@ export function ResumeDatePicker({ value, onChange, presentToggle, presentLabel 
   const parsed = parseValue(value)
   const [yearView, setYearView] = useState<number>(parsed.year || new Date().getFullYear())
   const wrapRef = useRef<HTMLDivElement>(null)
+  const popupRef = useRef<HTMLDivElement>(null)
+  const [popupPos, setPopupPos] = useState<{ top: number; left: number } | null>(null)
 
+  // Закрываем по клику вне попапа/триггера
   useEffect(() => {
     if (!open) return
     const onClick = (e: MouseEvent) => {
-      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false)
+      const t = e.target as Node
+      if (wrapRef.current?.contains(t) || popupRef.current?.contains(t)) return
+      setOpen(false)
     }
     document.addEventListener('mousedown', onClick)
     return () => document.removeEventListener('mousedown', onClick)
+  }, [open])
+
+  // Расчёт позиции попапа в координатах document (для portal)
+  useLayoutEffect(() => {
+    if (!open) { setPopupPos(null); return }
+    function update() {
+      const r = wrapRef.current?.getBoundingClientRect()
+      if (!r) return
+      setPopupPos({ top: r.bottom + window.scrollY + 6, left: r.left + window.scrollX })
+    }
+    update()
+    window.addEventListener('resize', update)
+    window.addEventListener('scroll', update, true)
+    return () => {
+      window.removeEventListener('resize', update)
+      window.removeEventListener('scroll', update, true)
+    }
   }, [open])
 
   const display = parsed.isPresent
@@ -85,13 +108,14 @@ export function ResumeDatePicker({ value, onChange, presentToggle, presentLabel 
         <span style={{ fontSize: 12, opacity: 0.5 }}>📅</span>
       </button>
 
-      {open && (
+      {open && popupPos && typeof document !== 'undefined' && createPortal(
         <div
+          ref={popupRef}
           style={{
             position: 'absolute',
-            top: 'calc(100% + 6px)',
-            left: 0,
-            zIndex: 50,
+            top: popupPos.top,
+            left: popupPos.left,
+            zIndex: 9999,
             background: '#fff',
             border: '1px solid var(--ds-border)',
             borderRadius: 12,
@@ -195,7 +219,8 @@ export function ResumeDatePicker({ value, onChange, presentToggle, presentLabel 
               >clear</button>
             </div>
           )}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

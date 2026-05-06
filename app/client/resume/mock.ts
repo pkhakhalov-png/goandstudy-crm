@@ -129,7 +129,25 @@ export type Resume = {
   volunteering: VolunteeringItem[]
   olympiads: OlympiadItem[]
   optional?: OptionalSectionFlags
+  /** Порядок секций — клиент перетаскивает в редакторе, отражается в preview.
+   *  Если пусто — берётся DEFAULT_SECTION_ORDER. */
+  sectionOrder?: string[]
 }
+
+export const DEFAULT_SECTION_ORDER = [
+  'workExperience',
+  'links',
+  'education',
+  'courses',
+  'skills',
+  'conferences',
+  'customSections',
+  'hobbies',
+  'languages',
+  'awards',
+  'volunteering',
+  'olympiads',
+] as const
 
 export const INITIAL_RESUME: Resume = {
   personal: {
@@ -218,6 +236,7 @@ export function normalizeResume(input: any): Resume {
     volunteering: Array.isArray(r.volunteering) ? r.volunteering : [],
     olympiads: Array.isArray(r.olympiads) ? r.olympiads : [],
     optional: r.optional && typeof r.optional === 'object' ? r.optional : undefined,
+    sectionOrder: Array.isArray(r.sectionOrder) ? r.sectionOrder.filter((k: any) => typeof k === 'string') : undefined,
   }
 }
 

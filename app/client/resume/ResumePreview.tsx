@@ -1,6 +1,13 @@
 'use client'
 
 import type { Resume } from './mock'
+import { DEFAULT_SECTION_ORDER } from './mock'
+
+function sectionOrderIndex(resume: Resume, key: string): number {
+  const order: readonly string[] = resume.sectionOrder?.length ? resume.sectionOrder : DEFAULT_SECTION_ORDER
+  const idx = order.indexOf(key)
+  return idx >= 0 ? idx : 99
+}
 
 /* Минимальный read-only превью — одна колонка Details + основная
    колонка с крупными секциями. Повторяет вид из скриншотов resume.io. */
@@ -142,6 +149,7 @@ export function ResumePreview({ resume }: Props) {
           {/* RIGHT column */}
           <main style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
             {resume.workExperience.length > 0 && (
+              <div style={{ order: sectionOrderIndex(resume, 'workExperience') }}>
               <PreviewSection title="Work Experience">
                 {resume.workExperience.map(w => (
                   <PreviewEntry
@@ -153,9 +161,11 @@ export function ResumePreview({ resume }: Props) {
                   />
                 ))}
               </PreviewSection>
+              </div>
             )}
 
             {resume.education.length > 0 && (
+              <div style={{ order: sectionOrderIndex(resume, 'education') }}>
               <PreviewSection title="Education">
                 {resume.education.map(e => (
                   <PreviewEntry
@@ -167,9 +177,11 @@ export function ResumePreview({ resume }: Props) {
                   />
                 ))}
               </PreviewSection>
+              </div>
             )}
 
             {resume.courses.length > 0 && (
+              <div style={{ order: sectionOrderIndex(resume, 'courses') }}>
               <PreviewSection title="Courses">
                 {resume.courses.map(c => (
                   <PreviewEntry
@@ -181,9 +193,11 @@ export function ResumePreview({ resume }: Props) {
                   />
                 ))}
               </PreviewSection>
+              </div>
             )}
 
             {resume.conferences.length > 0 && (
+              <div style={{ order: sectionOrderIndex(resume, 'conferences') }}>
               <PreviewSection title="Conferences">
                 {resume.conferences.map(c => (
                   <PreviewEntry
@@ -195,8 +209,11 @@ export function ResumePreview({ resume }: Props) {
                   />
                 ))}
               </PreviewSection>
+              </div>
             )}
 
+            {resume.customSections.length > 0 && (
+            <div style={{ order: sectionOrderIndex(resume, 'customSections'), display: 'flex', flexDirection: 'column', gap: 24 }}>
             {resume.customSections.map(cs => (
               <PreviewSection key={cs.id} title={cs.title}>
                 {cs.items.map(item => (
@@ -209,8 +226,11 @@ export function ResumePreview({ resume }: Props) {
                 ))}
               </PreviewSection>
             ))}
+            </div>
+            )}
 
             {resume.awards.length > 0 && (
+              <div style={{ order: sectionOrderIndex(resume, 'awards') }}>
               <PreviewSection title="Awards">
                 <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {resume.awards.map(a => (
@@ -221,9 +241,11 @@ export function ResumePreview({ resume }: Props) {
                   ))}
                 </ul>
               </PreviewSection>
+              </div>
             )}
 
             {resume.volunteering.length > 0 && (
+              <div style={{ order: sectionOrderIndex(resume, 'volunteering') }}>
               <PreviewSection title="Volunteering">
                 {resume.volunteering.map(v => (
                   <PreviewEntry
@@ -235,9 +257,11 @@ export function ResumePreview({ resume }: Props) {
                   />
                 ))}
               </PreviewSection>
+              </div>
             )}
 
             {resume.olympiads.length > 0 && (
+              <div style={{ order: sectionOrderIndex(resume, 'olympiads') }}>
               <PreviewSection title="Olympiads">
                 {resume.olympiads.map(o => (
                   <div key={o.id} style={{ marginBottom: 8 }}>
@@ -246,6 +270,7 @@ export function ResumePreview({ resume }: Props) {
                   </div>
                 ))}
               </PreviewSection>
+              </div>
             )}
           </main>
         </div>

@@ -4,6 +4,7 @@ import { useMemo, useState, useEffect, useRef, useTransition } from 'react'
 import {
   INITIAL_RESUME,
   SECTION_TEMPLATES,
+  DEFAULT_SECTION_ORDER,
   normalizeResume,
   type Resume,
   type LinkItem,
@@ -182,6 +183,69 @@ export function ResumeEditor({ initialResume, clientId, status = 'draft', viewer
 
   const completeness = useMemo(() => calcCompleteness(resume), [resume])
 
+  // Section reordering — клиент перетаскивает блоки, порядок отражается и в preview.
+  const effectiveOrder = useMemo(() => {
+    const fromState = (resume.sectionOrder && resume.sectionOrder.length)
+      ? resume.sectionOrder.slice()
+      : DEFAULT_SECTION_ORDER.slice()
+    for (const k of DEFAULT_SECTION_ORDER) if (!fromState.includes(k)) fromState.push(k)
+    return fromState
+  }, [resume.sectionOrder])
+
+  const [draggingKey, setDraggingKey] = useState<string | null>(null)
+  const [dragOverKey, setDragOverKey] = useState<string | null>(null)
+
+  function reorderSections(fromKey: string, toKey: string) {
+    if (fromKey === toKey) return
+    setResume(r => {
+      const order = effectiveOrder.slice()
+      const fromIdx = order.indexOf(fromKey)
+      const toIdx = order.indexOf(toKey)
+      if (fromIdx < 0 || toIdx < 0) return r
+      const [moved] = order.splice(fromIdx, 1)
+      order.splice(toIdx, 0, moved)
+      return { ...r, sectionOrder: order }
+    })
+  }
+
+  function SectionShell({ sectionKey, children }: { sectionKey: string; children: React.ReactNode }) {
+    if (!children) return null
+    // +10 чтобы оставить место выше для статуса/progress/Personal Details
+    // (они с order=0 идут первыми)
+    const order = effectiveOrder.indexOf(sectionKey) + 10
+    const isDragging = draggingKey === sectionKey
+    const isOver = dragOverKey === sectionKey && draggingKey !== sectionKey
+    return (
+      <div
+        draggable
+        onDragStart={(e) => {
+          e.dataTransfer.setData('text/plain', sectionKey)
+          e.dataTransfer.effectAllowed = 'move'
+          setDraggingKey(sectionKey)
+        }}
+        onDragEnd={() => { setDraggingKey(null); setDragOverKey(null) }}
+        onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (dragOverKey !== sectionKey) setDragOverKey(sectionKey) }}
+        onDragLeave={() => { if (dragOverKey === sectionKey) setDragOverKey(null) }}
+        onDrop={(e) => {
+          e.preventDefault()
+          const sourceKey = e.dataTransfer.getData('text/plain')
+          setDragOverKey(null)
+          setDraggingKey(null)
+          if (sourceKey) reorderSections(sourceKey, sectionKey)
+        }}
+        style={{
+          order,
+          opacity: isDragging ? 0.4 : 1,
+          transition: 'opacity 120ms',
+          boxShadow: isOver ? '0 0 0 2px var(--ds-purple)' : 'none',
+          borderRadius: 14,
+        }}
+      >
+        {children}
+      </div>
+    )
+  }
+
   return (
     <div
       className="resume-editor-grid"
@@ -233,12 +297,12 @@ export function ResumeEditor({ initialResume, clientId, status = 'draft', viewer
           <div style={{ marginTop: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
             <Field label="Email" value={resume.personal.email} onChange={(v) => updatePersonal('email', v)} width="half" />
             <Field label="Phone" value={resume.personal.phone} onChange={(v) => updatePersonal('phone', v)} width="half" />
-            <Field label="LinkedIn URL" value={resume.personal.linkedIn} onChange={(v) => updatePersonal('linkedIn', v)} placeholder="linkedin.com/in/yourprofile" width="half" />
             <Field label="City" value={resume.personal.city} onChange={(v) => updatePersonal('city', v)} width="half" />
           </div>
         </AccordionSection>
 
         {/* ═══ Work Experience ═══ */}
+        <SectionShell sectionKey="workExperience">
         {isOptionalShown('workExperience') && (
         <AccordionSection
           title="Work Experience"
@@ -271,7 +335,10 @@ export function ResumeEditor({ initialResume, clientId, status = 'draft', viewer
         </AccordionSection>
         )}
 
+        </SectionShell>
+
         {/* ═══ Websites & Social Links — optional ═══ */}
+        <SectionShell sectionKey="links">
         {isOptionalShown('links') && (
           <AccordionSection
             title="Websites & Social Links"
@@ -300,7 +367,10 @@ export function ResumeEditor({ initialResume, clientId, status = 'draft', viewer
           </AccordionSection>
         )}
 
+        </SectionShell>
+
         {/* ═══ Education ═══ */}
+        <SectionShell sectionKey="education">
         {isOptionalShown('education') && (
         <AccordionSection
           title="Education"
@@ -339,7 +409,10 @@ export function ResumeEditor({ initialResume, clientId, status = 'draft', viewer
         </AccordionSection>
         )}
 
+        </SectionShell>
+
         {/* ═══ Courses ═══ */}
+        <SectionShell sectionKey="courses">
         {isOptionalShown('courses') && (
         <AccordionSection title="Courses" right={<RemoveSectionBtn onClick={() => removeOptionalSection('courses')} />}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -366,7 +439,10 @@ export function ResumeEditor({ initialResume, clientId, status = 'draft', viewer
         </AccordionSection>
         )}
 
+        </SectionShell>
+
         {/* ═══ Areas of Expertise (Skills) ═══ */}
+        <SectionShell sectionKey="skills">
         {isOptionalShown('skills') && (
         <AccordionSection
           title="Areas of Expertise"
@@ -410,7 +486,10 @@ export function ResumeEditor({ initialResume, clientId, status = 'draft', viewer
         </AccordionSection>
         )}
 
+        </SectionShell>
+
         {/* ═══ Conferences — optional ═══ */}
+        <SectionShell sectionKey="conferences">
         {isOptionalShown('conferences') && (
           <AccordionSection title="Conferences" right={<RemoveSectionBtn onClick={() => removeOptionalSection('conferences')} />}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -437,7 +516,12 @@ export function ResumeEditor({ initialResume, clientId, status = 'draft', viewer
           </AccordionSection>
         )}
 
+        </SectionShell>
+
         {/* ═══ Custom sections (TED Ed Student Talks и др.) ═══ */}
+        <SectionShell sectionKey="customSections">
+        {resume.customSections.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {resume.customSections.map((cs, csIdx) => (
           <AccordionSection
             key={cs.id}
@@ -481,8 +565,12 @@ export function ResumeEditor({ initialResume, clientId, status = 'draft', viewer
             />
           </AccordionSection>
         ))}
+          </div>
+        )}
+        </SectionShell>
 
         {/* ═══ Hobbies — optional ═══ */}
+        <SectionShell sectionKey="hobbies">
         {isOptionalShown('hobbies') && (
           <AccordionSection title="Hobbies" right={<RemoveSectionBtn onClick={() => removeOptionalSection('hobbies')} />}>
             <Field
@@ -496,7 +584,10 @@ export function ResumeEditor({ initialResume, clientId, status = 'draft', viewer
           </AccordionSection>
         )}
 
+        </SectionShell>
+
         {/* ═══ Languages ═══ */}
+        <SectionShell sectionKey="languages">
         {isOptionalShown('languages') && (
         <AccordionSection title="Languages" right={<RemoveSectionBtn onClick={() => removeOptionalSection('languages')} />}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -527,7 +618,10 @@ export function ResumeEditor({ initialResume, clientId, status = 'draft', viewer
         </AccordionSection>
         )}
 
+        </SectionShell>
+
         {/* ═══ Awards — optional ═══ */}
+        <SectionShell sectionKey="awards">
         {isOptionalShown('awards') && (
           <AccordionSection title="Awards" right={<RemoveSectionBtn onClick={() => removeOptionalSection('awards')} />}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -553,7 +647,10 @@ export function ResumeEditor({ initialResume, clientId, status = 'draft', viewer
           </AccordionSection>
         )}
 
+        </SectionShell>
+
         {/* ═══ Volunteering — optional ═══ */}
+        <SectionShell sectionKey="volunteering">
         {isOptionalShown('volunteering') && (
           <AccordionSection title="Volunteering" right={<RemoveSectionBtn onClick={() => removeOptionalSection('volunteering')} />}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -581,7 +678,10 @@ export function ResumeEditor({ initialResume, clientId, status = 'draft', viewer
           </AccordionSection>
         )}
 
+        </SectionShell>
+
         {/* ═══ Olympiads — optional ═══ */}
+        <SectionShell sectionKey="olympiads">
         {isOptionalShown('olympiads') && (
           <AccordionSection title="Olympiads" right={<RemoveSectionBtn onClick={() => removeOptionalSection('olympiads')} />}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -607,7 +707,10 @@ export function ResumeEditor({ initialResume, clientId, status = 'draft', viewer
           </AccordionSection>
         )}
 
+        </SectionShell>
+
         {/* ═══ Add Section ═══ */}
+        <div style={{ order: 999 }}>
         <AddSectionGrid
           onAdd={(templateKey) => {
             // Optional typed sections — toggle visible + seed empty item if needed
@@ -708,6 +811,7 @@ export function ResumeEditor({ initialResume, clientId, status = 'draft', viewer
             }
           }}
         />
+        </div>
       </div>
 
       {/* ─── Preview column ─── */}
