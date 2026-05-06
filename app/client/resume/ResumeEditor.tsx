@@ -201,8 +201,8 @@ export function ResumeEditor({ initialResume, clientId, status = 'draft', viewer
         {/* ═══ Personal details ═══ */}
         <AccordionSection title="Personal details" defaultOpen>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-            <Field label="First name" value={resume.personal.firstName} onChange={(v) => updatePersonal('firstName', v)} width="half" />
-            <Field label="Surname" value={resume.personal.lastName} onChange={(v) => updatePersonal('lastName', v)} width="half" />
+            <Field label="First name" value={resume.personal.firstName} onChange={(v) => updatePersonal('firstName', v)} width="half" placeholder="Name" />
+            <Field label="Surname" value={resume.personal.lastName} onChange={(v) => updatePersonal('lastName', v)} width="half" placeholder="Lastname" />
           </div>
           <div style={{ marginTop: 16 }}>
             <Field
@@ -910,26 +910,36 @@ function ProgressCard({ completeness }: { completeness: ReturnType<typeof calcCo
 }
 
 function calcCompleteness(resume: Resume) {
-  const scores = [
-    { key: 'firstName', weight: 5, ok: resume.personal.firstName.trim().length > 0, label: 'Add first name' },
-    { key: 'lastName', weight: 5, ok: resume.personal.lastName.trim().length > 0, label: 'Add last name' },
-    { key: 'profileSummary', weight: 15, ok: resume.personal.profileSummary.trim().length > 20, label: 'Add profile summary' },
-    { key: 'email', weight: 5, ok: resume.personal.email.trim().length > 0, label: 'Add email' },
-    { key: 'phone', weight: 5, ok: resume.personal.phone.trim().length > 0, label: 'Add phone' },
-    { key: 'city', weight: 5, ok: resume.personal.city.trim().length > 0, label: 'Add a city name' },
-    { key: 'workExperience', weight: 15, ok: resume.workExperience.length > 0, label: 'Add work experience' },
-    { key: 'education', weight: 15, ok: resume.education.length > 0, label: 'Add education' },
-    { key: 'skills', weight: 10, ok: resume.skills.length > 0, label: 'Add skills' },
-    { key: 'languages', weight: 10, ok: resume.languages.length > 0, label: 'Add languages' },
-    { key: 'experience', weight: 10, ok: resume.courses.length > 0 || resume.conferences.length > 0 || resume.customSections.length > 0, label: 'Add courses / conferences / custom experience' },
+  // Динамический подсчёт: учитываем только активные секции. Если клиент
+  // удалил секцию (например, Work Experience) — она не должна тянуть
+  // процент вниз. То же самое для опциональных языков/наград и т.д.
+  function isShown(key: keyof OptionalSectionFlags, hasData: boolean): boolean {
+    const flag = resume.optional?.[key]
+    if (typeof flag === 'boolean') return flag
+    return hasData
+  }
+
+  const scores: Array<{ key: string; weight: number; ok: boolean; label: string; included: boolean }> = [
+    { key: 'firstName',      weight: 5,  ok: resume.personal.firstName.trim().length > 0, label: 'Add first name', included: true },
+    { key: 'lastName',       weight: 5,  ok: resume.personal.lastName.trim().length > 0,  label: 'Add last name',  included: true },
+    { key: 'profileSummary', weight: 15, ok: resume.personal.profileSummary.trim().length > 20, label: 'Add profile summary', included: true },
+    { key: 'email',          weight: 5,  ok: resume.personal.email.trim().length > 0, label: 'Add email', included: true },
+    { key: 'phone',          weight: 5,  ok: resume.personal.phone.trim().length > 0, label: 'Add phone', included: true },
+    { key: 'city',           weight: 5,  ok: resume.personal.city.trim().length > 0,  label: 'Add a city name', included: true },
+    { key: 'workExperience', weight: 15, ok: resume.workExperience.length > 0, label: 'Add work experience', included: isShown('workExperience', resume.workExperience.length > 0) },
+    { key: 'education',      weight: 15, ok: resume.education.length > 0, label: 'Add education', included: isShown('education', resume.education.length > 0) },
+    { key: 'skills',         weight: 10, ok: resume.skills.length > 0, label: 'Add skills', included: isShown('skills', resume.skills.length > 0) },
+    { key: 'languages',      weight: 10, ok: resume.languages.length > 0, label: 'Add languages', included: isShown('languages', resume.languages.length > 0) },
+    { key: 'experience',     weight: 10, ok: resume.courses.length > 0 || resume.conferences.length > 0 || resume.customSections.length > 0, label: 'Add courses / conferences / custom experience', included: true },
   ]
-  const total = scores.reduce((a, s) => a + s.weight, 0)
-  const gained = scores.reduce((a, s) => a + (s.ok ? s.weight : 0), 0)
-  const percent = Math.min(100, Math.round((gained / total) * 100))
+  const active = scores.filter(s => s.included)
+  const total = active.reduce((a, s) => a + s.weight, 0)
+  const gained = active.reduce((a, s) => a + (s.ok ? s.weight : 0), 0)
+  const percent = total > 0 ? Math.min(100, Math.round((gained / total) * 100)) : 0
 
   const suggestions: Array<{ key: string; label: string; points?: number; type?: 'points' | 'ai' }> = []
   if (!resume.personal.profileSummary.trim()) suggestions.push({ key: 'ai-summary', label: 'Write your profile summary', type: 'ai' })
-  for (const s of scores) {
+  for (const s of active) {
     if (!s.ok && (s as any).label) suggestions.push({ key: s.key, label: (s as any).label, points: s.weight, type: 'points' })
   }
   return { percent, suggestions: suggestions.slice(0, 6) }

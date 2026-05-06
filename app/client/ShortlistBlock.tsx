@@ -236,34 +236,57 @@ function EmptyState({ total }: { total: number }) {
     )
   }
 
-  // Реальное пустое — куратор ещё не подобрал
+  // Реальное пустое — куратор ещё не подобрал. Не пугающий dashed-empty,
+  // а спокойный «всё под контролем, мы работаем».
   return (
     <div
       style={{
-        display: 'grid',
-        placeItems: 'center',
-        padding: '48px 24px',
-        border: '2px dashed var(--ds-border)',
+        position: 'relative',
+        padding: '36px 32px',
+        background: 'var(--ds-bg-alt)',
+        border: '1px solid var(--ds-border-soft)',
         borderRadius: 'var(--ds-r-lg)',
-        textAlign: 'center',
-        color: 'var(--ds-muted)',
-        gap: 10,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 20,
+        flexWrap: 'wrap',
       }}
     >
       <div
         style={{
-          width: 56, height: 56, borderRadius: '50%',
-          background: 'var(--ds-bg-alt)', color: 'var(--ds-muted)',
-          display: 'grid', placeItems: 'center', fontSize: 24,
+          width: 56,
+          height: 56,
+          borderRadius: '50%',
+          background: '#fff',
+          border: '1px solid var(--ds-border-soft)',
+          color: 'var(--ds-purple-deep)',
+          display: 'grid',
+          placeItems: 'center',
+          fontSize: 26,
+          flexShrink: 0,
         }}
       >
-        ⏳
+        🔍
       </div>
-      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ds-ink)' }}>
-        Куратор ещё подбирает программы
-      </div>
-      <div style={{ fontSize: 13, color: 'var(--ds-muted)', maxWidth: 360 }}>
-        Скоро здесь появится подборка под твой профиль. Дадим знать.
+      <div style={{ flex: 1, minWidth: 220 }}>
+        <div
+          style={{
+            fontFamily: 'var(--ds-font-display-stack)',
+            fontWeight: 700,
+            fontSize: 17,
+            textTransform: 'uppercase',
+            letterSpacing: '0.04em',
+            color: 'var(--ds-ink)',
+            marginBottom: 4,
+          }}
+        >
+          Куратор подбирает программы
+        </div>
+        <div style={{ fontSize: 13.5, color: 'var(--ds-ink-dim)', lineHeight: 1.5 }}>
+          После стратегической сессии куратор соберёт список вузов под твой
+          профиль — обычно это занимает 5-10 рабочих дней. Появится здесь и
+          в «Обновлениях».
+        </div>
       </div>
     </div>
   )

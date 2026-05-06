@@ -23,12 +23,12 @@ export type RequiredDoc = {
 }
 
 export const REQUIRED_DOCS: RequiredDoc[] = [
-  { key: 'passport', title: 'Паспорт', hint: 'Заграничный, скан первой страницы', status: 'pending', hasExample: true, exampleTitle: 'Паспорт — образец', samplePath: '/samples/passport.jpg' },
-  { key: 'diploma', title: 'Диплом', hint: 'Диплом о высшем/среднем образовании', status: 'pending', hasExample: true, exampleTitle: 'Диплом — образец', samplePath: '/samples/diploma.jpg' },
-  { key: 'transcript', title: 'Транскрипт', hint: 'Выписка оценок (с переводом если требуется)', status: 'pending', hasExample: true, exampleTitle: 'Транскрипт — образец', samplePath: '/samples/transcript.jpg' },
-  { key: 'attestat', title: 'Аттестат', hint: 'Школьный аттестат с приложением оценок', status: 'pending', hasExample: true, exampleTitle: 'Аттестат — образец', samplePath: '/samples/attestat.jpeg' },
+  { key: 'passport', title: 'Паспорт', hint: 'Заграничный, скан первой страницы', status: 'missing', hasExample: true, exampleTitle: 'Паспорт — образец', samplePath: '/samples/passport.jpg' },
+  { key: 'diploma', title: 'Диплом', hint: 'Диплом о высшем/среднем образовании', status: 'missing', hasExample: true, exampleTitle: 'Диплом — образец', samplePath: '/samples/diploma.jpg' },
+  { key: 'transcript', title: 'Транскрипт', hint: 'Выписка оценок (с переводом если требуется)', status: 'missing', hasExample: true, exampleTitle: 'Транскрипт — образец', samplePath: '/samples/transcript.jpg' },
+  { key: 'attestat', title: 'Аттестат', hint: 'Школьный аттестат с приложением оценок', status: 'missing', hasExample: true, exampleTitle: 'Аттестат — образец', samplePath: '/samples/attestat.jpeg' },
   { key: 'ielts', title: 'IELTS / TOEFL', hint: 'Сертификат языкового теста', status: 'missing', hasExample: true, exampleTitle: 'IELTS — образец', samplePath: '/samples/ielts.jpg' },
-  { key: 'recommendation', title: 'Рекомендательное письмо', hint: 'От школы / преподавателя / работодателя', status: 'pending', hasExample: true, exampleTitle: 'Рекомендательное письмо — образец', samplePath: '/samples/recomm.pdf' },
+  { key: 'recommendation', title: 'Рекомендательное письмо', hint: 'От школы / преподавателя / работодателя', status: 'missing', hasExample: true, exampleTitle: 'Рекомендательное письмо — образец', samplePath: '/samples/recomm.pdf' },
   {
     key: 'resume',
     title: 'Резюме',
