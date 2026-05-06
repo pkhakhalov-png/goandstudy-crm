@@ -20,6 +20,9 @@ export type RoadmapStage = {
 
 export type RoadmapData = {
   stages: RoadmapStage[]
+  /** Куратор отправил клиенту на подтверждение. До этого клиент карту не видит. */
+  sent_at?: string | null
+  sent_by_name?: string | null
 }
 
 const RU_MONTH_SHORT: Record<string, string> = {

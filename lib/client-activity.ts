@@ -11,6 +11,7 @@ export type ActivityType =
   | 'note'
   | 'essay_approved'
   | 'essay_unapproved'
+  | 'roadmap_sent'
   | 'roadmap_approved'
   | 'roadmap_unapproved'
   | 'shortlist_added'

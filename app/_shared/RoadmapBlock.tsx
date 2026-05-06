@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import {
   addRoadmapStage, updateRoadmapStage, deleteRoadmapStage,
   addRoadmapItem, updateRoadmapItem, deleteRoadmapItem,
-  approveRoadmap, unapproveRoadmap, seedRoadmapTemplate,
+  approveRoadmap, unapproveRoadmap, seedRoadmapTemplate, sendRoadmap,
 } from '@/lib/roadmap-actions'
 import {
   formatRoadmapMonth,
@@ -30,6 +30,7 @@ export function RoadmapBlock({ clientId, initial, approvedAt: approvedAtProp, ap
 
   const totalItems = data.stages.reduce((acc, s) => acc + s.items.length, 0)
   const isApproved = !!approvedAt
+  const isSent = !!data.sent_at
   const canEditStructure = canEdit && !isApproved
 
   const showError = (e: string) => setErr(e)
@@ -96,6 +97,15 @@ export function RoadmapBlock({ clientId, initial, approvedAt: approvedAtProp, ap
   }
 
   // ─── approval ───────────────────────────────────────────────────────────
+  const onSend = () => {
+    if (!confirm('Отправить карту клиенту на подтверждение? После этого клиент увидит её в своём кабинете.')) return
+    startTransition(async () => {
+      const r = await sendRoadmap({ clientId })
+      if (!r.ok) showError(r.error)
+      else setData(d => ({ ...d, sent_at: new Date().toISOString() }))
+    })
+  }
+
   const onApprove = () => {
     if (!confirm('Подтверждаю дорожную карту? После этого карта зафиксируется.')) return
     startTransition(async () => {
@@ -106,11 +116,11 @@ export function RoadmapBlock({ clientId, initial, approvedAt: approvedAtProp, ap
   }
 
   const onUnapprove = () => {
-    if (!confirm('Снять подтверждение?')) return
+    if (!confirm('Снять подтверждение и вернуть карту в работу?')) return
     startTransition(async () => {
       const r = await unapproveRoadmap({ clientId })
       if (!r.ok) showError(r.error)
-      else setApprovedAt(null)
+      else { setApprovedAt(null); setData(d => ({ ...d, sent_at: null })) }
     })
   }
 
@@ -124,14 +134,14 @@ export function RoadmapBlock({ clientId, initial, approvedAt: approvedAtProp, ap
 
   // ─── render ─────────────────────────────────────────────────────────────
 
-  // Клиенту до утверждения, когда куратор ещё ничего не заполнил
-  if (!canEdit && !isApproved && data.stages.length === 0) {
+  // Клиенту: карту видно только после того как куратор её отправил
+  if (!canEdit && !isSent) {
     return (
       <div style={{
         padding: '32px 24px', background: 'var(--ds-bg-alt)', borderRadius: 'var(--ds-r-md)',
         border: '1px dashed var(--ds-border)', textAlign: 'center', color: 'var(--ds-muted)', fontSize: 13,
       }}>
-        Куратор готовит дорожную карту. Появится здесь как только этапы будут заполнены.
+        Куратор готовит дорожную карту. Появится здесь как только он её отправит на подтверждение.
       </div>
     )
   }
@@ -219,27 +229,37 @@ export function RoadmapBlock({ clientId, initial, approvedAt: approvedAtProp, ap
         )}
       </div>
 
-      {/* Куратору — статус-блок, без кнопки утверждения (теперь это делает клиент) */}
+      {/* Куратору — кнопки в зависимости от стадии: Send / Status / Unapprove */}
       {canEdit && (
         <div style={{ marginTop: 24, paddingTop: 20, borderTop: '1px solid var(--ds-border-soft)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <div style={{ fontSize: 12, color: 'var(--ds-muted)', flex: 1, minWidth: 180 }}>
             {isApproved
-              ? 'Клиент подтвердил карту — структуру менять нельзя, только галочки выполнения.'
-              : 'Заполни этапы и пункты — клиент увидит и сам подтвердит карту в своём кабинете.'}
+              ? 'Клиент подтвердил карту — структуру менять нельзя.'
+              : isSent
+                ? 'Карта отправлена клиенту. Ждём его подтверждения.'
+                : 'Заполни этапы и пункты — потом отправь клиенту, он подтвердит.'}
           </div>
-          {isApproved && (
+          {isApproved ? (
             <button type="button" disabled={pending} onClick={onUnapprove} className="ds-btn ds-btn-secondary" style={{ fontSize: 13, padding: '8px 16px' }}>
               Снять подтверждение
+            </button>
+          ) : isSent ? (
+            <button type="button" disabled={pending} onClick={onUnapprove} className="ds-btn ds-btn-secondary ds-btn-sm" style={{ fontSize: 12 }}>
+              Отозвать (вернуть в работу)
+            </button>
+          ) : (
+            <button type="button" disabled={pending || data.stages.length === 0} onClick={onSend} className="ds-btn ds-btn-primary" style={{ fontSize: 13, padding: '8px 20px', fontWeight: 600 }}>
+              📤 Отправить клиенту
             </button>
           )}
         </div>
       )}
 
-      {/* Клиенту — кнопка «Подтверждаю» когда не утверждено + есть этапы */}
-      {!canEdit && !isApproved && data.stages.length > 0 && (
+      {/* Клиенту — кнопка «Подтверждаю» когда отправлено и не утверждено */}
+      {!canEdit && isSent && !isApproved && (
         <div style={{ marginTop: 24, paddingTop: 20, borderTop: '1px solid var(--ds-border-soft)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <div style={{ fontSize: 12, color: 'var(--ds-muted)', flex: 1, minWidth: 180 }}>
-            Куратор подготовил план. Изучи и подтверди если всё ок — после этого карта зафиксируется.
+            Куратор отправил план. Изучи и подтверди если всё ок — после этого карта зафиксируется.
           </div>
           <button type="button" disabled={pending} onClick={onApprove} className="ds-btn ds-btn-primary" style={{ fontSize: 13, padding: '8px 20px', fontWeight: 600 }}>
             ✓ Подтверждаю
@@ -247,14 +267,7 @@ export function RoadmapBlock({ clientId, initial, approvedAt: approvedAtProp, ap
         </div>
       )}
 
-      {/* Клиенту — кнопка «Снять подтверждение» если уже подтвердил и хочет вернуть в работу */}
-      {!canEdit && isApproved && (
-        <div style={{ marginTop: 24, paddingTop: 20, borderTop: '1px solid var(--ds-border-soft)', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          <button type="button" disabled={pending} onClick={onUnapprove} className="ds-btn ds-btn-secondary ds-btn-sm" style={{ fontSize: 12 }}>
-            Снять подтверждение
-          </button>
-        </div>
-      )}
+      {/* Клиенту после подтверждения — никаких кнопок (нельзя откатить, по запросу) */}
     </div>
   )
 }

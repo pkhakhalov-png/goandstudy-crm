@@ -226,8 +226,38 @@ export async function deleteRoadmapItem(opts: {
 // ─── APPROVAL ──────────────────────────────────────────────────────────────
 
 /**
- * Утверждение дорожной карты — теперь делает КЛИЕНТ (как Project Student).
- * Куратор заполняет этапы / пункты, клиент подтверждает.
+ * Куратор отправляет дорожную карту клиенту на подтверждение.
+ * До этого клиент карту НЕ видит.
+ */
+export async function sendRoadmap(opts: { clientId: number }): Promise<ActionResult> {
+  const ctx = await checkAccess(opts.clientId)
+  if (!ctx.ok) return { ok: false, error: ctx.error }
+  if (!CURATOR_ROLES.has(ctx.role || '')) return { ok: false, error: 'Только куратор' }
+
+  const data = await readRoadmap(opts.clientId, ctx.admin)
+  if (data.stages.length === 0) return { ok: false, error: 'Карта пустая — заполни хотя бы один этап' }
+
+  const next: RoadmapData = {
+    ...data,
+    sent_at: new Date().toISOString(),
+    sent_by_name: ctx.profile?.name || ctx.user.email || null,
+  }
+  const { error } = await writeRoadmap(opts.clientId, next, ctx.admin)
+  if (error) return { ok: false, error: error.message }
+
+  await logActivity(ctx.admin, {
+    clientId: opts.clientId,
+    userId: ctx.user.id,
+    type: 'roadmap_sent',
+    content: 'Куратор отправил дорожную карту на подтверждение',
+  })
+  revalidate(opts.clientId)
+  return { ok: true }
+}
+
+/**
+ * Утверждение делает КЛИЕНТ — но только если куратор уже отправил карту
+ * (sent_at установлен).
  */
 export async function approveRoadmap(opts: { clientId: number }): Promise<ActionResult> {
   const ctx = await checkAccess(opts.clientId)
@@ -235,7 +265,8 @@ export async function approveRoadmap(opts: { clientId: number }): Promise<Action
   if (ctx.role !== 'client') return { ok: false, error: 'Только клиент может подтвердить дорожную карту' }
 
   const data = await readRoadmap(opts.clientId, ctx.admin)
-  if (data.stages.length === 0) return { ok: false, error: 'Карта пустая — куратор ещё не заполнил этапы' }
+  if (data.stages.length === 0) return { ok: false, error: 'Карта пустая' }
+  if (!data.sent_at) return { ok: false, error: 'Куратор ещё не отправил карту на подтверждение' }
 
   const { error } = await ctx.admin.from('clients').update({
     roadmap_approved_at: new Date().toISOString(),
@@ -253,27 +284,30 @@ export async function approveRoadmap(opts: { clientId: number }): Promise<Action
 }
 
 /**
- * Снять утверждение — может куратор/админ (открыть для правок) ИЛИ клиент
- * (передумал). По аналогии с Project Student.
+ * Снять утверждение — ТОЛЬКО куратор/админ. Клиент после подтверждения
+ * не может откатить (исключаем «передумал» туда-сюда). Куратор может
+ * вернуть в работу + сбрасывает sent_at, чтобы пройти flow заново.
  */
 export async function unapproveRoadmap(opts: { clientId: number }): Promise<ActionResult> {
   const ctx = await checkAccess(opts.clientId)
   if (!ctx.ok) return { ok: false, error: ctx.error }
-  // Любая роль с доступом к клиенту может снять подтверждение
+  if (!CURATOR_ROLES.has(ctx.role || '')) return { ok: false, error: 'Только куратор может снять подтверждение' }
+
+  // Сбрасываем approval + sent_at — куратор открывает карту в работу заново
+  const data = await readRoadmap(opts.clientId, ctx.admin)
+  const next: RoadmapData = { ...data, sent_at: null, sent_by_name: null }
+  await writeRoadmap(opts.clientId, next, ctx.admin)
 
   const { error } = await ctx.admin.from('clients').update({
     roadmap_approved_at: null,
     roadmap_approved_by_name: null,
   }).eq('id', opts.clientId)
   if (error) return { ok: false, error: error.message }
-  const byClient = ctx.role === 'client'
   await logActivity(ctx.admin, {
     clientId: opts.clientId,
     userId: ctx.user.id,
     type: 'roadmap_unapproved',
-    content: byClient
-      ? 'Клиент снял подтверждение дорожной карты'
-      : 'Куратор снял подтверждение дорожной карты — открыто для правок',
+    content: 'Куратор снял подтверждение и вернул карту в работу',
   })
   revalidate(opts.clientId)
   return { ok: true }
