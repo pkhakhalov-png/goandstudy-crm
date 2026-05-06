@@ -138,10 +138,10 @@ export default async function ProgramPage({
       <div className="main">
         <div className="topbar" style={{ gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
-            <BackButton fallbackHref={asClient ? '/client/shortlist' : '/curator/universities'} label={asClient ? '← К моей подборке' : '← База программ'} clientMode={asClient} />
-            <span style={{ color: 'var(--bor2)' }}>/</span>
             <Link
-              href={`/curator/universities/${school.id}`}
+              href={asClient
+                ? `/curator/universities/${school.id}?asClient=1${sp.clientId ? `&clientId=${sp.clientId}` : ''}`
+                : `/curator/universities/${school.id}`}
               style={{
                 color: 'var(--muted)', textDecoration: 'none', fontSize: 13,
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
@@ -168,7 +168,9 @@ export default async function ProgramPage({
           }}>
             {/* School row */}
             <Link
-              href={`/curator/universities/${school.id}`}
+              href={asClient
+                ? `/curator/universities/${school.id}?asClient=1${sp.clientId ? `&clientId=${sp.clientId}` : ''}`
+                : `/curator/universities/${school.id}`}
               style={{
                 display: 'flex', gap: 12, alignItems: 'center',
                 textDecoration: 'none', color: 'inherit',

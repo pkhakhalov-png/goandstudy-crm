@@ -92,8 +92,6 @@ export default async function SchoolPage({
       <div className="main">
         <div className="topbar" style={{ gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <BackButton fallbackHref={asClient ? '/client/shortlist' : '/curator/universities'} label={asClient ? '← К моей подборке' : '← База вузов'} clientMode={asClient} />
-            <span style={{ color: 'var(--bor2)' }}>/</span>
             <span className="pt" style={{
               display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', overflow: 'hidden',
             }}>{school.name}</span>

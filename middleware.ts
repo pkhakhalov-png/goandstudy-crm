@@ -80,11 +80,12 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/curator', request.url))
     }
     if (profile?.role === 'client') {
-      // Клиент имеет read-only доступ к деталям программ и вузов из подборки
+      // Клиент имеет read-only доступ к деталям программ/вузов/стипендий
       // (используются ?asClient=1 — серверная страница сама прячет curator-only кнопки).
       const isReadOnlyDetail =
         /^\/curator\/universities\/[^/]+/.test(pathname) ||
-        /^\/curator\/programs\/[^/]+/.test(pathname)
+        /^\/curator\/programs\/[^/]+/.test(pathname) ||
+        /^\/curator\/scholarships\/[^/]+/.test(pathname)
       if (!isReadOnlyDetail) {
         return NextResponse.redirect(new URL('/client', request.url))
       }

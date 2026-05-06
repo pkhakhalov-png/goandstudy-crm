@@ -91,6 +91,7 @@ export function SchoolTabs({ school, programs, myClients, asClient, clientId, id
           topuni={topuniScholarships}
           myClients={myClients}
           asClient={asClient}
+          clientId={clientId}
         />
       )}
     </div>
@@ -99,12 +100,14 @@ export function SchoolTabs({ school, programs, myClients, asClient, clientId, id
 
 /* ─── Scholarships ─── */
 
-function ScholarshipsTab({ idp, topuni, myClients, asClient }: {
+function ScholarshipsTab({ idp, topuni, myClients, asClient, clientId }: {
   idp: any[]
   topuni: any[]
   myClients: { id: number; name: string }[]
   asClient?: boolean
+  clientId?: string
 }) {
+  const qs = asClient ? `?asClient=1${clientId ? `&clientId=${clientId}` : ''}` : ''
   function fmt(d: string | null) {
     if (!d) return null
     try {
@@ -123,7 +126,7 @@ function ScholarshipsTab({ idp, topuni, myClients, asClient }: {
             {topuni.map(s => (
               <Link
                 key={s.scholarship_id}
-                href={`/curator/scholarships/${s.scholarship_id}`}
+                href={`/curator/scholarships/${s.scholarship_id}${qs}`}
                 style={{ ...cardStyle, textDecoration: 'none', color: 'inherit', display: 'block' }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -171,7 +174,7 @@ function ScholarshipsTab({ idp, topuni, myClients, asClient }: {
               return (
                 <Link
                   key={s.id}
-                  href={`/curator/scholarships/idp/${s.id}`}
+                  href={`/curator/scholarships/idp/${s.id}${qs}`}
                   style={{ ...cardStyle, textDecoration: 'none', color: 'inherit', display: 'block', borderLeft: '3px solid #0088cc' }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -932,7 +935,7 @@ function ProgramRow({
 
       <div style={{ marginTop: 12, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
         <Link
-          href={`/curator/programs/${program.id}`}
+          href={programHref}
           style={{
             fontSize: 12, fontWeight: 600, color: 'var(--purple)',
             textDecoration: 'none',
