@@ -4,7 +4,7 @@ import { useEffect, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import type { RequiredDoc } from './mock-data'
 import type { ClientDocumentRow } from '@/lib/client-data'
-import { uploadDocument, deleteDocument, getDocumentDownloadUrl } from './documents/actions'
+import { uploadDocument, deleteDocument, getDocumentDownloadUrl, prepareDocumentUpload, finalizeDocumentUpload } from './documents/actions'
 
 interface Props {
   required: RequiredDoc[]
@@ -496,19 +496,40 @@ function UploadZone({ doc, clientId, existingRow }: { doc: RequiredDoc; clientId
   async function doUpload() {
     if (!file) return
     setErrorMsg(null)
-    const fd = new FormData()
-    fd.append('client_id', String(clientId))
-    fd.append('doc_type', doc.key)
-    if (doc.title) fd.append('title', doc.title)
-    fd.append('file', file)
     startTransition(async () => {
-      const res = await uploadDocument(fd)
-      if (res && (res as any).error) {
-        setErrorMsg((res as any).error)
-      } else {
-        setFile(null)
-        router.refresh()
+      // 1) Получаем signed upload URL
+      const prep = await prepareDocumentUpload({
+        clientId,
+        docType: doc.key,
+        fileName: file.name,
+        fileSize: file.size,
+        mimeType: file.type || undefined,
+      })
+      if ('error' in prep && prep.error) { setErrorMsg(prep.error); return }
+      // 2) Грузим файл прямо в Supabase Storage (минуя Vercel)
+      const putRes = await fetch((prep as any).uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': file.type || 'application/octet-stream' },
+        body: file,
+      })
+      if (!putRes.ok) {
+        const body = await putRes.text().catch(() => '')
+        setErrorMsg(`Storage upload failed (${putRes.status}): ${body.slice(0, 200)}`)
+        return
       }
+      // 3) Сохраняем metadata
+      const fin = await finalizeDocumentUpload({
+        clientId,
+        docType: doc.key,
+        storagePath: (prep as any).storagePath,
+        fileName: file.name,
+        fileSize: file.size,
+        mimeType: file.type || undefined,
+        title: doc.title || undefined,
+      })
+      if ('error' in fin && fin.error) { setErrorMsg(fin.error); return }
+      setFile(null)
+      router.refresh()
     })
   }
 
@@ -637,19 +658,37 @@ function OptionalDocsBlock({ optionalUploads, clientId }: { optionalUploads: Cli
   async function doUpload() {
     if (!file) return
     setErrorMsg(null)
-    const fd = new FormData()
-    fd.append('client_id', String(clientId))
-    fd.append('doc_type', 'optional')
-    if (title.trim()) fd.append('title', title.trim())
-    fd.append('file', file)
     startTransition(async () => {
-      const res = await uploadDocument(fd)
-      if ((res as any).error) {
-        setErrorMsg((res as any).error)
-      } else {
-        setFile(null); setTitle(''); setShowForm(false)
-        router.refresh()
+      const prep = await prepareDocumentUpload({
+        clientId,
+        docType: 'optional',
+        fileName: file.name,
+        fileSize: file.size,
+        mimeType: file.type || undefined,
+      })
+      if ('error' in prep && prep.error) { setErrorMsg(prep.error); return }
+      const putRes = await fetch((prep as any).uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': file.type || 'application/octet-stream' },
+        body: file,
+      })
+      if (!putRes.ok) {
+        const body = await putRes.text().catch(() => '')
+        setErrorMsg(`Storage upload failed (${putRes.status}): ${body.slice(0, 200)}`)
+        return
       }
+      const fin = await finalizeDocumentUpload({
+        clientId,
+        docType: 'optional',
+        storagePath: (prep as any).storagePath,
+        fileName: file.name,
+        fileSize: file.size,
+        mimeType: file.type || undefined,
+        title: title.trim() || undefined,
+      })
+      if ('error' in fin && fin.error) { setErrorMsg(fin.error); return }
+      setFile(null); setTitle(''); setShowForm(false)
+      router.refresh()
     })
   }
 

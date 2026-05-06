@@ -6,6 +6,109 @@ import { revalidatePath } from 'next/cache'
 const BUCKET = 'client-docs'
 const MAX_BYTES = 15 * 1024 * 1024 // 15 MB
 
+/**
+ * Готовит подпись для прямой загрузки браузер → Supabase Storage,
+ * минуя Vercel (у него лимит body ~4.5 МБ для server actions).
+ * Возвращает { uploadUrl, token, storagePath }.
+ */
+export async function prepareDocumentUpload(opts: {
+  clientId?: number
+  docType: string
+  fileName: string
+  fileSize: number
+  mimeType?: string
+}) {
+  if (!opts.docType) return { error: 'Не передан doc_type' as const }
+  if (!opts.fileSize || opts.fileSize <= 0) return { error: 'Пустой файл' as const }
+  if (opts.fileSize > MAX_BYTES) return { error: `Файл больше ${Math.round(MAX_BYTES / 1024 / 1024)} МБ` as const }
+
+  const ctx = await resolveContext({ clientId: opts.clientId })
+  if (ctx.error) return { error: ctx.error }
+
+  const ext = (opts.fileName.split('.').pop() || 'bin').toLowerCase().replace(/[^a-z0-9]/g, '')
+  const storagePath = `clients/${ctx.client.id}/${opts.docType}/${Date.now()}-${crypto.randomUUID()}.${ext}`
+
+  const { data, error } = await ctx.admin.storage.from(BUCKET).createSignedUploadUrl(storagePath)
+  if (error || !data) return { error: `Storage: ${error?.message || 'no signed url'}` as const }
+
+  return {
+    uploadUrl: data.signedUrl,
+    token: data.token,
+    storagePath: data.path,
+    clientId: ctx.client.id,
+  }
+}
+
+/**
+ * После того как браузер загрузил файл в Storage — записываем metadata
+ * в client_documents.
+ */
+export async function finalizeDocumentUpload(opts: {
+  clientId?: number
+  docType: string
+  storagePath: string
+  fileName: string
+  fileSize: number
+  mimeType?: string
+  title?: string
+}) {
+  if (!opts.docType || !opts.storagePath) return { error: 'Неполные данные' as const }
+
+  const ctx = await resolveContext({ clientId: opts.clientId })
+  if (ctx.error) return { error: ctx.error }
+
+  const isOptional = opts.docType === 'optional'
+  if (!isOptional) {
+    const { data: existing } = await ctx.admin
+      .from('client_documents')
+      .select('id, storage_path')
+      .eq('client_id', ctx.client.id)
+      .eq('doc_type', opts.docType)
+      .maybeSingle()
+    if (existing?.storage_path) {
+      await ctx.admin.storage.from(BUCKET).remove([existing.storage_path])
+    }
+    if (existing) {
+      const { error } = await ctx.admin.from('client_documents').update({
+        title: opts.title || null,
+        status: 'received',
+        storage_path: opts.storagePath,
+        file_name: opts.fileName,
+        file_size_bytes: opts.fileSize,
+        mime_type: opts.mimeType || null,
+        uploaded_by: ctx.user.id,
+        uploaded_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }).eq('id', existing.id)
+      if (error) return { error: `DB: ${error.message}` as const }
+      revalidatePath('/client', 'layout')
+      revalidatePath(`/curator/clients/${ctx.client.id}`)
+      return { success: true as const }
+    }
+  }
+
+  const { error } = await ctx.admin.from('client_documents').insert({
+    client_id: ctx.client.id,
+    doc_type: opts.docType,
+    title: opts.title || null,
+    status: 'received',
+    storage_path: opts.storagePath,
+    file_name: opts.fileName,
+    file_size_bytes: opts.fileSize,
+    mime_type: opts.mimeType || null,
+    uploaded_by: ctx.user.id,
+    uploaded_at: new Date().toISOString(),
+  })
+  if (error) {
+    await ctx.admin.storage.from(BUCKET).remove([opts.storagePath])
+    return { error: `DB: ${error.message}` as const }
+  }
+
+  revalidatePath('/client', 'layout')
+  revalidatePath(`/curator/clients/${ctx.client.id}`)
+  return { success: true as const }
+}
+
 async function resolveContext(opts: { clientId?: number }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
