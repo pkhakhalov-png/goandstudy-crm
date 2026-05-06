@@ -225,13 +225,17 @@ export async function deleteRoadmapItem(opts: {
 
 // ─── APPROVAL ──────────────────────────────────────────────────────────────
 
+/**
+ * Утверждение дорожной карты — теперь делает КЛИЕНТ (как Project Student).
+ * Куратор заполняет этапы / пункты, клиент подтверждает.
+ */
 export async function approveRoadmap(opts: { clientId: number }): Promise<ActionResult> {
   const ctx = await checkAccess(opts.clientId)
   if (!ctx.ok) return { ok: false, error: ctx.error }
-  if (!CURATOR_ROLES.has(ctx.role || '')) return { ok: false, error: 'Только куратор' }
+  if (ctx.role !== 'client') return { ok: false, error: 'Только клиент может подтвердить дорожную карту' }
 
   const data = await readRoadmap(opts.clientId, ctx.admin)
-  if (data.stages.length === 0) return { ok: false, error: 'Сначала добавь хотя бы один этап' }
+  if (data.stages.length === 0) return { ok: false, error: 'Карта пустая — куратор ещё не заполнил этапы' }
 
   const { error } = await ctx.admin.from('clients').update({
     roadmap_approved_at: new Date().toISOString(),
@@ -242,27 +246,34 @@ export async function approveRoadmap(opts: { clientId: number }): Promise<Action
     clientId: opts.clientId,
     userId: ctx.user.id,
     type: 'roadmap_approved',
-    content: 'Куратор утвердил дорожную карту',
+    content: 'Клиент подтвердил дорожную карту',
   })
   revalidate(opts.clientId)
   return { ok: true }
 }
 
+/**
+ * Снять утверждение — может куратор/админ (открыть для правок) ИЛИ клиент
+ * (передумал). По аналогии с Project Student.
+ */
 export async function unapproveRoadmap(opts: { clientId: number }): Promise<ActionResult> {
   const ctx = await checkAccess(opts.clientId)
   if (!ctx.ok) return { ok: false, error: ctx.error }
-  if (!CURATOR_ROLES.has(ctx.role || '')) return { ok: false, error: 'Только куратор' }
+  // Любая роль с доступом к клиенту может снять подтверждение
 
   const { error } = await ctx.admin.from('clients').update({
     roadmap_approved_at: null,
     roadmap_approved_by_name: null,
   }).eq('id', opts.clientId)
   if (error) return { ok: false, error: error.message }
+  const byClient = ctx.role === 'client'
   await logActivity(ctx.admin, {
     clientId: opts.clientId,
     userId: ctx.user.id,
     type: 'roadmap_unapproved',
-    content: 'Куратор снял утверждение дорожной карты',
+    content: byClient
+      ? 'Клиент снял подтверждение дорожной карты'
+      : 'Куратор снял подтверждение дорожной карты — открыто для правок',
   })
   revalidate(opts.clientId)
   return { ok: true }

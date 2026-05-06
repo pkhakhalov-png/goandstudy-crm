@@ -21,6 +21,9 @@ export type ActivityType =
   | 'application_created'
   | 'application_stage_change'
   | 'application_decision'
+  | 'project_field_filled'
+  | 'project_confirmed'
+  | 'project_unconfirmed'
 
 export async function logActivity(
   admin: any,

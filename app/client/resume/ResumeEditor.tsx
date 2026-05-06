@@ -28,6 +28,55 @@ import { ResumePreview } from './ResumePreview'
 import { ResumeDatePicker } from './ResumeDatePicker'
 import { saveClientDraft, submitToCurator, curatorSaveEdit, approveEssay } from '@/app/client/essays/actions'
 
+interface SectionShellOuterProps {
+  effectiveOrder: string[]
+  draggingKey: string | null
+  setDraggingKey: (k: string | null) => void
+  dragOverKey: string | null
+  setDragOverKey: (k: string | null) => void
+  reorderSections: (fromKey: string, toKey: string) => void
+}
+
+// На верхнем уровне модуля (НЕ внутри ResumeEditor), чтобы React не
+// пересоздавал компонент при каждом ререндере родителя — иначе при
+// вводе в input'ы внутри секций фокус терялся и UI «слетал».
+function SectionShell(props: SectionShellOuterProps & { sectionKey: string; children: React.ReactNode }) {
+  const { sectionKey, children, effectiveOrder, draggingKey, setDraggingKey, dragOverKey, setDragOverKey, reorderSections } = props
+  if (!children) return null
+  const order = effectiveOrder.indexOf(sectionKey) + 10
+  const isDragging = draggingKey === sectionKey
+  const isOver = dragOverKey === sectionKey && draggingKey !== sectionKey
+  return (
+    <div
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData('text/plain', sectionKey)
+        e.dataTransfer.effectAllowed = 'move'
+        setDraggingKey(sectionKey)
+      }}
+      onDragEnd={() => { setDraggingKey(null); setDragOverKey(null) }}
+      onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (dragOverKey !== sectionKey) setDragOverKey(sectionKey) }}
+      onDragLeave={() => { if (dragOverKey === sectionKey) setDragOverKey(null) }}
+      onDrop={(e) => {
+        e.preventDefault()
+        const sourceKey = e.dataTransfer.getData('text/plain')
+        setDragOverKey(null)
+        setDraggingKey(null)
+        if (sourceKey) reorderSections(sourceKey, sectionKey)
+      }}
+      style={{
+        order,
+        opacity: isDragging ? 0.4 : 1,
+        transition: 'opacity 120ms',
+        boxShadow: isOver ? '0 0 0 2px var(--ds-purple)' : 'none',
+        borderRadius: 14,
+      }}
+    >
+      {children}
+    </div>
+  )
+}
+
 function DateField({ label, value, onChange, presentToggle, width = 'half' }: {
   label: string; value: string; onChange: (v: string) => void; presentToggle?: boolean; width?: 'full' | 'half'
 }) {
@@ -208,45 +257,16 @@ export function ResumeEditor({ initialResume, clientId, status = 'draft', viewer
     })
   }
 
-  function SectionShell({ sectionKey, children }: { sectionKey: string; children: React.ReactNode }) {
-    if (!children) return null
-    const order = effectiveOrder.indexOf(sectionKey) + 10
-    const isDragging = draggingKey === sectionKey
-    const isOver = dragOverKey === sectionKey && draggingKey !== sectionKey
-    return (
-      <div
-        draggable
-        onDragStart={(e) => {
-          e.dataTransfer.setData('text/plain', sectionKey)
-          e.dataTransfer.effectAllowed = 'move'
-          setDraggingKey(sectionKey)
-        }}
-        onDragEnd={() => { setDraggingKey(null); setDragOverKey(null) }}
-        onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (dragOverKey !== sectionKey) setDragOverKey(sectionKey) }}
-        onDragLeave={() => { if (dragOverKey === sectionKey) setDragOverKey(null) }}
-        onDrop={(e) => {
-          e.preventDefault()
-          const sourceKey = e.dataTransfer.getData('text/plain')
-          setDragOverKey(null)
-          setDraggingKey(null)
-          if (sourceKey) reorderSections(sourceKey, sectionKey)
-        }}
-        // userSelect:none на wrapper чтобы первый mousedown не уходил в
-        // выделение текста — drag начинается сразу. Внутренние input/
-        // textarea сами разрешают редактирование (нативный input behavior).
-        style={{
-          order,
-          opacity: isDragging ? 0.4 : 1,
-          transition: 'opacity 120ms',
-          boxShadow: isOver ? '0 0 0 2px var(--ds-purple)' : 'none',
-          borderRadius: 14,
-          userSelect: 'none',
-          WebkitUserSelect: 'none',
-        }}
-      >
-        {children}
-      </div>
-    )
+  // Передаём всё в SectionShell через props — компонент должен жить ВНЕ
+  // ResumeEditor, чтобы React не пересоздавал его при каждом ререндере
+  // (это приводило к перемонтированию полей и потере фокуса при вводе).
+  const sectionShellProps = {
+    effectiveOrder,
+    draggingKey,
+    setDraggingKey,
+    dragOverKey,
+    setDragOverKey,
+    reorderSections,
   }
 
   return (
@@ -305,7 +325,7 @@ export function ResumeEditor({ initialResume, clientId, status = 'draft', viewer
         </AccordionSection>
 
         {/* ═══ Work Experience ═══ */}
-        <SectionShell sectionKey="workExperience">
+        <SectionShell sectionKey="workExperience" {...sectionShellProps}>
         {isOptionalShown('workExperience') && (
         <AccordionSection
           title="Work Experience"
@@ -341,7 +361,7 @@ export function ResumeEditor({ initialResume, clientId, status = 'draft', viewer
         </SectionShell>
 
         {/* ═══ Websites & Social Links — optional ═══ */}
-        <SectionShell sectionKey="links">
+        <SectionShell sectionKey="links" {...sectionShellProps}>
         {isOptionalShown('links') && (
           <AccordionSection
             title="Websites & Social Links"
@@ -373,7 +393,7 @@ export function ResumeEditor({ initialResume, clientId, status = 'draft', viewer
         </SectionShell>
 
         {/* ═══ Education ═══ */}
-        <SectionShell sectionKey="education">
+        <SectionShell sectionKey="education" {...sectionShellProps}>
         {isOptionalShown('education') && (
         <AccordionSection
           title="Education"
@@ -415,7 +435,7 @@ export function ResumeEditor({ initialResume, clientId, status = 'draft', viewer
         </SectionShell>
 
         {/* ═══ Courses ═══ */}
-        <SectionShell sectionKey="courses">
+        <SectionShell sectionKey="courses" {...sectionShellProps}>
         {isOptionalShown('courses') && (
         <AccordionSection title="Courses" right={<RemoveSectionBtn onClick={() => removeOptionalSection('courses')} />}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -445,7 +465,7 @@ export function ResumeEditor({ initialResume, clientId, status = 'draft', viewer
         </SectionShell>
 
         {/* ═══ Areas of Expertise (Skills) ═══ */}
-        <SectionShell sectionKey="skills">
+        <SectionShell sectionKey="skills" {...sectionShellProps}>
         {isOptionalShown('skills') && (
         <AccordionSection
           title="Areas of Expertise"
@@ -492,7 +512,7 @@ export function ResumeEditor({ initialResume, clientId, status = 'draft', viewer
         </SectionShell>
 
         {/* ═══ Conferences — optional ═══ */}
-        <SectionShell sectionKey="conferences">
+        <SectionShell sectionKey="conferences" {...sectionShellProps}>
         {isOptionalShown('conferences') && (
           <AccordionSection title="Conferences" right={<RemoveSectionBtn onClick={() => removeOptionalSection('conferences')} />}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -522,7 +542,7 @@ export function ResumeEditor({ initialResume, clientId, status = 'draft', viewer
         </SectionShell>
 
         {/* ═══ Custom sections (TED Ed Student Talks и др.) ═══ */}
-        <SectionShell sectionKey="customSections">
+        <SectionShell sectionKey="customSections" {...sectionShellProps}>
         {resume.customSections.length > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {resume.customSections.map((cs, csIdx) => (
@@ -573,7 +593,7 @@ export function ResumeEditor({ initialResume, clientId, status = 'draft', viewer
         </SectionShell>
 
         {/* ═══ Hobbies — optional ═══ */}
-        <SectionShell sectionKey="hobbies">
+        <SectionShell sectionKey="hobbies" {...sectionShellProps}>
         {isOptionalShown('hobbies') && (
           <AccordionSection title="Hobbies" right={<RemoveSectionBtn onClick={() => removeOptionalSection('hobbies')} />}>
             <Field
@@ -590,7 +610,7 @@ export function ResumeEditor({ initialResume, clientId, status = 'draft', viewer
         </SectionShell>
 
         {/* ═══ Languages ═══ */}
-        <SectionShell sectionKey="languages">
+        <SectionShell sectionKey="languages" {...sectionShellProps}>
         {isOptionalShown('languages') && (
         <AccordionSection title="Languages" right={<RemoveSectionBtn onClick={() => removeOptionalSection('languages')} />}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -624,7 +644,7 @@ export function ResumeEditor({ initialResume, clientId, status = 'draft', viewer
         </SectionShell>
 
         {/* ═══ Awards — optional ═══ */}
-        <SectionShell sectionKey="awards">
+        <SectionShell sectionKey="awards" {...sectionShellProps}>
         {isOptionalShown('awards') && (
           <AccordionSection title="Awards" right={<RemoveSectionBtn onClick={() => removeOptionalSection('awards')} />}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -653,7 +673,7 @@ export function ResumeEditor({ initialResume, clientId, status = 'draft', viewer
         </SectionShell>
 
         {/* ═══ Volunteering — optional ═══ */}
-        <SectionShell sectionKey="volunteering">
+        <SectionShell sectionKey="volunteering" {...sectionShellProps}>
         {isOptionalShown('volunteering') && (
           <AccordionSection title="Volunteering" right={<RemoveSectionBtn onClick={() => removeOptionalSection('volunteering')} />}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -684,7 +704,7 @@ export function ResumeEditor({ initialResume, clientId, status = 'draft', viewer
         </SectionShell>
 
         {/* ═══ Olympiads — optional ═══ */}
-        <SectionShell sectionKey="olympiads">
+        <SectionShell sectionKey="olympiads" {...sectionShellProps}>
         {isOptionalShown('olympiads') && (
           <AccordionSection title="Olympiads" right={<RemoveSectionBtn onClick={() => removeOptionalSection('olympiads')} />}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>

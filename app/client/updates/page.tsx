@@ -20,8 +20,11 @@ const TYPE_META: Record<string, { emoji: string; label: string }> = {
   scholarship_visibility: { emoji: '🔓', label: 'Доступ' },
   application_created:    { emoji: '📝', label: 'Заявка создана' },
   application_stage_change: { emoji: '🚀', label: 'Заявка' },
-  application_decision:   { emoji: '🏆', label: 'Решение по заявке' },
-  note:                   { emoji: '💬', label: 'Заметка' },
+  application_decision:    { emoji: '🏆', label: 'Решение по заявке' },
+  project_field_filled:    { emoji: '📋', label: 'Проект студента' },
+  project_confirmed:       { emoji: '✅', label: 'Проект подтверждён' },
+  project_unconfirmed:     { emoji: '↩️', label: 'Проект на доработке' },
+  note:                    { emoji: '💬', label: 'Заметка' },
 }
 
 function fmtDateTime(d: string) {

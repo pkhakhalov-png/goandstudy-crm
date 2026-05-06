@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createAdminClient, createClient as createSsrClient } from './supabase/server'
+import { logActivity } from './client-activity'
 
 type ActionResult = { ok: true } | { ok: false; error: string }
 
@@ -58,9 +59,33 @@ export async function saveProjectField(opts: {
     .eq('id', opts.clientId)
   if (error) return { ok: false, error: error.message }
 
+  // Не логируем каждое поле отдельно — слишком шумно. Только первое
+  // заполнение поля (когда было пусто) → одна строка в фид.
+  if (!current[opts.key] && opts.value) {
+    await logActivity(ctx.admin, {
+      clientId: opts.clientId,
+      userId: ctx.user.id,
+      type: 'project_field_filled',
+      content: `Куратор заполнил «Проект студента» → ${PROJECT_FIELD_LABELS[opts.key] || opts.key}`,
+      metadata: { field: opts.key },
+    })
+  }
+
   revalidatePath(`/curator/clients/${opts.clientId}`)
   revalidatePath('/client')
   return { ok: true }
+}
+
+const PROJECT_FIELD_LABELS: Record<string, string> = {
+  level: 'Уровень',
+  specialty: 'Специальность',
+  location: 'Локация',
+  budget: 'Бюджет',
+  start_date: 'Начало учёбы',
+  english: 'Английский',
+  education: 'Образование',
+  other: 'Иное',
+  note: 'Заметка',
 }
 
 export async function saveProjectNote(opts: {
@@ -96,6 +121,13 @@ export async function confirmProject(opts: {
     .eq('id', opts.clientId)
   if (error) return { ok: false, error: error.message }
 
+  await logActivity(ctx.admin, {
+    clientId: opts.clientId,
+    userId: ctx.user.id,
+    type: 'project_confirmed',
+    content: 'Клиент подтвердил «Проект студента»',
+  })
+
   revalidatePath(`/curator/clients/${opts.clientId}`)
   revalidatePath('/client')
   return { ok: true }
@@ -117,6 +149,13 @@ export async function unconfirmProject(opts: {
     .update({ project_data: updated })
     .eq('id', opts.clientId)
   if (error) return { ok: false, error: error.message }
+
+  await logActivity(ctx.admin, {
+    clientId: opts.clientId,
+    userId: ctx.user.id,
+    type: 'project_unconfirmed',
+    content: 'Снято подтверждение «Проекта студента» — открыт для правок',
+  })
 
   revalidatePath(`/curator/clients/${opts.clientId}`)
   revalidatePath('/client')
