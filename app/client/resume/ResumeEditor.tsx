@@ -24,7 +24,22 @@ import {
 } from './mock'
 import { AccordionSection, SubItem, AddMoreButton, Field, SelectField } from './AccordionSection'
 import { ResumePreview } from './ResumePreview'
+import { ResumeDatePicker } from './ResumeDatePicker'
 import { saveClientDraft, submitToCurator, curatorSaveEdit, approveEssay } from '@/app/client/essays/actions'
+
+function DateField({ label, value, onChange, presentToggle, width = 'half' }: {
+  label: string; value: string; onChange: (v: string) => void; presentToggle?: boolean; width?: 'full' | 'half'
+}) {
+  return (
+    <div style={{ gridColumn: width === 'full' ? '1 / -1' : undefined }}>
+      <label style={{
+        display: 'block', fontSize: 11, fontWeight: 600, textTransform: 'uppercase',
+        letterSpacing: '0.08em', color: 'var(--ds-muted)', marginBottom: 6,
+      }}>{label}</label>
+      <ResumeDatePicker value={value} onChange={onChange} presentToggle={presentToggle} />
+    </div>
+  )
+}
 
 const SKILL_LEVELS: SkillLevel[] = ['Beginner', 'Intermediate', 'Advanced', 'Expert']
 const LANG_LEVELS: LanguageLevel[] = ['Beginner', 'Intermediate', 'Good command', 'Very good command', 'Highly proficient', 'Native speaker']
@@ -242,8 +257,8 @@ export function ResumeEditor({ initialResume, clientId, status = 'draft', viewer
                   <Field label="Job title" value={w.jobTitle} onChange={(v) => updateList('workExperience', list => list.map((x, i) => i === idx ? { ...x, jobTitle: v } : x))} placeholder="The role you want" width="half" />
                   <Field label="Company" value={w.company} onChange={(v) => updateList('workExperience', list => list.map((x, i) => i === idx ? { ...x, company: v } : x))} width="half" />
                   <Field label="City" value={w.city} onChange={(v) => updateList('workExperience', list => list.map((x, i) => i === idx ? { ...x, city: v } : x))} width="half" />
-                  <Field label="Start date" value={w.startDate} onChange={(v) => updateList('workExperience', list => list.map((x, i) => i === idx ? { ...x, startDate: v } : x))} width="half" />
-                  <Field label="End date" value={w.endDate} onChange={(v) => updateList('workExperience', list => list.map((x, i) => i === idx ? { ...x, endDate: v } : x))} placeholder="Present" width="half" />
+                  <DateField label="Start date" value={w.startDate} onChange={(v) => updateList('workExperience', list => list.map((x, i) => i === idx ? { ...x, startDate: v } : x))} />
+                  <DateField label="End date" value={w.endDate} onChange={(v) => updateList('workExperience', list => list.map((x, i) => i === idx ? { ...x, endDate: v } : x))} presentToggle />
                   <Field label="Description" value={w.description} onChange={(v) => updateList('workExperience', list => list.map((x, i) => i === idx ? { ...x, description: v } : x))} multiline rows={4} />
                 </div>
               </SubItem>
@@ -303,8 +318,8 @@ export function ResumeEditor({ initialResume, clientId, status = 'draft', viewer
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                   <Field label="School" value={e.school} onChange={(v) => updateList('education', list => list.map((x, i) => i === idx ? { ...x, school: v } : x))} width="half" />
                   <Field label="Degree" value={e.degree} onChange={(v) => updateList('education', list => list.map((x, i) => i === idx ? { ...x, degree: v } : x))} width="half" />
-                  <Field label="Start date" value={e.startDate} onChange={(v) => updateList('education', list => list.map((x, i) => i === idx ? { ...x, startDate: v } : x))} width="half" />
-                  <Field label="End date" value={e.endDate} onChange={(v) => updateList('education', list => list.map((x, i) => i === idx ? { ...x, endDate: v } : x))} placeholder="Present" width="half" />
+                  <DateField label="Start date" value={e.startDate} onChange={(v) => updateList('education', list => list.map((x, i) => i === idx ? { ...x, startDate: v } : x))} />
+                  <DateField label="End date" value={e.endDate} onChange={(v) => updateList('education', list => list.map((x, i) => i === idx ? { ...x, endDate: v } : x))} presentToggle />
                   <Field label="City" value={e.city} onChange={(v) => updateList('education', list => list.map((x, i) => i === idx ? { ...x, city: v } : x))} width="full" />
                   <Field
                     label="Description"
@@ -552,8 +567,8 @@ export function ResumeEditor({ initialResume, clientId, status = 'draft', viewer
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                     <Field label="Title" value={v.title} onChange={(x) => updateList('volunteering', list => list.map((r, i) => i === idx ? { ...r, title: x } : r))} />
                     <Field label="City" value={v.city} onChange={(x) => updateList('volunteering', list => list.map((r, i) => i === idx ? { ...r, city: x } : r))} width="half" />
-                    <Field label="Start date" value={v.startDate} onChange={(x) => updateList('volunteering', list => list.map((r, i) => i === idx ? { ...r, startDate: x } : r))} width="half" />
-                    <Field label="End date" value={v.endDate} onChange={(x) => updateList('volunteering', list => list.map((r, i) => i === idx ? { ...r, endDate: x } : r))} width="half" />
+                    <DateField label="Start date" value={v.startDate} onChange={(x) => updateList('volunteering', list => list.map((r, i) => i === idx ? { ...r, startDate: x } : r))} />
+                    <DateField label="End date" value={v.endDate} onChange={(x) => updateList('volunteering', list => list.map((r, i) => i === idx ? { ...r, endDate: x } : r))} presentToggle />
                     <Field label="Description" value={v.description} onChange={(x) => updateList('volunteering', list => list.map((r, i) => i === idx ? { ...r, description: x } : r))} multiline rows={4} />
                   </div>
                 </SubItem>
@@ -919,6 +934,16 @@ function calcCompleteness(resume: Resume) {
     return hasData
   }
 
+  // ok = реально заполнено (хотя бы одно ключевое поле), а не «массив непустой».
+  // Иначе пустой шаблон Education даёт +15% при пустом резюме.
+  const eduOk = resume.education.some(e => e.school?.trim() || e.degree?.trim())
+  const workOk = resume.workExperience.some(w => w.jobTitle?.trim() || w.company?.trim())
+  const skillsOk = resume.skills.some(s => s.name?.trim())
+  const langsOk = resume.languages.some(l => l.name?.trim())
+  const coursesOk = resume.courses.some(c => c.title?.trim())
+  const conferencesOk = resume.conferences.some(c => c.title?.trim())
+  const customOk = resume.customSections.some(cs => cs.items.some(i => i.title?.trim()))
+
   const scores: Array<{ key: string; weight: number; ok: boolean; label: string; included: boolean }> = [
     { key: 'firstName',      weight: 5,  ok: resume.personal.firstName.trim().length > 0, label: 'Add first name', included: true },
     { key: 'lastName',       weight: 5,  ok: resume.personal.lastName.trim().length > 0,  label: 'Add last name',  included: true },
@@ -926,11 +951,11 @@ function calcCompleteness(resume: Resume) {
     { key: 'email',          weight: 5,  ok: resume.personal.email.trim().length > 0, label: 'Add email', included: true },
     { key: 'phone',          weight: 5,  ok: resume.personal.phone.trim().length > 0, label: 'Add phone', included: true },
     { key: 'city',           weight: 5,  ok: resume.personal.city.trim().length > 0,  label: 'Add a city name', included: true },
-    { key: 'workExperience', weight: 15, ok: resume.workExperience.length > 0, label: 'Add work experience', included: isShown('workExperience', resume.workExperience.length > 0) },
-    { key: 'education',      weight: 15, ok: resume.education.length > 0, label: 'Add education', included: isShown('education', resume.education.length > 0) },
-    { key: 'skills',         weight: 10, ok: resume.skills.length > 0, label: 'Add skills', included: isShown('skills', resume.skills.length > 0) },
-    { key: 'languages',      weight: 10, ok: resume.languages.length > 0, label: 'Add languages', included: isShown('languages', resume.languages.length > 0) },
-    { key: 'experience',     weight: 10, ok: resume.courses.length > 0 || resume.conferences.length > 0 || resume.customSections.length > 0, label: 'Add courses / conferences / custom experience', included: true },
+    { key: 'workExperience', weight: 15, ok: workOk, label: 'Add work experience', included: isShown('workExperience', resume.workExperience.length > 0) },
+    { key: 'education',      weight: 15, ok: eduOk, label: 'Add education', included: isShown('education', resume.education.length > 0) },
+    { key: 'skills',         weight: 10, ok: skillsOk, label: 'Add skills', included: isShown('skills', resume.skills.length > 0) },
+    { key: 'languages',      weight: 10, ok: langsOk, label: 'Add languages', included: isShown('languages', resume.languages.length > 0) },
+    { key: 'experience',     weight: 10, ok: coursesOk || conferencesOk || customOk, label: 'Add courses / conferences / custom experience', included: true },
   ]
   const active = scores.filter(s => s.included)
   const total = active.reduce((a, s) => a + s.weight, 0)
