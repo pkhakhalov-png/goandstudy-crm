@@ -34,7 +34,7 @@ export function EssayCards({ essays }: Props) {
 }
 
 function EssayCard({ essay }: { essay: Essay }) {
-  const label = stateLabel(essay.state)
+  const meta = stateMeta(essay.state)
   const ctaText =
     essay.state === 'not_started' ? 'Создать' :
     essay.state === 'in_progress' ? 'Продолжить' :
@@ -51,8 +51,27 @@ function EssayCard({ essay }: { essay: Essay }) {
         textAlign: 'center',
         gap: 18,
         minHeight: 300,
+        position: 'relative',
       }}
     >
+      {/* Status chip top-right — видно сразу что начали но не закончили */}
+      {meta.chipText && (
+        <span
+          className={`ds-chip ${meta.chipClass}`}
+          style={{
+            position: 'absolute',
+            top: 16,
+            right: 16,
+            textTransform: 'uppercase',
+            letterSpacing: '0.06em',
+            fontSize: 10,
+            fontWeight: 700,
+          }}
+        >
+          {meta.chipText}
+        </span>
+      )}
+
       {/* ЧБ эмодзи — CSS-grayscale через SVG-фильтр */}
       <div
         style={{
@@ -97,19 +116,19 @@ function EssayCard({ essay }: { essay: Essay }) {
           </button>
         )}
         <div style={{ fontSize: 11, color: 'var(--ds-muted)', fontWeight: 500 }}>
-          {label}
+          {meta.label}
         </div>
       </div>
     </article>
   )
 }
 
-function stateLabel(state: Essay['state']) {
+function stateMeta(state: Essay['state']): { label: string; chipText: string | null; chipClass: string } {
   switch (state) {
-    case 'not_started': return 'Нужно сделать'
-    case 'in_progress': return 'Заполняешь'
-    case 'sent':        return 'Отправлено куратору'
-    case 'editing':     return 'Куратор дорабатывает'
-    case 'ready':       return 'Готово, финальная версия'
+    case 'not_started': return { label: 'Нужно сделать',           chipText: null,             chipClass: '' }
+    case 'in_progress': return { label: 'Заполняешь',              chipText: 'в работе',       chipClass: 'ds-chip-warning' }
+    case 'sent':        return { label: 'Отправлено куратору',     chipText: 'у куратора',     chipClass: 'ds-chip-info' }
+    case 'editing':     return { label: 'Куратор дорабатывает',    chipText: 'у куратора',     chipClass: 'ds-chip-info' }
+    case 'ready':       return { label: 'Готово, финальная версия', chipText: '✓ готово',       chipClass: 'ds-chip-success' }
   }
 }

@@ -12,6 +12,15 @@ function firstNameOnly(full: string): string {
   return (full || '').trim().split(/\s+/)[0] || ''
 }
 
+// Русское склонение «1 этап / 2 этапа / 5 этапов»
+function pluralStages(n: number): string {
+  const mod10 = n % 10
+  const mod100 = n % 100
+  if (mod10 === 1 && mod100 !== 11) return `${n} этап`
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return `${n} этапа`
+  return `${n} этапов`
+}
+
 export function DashboardHero({ ctx, stages }: Props) {
   const currentStage = stages.find(s => s.state === 'current')
   const doneCount = stages.filter(s => s.state === 'done').length
@@ -118,7 +127,7 @@ export function DashboardHero({ ctx, stages }: Props) {
             {progress}%
           </span>
           <span style={{ fontSize: 14, color: 'var(--ds-muted)' }}>
-            пройдено · осталось {stages.filter(s => s.state === 'upcoming').length} этапа
+            пройдено · осталось {pluralStages(stages.filter(s => s.state !== 'done').length)}
           </span>
         </div>
 
