@@ -64,16 +64,25 @@ export function ShortlistView({ items, clientId, applicationsBySchool }: Props) 
   const mainPageCount = Math.min(selectedCount, MAIN_PAGE_PRIORITY_LIMIT)
 
   /* ─── drag handlers ─── */
-  function onDragStart(idx: number) {
+  // Источник передаём через dataTransfer (не через React-state) — иначе была
+  // проблема: closure onDrop ловил stale dragFromIdx и reorder не вызывался.
+  function onDragStart(e: React.DragEvent, idx: number) {
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', `priority-from:${idx}`)
     setDragFromIdx(idx)
   }
   function onDragOver(e: React.DragEvent, idx: number) {
     e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
     setDragOverIdx(idx)
   }
-  function onDrop(idx: number) {
-    if (dragFromIdx != null && dragFromIdx !== idx) {
-      update(s => reorderPriority(s, dragFromIdx, idx))
+  function onDrop(e: React.DragEvent, idx: number) {
+    e.preventDefault()
+    const raw = e.dataTransfer.getData('text/plain')
+    const m = /^priority-from:(\d+)$/.exec(raw)
+    const fromIdx = m ? Number(m[1]) : (dragFromIdx ?? -1)
+    if (fromIdx >= 0 && fromIdx !== idx) {
+      update(s => reorderPriority(s, fromIdx, idx))
     }
     setDragFromIdx(null)
     setDragOverIdx(null)
@@ -199,9 +208,9 @@ export function ShortlistView({ items, clientId, applicationsBySchool }: Props) 
                 inMainPage={idx < MAIN_PAGE_PRIORITY_LIMIT}
                 isDragging={dragFromIdx === idx}
                 isDragOver={dragOverIdx === idx && dragFromIdx !== idx}
-                onDragStart={() => onDragStart(idx)}
+                onDragStart={(e) => onDragStart(e, idx)}
                 onDragOver={(e) => onDragOver(e, idx)}
-                onDrop={() => onDrop(idx)}
+                onDrop={(e) => onDrop(e, idx)}
                 onDragEnd={onDragEnd}
                 onMoveUp={idx > 0 ? () => update(s => movePriority(s, uni.key, 'up')) : undefined}
                 onMoveDown={idx < priority.length - 1 ? () => update(s => movePriority(s, uni.key, 'down')) : undefined}
@@ -310,9 +319,9 @@ function PriorityCard({
   inMainPage: boolean
   isDragging: boolean
   isDragOver: boolean
-  onDragStart: () => void
+  onDragStart: (e: React.DragEvent) => void
   onDragOver: (e: React.DragEvent) => void
-  onDrop: () => void
+  onDrop: (e: React.DragEvent) => void
   onDragEnd: () => void
   onMoveUp?: () => void
   onMoveDown?: () => void
@@ -359,10 +368,9 @@ function PriorityCard({
           // карточку (setDragImage у parent article).
           draggable={hydrated}
           onDragStart={(e) => {
-            e.dataTransfer.effectAllowed = 'move'
             const card = (e.currentTarget as HTMLElement).closest('article')
             if (card) e.dataTransfer.setDragImage(card, 0, 0)
-            onDragStart()
+            onDragStart(e)
           }}
           title="Перетащи чтобы поменять порядок"
           style={{
