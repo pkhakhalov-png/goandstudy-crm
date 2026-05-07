@@ -882,7 +882,10 @@ function splitPriceMain(s: string): { main: string; note: string | null } {
   const m = /^([^();]+?)(?:\s*[(;])/.exec(trimmed)
   if (m && m[1].trim().length >= 6) {
     const main = m[1].trim()
-    const note = trimmed.slice(main.length).trim().replace(/^[(;:\s]+/, '').replace(/[\s)]+$/, '')
+    const note = trimmed.slice(main.length).trim()
+      .replace(/^[(;:\s]+/, '')   // открывающие
+      .replace(/[\s)]+$/, '')      // закрывающие в конце
+      .replace(/\)\s*;\s*/g, ' · ') // orphan «);» в середине → bullet-точка
     return { main, note: note || null }
   }
   return { main: trimmed, note: null }
