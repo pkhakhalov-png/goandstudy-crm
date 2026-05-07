@@ -874,21 +874,37 @@ function PillRow({ items }: { items: { value: string; label: string }[] }) {
 }
 
 /* ─── Hero price card: крупная стоимость + проживание ─── */
+/** Достаёт «€726.72 EUR / semester» из длинной строки с условиями.
+ *  Если на входе короткая строка — возвращает её как есть. */
+function splitPriceMain(s: string): { main: string; note: string | null } {
+  const trimmed = s.trim()
+  // Разделители для «деталей»: скобки, точка с запятой, ; — главное до них
+  const m = /^([^();]+?)(?:\s*[(;])/.exec(trimmed)
+  if (m && m[1].trim().length >= 6) {
+    const main = m[1].trim()
+    const note = trimmed.slice(main.length).trim().replace(/^[(;:\s]+/, '').replace(/[\s)]+$/, '')
+    return { main, note: note || null }
+  }
+  return { main: trimmed, note: null }
+}
+
 function PriceHero({ tuition, living }: { tuition: string | null; living: string | null }) {
   if (!tuition && !living) return null
+  const t = tuition ? splitPriceMain(tuition) : null
+  const l = living ? splitPriceMain(living) : null
   return (
     <div style={{
       background: 'linear-gradient(135deg, rgba(177,94,204,.12) 0%, rgba(177,94,204,.04) 100%)',
       border: '1px solid rgba(177,94,204,.25)',
       borderRadius: 16,
-      padding: '20px 24px',
+      padding: '18px 22px',
       display: 'grid',
       gridTemplateColumns: tuition && living ? '1fr 1fr' : '1fr',
-      gap: 24,
-      alignItems: 'center',
+      gap: 20,
+      alignItems: 'flex-start',
     }}>
-      {tuition && (
-        <div>
+      {t && (
+        <div style={{ minWidth: 0 }}>
           <div style={{
             fontSize: 10, fontWeight: 800, letterSpacing: '0.12em',
             textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 6,
@@ -896,15 +912,22 @@ function PriceHero({ tuition, living }: { tuition: string | null; living: string
             Стоимость обучения
           </div>
           <div style={{
-            fontSize: 28, fontWeight: 800, color: 'var(--purple-deep, #7c3aed)',
-            letterSpacing: '-0.02em', lineHeight: 1.05,
+            fontSize: 22, fontWeight: 800, color: 'var(--purple-deep, #7c3aed)',
+            letterSpacing: '-0.02em', lineHeight: 1.15, wordBreak: 'break-word',
           }}>
-            {tuition}
+            {t.main}
           </div>
+          {t.note && (
+            <div style={{
+              fontSize: 11, color: 'var(--muted)', marginTop: 6, lineHeight: 1.4,
+            }}>
+              {t.note}
+            </div>
+          )}
         </div>
       )}
-      {living && (
-        <div style={tuition ? { textAlign: 'right' } : {}}>
+      {l && (
+        <div style={{ minWidth: 0, ...(tuition ? { textAlign: 'right' } : {}) }}>
           <div style={{
             fontSize: 10, fontWeight: 800, letterSpacing: '0.12em',
             textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 6,
@@ -912,11 +935,16 @@ function PriceHero({ tuition, living }: { tuition: string | null; living: string
             Проживание
           </div>
           <div style={{
-            fontSize: 22, fontWeight: 800, color: '#d97706', // янтарный
-            letterSpacing: '-0.01em', lineHeight: 1.05,
+            fontSize: 18, fontWeight: 800, color: '#d97706',
+            letterSpacing: '-0.01em', lineHeight: 1.15, wordBreak: 'break-word',
           }}>
-            {living}
+            {l.main}
           </div>
+          {l.note && (
+            <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6, lineHeight: 1.4 }}>
+              {l.note}
+            </div>
+          )}
         </div>
       )}
     </div>
