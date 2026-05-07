@@ -146,10 +146,11 @@ const SHORTLIST = [
   { schoolName: 'KTH Royal Institute of Technology', country: 'Швеция', city: 'Стокгольм', programName: 'BSc ICT', tuition: 12500, currency: 'EUR', priority: null },
 ]
 
+// Реальные IDP scholarship_ids из scholarships DB чтоб клик «к деталям» работал
 const SCHOLARSHIPS = [
-  { kind: 'private', title: 'Edinburgh Global Undergraduate Scholarship', institution: 'University of Edinburgh', amountText: '£8,000 / год', deadline: '2026-04-01' },
-  { kind: 'private', title: 'President\'s Entrance Scholarship', institution: 'University of Toronto', amountText: '$7,500 (one-time)', deadline: '2026-03-15' },
-  { kind: 'government', title: 'Holland Scholarship', institution: 'TU Delft', amountText: '€5,000 (one-time)', deadline: '2026-02-01' },
+  { kind: 'idp', scholarshipId: 3085, title: 'Edinburgh Global Undergraduate Mathematics Scholarships', institution: 'University of Edinburgh', amountText: '£5,000 / год', deadline: '2026-03-31' },
+  { kind: 'idp', scholarshipId: 3428, title: 'Rosedale OSSD University of Edinburgh Scholarship',       institution: 'University of Edinburgh', amountText: '£10,000 / год', deadline: '2026-04-30' },
+  { kind: 'idp', scholarshipId: 3619, title: "Haworth Charitable Trust Manchester's Artist Community Studio Space Scholarship", institution: 'University of Manchester', amountText: '£8,000 / год', deadline: null },
 ]
 
 async function seedShortlist(clientId: number) {
@@ -190,7 +191,7 @@ async function seedScholarships(clientId: number) {
     await sb.from('client_scholarships').insert({
       client_id: clientId,
       kind: s.kind,
-      scholarship_id: Math.floor(Math.random() * 1000000),
+      scholarship_id: s.scholarshipId,
       scholarship_title: s.title,
       institution_title: s.institution,
       amount_text: s.amountText,
