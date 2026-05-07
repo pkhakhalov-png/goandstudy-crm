@@ -288,6 +288,8 @@ async function main() {
     curator_id: curatorId,
     salesperson_id: salespersonId,
     first_payment_date: new Date(Date.now() - 30 * 24 * 3600e3).toISOString().slice(0, 10),
+    // Стадия — Подача (7/12). Этапы 1-6 «done», текущий — Подача
+    current_stage_code: 'applications',
     project_data: DEMO_PROJECT_DATA,
     roadmap_data: DEMO_ROADMAP_DATA,
     roadmap_approved_at: new Date(Date.now() - 13 * 24 * 3600e3).toISOString(),
