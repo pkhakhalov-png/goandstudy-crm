@@ -21,11 +21,11 @@ const SPECIALTY_GROUPS = new Set([
 
 // Если program_name — placeholder-специальность (BD-импорт),
 // школа становится primary-заголовком, специализация — вторичная строка.
-function pickTitleAndSubtitle(uni: University, programHref: string | null, schoolHref: string | null) {
+function pickTitleAndSubtitle(uni: University) {
   const isPlaceholder = !!uni.program && SPECIALTY_GROUPS.has(uni.program)
   return isPlaceholder
-    ? { titleHref: schoolHref, titleText: uni.name, subHref: uni.programId ? programHref : null, subText: uni.program }
-    : { titleHref: uni.programId ? programHref : null, titleText: uni.program, subHref: schoolHref, subText: uni.name }
+    ? { titleText: uni.name, subText: uni.program }
+    : { titleText: uni.program, subText: uni.name }
 }
 
 export function ShortlistBlock({ items, total, clientId }: Props) {
@@ -294,82 +294,82 @@ function EmptyState({ total }: { total: number }) {
 
 function UniCard({ uni, rank, clientId }: { uni: University; rank: number; clientId?: number }) {
   const qs = `?asClient=1${clientId ? `&clientId=${clientId}` : ''}`
-  const programHref = uni.programId ? `/curator/programs/${uni.programId}${qs}` : '/client/shortlist'
-  const schoolHref = uni.schoolId ? `/curator/universities/${uni.schoolId}${qs}` : null
+  const cardHref = uni.programId
+    ? `/curator/programs/${uni.programId}${qs}`
+    : (uni.schoolId ? `/curator/universities/${uni.schoolId}${qs}` : '/client/shortlist')
+  const { titleText, subText } = pickTitleAndSubtitle(uni)
 
   return (
-    <article
-      style={{
-        background: 'var(--ds-bg-alt)',
-        border: '1px solid var(--ds-border-soft)',
-        borderRadius: 'var(--ds-r-lg)',
-        padding: 20,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 14,
-        position: 'relative',
-      }}
+    <Link
+      href={cardHref}
+      style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}
     >
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <UniLogo uni={uni} size={44} />
-          <div
+      <article
+        style={{
+          background: 'var(--ds-bg-alt)',
+          border: '1px solid var(--ds-border-soft)',
+          borderRadius: 'var(--ds-r-lg)',
+          padding: 20,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 14,
+          position: 'relative',
+          cursor: 'pointer',
+          transition: 'transform 120ms, box-shadow 120ms, border-color 120ms',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.transform = 'translateY(-2px)'
+          e.currentTarget.style.boxShadow = '0 6px 18px -8px rgba(0,0,0,0.12)'
+          e.currentTarget.style.borderColor = 'var(--ds-purple)'
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform = 'translateY(0)'
+          e.currentTarget.style.boxShadow = 'none'
+          e.currentTarget.style.borderColor = 'var(--ds-border-soft)'
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <UniLogo uni={uni} size={44} />
+            <div
+              style={{
+                fontFamily: 'var(--ds-font-display-stack)',
+                fontSize: 12,
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: '0.1em',
+                color: 'var(--ds-muted)',
+                fontVariantNumeric: 'tabular-nums',
+              }}
+            >
+              #{rank}
+            </div>
+          </div>
+          <RankBadge qsRank={uni.qsRank} />
+        </div>
+
+        <div style={{ flex: 1 }}>
+          <h4
             style={{
-              fontFamily: 'var(--ds-font-display-stack)',
-              fontSize: 12,
+              fontSize: 16,
               fontWeight: 700,
-              textTransform: 'uppercase',
-              letterSpacing: '0.1em',
-              color: 'var(--ds-muted)',
-              fontVariantNumeric: 'tabular-nums',
+              letterSpacing: '-0.02em',
+              color: 'var(--ds-ink)',
+              margin: '0 0 4px 0',
+              lineHeight: 1.2,
             }}
           >
-            #{rank}
+            {titleText}
+          </h4>
+          <div style={{ fontSize: 12, color: 'var(--ds-muted)', marginBottom: 10 }}>
+            {subText} · {uni.city} · {uni.country}
           </div>
+          <p style={{ fontSize: 13, color: 'var(--ds-ink-dim)', lineHeight: 1.45, margin: 0, letterSpacing: '-0.005em' }}>
+            {uni.reason}
+          </p>
         </div>
-        <RankBadge qsRank={uni.qsRank} />
-      </div>
-
-      <div style={{ flex: 1 }}>
-        <h4
-          style={{
-            fontSize: 16,
-            fontWeight: 700,
-            letterSpacing: '-0.02em',
-            color: 'var(--ds-ink)',
-            margin: '0 0 4px 0',
-            lineHeight: 1.2,
-          }}
-        >
-          {(() => {
-            const { titleHref, titleText } = pickTitleAndSubtitle(uni, programHref, schoolHref)
-            return titleHref ? (
-              <Link href={titleHref} style={{ textDecoration: 'none', color: 'inherit' }} className="ds-link-hover">
-                {titleText}
-              </Link>
-            ) : titleText
-          })()}
-        </h4>
-        <div style={{ fontSize: 12, color: 'var(--ds-muted)', marginBottom: 10 }}>
-          {(() => {
-            const { subHref, subText } = pickTitleAndSubtitle(uni, programHref, schoolHref)
-            return (
-              <>
-                {subHref ? (
-                  <Link href={subHref} style={{ textDecoration: 'none', color: 'inherit' }} className="ds-link-hover">
-                    {subText}
-                  </Link>
-                ) : subText} · {uni.city} · {uni.country}
-              </>
-            )
-          })()}
-        </div>
-        <p style={{ fontSize: 13, color: 'var(--ds-ink-dim)', lineHeight: 1.45, margin: 0, letterSpacing: '-0.005em' }}>
-          {uni.reason}
-        </p>
-        <CardLinks uni={uni} programHref={uni.programId ? programHref : null} schoolHref={schoolHref} />
-      </div>
-    </article>
+      </article>
+    </Link>
   )
 }
 
@@ -393,35 +393,6 @@ function RankBadge({ qsRank }: { qsRank: number | null | undefined }) {
       <span style={{ fontSize: 22, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
         #{qsRank}
       </span>
-    </div>
-  )
-}
-
-function CardLinks({ uni, programHref, schoolHref }: { uni: University; programHref: string | null; schoolHref: string | null }) {
-  if (!programHref && !schoolHref) return null
-  const linkStyle: React.CSSProperties = {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 4,
-    fontSize: 11,
-    fontWeight: 600,
-    color: 'var(--ds-purple)',
-    background: 'var(--ds-purple-soft)',
-    border: '1px solid rgba(177,94,204,0.2)',
-    padding: '4px 10px',
-    borderRadius: 100,
-    textDecoration: 'none',
-    textTransform: 'uppercase',
-    letterSpacing: '0.04em',
-  }
-  return (
-    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 12 }}>
-      {programHref && (
-        <Link href={programHref} style={linkStyle}>Программа →</Link>
-      )}
-      {schoolHref && (
-        <Link href={schoolHref} style={linkStyle}>Вуз →</Link>
-      )}
     </div>
   )
 }

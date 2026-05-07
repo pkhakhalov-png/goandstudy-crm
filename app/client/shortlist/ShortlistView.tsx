@@ -32,13 +32,6 @@ const SPECIALTY_GROUPS = new Set([
   'Туризм и гостиничный', 'Архитектура', 'Языковые курсы', 'Другое',
 ])
 
-function pickTitleAndSubtitle(uni: University, programHref: string | null, schoolHref: string | null) {
-  const isPlaceholder = !!uni.program && SPECIALTY_GROUPS.has(uni.program)
-  return isPlaceholder
-    ? { titleHref: schoolHref, titleText: uni.name, subHref: uni.programId ? programHref : null, subText: uni.program }
-    : { titleHref: uni.programId ? programHref : null, titleText: uni.program, subHref: schoolHref, subText: uni.name }
-}
-
 function lookupAppForUni(uni: University, apps?: Record<string, ShortlistAppStatus>): ShortlistAppStatus | null {
   if (!apps) return null
   if (uni.schoolId && apps[`id:${uni.schoolId}`]) return apps[`id:${uni.schoolId}`]
@@ -487,12 +480,40 @@ function PriorityCard({
           </button>
         </div>
 
-        <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
-          <UniLogo uni={uni} size={48} />
-          <UniInfo uni={uni} clientId={clientId} app={app} />
-        </div>
+        <CardLinkWrap uni={uni} clientId={clientId}>
+          <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+            <UniLogo uni={uni} size={48} />
+            <UniInfo uni={uni} />
+          </div>
+        </CardLinkWrap>
+        {app !== undefined && (
+          <ApplyButton uni={uni} app={app} disabled={false} />
+        )}
       </div>
     </article>
+  )
+}
+
+function CardLinkWrap({ uni, clientId, children }: { uni: University; clientId?: number; children: React.ReactNode }) {
+  const qs = `?asClient=1${clientId ? `&clientId=${clientId}` : ''}`
+  const href = uni.programId
+    ? `/curator/programs/${uni.programId}${qs}`
+    : (uni.schoolId ? `/curator/universities/${uni.schoolId}${qs}` : null)
+  if (!href) return <>{children}</>
+  return (
+    <Link
+      href={href}
+      style={{
+        textDecoration: 'none',
+        color: 'inherit',
+        display: 'block',
+        borderRadius: 'var(--ds-r-md)',
+        cursor: 'pointer',
+      }}
+      className="ds-shortlist-card-link"
+    >
+      {children}
+    </Link>
   )
 }
 
@@ -514,12 +535,18 @@ function RestCard({ uni, onToggle, hydrated, clientId, app }: { uni: University;
         gap: 14,
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
-        <UniLogo uni={uni} size={44} />
-        <RankBadge qsRank={uni.qsRank} />
-      </div>
+      <CardLinkWrap uni={uni} clientId={clientId}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+          <UniLogo uni={uni} size={44} />
+          <RankBadge qsRank={uni.qsRank} />
+        </div>
 
-      <UniInfo uni={uni} clientId={clientId} app={app} />
+        <UniInfo uni={uni} />
+      </CardLinkWrap>
+
+      {app !== undefined && (
+        <ApplyButton uni={uni} app={app} disabled={false} />
+      )}
 
       <button
         type="button"
@@ -619,10 +646,10 @@ function ApplyButton({
   )
 }
 
-function UniInfo({ uni, clientId, app }: { uni: University; clientId?: number; app?: ShortlistAppStatus | null }) {
-  const qs = `?asClient=1${clientId ? `&clientId=${clientId}` : ''}`
-  const programHref = uni.programId ? `/curator/programs/${uni.programId}${qs}` : null
-  const schoolHref = uni.schoolId ? `/curator/universities/${uni.schoolId}${qs}` : null
+function UniInfo({ uni }: { uni: University }) {
+  const isPlaceholder = !!uni.program && SPECIALTY_GROUPS.has(uni.program)
+  const titleText = isPlaceholder ? uni.name : uni.program
+  const subText = isPlaceholder ? uni.program : uni.name
   return (
     <div style={{ flex: 1, minWidth: 0 }}>
       <h4
@@ -635,40 +662,10 @@ function UniInfo({ uni, clientId, app }: { uni: University; clientId?: number; a
           lineHeight: 1.22,
         }}
       >
-        {(() => {
-          const { titleHref, titleText } = pickTitleAndSubtitle(uni, programHref, schoolHref)
-          return titleHref ? (
-            <Link
-              href={titleHref}
-              style={{ textDecoration: 'none', color: 'inherit' }}
-              className="ds-link-hover"
-              onClick={(e) => e.stopPropagation()}
-              onMouseDown={(e) => e.stopPropagation()}
-            >
-              {titleText}
-            </Link>
-          ) : titleText
-        })()}
+        {titleText}
       </h4>
       <div style={{ fontSize: 12, color: 'var(--ds-muted)', marginBottom: 8 }}>
-        {(() => {
-          const { subHref, subText } = pickTitleAndSubtitle(uni, programHref, schoolHref)
-          return (
-            <>
-              {subHref ? (
-                <Link
-                  href={subHref}
-                  style={{ textDecoration: 'none', color: 'inherit' }}
-                  className="ds-link-hover"
-                  onClick={(e) => e.stopPropagation()}
-                  onMouseDown={(e) => e.stopPropagation()}
-                >
-                  {subText}
-                </Link>
-              ) : subText} · {uni.city} · {uni.country}
-            </>
-          )
-        })()}
+        {subText} · {uni.city} · {uni.country}
       </div>
       {uni.tuition && (
         <div style={{ fontSize: 12, color: 'var(--ds-ink-dim)', marginBottom: 8 }}>
@@ -690,10 +687,6 @@ function UniInfo({ uni, clientId, app }: { uni: University; clientId?: number; a
             </span>
           ))}
         </div>
-      )}
-      <CardLinks programHref={programHref} schoolHref={schoolHref} />
-      {app !== undefined && (
-        <ApplyButton uni={uni} app={app} disabled={false} />
       )}
     </div>
   )
@@ -719,35 +712,6 @@ function RankBadge({ qsRank }: { qsRank: number | null | undefined }) {
       <span style={{ fontSize: 22, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
         #{qsRank}
       </span>
-    </div>
-  )
-}
-
-function CardLinks({ programHref, schoolHref }: { programHref: string | null; schoolHref: string | null }) {
-  if (!programHref && !schoolHref) return null
-  const linkStyle: React.CSSProperties = {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 4,
-    fontSize: 11,
-    fontWeight: 600,
-    color: 'var(--ds-purple)',
-    background: 'var(--ds-purple-soft)',
-    border: '1px solid rgba(177,94,204,0.2)',
-    padding: '4px 10px',
-    borderRadius: 100,
-    textDecoration: 'none',
-    textTransform: 'uppercase',
-    letterSpacing: '0.04em',
-  }
-  return (
-    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 12 }}>
-      {programHref && (
-        <Link href={programHref} style={linkStyle} onClick={(e) => e.stopPropagation()}>Программа →</Link>
-      )}
-      {schoolHref && (
-        <Link href={schoolHref} style={linkStyle} onClick={(e) => e.stopPropagation()}>Вуз →</Link>
-      )}
     </div>
   )
 }

@@ -1572,26 +1572,14 @@ function UniversityRow({
     'Туризм и гостиничный', 'Архитектура', 'Языковые курсы', 'Другое',
   ])
   const isPlaceholderProgramName = !!uni.program_name && SPECIALTY_GROUPS.has(uni.program_name)
-  const titleHref = isPlaceholderProgramName ? schoolHref : (programHref || schoolHref)
   const titleText = isPlaceholderProgramName
     ? uni.university_name
     : (uni.program_name || uni.university_name || 'Программа')
-  const subtitleHref = isPlaceholderProgramName ? programHref : schoolHref
   const subtitleText = isPlaceholderProgramName
     ? (uni.program_name || '')
     : uni.university_name
-
-  const titleEl = titleHref ? (
-    <Link href={titleHref} style={{ color: 'inherit', textDecoration: 'none' }} className="ds-link-hover">
-      {titleText}
-    </Link>
-  ) : titleText
-
-  const subtitleEl = subtitleHref && subtitleText ? (
-    <Link href={subtitleHref} style={{ color: 'inherit', textDecoration: 'none' }} className="ds-link-hover">
-      {subtitleText}
-    </Link>
-  ) : subtitleText
+  // Клик по строке всегда ведёт на программу. Из программы есть ссылка на вуз.
+  const cardHref = programHref || schoolHref
 
   return (
     <div
@@ -1608,41 +1596,56 @@ function UniversityRow({
     >
       <UniLogo logoUrl={logoUrl} name={uni.university_name} size={40} />
 
-      <div style={{ minWidth: 0 }}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ds-ink)', letterSpacing: '-0.01em' }}>
-          {titleEl}
-        </div>
-        <div style={{ fontSize: 12, color: 'var(--ds-muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {subtitleEl}{[uni.country, uni.city].filter(Boolean).length > 0 && subtitleText ? ' · ' : ''}{[uni.country, uni.city].filter(Boolean).join(' · ')}
-        </div>
-        {aiFacts.length > 0 && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
-            {aiFacts.map((fact, i) => (
-              <span
-                key={i}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  padding: '2px 8px',
-                  fontSize: 10,
-                  fontWeight: 600,
-                  letterSpacing: '0.02em',
-                  background: 'var(--ds-purple-soft)',
-                  color: 'var(--ds-purple-deep)',
-                  borderRadius: 999,
-                }}
-              >
-                {fact}
-              </span>
-            ))}
+      {cardHref ? (
+        <Link
+          href={cardHref}
+          style={{ minWidth: 0, color: 'inherit', textDecoration: 'none', display: 'block' }}
+          className="ds-link-hover"
+        >
+          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ds-ink)', letterSpacing: '-0.01em' }}>
+            {titleText}
           </div>
-        )}
-        {aiError && (
-          <div style={{ marginTop: 6, fontSize: 11, color: 'var(--ds-error)' }}>
-            ИИ: {aiError}
+          <div style={{ fontSize: 12, color: 'var(--ds-muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {subtitleText}{[uni.country, uni.city].filter(Boolean).length > 0 && subtitleText ? ' · ' : ''}{[uni.country, uni.city].filter(Boolean).join(' · ')}
           </div>
-        )}
-      </div>
+          {aiFacts.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+              {aiFacts.map((fact, i) => (
+                <span
+                  key={i}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    padding: '2px 8px',
+                    fontSize: 10,
+                    fontWeight: 600,
+                    letterSpacing: '0.02em',
+                    background: 'var(--ds-purple-soft)',
+                    color: 'var(--ds-purple-deep)',
+                    borderRadius: 999,
+                  }}
+                >
+                  {fact}
+                </span>
+              ))}
+            </div>
+          )}
+          {aiError && (
+            <div style={{ marginTop: 6, fontSize: 11, color: 'var(--ds-error)' }}>
+              ИИ: {aiError}
+            </div>
+          )}
+        </Link>
+      ) : (
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ds-ink)', letterSpacing: '-0.01em' }}>
+            {titleText}
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--ds-muted)', marginTop: 2 }}>
+            {subtitleText}{[uni.country, uni.city].filter(Boolean).length > 0 && subtitleText ? ' · ' : ''}{[uni.country, uni.city].filter(Boolean).join(' · ')}
+          </div>
+        </div>
+      )}
 
       <div ref={statusRef} style={{ position: 'relative' }}>
         <button
