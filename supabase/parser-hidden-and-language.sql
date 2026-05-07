@@ -116,7 +116,7 @@ BEGIN
   )
   SELECT COUNT(*) INTO v_total FROM filtered;
 
-  SELECT COALESCE(jsonb_agg(row_to_jsonb(t)), '[]'::jsonb)
+  SELECT COALESCE(jsonb_agg(to_jsonb(t)), '[]'::jsonb)
   INTO v_rows
   FROM (
     SELECT
