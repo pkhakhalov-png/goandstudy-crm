@@ -364,9 +364,24 @@ function UniCard({ uni, rank, clientId }: { uni: University; rank: number; clien
           <div style={{ fontSize: 12, color: 'var(--ds-muted)', marginBottom: 10 }}>
             {subText} · {uni.city} · {uni.country}
           </div>
-          <p style={{ fontSize: 13, color: 'var(--ds-ink-dim)', lineHeight: 1.45, margin: 0, letterSpacing: '-0.005em' }}>
-            {uni.reason}
-          </p>
+          {uni.tags && uni.tags.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {uni.tags.map((fact, i) => (
+                <span
+                  key={i}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center',
+                    padding: '2px 8px', fontSize: 10, fontWeight: 600,
+                    letterSpacing: '0.02em',
+                    background: 'var(--ds-purple-soft)', color: 'var(--ds-purple-deep)',
+                    borderRadius: 999,
+                  }}
+                >
+                  {fact}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </article>
     </Link>

@@ -219,8 +219,9 @@ export async function getClientUniversities(clientId: number): Promise<Universit
 
   const rows = (data || []) as UniRow[]
 
-  // Enrich with school logo + qs_rank from parser DB (batch fetch)
+  // Enrich with school logo + qs_rank from parser DB + AI facts from program_curator_data
   const schoolIds = Array.from(new Set(rows.map(r => parseLink(r.notes).school_id).filter((x): x is number => typeof x === 'number')))
+  const programIds = Array.from(new Set(rows.map(r => parseLink(r.notes).program_id).filter((x): x is number => typeof x === 'number')))
   let logoBySchool = new Map<number, string | null>()
   let qsBySchool = new Map<number, number | null>()
   if (schoolIds.length > 0) {
@@ -234,9 +235,31 @@ export async function getClientUniversities(clientId: number): Promise<Universit
     } catch { /* parser DB unavailable — fall back to flags */ }
   }
 
+  // Программа: ИИ-факты для краткой выжимки в карточку (intake / deadline / IELTS / GPA / PGWP / Co-op)
+  const aiByProgram = new Map<number, string[]>()
+  if (programIds.length > 0) {
+    const { data: aiRows } = await admin
+      .from('program_curator_data')
+      .select('program_id, earliest_intake_label, deadline_label, gross_tuition_label, ielts_min, min_gpa_percent, pgwp_eligible, coop_available, conditional_offer_available')
+      .in('program_id', programIds)
+    for (const r of (aiRows || []) as any[]) {
+      const facts: string[] = []
+      if (r.earliest_intake_label) facts.push(`🗓 ${r.earliest_intake_label}`)
+      if (r.deadline_label) facts.push(`⏱ ${r.deadline_label}`)
+      if (r.gross_tuition_label) facts.push(`💵 ${r.gross_tuition_label}`)
+      if (r.ielts_min) facts.push(`IELTS ≥ ${r.ielts_min}`)
+      if (r.min_gpa_percent) facts.push(`GPA ≥ ${r.min_gpa_percent}%`)
+      if (r.pgwp_eligible) facts.push('PGWP')
+      if (r.coop_available) facts.push('Co-op')
+      if (r.conditional_offer_available) facts.push('Conditional')
+      if (facts.length) aiByProgram.set(r.program_id as number, facts)
+    }
+  }
+
   return rows.map((u): University => {
     const link = parseLink(u.notes)
     const qs = link.school_id ? qsBySchool.get(link.school_id) ?? null : null
+    const aiFacts = link.program_id ? aiByProgram.get(link.program_id) || [] : []
     return {
       key: u.id,
       name: u.university_name,
@@ -251,8 +274,8 @@ export async function getClientUniversities(clientId: number): Promise<Universit
         ? `${Math.round(u.tuition_per_year).toLocaleString('ru-RU')} ${u.currency} / год`
         : undefined,
       qsRank: qs && qs > 0 && qs < 999 ? qs : null,
-      reason: 'Комментарий куратора появится здесь',
-      tags: [],
+      reason: '',
+      tags: aiFacts,
     }
   })
 }

@@ -544,6 +544,9 @@ function RestCard({ uni, onToggle, hydrated, clientId, app }: { uni: University;
         <UniInfo uni={uni} />
       </CardLinkWrap>
 
+      {/* spacer прижимает кнопки вниз — все «+ В приоритет» на одном уровне */}
+      <div style={{ flex: 1 }} />
+
       {app !== undefined && (
         <ApplyButton uni={uni} app={app} disabled={false} />
       )}
@@ -595,6 +598,28 @@ function ApplyButton({
     })
   }
 
+  // Маленькая ghost-кнопка: серая по умолчанию, фиолетовая при hover.
+  const ghostStyle: React.CSSProperties = {
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+    padding: '5px 10px', fontSize: 11, fontWeight: 600,
+    border: '1px solid var(--ds-border)',
+    background: 'var(--ds-bg)',
+    color: 'var(--ds-muted)',
+    borderRadius: 7, textDecoration: 'none',
+    cursor: 'pointer', fontFamily: 'inherit',
+    transition: 'color 120ms, border-color 120ms, background 120ms',
+  }
+  const onHover = (e: React.MouseEvent<HTMLElement>) => {
+    e.currentTarget.style.color = 'var(--ds-purple)'
+    e.currentTarget.style.borderColor = 'var(--ds-purple)'
+    e.currentTarget.style.background = 'var(--ds-purple-soft)'
+  }
+  const offHover = (e: React.MouseEvent<HTMLElement>) => {
+    e.currentTarget.style.color = 'var(--ds-muted)'
+    e.currentTarget.style.borderColor = 'var(--ds-border)'
+    e.currentTarget.style.background = 'var(--ds-bg)'
+  }
+
   if (app) {
     const labels: Record<ShortlistAppStatus['stage'], string> = {
       created: 'Открыть заявку',
@@ -610,19 +635,9 @@ function ApplyButton({
     return (
       <Link
         href={url}
-        style={{
-          display: 'inline-flex', alignItems: 'center', gap: 8,
-          padding: '8px 14px',
-          background: app.stage === 'submitted' || app.stage === 'decision'
-            ? 'var(--ds-success-soft)' : 'var(--ds-purple-soft)',
-          border: `1px solid ${app.stage === 'submitted' || app.stage === 'decision' ? 'rgba(52,199,89,0.32)' : 'var(--ds-purple)'}`,
-          color: 'var(--ds-ink)',
-          borderRadius: 8,
-          fontSize: 12,
-          fontWeight: 600,
-          textDecoration: 'none',
-          marginTop: 10,
-        }}
+        style={ghostStyle}
+        onMouseEnter={onHover}
+        onMouseLeave={offHover}
         onClick={e => e.stopPropagation()}
       >
         {app.stage === 'submitted' && '✓ '}{labels[app.stage]}
@@ -631,18 +646,19 @@ function ApplyButton({
   }
 
   return (
-    <div style={{ marginTop: 10 }}>
+    <>
       <button
         type="button"
         onClick={(e) => { e.stopPropagation(); handleApply() }}
         disabled={disabled || pending}
-        className="ds-btn ds-btn-primary ds-btn-sm"
-        style={{ fontSize: 12, padding: '8px 14px' }}
+        style={ghostStyle}
+        onMouseEnter={onHover}
+        onMouseLeave={offHover}
       >
-        {pending ? 'Создаём...' : 'Подать заявку'}
+        {pending ? 'Создаём…' : 'Подать заявку'}
       </button>
       {err && <div style={{ fontSize: 11, color: 'var(--ds-error)', marginTop: 4 }}>{err}</div>}
-    </div>
+    </>
   )
 }
 
@@ -672,18 +688,20 @@ function UniInfo({ uni }: { uni: University }) {
           <span className="ds-mono" style={{ fontWeight: 600 }}>{uni.tuition}</span>
         </div>
       )}
-      <p style={{ fontSize: 13, color: 'var(--ds-ink-dim)', lineHeight: 1.45, margin: 0, letterSpacing: '-0.005em' }}>
-        {uni.reason}
-      </p>
       {uni.tags && uni.tags.length > 0 && (
-        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 10 }}>
-          {uni.tags.map(tag => (
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
+          {uni.tags.map((fact, i) => (
             <span
-              key={tag}
-              className="ds-chip ds-chip-neutral"
-              style={{ textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: 10, fontWeight: 700 }}
+              key={i}
+              style={{
+                display: 'inline-flex', alignItems: 'center',
+                padding: '2px 8px', fontSize: 10, fontWeight: 600,
+                letterSpacing: '0.02em',
+                background: 'var(--ds-purple-soft)', color: 'var(--ds-purple-deep)',
+                borderRadius: 999,
+              }}
             >
-              {tag}
+              {fact}
             </span>
           ))}
         </div>
