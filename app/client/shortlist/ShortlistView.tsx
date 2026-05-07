@@ -505,6 +505,9 @@ function CardLinkWrap({ uni, clientId, children }: { uni: University; clientId?:
   return (
     <Link
       href={href}
+      // draggable=false критично: иначе браузер по дефолту инициирует drag-the-URL
+      // от <a>, перехватывая drag у родительского article (карточка не переставляется).
+      draggable={false}
       style={{
         textDecoration: 'none',
         color: 'inherit',
@@ -745,6 +748,7 @@ function UniLogo({ uni, size = 44 }: { uni: University; size?: number }) {
       <img
         src={uni.logoUrl}
         alt={uni.name}
+        draggable={false}
         style={{
           width: size,
           height: size,
