@@ -486,6 +486,8 @@ function PriorityCard({
             <UniInfo uni={uni} />
           </div>
         </CardLinkWrap>
+        {/* spacer прижимает ApplyButton к низу — кнопки на одном уровне у всех карточек */}
+        <div style={{ flex: 1 }} />
         {app !== undefined && (
           <ApplyButton uni={uni} app={app} disabled={false} />
         )}
