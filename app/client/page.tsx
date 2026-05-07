@@ -17,7 +17,6 @@ import { ClientTopNav } from './ClientTopNav'
 import { DashboardHero } from './DashboardHero'
 import { OnboardingTour } from './OnboardingTour'
 import { ProjectAndRoadmap } from './ProjectAndRoadmap'
-import { ProgressBlock } from './ProgressBlock'
 import { ShortlistBlock } from './ShortlistBlock'
 import { ApplicationsBlock } from './ApplicationsBlock'
 import { EssayCards } from './EssayCards'
@@ -178,12 +177,6 @@ export default async function ClientHomePage({ searchParams }: { searchParams: P
         <div data-tour="shortlist">
           <ShortlistBlock items={universities} total={universities.length} clientId={client.id} />
         </div>
-        <ProgressBlock
-          timeline={timeline}
-          universities={universities}
-          documents={requiredDocs}
-          essays={essaysWithState}
-        />
         <ApplicationsBlock applications={applications} previewQuery={previewId} />
         <div data-tour="essays">
           <EssayCards essays={essaysWithState} />
