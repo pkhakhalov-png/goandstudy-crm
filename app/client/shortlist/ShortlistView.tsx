@@ -323,8 +323,6 @@ function PriorityCard({
 }) {
   return (
     <article
-      draggable={hydrated}
-      onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; onDragStart() }}
       onDragOver={onDragOver}
       onDrop={onDrop}
       onDragEnd={onDragEnd}
@@ -341,7 +339,6 @@ function PriorityCard({
         opacity: isDragging ? 0.4 : 1,
         transform: isDragOver ? 'scale(1.02)' : 'scale(1)',
         transition: 'transform 150ms, opacity 150ms',
-        cursor: isDragging ? 'grabbing' : 'default',
       }}
     >
       {/* ── Drag handle + arrows column ── */}
@@ -356,12 +353,23 @@ function PriorityCard({
         }}
       >
         <div
+          // ВАЖНО: draggable стоит ТОЛЬКО на этом грипе. На уровне article не работало —
+          // внутри article теперь есть <Link>, и браузер по дефолту перехватывал drag,
+          // делая drop невозможным. Теперь грип — единственный drag-source, тащит всю
+          // карточку (setDragImage у parent article).
+          draggable={hydrated}
+          onDragStart={(e) => {
+            e.dataTransfer.effectAllowed = 'move'
+            const card = (e.currentTarget as HTMLElement).closest('article')
+            if (card) e.dataTransfer.setDragImage(card, 0, 0)
+            onDragStart()
+          }}
           title="Перетащи чтобы поменять порядок"
           style={{
-            cursor: 'grab',
+            cursor: isDragging ? 'grabbing' : 'grab',
             color: 'var(--ds-muted)',
             padding: 4,
-            opacity: 0.55,
+            opacity: 0.7,
             display: 'grid',
             gridTemplateColumns: 'repeat(2, 3px)',
             gridAutoRows: '3px',
