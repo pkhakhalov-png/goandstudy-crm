@@ -112,7 +112,20 @@ export default async function SchoolPage({
           }}>
             <SchoolHeaderLogo src={school.logo_url} name={school.name} />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, lineHeight: 1.2 }}>{school.name}</h1>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
+                <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, lineHeight: 1.2, flex: 1, minWidth: 0 }}>{school.name}</h1>
+                {school.qs_rank && school.qs_rank > 0 && school.qs_rank < 999 && (
+                  <div title="Позиция в QS World University Rankings" style={{
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+                    padding: '6px 12px', borderRadius: 10,
+                    background: 'rgba(177,94,204,.08)', border: '1px solid rgba(177,94,204,.3)',
+                    color: 'var(--purple)', whiteSpace: 'nowrap', flexShrink: 0,
+                  }}>
+                    <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', opacity: 0.8 }}>QS</span>
+                    <span style={{ fontSize: 22, fontWeight: 700, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>#{school.qs_rank}</span>
+                  </div>
+                )}
+              </div>
               <div style={{ marginTop: 8, fontSize: 13, color: 'var(--muted)', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                 <span>📍 {countryLabel}{school.province ? `, ${school.province}` : ''}{school.city ? `, ${school.city}` : ''}</span>
                 {school.address && <span>{school.address}</span>}
@@ -121,11 +134,6 @@ export default async function SchoolPage({
               <div style={{ marginTop: 10, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {(school.university_type || school.institution_type || raw.institution_type) && (
                   <span className="ctag">{school.university_type || school.institution_type || raw.institution_type}</span>
-                )}
-                {school.qs_rank && school.qs_rank < 999 && (
-                  <span className="ctag" style={{ background: 'rgba(177,94,204,.10)', color: 'var(--purple)', borderColor: 'rgba(177,94,204,.3)' }}>
-                    QS #{school.qs_rank}
-                  </span>
                 )}
                 {(school.founded_in || raw.founded_in) && (
                   <span className="ctag" style={{ background: 'rgba(22,163,97,.08)', color: 'var(--green)', borderColor: 'rgba(22,163,97,.2)' }}>

@@ -50,7 +50,7 @@ export default async function ProgramPage({
     .from('programs')
     .select(`
       *,
-      school:schools(id, name, logo_url, country_code, city, province, address, institution_type, avg_tuition, cost_of_living, currency_of_fees, raw_data)
+      school:schools(id, name, logo_url, country_code, city, province, address, institution_type, avg_tuition, cost_of_living, currency_of_fees, qs_rank, raw_data)
     `)
     .eq('id', id)
     .maybeSingle()
@@ -207,6 +207,17 @@ export default async function ProgramPage({
                   📍 {countryLabel}{school.city ? `, ${school.city}` : ''}{school.address ? `, ${school.address}` : ''}
                 </div>
               </div>
+              {school.qs_rank && school.qs_rank > 0 && school.qs_rank < 999 && (
+                <div title="Позиция в QS World University Rankings" style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+                  padding: '4px 10px', borderRadius: 8,
+                  background: 'rgba(177,94,204,.08)', border: '1px solid rgba(177,94,204,.25)',
+                  color: 'var(--purple)', whiteSpace: 'nowrap',
+                }}>
+                  <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', opacity: 0.8 }}>QS</span>
+                  <span style={{ fontSize: 16, fontWeight: 700, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>#{school.qs_rank}</span>
+                </div>
+              )}
               <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--purple)' }}>
                 К вузу →
               </span>
