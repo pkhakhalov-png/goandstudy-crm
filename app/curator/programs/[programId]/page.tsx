@@ -207,17 +207,28 @@ export default async function ProgramPage({
                   📍 {countryLabel}{school.city ? `, ${school.city}` : ''}{school.address ? `, ${school.address}` : ''}
                 </div>
               </div>
-              {school.qs_rank && school.qs_rank > 0 && school.qs_rank < 999 && (
-                <div title="Позиция в QS World University Rankings" style={{
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
-                  padding: '4px 10px', borderRadius: 8,
-                  background: 'rgba(177,94,204,.08)', border: '1px solid rgba(177,94,204,.25)',
-                  color: 'var(--purple)', whiteSpace: 'nowrap',
-                }}>
-                  <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', opacity: 0.8 }}>QS</span>
-                  <span style={{ fontSize: 16, fontWeight: 700, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>#{school.qs_rank}</span>
-                </div>
-              )}
+              {(() => {
+                const isValid = (n: any) => typeof n === 'number' && n > 0 && n < 9999
+                const ex = (school.raw_data as any)?.curator_extras || {}
+                let rank: { source: string; value: number } | null = null
+                if (isValid(school.qs_rank)) rank = { source: 'QS', value: school.qs_rank }
+                else if (isValid(ex.the_rank)) rank = { source: 'THE', value: ex.the_rank }
+                else if (isValid(ex.arwu_rank)) rank = { source: 'ARWU', value: ex.arwu_rank }
+                else if (isValid(ex.usnews_rank)) rank = { source: 'US News', value: ex.usnews_rank }
+                else if (isValid(ex.webometrics_rank)) rank = { source: 'Webometrics', value: ex.webometrics_rank }
+                if (!rank) return null
+                return (
+                  <div title={`Позиция в рейтинге ${rank.source}`} style={{
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+                    padding: '4px 10px', borderRadius: 8,
+                    background: 'rgba(177,94,204,.08)', border: '1px solid rgba(177,94,204,.25)',
+                    color: 'var(--purple)', whiteSpace: 'nowrap',
+                  }}>
+                    <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', opacity: 0.8 }}>{rank.source}</span>
+                    <span style={{ fontSize: 16, fontWeight: 700, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>#{rank.value}</span>
+                  </div>
+                )
+              })()}
               <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--purple)' }}>
                 К вузу →
               </span>

@@ -208,6 +208,18 @@ function parseLink(notes: string | null): { school_id?: number; program_id?: num
   try { return JSON.parse(notes || '{}') } catch { return {} }
 }
 
+/** Лучший доступный мировой ранк школы. Приоритет: QS → THE → ARWU → US News → Webometrics. */
+function pickBestRank(school: { qs_rank?: number | null; raw_data?: any }): { source: string; value: number } | null {
+  const isValid = (n: any) => typeof n === 'number' && n > 0 && n < 9999
+  if (isValid(school.qs_rank)) return { source: 'QS', value: school.qs_rank! }
+  const ex = school.raw_data?.curator_extras || {}
+  if (isValid(ex.the_rank)) return { source: 'THE', value: ex.the_rank }
+  if (isValid(ex.arwu_rank)) return { source: 'ARWU', value: ex.arwu_rank }
+  if (isValid(ex.usnews_rank)) return { source: 'US News', value: ex.usnews_rank }
+  if (isValid(ex.webometrics_rank)) return { source: 'Webometrics', value: ex.webometrics_rank }
+  return null
+}
+
 export async function getClientUniversities(clientId: number): Promise<University[]> {
   const admin = await createAdminClient()
   const { data } = await admin
@@ -219,18 +231,18 @@ export async function getClientUniversities(clientId: number): Promise<Universit
 
   const rows = (data || []) as UniRow[]
 
-  // Enrich with school logo + qs_rank from parser DB + AI facts from program_curator_data
+  // Enrich with school logo + лучший доступный ранк из parser DB + AI facts из program_curator_data
   const schoolIds = Array.from(new Set(rows.map(r => parseLink(r.notes).school_id).filter((x): x is number => typeof x === 'number')))
   const programIds = Array.from(new Set(rows.map(r => parseLink(r.notes).program_id).filter((x): x is number => typeof x === 'number')))
   let logoBySchool = new Map<number, string | null>()
-  let qsBySchool = new Map<number, number | null>()
+  let rankBySchool = new Map<number, { source: string; value: number } | null>()
   if (schoolIds.length > 0) {
     try {
       const parser = createParserClient()
-      const { data: schools } = await parser.from('schools').select('id, logo_url, qs_rank').in('id', schoolIds)
+      const { data: schools } = await parser.from('schools').select('id, logo_url, qs_rank, raw_data').in('id', schoolIds)
       for (const s of schools || []) {
         logoBySchool.set(s.id as number, (s as any).logo_url)
-        qsBySchool.set(s.id as number, (s as any).qs_rank ?? null)
+        rankBySchool.set(s.id as number, pickBestRank(s as any))
       }
     } catch { /* parser DB unavailable — fall back to flags */ }
   }
@@ -258,7 +270,7 @@ export async function getClientUniversities(clientId: number): Promise<Universit
 
   return rows.map((u): University => {
     const link = parseLink(u.notes)
-    const qs = link.school_id ? qsBySchool.get(link.school_id) ?? null : null
+    const rank = link.school_id ? rankBySchool.get(link.school_id) || null : null
     const aiFacts = link.program_id ? aiByProgram.get(link.program_id) || [] : []
     return {
       key: u.id,
@@ -273,7 +285,7 @@ export async function getClientUniversities(clientId: number): Promise<Universit
       tuition: u.tuition_per_year && u.currency
         ? `${Math.round(u.tuition_per_year).toLocaleString('ru-RU')} ${u.currency} / год`
         : undefined,
-      qsRank: qs && qs > 0 && qs < 999 ? qs : null,
+      rank,
       reason: '',
       tags: aiFacts,
     }

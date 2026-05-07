@@ -98,7 +98,7 @@ export type University = {
   schoolId?: number | null
   program: string
   tuition?: string
-  qsRank?: number | null
+  rank?: { source: string; value: number } | null
   reason: string
   tags?: string[] // Scholarship, English-taught, EU, etc
 }

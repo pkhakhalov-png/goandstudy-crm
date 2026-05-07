@@ -83,6 +83,16 @@ export default async function SchoolPage({
     || (school.country_code || '').toUpperCase()
 
   const raw = (school.raw_data as any)?.attributes || {}
+  const extras = (school.raw_data as any)?.curator_extras || {}
+  const bestRank: { source: string; value: number } | null = (() => {
+    const isValid = (n: any) => typeof n === 'number' && n > 0 && n < 9999
+    if (isValid(school.qs_rank)) return { source: 'QS', value: school.qs_rank }
+    if (isValid(extras.the_rank)) return { source: 'THE', value: extras.the_rank }
+    if (isValid(extras.arwu_rank)) return { source: 'ARWU', value: extras.arwu_rank }
+    if (isValid(extras.usnews_rank)) return { source: 'US News', value: extras.usnews_rank }
+    if (isValid(extras.webometrics_rank)) return { source: 'Webometrics', value: extras.webometrics_rank }
+    return null
+  })()
 
   return (
     <div className="app">
@@ -114,15 +124,15 @@ export default async function SchoolPage({
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
                 <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, lineHeight: 1.2, flex: 1, minWidth: 0 }}>{school.name}</h1>
-                {school.qs_rank && school.qs_rank > 0 && school.qs_rank < 999 && (
-                  <div title="Позиция в QS World University Rankings" style={{
+                {bestRank && (
+                  <div title={`Позиция в рейтинге ${bestRank.source}`} style={{
                     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
                     padding: '6px 12px', borderRadius: 10,
                     background: 'rgba(177,94,204,.08)', border: '1px solid rgba(177,94,204,.3)',
                     color: 'var(--purple)', whiteSpace: 'nowrap', flexShrink: 0,
                   }}>
-                    <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', opacity: 0.8 }}>QS</span>
-                    <span style={{ fontSize: 22, fontWeight: 700, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>#{school.qs_rank}</span>
+                    <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', opacity: 0.8 }}>{bestRank.source}</span>
+                    <span style={{ fontSize: 22, fontWeight: 700, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>#{bestRank.value}</span>
                   </div>
                 )}
               </div>

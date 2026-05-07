@@ -17,7 +17,23 @@ const SAVE_TOOL = {
     properties: {
       qs_rank: {
         type: ['integer', 'null'],
-        description: 'Текущий QS World University Rank. Если вуз unranked — null.',
+        description: 'Текущий QS World University Rank (актуальный год). Если вуз unranked в QS — null.',
+      },
+      the_rank: {
+        type: ['integer', 'null'],
+        description: 'Текущий Times Higher Education (THE) World University Rankings. Заполняй ОБЯЗАТЕЛЬНО если вуз есть в THE — особенно если в QS его нет, чтоб у клиента всё равно был мировой ранк.',
+      },
+      arwu_rank: {
+        type: ['integer', 'null'],
+        description: 'Shanghai ARWU Academic Ranking of World Universities. Используется как fallback если ни QS, ни THE нет.',
+      },
+      usnews_rank: {
+        type: ['integer', 'null'],
+        description: 'US News Best Global Universities Rank. Fallback для американских вузов.',
+      },
+      webometrics_rank: {
+        type: ['integer', 'null'],
+        description: 'Webometrics Ranking of World Universities — у этого рейтинга самое широкое покрытие (тысячи вузов). Используется как последний fallback для маленьких/прикладных вузов которые не попадают в QS/THE/ARWU/US News.',
       },
       university_type: {
         type: ['string', 'null'],
@@ -400,7 +416,13 @@ async function handle(req: NextRequest) {
 
 Что ИИ нужно найти:
 
-1. **QS World University Rank** — текущий. Unranked — null.
+1. **Мировые рейтинги вуза**. Заполни ВСЕ что найдёшь — у каждого вуза должен быть хотя бы один ранк, иначе клиент не видит его престиж:
+   - **qs_rank** — QS World University Rankings
+   - **the_rank** — Times Higher Education (THE) World University Rankings
+   - **arwu_rank** — Shanghai ARWU
+   - **usnews_rank** — US News Best Global Universities
+   - **webometrics_rank** — Webometrics (самое широкое покрытие, последний fallback)
+   Если вуза нет вообще ни в одном — все null.
 2. **Тип финансирования**: Государственный или Частный.
 3. **Год основания** (4 цифры).
 4. **Логотип** — прямая ссылка на PNG/SVG/JPG. ВАЖНО: убедись что ссылка реально ведёт на изображение. Лучше проверить через web_search ("название_вуза logo wikimedia commons" или "название_вуза logo png"). Если не уверен — null.
@@ -599,6 +621,11 @@ async function handle(req: NextRequest) {
   // Доп.поля в raw_data.curator_extras (мерджим с существующими если есть)
   const extras: Record<string, unknown> = {}
   if (aiInput.tuition_currency) extras.tuition_currency = aiInput.tuition_currency
+  // Альтернативные мировые рейтинги (qs_rank — отдельной колонкой выше, остальные через extras)
+  for (const k of ['the_rank', 'arwu_rank', 'usnews_rank', 'webometrics_rank'] as const) {
+    const v = aiInput[k]
+    if (typeof v === 'number' && v > 0 && v < 9999) extras[k] = v
+  }
   if (typeof aiInput.student_count_total === 'number' && aiInput.student_count_total > 0) {
     extras.student_count_total = aiInput.student_count_total
   }

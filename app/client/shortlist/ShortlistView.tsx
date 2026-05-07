@@ -52,9 +52,9 @@ export function ShortlistView({ items, clientId, applicationsBySchool }: Props) 
     const rest = items
       .filter(u => !state.priorityUniKeys.includes(u.key))
       .sort((a, b) => {
-        // QS-ранк (меньше = лучше). Без ранка — в конец.
-        const ra = a.qsRank ?? Number.POSITIVE_INFINITY
-        const rb = b.qsRank ?? Number.POSITIVE_INFINITY
+        // Любой мировой ранк (меньше = лучше). Без ранка — в конец.
+        const ra = a.rank?.value ?? Number.POSITIVE_INFINITY
+        const rb = b.rank?.value ?? Number.POSITIVE_INFINITY
         return (ra - rb) || (keyIndex.get(a.key)! - keyIndex.get(b.key)!)
       })
     return { priority, rest }
@@ -538,7 +538,7 @@ function RestCard({ uni, onToggle, hydrated, clientId, app }: { uni: University;
       <CardLinkWrap uni={uni} clientId={clientId}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
           <UniLogo uni={uni} size={44} />
-          <RankBadge qsRank={uni.qsRank} />
+          <RankBadge rank={uni.rank} />
         </div>
 
         <UniInfo uni={uni} />
@@ -710,11 +710,11 @@ function UniInfo({ uni }: { uni: University }) {
   )
 }
 
-function RankBadge({ qsRank }: { qsRank: number | null | undefined }) {
-  if (!qsRank) return null
+function RankBadge({ rank }: { rank: { source: string; value: number } | null | undefined }) {
+  if (!rank) return null
   return (
     <div
-      title="Позиция в QS World University Rankings"
+      title={`Позиция в рейтинге ${rank.source}`}
       style={{
         display: 'inline-flex',
         flexDirection: 'column',
@@ -725,10 +725,10 @@ function RankBadge({ qsRank }: { qsRank: number | null | undefined }) {
       }}
     >
       <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ds-muted)', marginBottom: 4 }}>
-        QS
+        {rank.source}
       </span>
       <span style={{ fontSize: 22, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
-        #{qsRank}
+        #{rank.value}
       </span>
     </div>
   )

@@ -345,7 +345,7 @@ function UniCard({ uni, rank, clientId }: { uni: University; rank: number; clien
               #{rank}
             </div>
           </div>
-          <RankBadge qsRank={uni.qsRank} />
+          <RankBadge rank={uni.rank} />
         </div>
 
         <div style={{ flex: 1 }}>
@@ -388,11 +388,11 @@ function UniCard({ uni, rank, clientId }: { uni: University; rank: number; clien
   )
 }
 
-function RankBadge({ qsRank }: { qsRank: number | null | undefined }) {
-  if (!qsRank) return null
+function RankBadge({ rank }: { rank: { source: string; value: number } | null | undefined }) {
+  if (!rank) return null
   return (
     <div
-      title="Позиция в QS World University Rankings"
+      title={`Позиция в рейтинге ${rank.source}`}
       style={{
         display: 'inline-flex',
         flexDirection: 'column',
@@ -403,10 +403,10 @@ function RankBadge({ qsRank }: { qsRank: number | null | undefined }) {
       }}
     >
       <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ds-muted)', marginBottom: 4 }}>
-        QS
+        {rank.source}
       </span>
       <span style={{ fontSize: 22, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
-        #{qsRank}
+        #{rank.value}
       </span>
     </div>
   )
