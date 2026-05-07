@@ -49,11 +49,12 @@ export function ClientTopNav({ userName, activePage = 'home' }: Props) {
           href="/client"
           style={{ display: 'flex', alignItems: 'center', gap: 12, textDecoration: 'none', color: 'inherit' }}
         >
-          <div className="ds-logo-mark">
-            <span>GO</span>
-            <span>AND</span>
-            <span>STUDY</span>
-          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/gas-logo.png"
+            alt="Go And Study"
+            style={{ height: 36, width: 'auto', objectFit: 'contain', display: 'block' }}
+          />
           <span
             style={{
               fontFamily: 'var(--ds-font-display-stack)',
