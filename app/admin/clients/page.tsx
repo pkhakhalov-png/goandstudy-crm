@@ -28,7 +28,7 @@ export default async function AdminClientsPage() {
     { data: expenses },
     { data: invoices },
   ] = await Promise.all([
-    supabase.from('clients').select('id, name, phone, email, telegram, country, university, status, months, created_at, salesperson_id, curator_id, tg_group_chat_id, tg_group_title').order('created_at', { ascending: false }),
+    supabase.from('clients').select('id, name, phone, email, telegram, country, university, status, months, created_at, salesperson_id, curator_id, tg_group_chat_id, tg_group_title').neq('email', 'demo@goandstudy.com').order('created_at', { ascending: false }),
     supabase.from('payments_view').select('id, client_id, num, plan_date, plan_sum, fact_sum, is_paid, status'),
     supabase.from('users').select('id, name'),
     supabase.from('curators').select('id, name'),

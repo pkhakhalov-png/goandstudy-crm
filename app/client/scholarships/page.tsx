@@ -58,6 +58,7 @@ export default async function ClientScholarshipsPage({ searchParams }: { searchP
   const scholarships = await getClientUnlockedScholarships(client.id)
   const isPreview = profile?.role !== 'client'
   const hasUnlocked = scholarships.length > 0
+  const isDemo = client.email === 'demo@goandstudy.com'
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--ds-bg)' }}>
@@ -147,9 +148,11 @@ export default async function ClientScholarshipsPage({ searchParams }: { searchP
           {scholarships.map(s => {
             const badge = KIND_LABEL[s.kind] || KIND_LABEL.private
             const dl = daysLeft(s.deadline)
-            const detailHref = s.kind === 'idp'
+            // В демо-кабинете не ведём на реальные curator-страницы стипендий —
+            // карточка чисто информативная.
+            const detailHref = isDemo ? null : (s.kind === 'idp'
               ? `/curator/scholarships/idp/${s.scholarship_id}?asClient=1`
-              : `/curator/scholarships/${s.scholarship_id}?asClient=1`
+              : `/curator/scholarships/${s.scholarship_id}?asClient=1`)
             return (
               <article
                 key={s.id}
@@ -178,14 +181,23 @@ export default async function ClientScholarshipsPage({ searchParams }: { searchP
                         </span>
                       )}
                     </div>
-                    <Link href={detailHref} style={{ textDecoration: 'none', color: 'inherit' }}>
+                    {detailHref ? (
+                      <Link href={detailHref} style={{ textDecoration: 'none', color: 'inherit' }}>
+                        <h2 style={{
+                          fontSize: 20, fontWeight: 700, color: 'var(--ds-ink)',
+                          margin: '0 0 6px 0', letterSpacing: '-0.01em', lineHeight: 1.25,
+                        }}>
+                          {s.scholarship_title}
+                        </h2>
+                      </Link>
+                    ) : (
                       <h2 style={{
                         fontSize: 20, fontWeight: 700, color: 'var(--ds-ink)',
                         margin: '0 0 6px 0', letterSpacing: '-0.01em', lineHeight: 1.25,
                       }}>
                         {s.scholarship_title}
                       </h2>
-                    </Link>
+                    )}
                     {s.institution_title && (
                       <div style={{ fontSize: 13, color: 'var(--ds-ink-dim)', marginBottom: 10 }}>
                         {s.institution_title}
@@ -203,13 +215,15 @@ export default async function ClientScholarshipsPage({ searchParams }: { searchP
                       <span>· {STATUS_LABEL[s.status] || s.status}</span>
                     </div>
                   </div>
-                  <Link
-                    href={detailHref}
-                    className="ds-btn ds-btn-primary ds-btn-sm"
-                    style={{ textDecoration: 'none', whiteSpace: 'nowrap' }}
-                  >
-                    Подробнее →
-                  </Link>
+                  {detailHref && (
+                    <Link
+                      href={detailHref}
+                      className="ds-btn ds-btn-primary ds-btn-sm"
+                      style={{ textDecoration: 'none', whiteSpace: 'nowrap' }}
+                    >
+                      Подробнее →
+                    </Link>
+                  )}
                 </div>
               </article>
             )
