@@ -234,22 +234,42 @@ async function seedActivities(clientId: number) {
 
 async function seedEssays(clientId: number) {
   console.log('Сидую эссе…')
+
+  // Mock-letter в правильной структуре MotivationLetter
+  const motivationLetter = {
+    authorName: 'Алексей Демо',
+    whyApplying:
+      'Я подаюсь на BSc Computer Science в University of Edinburgh, потому что хочу заниматься machine learning и AI на самом высоком уровне. После победы во Всероссийской олимпиаде по математике я понял, что хочу глубоко разобраться в алгоритмах, которые делают возможным современный AI.',
+    whyInterest:
+      'Мой интерес к Computer Science начался с курса CS50 в 9 классе и не остыл с тех пор. Я прочитал «Designing Data-Intensive Applications» Мартина Клеппмана и провёл лето, разбирая как устроены распределённые системы. Хочу заниматься этим всерьёз.',
+    whySuitable:
+      'IELTS 7.0, GPA 4.7, призёр All-Russian Math Olympiad 2025, опыт лидерства в школьной команде по робототехнике. На данный момент изучаю Python и базовый PyTorch — закончил курс fast.ai. Готов к нагрузке топового технического университета.',
+    studiesRelated:
+      'В 10-11 классах углублённо изучал алгебру, мат-анализ, дискретку. Школьный проект — pet-tracker на Raspberry Pi с мобильным приложением (React Native). Прошёл Stanford CS229 на Coursera. Всё это напрямую готовит меня к программе.',
+    skills:
+      'Алгоритмическое мышление (5+ призовых мест на олимпиадах), Python, базовые ML-фреймворки (scikit-learn, PyTorch), Git, английский C1. Умею читать научные статьи и доводить проекты до продакшена.',
+    otherAchievements:
+      'Капитан школьной команды по робототехнике (3 место в RoboCup Junior 2025). Волонтёр на отборе ВсОШ по информатике. Запустил еженедельный math-club для младших классов.',
+    workExperience:
+      'Стажировался 2 месяца в локальной IT-компании летом 2025 — писал автотесты на Python. Также участвовал в open-source — два мерджа в репозиторий educational-content по математике для школьников.',
+    futurePlans:
+      'После бакалавриата планирую магистратуру в области AI (Edinburgh / Cambridge / ETH) и работу в research-команде крупного tech (DeepMind / OpenAI / Google Research). В долгосрочной перспективе — собственная AI-лаборатория в России.',
+  }
+
   await sb.from('client_essays').insert([
     {
       client_id: clientId,
       type: 'resume',
-      content: { sections: [], note: 'demo' },
+      content: null,
       curator_content: null,
-      status: 'approved',
-      submitted_at: new Date(Date.now() - 9 * 24 * 3600e3).toISOString(),
-      approved_at: new Date(Date.now() - 8 * 24 * 3600e3).toISOString(),
+      status: 'draft',
       last_updated_at: new Date(Date.now() - 8 * 24 * 3600e3).toISOString(),
     },
     {
       client_id: clientId,
       type: 'motivation',
-      content: { sections: [], note: 'demo' },
-      curator_content: null,
+      content: motivationLetter,
+      curator_content: motivationLetter,
       status: 'approved',
       submitted_at: new Date(Date.now() - 8 * 24 * 3600e3).toISOString(),
       approved_at: new Date(Date.now() - 7 * 24 * 3600e3).toISOString(),
