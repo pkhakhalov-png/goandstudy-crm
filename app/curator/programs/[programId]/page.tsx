@@ -319,46 +319,77 @@ export default async function ProgramPage({
               }
             `}</style>
 
-            {/* LEFT — куратор-блоки + описание + admission + pgwp */}
-            <div style={{ display: 'grid', gap: 12 }}>
-              {/* BD-куратор-блоки сверху слева (если есть) */}
-              {isCurator && program.curator_note && (
-                <div style={{ ...cardStyle, borderLeft: '4px solid var(--purple, #B15ECC)' }}>
-                  <div style={sectionTitle}>Заметка куратора</div>
-                  <div style={{ fontSize: 14, lineHeight: 1.6, color: 'var(--text)', whiteSpace: 'pre-wrap' }}>
-                    {program.curator_note}
-                  </div>
-                </div>
-              )}
-              {(program.entry_requirements?.length || 0) > 0 && (
-                <div style={cardStyle}>
-                  <div style={sectionTitle}>Требования к поступлению</div>
-                  <ul style={{ margin: 0, padding: '0 0 0 18px', fontSize: 13, lineHeight: 1.6, color: 'var(--text)' }}>
-                    {program.entry_requirements.map((r: string, i: number) => <li key={i}>{r}</li>)}
-                  </ul>
-                </div>
-              )}
-              {(program.accommodation_options?.length || 0) > 0 && (
-                <div style={cardStyle}>
-                  <div style={sectionTitle}>Варианты проживания</div>
-                  <ul style={{ margin: 0, padding: '0 0 0 18px', fontSize: 13, lineHeight: 1.6, color: 'var(--text)' }}>
-                    {program.accommodation_options.map((r: string, i: number) => <li key={i}>{r}</li>)}
-                  </ul>
-                </div>
-              )}
-              {program.scholarships_text && (
-                <div style={cardStyle}>
-                  <div style={sectionTitle}>Гранты и стипендии</div>
-                  <div style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--text)' }}>
-                    {program.scholarships_text}
-                  </div>
+            {/* LEFT — pill chips + hero price + alternating blocks (новый дизайн) */}
+            <div style={{ display: 'grid', gap: 16 }}>
+              {/* Pill chips: даты / формат / срок / язык / направление / тип вуза */}
+              <PillRow
+                items={[
+                  (curatorData?.earliest_intake_label || program.start_date_text || (intake ? fmtDate(intake) : null)) && {
+                    value: curatorData?.earliest_intake_label || program.start_date_text || fmtDate(intake!), label: 'Начало',
+                  },
+                  (curatorData?.deadline_label || program.deadline_text || (deadline ? fmtDate(deadline) : null)) && {
+                    value: curatorData?.deadline_label || program.deadline_text || fmtDate(deadline!), label: 'Дедлайн',
+                  },
+                  (curatorData?.program_length_text || program.duration_text || length) && {
+                    value: curatorData?.program_length_text || program.duration_text || length!, label: 'Срок',
+                  },
+                  language && { value: language, label: 'Язык' },
+                  program.specialty_group && { value: program.specialty_group, label: 'Направление' },
+                  school.university_type && { value: school.university_type, label: 'Тип вуза' },
+                ].filter(Boolean) as { value: string; label: string }[]}
+              />
+
+              {/* Hero price card — крупный блок стоимости / проживания */}
+              <PriceHero
+                tuition={curatorData?.gross_tuition_label || tuitionText || (tuition != null ? `${fmt(tuition)} ${currency} / год` : null)}
+                living={curatorData?.cost_of_living_label
+                  || (program.living_cost_text ? `${program.living_cost_text}${program.living_cost_period ? ' ' + program.living_cost_period : ''}` : null)
+                  || (school.cost_of_living != null ? `${fmt(school.cost_of_living)} ${currency} / мес.` : null)}
+              />
+
+              {/* Two-column block: требования | проживание */}
+              {((program.entry_requirements?.length || 0) > 0 || (program.accommodation_options?.length || 0) > 0) && (
+                <div className="prog-pair" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <style>{`@media (max-width: 720px) { .prog-pair { grid-template-columns: 1fr !important; } }`}</style>
+                  {(program.entry_requirements?.length || 0) > 0 && (
+                    <ListBlock
+                      eyebrow="Требования к поступлению"
+                      items={program.entry_requirements as string[]}
+                      bulletColor="var(--purple)"
+                    />
+                  )}
+                  {(program.accommodation_options?.length || 0) > 0 && (
+                    <ListBlock
+                      eyebrow="Варианты проживания"
+                      items={program.accommodation_options as string[]}
+                      bulletColor="var(--green)"
+                      checkmarks
+                    />
+                  )}
                 </div>
               )}
 
+              {/* Гранты и стипендии — золотой акцент */}
+              {program.scholarships_text && (
+                <ScholarshipsBlock text={program.scholarships_text} />
+              )}
+
+              {/* Описание */}
               {description && (
-                <div style={cardStyle}>
-                  <div style={sectionTitle}>Описание программы</div>
-                  <div style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--text)', whiteSpace: 'pre-wrap' }}>
+                <div style={{
+                  background: 'var(--surf)',
+                  border: '1px solid var(--bor)',
+                  borderRadius: 14,
+                  padding: '20px 24px',
+                  boxShadow: 'var(--sh)',
+                }}>
+                  <div style={{
+                    fontSize: 11, fontWeight: 800, letterSpacing: '0.1em',
+                    textTransform: 'uppercase', color: 'var(--purple)', marginBottom: 12,
+                  }}>
+                    Описание программы
+                  </div>
+                  <div style={{ fontSize: 14, lineHeight: 1.65, color: 'var(--text)', whiteSpace: 'pre-wrap' }}>
                     {description}
                   </div>
                 </div>
@@ -802,6 +833,160 @@ function SourceList({ urls }: { urls: string[] }) {
           </li>
         ))}
       </ul>
+    </div>
+  )
+}
+
+/* ─── Pill row: чипы со значением сверху и подписью снизу ─── */
+function PillRow({ items }: { items: { value: string; label: string }[] }) {
+  if (items.length === 0) return null
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+      {items.map((it, i) => (
+        <div
+          key={i}
+          style={{
+            display: 'flex', flexDirection: 'column',
+            alignItems: 'flex-start',
+            padding: '10px 16px',
+            background: 'rgba(177,94,204,.08)',
+            border: '1px solid rgba(177,94,204,.2)',
+            borderRadius: 14,
+            minWidth: 0,
+          }}
+        >
+          <div style={{
+            fontSize: 14, fontWeight: 700, color: 'var(--purple-deep, #7c3aed)',
+            lineHeight: 1.2, letterSpacing: '-0.005em',
+          }}>
+            {it.value}
+          </div>
+          <div style={{
+            fontSize: 9, fontWeight: 700, letterSpacing: '0.1em',
+            textTransform: 'uppercase', color: 'var(--muted)', marginTop: 4,
+          }}>
+            {it.label}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/* ─── Hero price card: крупная стоимость + проживание ─── */
+function PriceHero({ tuition, living }: { tuition: string | null; living: string | null }) {
+  if (!tuition && !living) return null
+  return (
+    <div style={{
+      background: 'linear-gradient(135deg, rgba(177,94,204,.12) 0%, rgba(177,94,204,.04) 100%)',
+      border: '1px solid rgba(177,94,204,.25)',
+      borderRadius: 16,
+      padding: '20px 24px',
+      display: 'grid',
+      gridTemplateColumns: tuition && living ? '1fr 1fr' : '1fr',
+      gap: 24,
+      alignItems: 'center',
+    }}>
+      {tuition && (
+        <div>
+          <div style={{
+            fontSize: 10, fontWeight: 800, letterSpacing: '0.12em',
+            textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 6,
+          }}>
+            Стоимость обучения
+          </div>
+          <div style={{
+            fontSize: 28, fontWeight: 800, color: 'var(--purple-deep, #7c3aed)',
+            letterSpacing: '-0.02em', lineHeight: 1.05,
+          }}>
+            {tuition}
+          </div>
+        </div>
+      )}
+      {living && (
+        <div style={tuition ? { textAlign: 'right' } : {}}>
+          <div style={{
+            fontSize: 10, fontWeight: 800, letterSpacing: '0.12em',
+            textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 6,
+          }}>
+            Проживание
+          </div>
+          <div style={{
+            fontSize: 22, fontWeight: 800, color: '#d97706', // янтарный
+            letterSpacing: '-0.01em', lineHeight: 1.05,
+          }}>
+            {living}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ─── List block: чек-лист с заголовком-eyebrow ─── */
+function ListBlock({ eyebrow, items, bulletColor, checkmarks }: {
+  eyebrow: string
+  items: string[]
+  bulletColor: string
+  checkmarks?: boolean
+}) {
+  return (
+    <div style={{
+      background: 'var(--surf)',
+      border: '1px solid var(--bor)',
+      borderRadius: 14,
+      padding: '16px 20px',
+      boxShadow: 'var(--sh)',
+    }}>
+      <div style={{
+        fontSize: 11, fontWeight: 800, letterSpacing: '0.1em',
+        textTransform: 'uppercase', color: 'var(--purple)', marginBottom: 12,
+      }}>
+        {eyebrow}
+      </div>
+      <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'grid', gap: 8 }}>
+        {items.map((it, i) => (
+          <li key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 13.5, lineHeight: 1.5, color: 'var(--text)' }}>
+            <span style={{
+              flexShrink: 0, marginTop: 2,
+              width: checkmarks ? 16 : 6,
+              height: checkmarks ? 16 : 6,
+              borderRadius: '50%',
+              background: checkmarks ? 'rgba(22,163,97,.15)' : bulletColor,
+              color: checkmarks ? bulletColor : undefined,
+              display: checkmarks ? 'flex' : 'block',
+              alignItems: 'center', justifyContent: 'center',
+              fontSize: 10, fontWeight: 800,
+            }}>
+              {checkmarks ? '✓' : ''}
+            </span>
+            <span style={{ flex: 1, minWidth: 0 }}>{it}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+/* ─── Стипендии: золотой левый бордер, eyebrow + текст ─── */
+function ScholarshipsBlock({ text }: { text: string }) {
+  return (
+    <div style={{
+      background: 'rgba(217,119,6,.05)',
+      border: '1px solid rgba(217,119,6,.2)',
+      borderLeft: '4px solid #d97706',
+      borderRadius: 14,
+      padding: '16px 20px',
+    }}>
+      <div style={{
+        fontSize: 11, fontWeight: 800, letterSpacing: '0.1em',
+        textTransform: 'uppercase', color: '#d97706', marginBottom: 8,
+      }}>
+        🏆 Гранты и стипендии
+      </div>
+      <div style={{ fontSize: 14, lineHeight: 1.6, color: 'var(--text)' }}>
+        {text}
+      </div>
     </div>
   )
 }
