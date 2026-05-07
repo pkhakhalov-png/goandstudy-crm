@@ -28,6 +28,7 @@ type Search = {
   specialty?: string
   uniType?: string
   budget?: string
+  langOnly?: string
 }
 
 export const dynamic = 'force-dynamic'
@@ -48,6 +49,7 @@ export default async function UniversitiesPage({
   const specialty = params.specialty?.trim() || ''
   const uniType = params.uniType?.trim() || ''
   const budget = params.budget?.trim() || ''
+  const languageOnly = params.langOnly === '1'
 
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -73,6 +75,7 @@ export default async function UniversitiesPage({
     sort,
     limit: PAGE_SIZE,
     offset,
+    languageOnly,
   })
 
   // Подгружаем все школы постранично (Supabase лимит 1000 на запрос) — для дропдауна вузов
@@ -165,7 +168,7 @@ export default async function UniversitiesPage({
             countryCounts={countryCounts}
             schools={schoolsList ?? []}
             specialtyOptions={SPECIALTY_OPTIONS}
-            initial={{ q, country, school: schoolFilter, levels, intakeYears, sort, specialty, uniType, budget }}
+            initial={{ q, country, school: schoolFilter, levels, intakeYears, sort, specialty, uniType, budget, langOnly: languageOnly }}
           />
 
           {(programs ?? []).length === 0 ? (

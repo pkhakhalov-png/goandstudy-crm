@@ -24,6 +24,10 @@ export interface SearchProgramsParams {
   /** Capped count для скорости: при cap=5000 широкие фильтры останавливаются
    *  на 5000-м row. UI показывает «5000+» если total === cap. NULL = exact. */
   countCap?: number | null
+  /** Только программы языковых курсов (English/ESL/Sprach…) */
+  languageOnly?: boolean
+  /** Включать скрытые школы (is_hidden=true). По умолчанию false. */
+  includeHidden?: boolean
 }
 
 export interface SearchProgramsResult {
@@ -54,6 +58,8 @@ export async function searchPrograms(params: SearchProgramsParams): Promise<Sear
     p_limit: params.limit ?? 24,
     p_offset: params.offset ?? 0,
     p_count_cap: cap,
+    p_language_only: !!params.languageOnly,
+    p_include_hidden: !!params.includeHidden,
   })
   if (error) {
     console.error('[searchPrograms] rpc error:', error.message)

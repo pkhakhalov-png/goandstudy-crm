@@ -19,6 +19,7 @@ interface Props {
     specialty?: string
     uniType?: string
     budget?: string
+    langOnly?: boolean
   }
   /** Base path to navigate on filter change. Extra params passed through. */
   basePath?: string
@@ -72,9 +73,10 @@ export function UniversityFilters({ countryCodes, countryLabels, countryCounts, 
   const [specialty, setSpecialty] = useState(initial.specialty || '')
   const [uniType, setUniType] = useState(initial.uniType || '')
   const [budget, setBudget] = useState(initial.budget || '')
+  const [langOnly, setLangOnly] = useState(!!initial.langOnly)
   const [pending, startTransition] = useTransition()
 
-  function push(next: Partial<{ q: string; country: string; school: string; levels: string[]; intakeYears: string[]; sort: string; specialty: string; uniType: string; budget: string }>) {
+  function push(next: Partial<{ q: string; country: string; school: string; levels: string[]; intakeYears: string[]; sort: string; specialty: string; uniType: string; budget: string; langOnly: boolean }>) {
     const merged = {
       q: next.q !== undefined ? next.q : q,
       country: next.country !== undefined ? next.country : country,
@@ -85,6 +87,7 @@ export function UniversityFilters({ countryCodes, countryLabels, countryCounts, 
       specialty: next.specialty !== undefined ? next.specialty : specialty,
       uniType: next.uniType !== undefined ? next.uniType : uniType,
       budget: next.budget !== undefined ? next.budget : budget,
+      langOnly: next.langOnly !== undefined ? next.langOnly : langOnly,
     }
     const qs = new URLSearchParams()
     if (stickyParams) for (const [k, v] of Object.entries(stickyParams)) qs.set(k, v)
@@ -97,6 +100,7 @@ export function UniversityFilters({ countryCodes, countryLabels, countryCounts, 
     if (merged.specialty) qs.set('specialty', merged.specialty)
     if (merged.uniType) qs.set('uniType', merged.uniType)
     if (merged.budget) qs.set('budget', merged.budget)
+    if (merged.langOnly) qs.set('langOnly', '1')
     const str = qs.toString()
     startTransition(() => {
       router.push(str ? `${basePath}?${str}` : basePath, { scroll: false })
@@ -105,7 +109,7 @@ export function UniversityFilters({ countryCodes, countryLabels, countryCounts, 
 
   function reset() {
     setQ(''); setCountry(''); setSchool(''); setLevels([]); setIntakeYears([]); setSort('name_asc')
-    setSpecialty(''); setUniType(''); setBudget('')
+    setSpecialty(''); setUniType(''); setBudget(''); setLangOnly(false)
     const qs = new URLSearchParams()
     if (stickyParams) for (const [k, v] of Object.entries(stickyParams)) qs.set(k, v)
     const str = qs.toString()
@@ -116,7 +120,7 @@ export function UniversityFilters({ countryCodes, countryLabels, countryCounts, 
     ? schools.filter(s => (s.country_code || '').toLowerCase() === country)
     : schools
 
-  const hasFilters = Boolean(q || country || school || levels.length > 0 || intakeYears.length > 0 || sort !== 'name_asc' || specialty || uniType || budget)
+  const hasFilters = Boolean(q || country || school || levels.length > 0 || intakeYears.length > 0 || sort !== 'name_asc' || specialty || uniType || budget || langOnly)
 
   const inputStyle: React.CSSProperties = {
     padding: '10px 14px',
@@ -139,6 +143,33 @@ export function UniversityFilters({ countryCodes, countryLabels, countryCounts, 
           .filters-row1, .filters-row2, .filters-row3 { grid-template-columns: 1fr !important; }
         }
       `}</style>
+
+      {/* Языковые курсы тоггл — отдельный режим выдачи */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <button
+          type="button"
+          onClick={() => { setLangOnly(!langOnly); push({ langOnly: !langOnly }) }}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            padding: '8px 14px',
+            border: `1px solid ${langOnly ? 'var(--ds-purple)' : 'var(--ds-border)'}`,
+            background: langOnly ? 'var(--ds-purple-soft)' : 'var(--ds-bg)',
+            color: langOnly ? 'var(--ds-purple-deep)' : 'var(--ds-muted)',
+            borderRadius: 100,
+            fontSize: 12, fontWeight: 600,
+            fontFamily: 'inherit',
+            cursor: 'pointer',
+            transition: 'all 120ms',
+          }}
+        >
+          🗣 {langOnly ? 'Только языковые курсы' : 'Все программы'}
+        </button>
+        {langOnly && (
+          <span style={{ fontSize: 11, color: 'var(--ds-muted)' }}>
+            Показываются только программы английского / Sprachschule / ESL
+          </span>
+        )}
+      </div>
 
       {/* Country tabs */}
       <div style={{ display: 'flex', gap: 4, overflowX: 'auto', borderBottom: '1px solid var(--ds-border-soft)', paddingBottom: 2 }}>
