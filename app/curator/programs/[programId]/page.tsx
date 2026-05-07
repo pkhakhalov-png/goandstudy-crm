@@ -874,21 +874,27 @@ function PillRow({ items }: { items: { value: string; label: string }[] }) {
 }
 
 /* ─── Hero price card: крупная стоимость + проживание ─── */
-/** Достаёт «€726.72 EUR / semester» из длинной строки с условиями.
- *  Если на входе короткая строка — возвращает её как есть. */
+/** Цены в БД могут быть короткие («£15,500 / год»), средние («€700-1000 в месяц»)
+ *  или огромные с условиями («€726.72 EUR / semester (non-EU…); free for EU/EEA…»).
+ *  Стратегия: если короткое — оставляем как есть. Если длинное — режем по «(» или «;»
+ *  и кладём хвост в note. Если не помогло — hard-cut. */
 function splitPriceMain(s: string): { main: string; note: string | null } {
   const trimmed = s.trim()
-  // Разделители для «деталей»: скобки, точка с запятой, ; — главное до них
+  // Короткие строки — без разделения
+  if (trimmed.length <= 32) return { main: trimmed, note: null }
+
+  // Режем по первой «(» или «;»
   const m = /^([^();]+?)(?:\s*[(;])/.exec(trimmed)
-  if (m && m[1].trim().length >= 6) {
+  if (m && m[1].trim().length >= 6 && m[1].trim().length <= 36) {
     const main = m[1].trim()
     const note = trimmed.slice(main.length).trim()
-      .replace(/^[(;:\s]+/, '')   // открывающие
-      .replace(/[\s)]+$/, '')      // закрывающие в конце
-      .replace(/\)\s*;\s*/g, ' · ') // orphan «);» в середине → bullet-точка
+      .replace(/^[(;:\s]+/, '')
+      .replace(/[\s)]+$/, '')
+      .replace(/\)\s*;\s*/g, ' · ')
     return { main, note: note || null }
   }
-  return { main: trimmed, note: null }
+  // Совсем не получилось — hard-cut по 28 символам
+  return { main: trimmed.slice(0, 28).trim() + '…', note: trimmed }
 }
 
 function PriceHero({ tuition, living }: { tuition: string | null; living: string | null }) {
