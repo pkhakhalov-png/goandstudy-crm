@@ -378,8 +378,38 @@ function UniCard({ uni, rank, clientId }: { uni: University; rank: number; clien
         <p style={{ fontSize: 13, color: 'var(--ds-ink-dim)', lineHeight: 1.45, margin: 0, letterSpacing: '-0.005em' }}>
           {uni.reason}
         </p>
+        <CardLinks uni={uni} programHref={uni.programId ? programHref : null} schoolHref={schoolHref} />
       </div>
     </article>
+  )
+}
+
+function CardLinks({ uni, programHref, schoolHref }: { uni: University; programHref: string | null; schoolHref: string | null }) {
+  if (!programHref && !schoolHref) return null
+  const linkStyle: React.CSSProperties = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 4,
+    fontSize: 11,
+    fontWeight: 600,
+    color: 'var(--ds-purple)',
+    background: 'var(--ds-purple-soft)',
+    border: '1px solid rgba(177,94,204,0.2)',
+    padding: '4px 10px',
+    borderRadius: 100,
+    textDecoration: 'none',
+    textTransform: 'uppercase',
+    letterSpacing: '0.04em',
+  }
+  return (
+    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 12 }}>
+      {programHref && (
+        <Link href={programHref} style={linkStyle}>Программа →</Link>
+      )}
+      {schoolHref && (
+        <Link href={schoolHref} style={linkStyle}>Вуз →</Link>
+      )}
+    </div>
   )
 }
 

@@ -697,8 +697,38 @@ function UniInfo({ uni, clientId, app }: { uni: University; clientId?: number; a
           ))}
         </div>
       )}
+      <CardLinks programHref={programHref} schoolHref={schoolHref} />
       {app !== undefined && (
         <ApplyButton uni={uni} app={app} disabled={false} />
+      )}
+    </div>
+  )
+}
+
+function CardLinks({ programHref, schoolHref }: { programHref: string | null; schoolHref: string | null }) {
+  if (!programHref && !schoolHref) return null
+  const linkStyle: React.CSSProperties = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 4,
+    fontSize: 11,
+    fontWeight: 600,
+    color: 'var(--ds-purple)',
+    background: 'var(--ds-purple-soft)',
+    border: '1px solid rgba(177,94,204,0.2)',
+    padding: '4px 10px',
+    borderRadius: 100,
+    textDecoration: 'none',
+    textTransform: 'uppercase',
+    letterSpacing: '0.04em',
+  }
+  return (
+    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 12 }}>
+      {programHref && (
+        <Link href={programHref} style={linkStyle} onClick={(e) => e.stopPropagation()}>Программа →</Link>
+      )}
+      {schoolHref && (
+        <Link href={schoolHref} style={linkStyle} onClick={(e) => e.stopPropagation()}>Вуз →</Link>
       )}
     </div>
   )
