@@ -98,7 +98,7 @@ export type University = {
   schoolId?: number | null
   program: string
   tuition?: string
-  match: number
+  qsRank?: number | null
   reason: string
   tags?: string[] // Scholarship, English-taught, EU, etc
 }
@@ -108,21 +108,21 @@ export type University = {
  * Клиент выбирает из них 3 приоритетные (state хранится в shared-store).
  */
 export const CURATOR_SHORTLIST: University[] = [
-  { key: 'edinburgh', name: 'University of Edinburgh', city: 'Эдинбург', country: 'UK', flag: '🏴󠁧󠁢󠁳󠁣󠁴󠁿', program: 'BSc Computer Science', tuition: '£26 500 / год', match: 92, reason: 'Сильная CS-программа, приемлемая финансовая нагрузка при раннем решении.', tags: ['UK', 'English'] },
-  { key: 'imperial', name: 'Imperial College London', city: 'Лондон', country: 'UK', flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿', program: 'BSc Computing', tuition: '£40 940 / год', match: 90, reason: 'Топ-5 мира по CS. Высокий порог поступления, но при профиле Игоря реально.', tags: ['Top-10', 'UK'] },
-  { key: 'tudelft', name: 'TU Delft', city: 'Делфт', country: 'Нидерланды', flag: '🇳🇱', program: 'BSc CS & Engineering', tuition: '€19 100 / год', match: 88, reason: 'Англоязычная программа, сильная технологическая сеть.', tags: ['NL', 'English'] },
-  { key: 'warwick', name: 'University of Warwick', city: 'Ковентри', country: 'UK', flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿', program: 'BSc Computer Science', tuition: '£29 830 / год', match: 87, reason: 'Top-10 UK по CS, сильная математическая подготовка студентов.', tags: ['UK'] },
-  { key: 'kth', name: 'KTH Royal Institute of Technology', city: 'Стокгольм', country: 'Швеция', flag: '🇸🇪', program: 'BSc Information & Communication Technology', tuition: '€0 (для EU/EEA) / €12 500 non-EU', match: 85, reason: 'Бесплатно для EU/EEA, сильная партнёрская сеть со шведским tech.', tags: ['Scholarship', 'EU'] },
-  { key: 'amsterdam', name: 'University of Amsterdam', city: 'Амстердам', country: 'Нидерланды', flag: '🇳🇱', program: 'BSc Artificial Intelligence', tuition: '€16 170 / год', match: 83, reason: 'Одна из сильнейших AI-программ в EU, интенсивная математика.', tags: ['NL', 'AI'] },
-  { key: 'tum', name: 'Technical University of Munich', city: 'Мюнхен', country: 'Германия', flag: '🇩🇪', program: 'BSc Informatik', tuition: '€4 000 / семестр', match: 82, reason: 'Недорого, сильная инженерная школа, но преподавание частично на немецком.', tags: ['DE', 'Low-cost'] },
-  { key: 'aalto', name: 'Aalto University', city: 'Эспоо', country: 'Финляндия', flag: '🇫🇮', program: 'BSc Data Science', tuition: '€15 000 / год (non-EU)', match: 81, reason: 'Сильная дата-сцена, эргономичный кампус, прозрачная admission политика.', tags: ['FI', 'EU'] },
-  { key: 'manchester', name: 'University of Manchester', city: 'Манчестер', country: 'UK', flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿', program: 'BSc Computer Science', tuition: '£32 000 / год', match: 80, reason: 'Большая школа CS, много специализаций на 3-м курсе.', tags: ['UK'] },
-  { key: 'southampton', name: 'University of Southampton', city: 'Саутгемптон', country: 'UK', flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿', program: 'MEng Computer Science', tuition: '£27 400 / год', match: 79, reason: 'Интегрированный мастер, можно закончить сразу с MSc уровнем.', tags: ['UK', '4-year'] },
-  { key: 'copenhagen', name: 'University of Copenhagen', city: 'Копенгаген', country: 'Дания', flag: '🇩🇰', program: 'BSc Computer Science', tuition: '€12 500 / год (non-EU)', match: 78, reason: 'Высокое качество жизни, сильные кейсы для Nordic tech companies.', tags: ['DK'] },
-  { key: 'chalmers', name: 'Chalmers University of Technology', city: 'Гётеборг', country: 'Швеция', flag: '🇸🇪', program: 'BSc Computer Science & Engineering', tuition: '€16 400 / год (non-EU)', match: 77, reason: 'Инженерный фокус, хорошие связи с Volvo и Ericsson.', tags: ['SE'] },
-  { key: 'trinity', name: 'Trinity College Dublin', city: 'Дублин', country: 'Ирландия', flag: '🇮🇪', program: 'BAI Computer Engineering', tuition: '€28 500 / год', match: 76, reason: 'Англоязычная, входит в EU — упрощает визу и будущую работу в Европе.', tags: ['IE', 'EU'] },
-  { key: 'polimi', name: 'Politecnico di Milano', city: 'Милан', country: 'Италия', flag: '🇮🇹', program: 'BSc Computer Science Engineering', tuition: '€3 900 / год', match: 74, reason: 'Дешёвое обучение, сильный бренд в инженерии, часть программ на английском.', tags: ['IT', 'Low-cost', 'EU'] },
-  { key: 'ethz', name: 'ETH Zürich', city: 'Цюрих', country: 'Швейцария', flag: '🇨🇭', program: 'BSc Informatik', tuition: 'CHF 1 460 / семестр', match: 72, reason: 'Топ-3 мира по CS, очень сложное поступление. Safety-план Б.', tags: ['Top-5', 'Low-cost'] },
+  { key: 'edinburgh', name: 'University of Edinburgh', city: 'Эдинбург', country: 'UK', flag: '🏴󠁧󠁢󠁳󠁣󠁴󠁿', program: 'BSc Computer Science', tuition: '£26 500 / год', reason: 'Сильная CS-программа, приемлемая финансовая нагрузка при раннем решении.', tags: ['UK', 'English'] },
+  { key: 'imperial', name: 'Imperial College London', city: 'Лондон', country: 'UK', flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿', program: 'BSc Computing', tuition: '£40 940 / год', reason: 'Топ-5 мира по CS. Высокий порог поступления, но при профиле Игоря реально.', tags: ['Top-10', 'UK'] },
+  { key: 'tudelft', name: 'TU Delft', city: 'Делфт', country: 'Нидерланды', flag: '🇳🇱', program: 'BSc CS & Engineering', tuition: '€19 100 / год', reason: 'Англоязычная программа, сильная технологическая сеть.', tags: ['NL', 'English'] },
+  { key: 'warwick', name: 'University of Warwick', city: 'Ковентри', country: 'UK', flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿', program: 'BSc Computer Science', tuition: '£29 830 / год', reason: 'Top-10 UK по CS, сильная математическая подготовка студентов.', tags: ['UK'] },
+  { key: 'kth', name: 'KTH Royal Institute of Technology', city: 'Стокгольм', country: 'Швеция', flag: '🇸🇪', program: 'BSc Information & Communication Technology', tuition: '€0 (для EU/EEA) / €12 500 non-EU', reason: 'Бесплатно для EU/EEA, сильная партнёрская сеть со шведским tech.', tags: ['Scholarship', 'EU'] },
+  { key: 'amsterdam', name: 'University of Amsterdam', city: 'Амстердам', country: 'Нидерланды', flag: '🇳🇱', program: 'BSc Artificial Intelligence', tuition: '€16 170 / год', reason: 'Одна из сильнейших AI-программ в EU, интенсивная математика.', tags: ['NL', 'AI'] },
+  { key: 'tum', name: 'Technical University of Munich', city: 'Мюнхен', country: 'Германия', flag: '🇩🇪', program: 'BSc Informatik', tuition: '€4 000 / семестр', reason: 'Недорого, сильная инженерная школа, но преподавание частично на немецком.', tags: ['DE', 'Low-cost'] },
+  { key: 'aalto', name: 'Aalto University', city: 'Эспоо', country: 'Финляндия', flag: '🇫🇮', program: 'BSc Data Science', tuition: '€15 000 / год (non-EU)', reason: 'Сильная дата-сцена, эргономичный кампус, прозрачная admission политика.', tags: ['FI', 'EU'] },
+  { key: 'manchester', name: 'University of Manchester', city: 'Манчестер', country: 'UK', flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿', program: 'BSc Computer Science', tuition: '£32 000 / год', reason: 'Большая школа CS, много специализаций на 3-м курсе.', tags: ['UK'] },
+  { key: 'southampton', name: 'University of Southampton', city: 'Саутгемптон', country: 'UK', flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿', program: 'MEng Computer Science', tuition: '£27 400 / год', reason: 'Интегрированный мастер, можно закончить сразу с MSc уровнем.', tags: ['UK', '4-year'] },
+  { key: 'copenhagen', name: 'University of Copenhagen', city: 'Копенгаген', country: 'Дания', flag: '🇩🇰', program: 'BSc Computer Science', tuition: '€12 500 / год (non-EU)', reason: 'Высокое качество жизни, сильные кейсы для Nordic tech companies.', tags: ['DK'] },
+  { key: 'chalmers', name: 'Chalmers University of Technology', city: 'Гётеборг', country: 'Швеция', flag: '🇸🇪', program: 'BSc Computer Science & Engineering', tuition: '€16 400 / год (non-EU)', reason: 'Инженерный фокус, хорошие связи с Volvo и Ericsson.', tags: ['SE'] },
+  { key: 'trinity', name: 'Trinity College Dublin', city: 'Дублин', country: 'Ирландия', flag: '🇮🇪', program: 'BAI Computer Engineering', tuition: '€28 500 / год', reason: 'Англоязычная, входит в EU — упрощает визу и будущую работу в Европе.', tags: ['IE', 'EU'] },
+  { key: 'polimi', name: 'Politecnico di Milano', city: 'Милан', country: 'Италия', flag: '🇮🇹', program: 'BSc Computer Science Engineering', tuition: '€3 900 / год', reason: 'Дешёвое обучение, сильный бренд в инженерии, часть программ на английском.', tags: ['IT', 'Low-cost', 'EU'] },
+  { key: 'ethz', name: 'ETH Zürich', city: 'Цюрих', country: 'Швейцария', flag: '🇨🇭', program: 'BSc Informatik', tuition: 'CHF 1 460 / семестр', reason: 'Топ-3 мира по CS, очень сложное поступление. Safety-план Б.', tags: ['Top-5', 'Low-cost'] },
 ]
 
 /** Для удобства: сколько всего в подборке от куратора. */

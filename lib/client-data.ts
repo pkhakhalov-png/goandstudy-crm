@@ -219,19 +219,24 @@ export async function getClientUniversities(clientId: number): Promise<Universit
 
   const rows = (data || []) as UniRow[]
 
-  // Enrich with school logo + ids from parser DB (batch fetch)
+  // Enrich with school logo + qs_rank from parser DB (batch fetch)
   const schoolIds = Array.from(new Set(rows.map(r => parseLink(r.notes).school_id).filter((x): x is number => typeof x === 'number')))
   let logoBySchool = new Map<number, string | null>()
+  let qsBySchool = new Map<number, number | null>()
   if (schoolIds.length > 0) {
     try {
       const parser = createParserClient()
-      const { data: schools } = await parser.from('schools').select('id, logo_url').in('id', schoolIds)
-      for (const s of schools || []) logoBySchool.set(s.id as number, (s as any).logo_url)
+      const { data: schools } = await parser.from('schools').select('id, logo_url, qs_rank').in('id', schoolIds)
+      for (const s of schools || []) {
+        logoBySchool.set(s.id as number, (s as any).logo_url)
+        qsBySchool.set(s.id as number, (s as any).qs_rank ?? null)
+      }
     } catch { /* parser DB unavailable — fall back to flags */ }
   }
 
   return rows.map((u): University => {
     const link = parseLink(u.notes)
+    const qs = link.school_id ? qsBySchool.get(link.school_id) ?? null : null
     return {
       key: u.id,
       name: u.university_name,
@@ -245,7 +250,7 @@ export async function getClientUniversities(clientId: number): Promise<Universit
       tuition: u.tuition_per_year && u.currency
         ? `${Math.round(u.tuition_per_year).toLocaleString('ru-RU')} ${u.currency} / год`
         : undefined,
-      match: 85,
+      qsRank: qs && qs > 0 && qs < 999 ? qs : null,
       reason: 'Комментарий куратора появится здесь',
       tags: [],
     }

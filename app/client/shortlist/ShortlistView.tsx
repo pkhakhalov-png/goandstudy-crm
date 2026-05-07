@@ -58,7 +58,12 @@ export function ShortlistView({ items, clientId, applicationsBySchool }: Props) 
       .filter((x): x is University => Boolean(x))
     const rest = items
       .filter(u => !state.priorityUniKeys.includes(u.key))
-      .sort((a, b) => (b.match - a.match) || (keyIndex.get(a.key)! - keyIndex.get(b.key)!))
+      .sort((a, b) => {
+        // QS-ранк (меньше = лучше). Без ранка — в конец.
+        const ra = a.qsRank ?? Number.POSITIVE_INFINITY
+        const rb = b.qsRank ?? Number.POSITIVE_INFINITY
+        return (ra - rb) || (keyIndex.get(a.key)! - keyIndex.get(b.key)!)
+      })
     return { priority, rest }
   }, [items, state.priorityUniKeys])
 
@@ -511,18 +516,7 @@ function RestCard({ uni, onToggle, hydrated, clientId, app }: { uni: University;
     >
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
         <UniLogo uni={uni} size={44} />
-        <div
-          style={{
-            fontFamily: 'var(--ds-font-display-stack)',
-            fontWeight: 700,
-            fontSize: 22,
-            color: 'var(--ds-purple-deep)',
-            fontVariantNumeric: 'tabular-nums',
-            lineHeight: 1,
-          }}
-        >
-          {uni.match}%
-        </div>
+        <RankBadge qsRank={uni.qsRank} />
       </div>
 
       <UniInfo uni={uni} clientId={clientId} app={app} />
@@ -701,6 +695,30 @@ function UniInfo({ uni, clientId, app }: { uni: University; clientId?: number; a
       {app !== undefined && (
         <ApplyButton uni={uni} app={app} disabled={false} />
       )}
+    </div>
+  )
+}
+
+function RankBadge({ qsRank }: { qsRank: number | null | undefined }) {
+  if (!qsRank) return null
+  return (
+    <div
+      title="Позиция в QS World University Rankings"
+      style={{
+        display: 'inline-flex',
+        flexDirection: 'column',
+        alignItems: 'flex-end',
+        lineHeight: 1,
+        fontFamily: 'var(--ds-font-display-stack)',
+        color: 'var(--ds-purple-deep)',
+      }}
+    >
+      <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ds-muted)', marginBottom: 4 }}>
+        QS
+      </span>
+      <span style={{ fontSize: 22, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+        #{qsRank}
+      </span>
     </div>
   )
 }
