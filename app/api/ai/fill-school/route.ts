@@ -416,13 +416,18 @@ async function handle(req: NextRequest) {
 
 Что ИИ нужно найти:
 
-1. **Мировые рейтинги вуза**. Заполни ВСЕ что найдёшь — у каждого вуза должен быть хотя бы один ранк, иначе клиент не видит его престиж:
-   - **qs_rank** — QS World University Rankings
-   - **the_rank** — Times Higher Education (THE) World University Rankings
-   - **arwu_rank** — Shanghai ARWU
-   - **usnews_rank** — US News Best Global Universities
-   - **webometrics_rank** — Webometrics (самое широкое покрытие, последний fallback)
-   Если вуза нет вообще ни в одном — все null.
+1. **Мировые рейтинги вуза** — критически важная задача. Клиент видит ранк прямо на карточке подборки, и если ранка нет — вуз выглядит как пустышка. Минимум один ранк должен быть найден почти ВСЕГДА.
+
+   Ищи в таком порядке (заполняй ВСЕ что нашёл, не только первый):
+   - **qs_rank** — QS World University Rankings (текущий год). Сайт: topuniversities.com
+   - **the_rank** — Times Higher Education (THE). Сайт: timeshighereducation.com/world-university-rankings
+   - **arwu_rank** — Shanghai ARWU. Сайт: shanghairanking.com
+   - **usnews_rank** — US News Best Global Universities. Сайт: usnews.com/education/best-global-universities
+   - **webometrics_rank** — Webometrics (КРИТИЧНО: покрывает 12000+ вузов, проверяй ОБЯЗАТЕЛЬНО если вуза нет в первых четырёх). Сайт: webometrics.info — ищи по странам: webometrics.info/en/{Region}/{Country}
+
+   ⚠️ Если ВСЕ четыре глобальных топ-рейтинга не нашли вуз — ОБЯЗАН сделать отдельный web_search запрос «${school.name} webometrics ranking» или открыть страну на webometrics.info. Маленькие/прикладные/региональные/частные колледжи всё равно ранжируются Webometrics — у них почти всегда есть позиция в тысячах.
+
+   Только если ни в одном из 5 рейтингов вуза нет (что редко) — все null.
 2. **Тип финансирования**: Государственный или Частный.
 3. **Год основания** (4 цифры).
 4. **Логотип** — прямая ссылка на PNG/SVG/JPG. ВАЖНО: убедись что ссылка реально ведёт на изображение. Лучше проверить через web_search ("название_вуза logo wikimedia commons" или "название_вуза logo png"). Если не уверен — null.
@@ -475,7 +480,7 @@ async function handle(req: NextRequest) {
       model: 'claude-sonnet-4-6',
       max_tokens: 8192,
       tools: [
-        { type: 'web_search_20250305', name: 'web_search', max_uses: 6 },
+        { type: 'web_search_20250305', name: 'web_search', max_uses: 10 },
         SAVE_TOOL,
       ] as any,
       messages: [{ role: 'user', content: userMessage }],
@@ -495,6 +500,15 @@ async function handle(req: NextRequest) {
     const msg = e instanceof Error ? e.message : 'Unknown'
     return NextResponse.json({ ok: false, error: `AI: ${msg}` }, { status: 500 })
   }
+
+  // Логирование того что вернул AI для рейтингов — поможет дебажить когда ранк не появляется
+  console.log('[fill-school] ranks returned by AI:', {
+    qs: aiInput.qs_rank ?? null,
+    the: aiInput.the_rank ?? null,
+    arwu: aiInput.arwu_rank ?? null,
+    usnews: aiInput.usnews_rank ?? null,
+    webometrics: aiInput.webometrics_rank ?? null,
+  })
 
   // Сохраняем — только если ИИ что-то нашёл
   const update: Record<string, unknown> = {}
@@ -676,6 +690,13 @@ async function handle(req: NextRequest) {
       sources: aiInput.sources || [],
       photo: photoDiag,
       video: videoDiag,
+      ranks: {
+        qs: aiInput.qs_rank ?? null,
+        the: aiInput.the_rank ?? null,
+        arwu: aiInput.arwu_rank ?? null,
+        usnews: aiInput.usnews_rank ?? null,
+        webometrics: aiInput.webometrics_rank ?? null,
+      },
     },
   })
 }
