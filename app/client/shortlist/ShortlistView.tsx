@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useMemo, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { MAIN_PAGE_PRIORITY_LIMIT, type University } from '../mock-data'
@@ -43,6 +43,10 @@ export function ShortlistView({ items, clientId, applicationsBySchool }: Props) 
   const { state, update, hydrated } = useClientState()
   const [dragFromIdx, setDragFromIdx] = useState<number | null>(null)
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null)
+  // useRef нужен потому что closures в handlers могут быть stale —
+  // dataTransfer.getData в Firefox/Safari возвращает '' до drop, а в drop —
+  // да; ref гарантированно актуальный.
+  const dragFromIdxRef = useRef<number | null>(null)
 
   const { priority, rest } = useMemo(() => {
     const keyIndex = new Map(items.map((u, i) => [u.key, i] as const))
@@ -63,31 +67,48 @@ export function ShortlistView({ items, clientId, applicationsBySchool }: Props) 
   const selectedCount = priority.length
   const mainPageCount = Math.min(selectedCount, MAIN_PAGE_PRIORITY_LIMIT)
 
-  /* ─── drag handlers ─── */
-  // Источник передаём через dataTransfer (не через React-state) — иначе была
-  // проблема: closure onDrop ловил stale dragFromIdx и reorder не вызывался.
-  function onDragStart(e: React.DragEvent, idx: number) {
-    e.dataTransfer.effectAllowed = 'move'
-    e.dataTransfer.setData('text/plain', `priority-from:${idx}`)
+  /* ─── drag handlers (на контейнере через делегирование) ─── */
+  function handleDragStart(e: React.DragEvent) {
+    const card = (e.target as HTMLElement).closest<HTMLElement>('[data-priority-idx]')
+    if (!card) return
+    const idx = Number(card.dataset.priorityIdx)
+    if (Number.isNaN(idx)) return
+    dragFromIdxRef.current = idx
     setDragFromIdx(idx)
+    try {
+      e.dataTransfer.effectAllowed = 'move'
+      e.dataTransfer.setData('text/plain', `priority-from:${idx}`)
+      e.dataTransfer.setDragImage(card, 0, 0)
+    } catch {}
   }
-  function onDragOver(e: React.DragEvent, idx: number) {
+  function handleDragOver(e: React.DragEvent) {
+    const card = (e.target as HTMLElement).closest<HTMLElement>('[data-priority-idx]')
+    if (!card) return
     e.preventDefault()
     e.dataTransfer.dropEffect = 'move'
-    setDragOverIdx(idx)
+    const idx = Number(card.dataset.priorityIdx)
+    if (!Number.isNaN(idx) && dragOverIdx !== idx) setDragOverIdx(idx)
   }
-  function onDrop(e: React.DragEvent, idx: number) {
+  function handleDrop(e: React.DragEvent) {
     e.preventDefault()
-    const raw = e.dataTransfer.getData('text/plain')
-    const m = /^priority-from:(\d+)$/.exec(raw)
-    const fromIdx = m ? Number(m[1]) : (dragFromIdx ?? -1)
-    if (fromIdx >= 0 && fromIdx !== idx) {
-      update(s => reorderPriority(s, fromIdx, idx))
+    const card = (e.target as HTMLElement).closest<HTMLElement>('[data-priority-idx]')
+    const toIdx = card ? Number(card.dataset.priorityIdx) : NaN
+    let fromIdx = dragFromIdxRef.current ?? -1
+    // На случай если ref ещё не установлен — пробуем dataTransfer
+    if (fromIdx < 0) {
+      const raw = e.dataTransfer.getData('text/plain')
+      const m = /^priority-from:(\d+)$/.exec(raw)
+      if (m) fromIdx = Number(m[1])
     }
+    if (!Number.isNaN(toIdx) && fromIdx >= 0 && fromIdx !== toIdx) {
+      update(s => reorderPriority(s, fromIdx, toIdx))
+    }
+    dragFromIdxRef.current = null
     setDragFromIdx(null)
     setDragOverIdx(null)
   }
-  function onDragEnd() {
+  function handleDragEnd() {
+    dragFromIdxRef.current = null
     setDragFromIdx(null)
     setDragOverIdx(null)
   }
@@ -192,6 +213,13 @@ export function ShortlistView({ items, clientId, applicationsBySchool }: Props) 
           </div>
         ) : (
           <div
+            // Все 4 drag-события — на контейнере. Делегирование через
+            // closest('[data-priority-idx]') надёжнее чем хендлеры на каждой
+            // карточке: меньше React-closures, меньше шансов на stale state.
+            onDragStart={handleDragStart}
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
+            onDragEnd={handleDragEnd}
             style={{
               marginTop: 16,
               display: 'grid',
@@ -203,15 +231,12 @@ export function ShortlistView({ items, clientId, applicationsBySchool }: Props) 
               <PriorityCard
                 key={uni.key}
                 uni={uni}
+                idx={idx}
                 rank={idx + 1}
                 total={priority.length}
                 inMainPage={idx < MAIN_PAGE_PRIORITY_LIMIT}
                 isDragging={dragFromIdx === idx}
                 isDragOver={dragOverIdx === idx && dragFromIdx !== idx}
-                onDragStart={(e) => onDragStart(e, idx)}
-                onDragOver={(e) => onDragOver(e, idx)}
-                onDrop={(e) => onDrop(e, idx)}
-                onDragEnd={onDragEnd}
                 onMoveUp={idx > 0 ? () => update(s => movePriority(s, uni.key, 'up')) : undefined}
                 onMoveDown={idx < priority.length - 1 ? () => update(s => movePriority(s, uni.key, 'down')) : undefined}
                 onRemove={() => update(s => togglePriority(s, uni.key))}
@@ -307,22 +332,18 @@ function SectionHeader({
    ═══════════════════════════════════════════════════════════════ */
 
 function PriorityCard({
-  uni, rank, total, inMainPage,
+  uni, idx, rank, total, inMainPage,
   isDragging, isDragOver,
-  onDragStart, onDragOver, onDrop, onDragEnd,
   onMoveUp, onMoveDown, onRemove,
   hydrated, clientId, app,
 }: {
   uni: University
+  idx: number
   rank: number
   total: number
   inMainPage: boolean
   isDragging: boolean
   isDragOver: boolean
-  onDragStart: (e: React.DragEvent) => void
-  onDragOver: (e: React.DragEvent) => void
-  onDrop: (e: React.DragEvent) => void
-  onDragEnd: () => void
   onMoveUp?: () => void
   onMoveDown?: () => void
   onRemove: () => void
@@ -332,9 +353,7 @@ function PriorityCard({
 }) {
   return (
     <article
-      onDragOver={onDragOver}
-      onDrop={onDrop}
-      onDragEnd={onDragEnd}
+      data-priority-idx={idx}
       style={{
         background: inMainPage ? 'var(--ds-bg-alt)' : 'var(--ds-bg)',
         border: `1px solid ${inMainPage ? 'var(--ds-purple)' : 'var(--ds-border)'}`,
@@ -362,16 +381,9 @@ function PriorityCard({
         }}
       >
         <div
-          // ВАЖНО: draggable стоит ТОЛЬКО на этом грипе. На уровне article не работало —
-          // внутри article теперь есть <Link>, и браузер по дефолту перехватывал drag,
-          // делая drop невозможным. Теперь грип — единственный drag-source, тащит всю
-          // карточку (setDragImage у parent article).
+          // draggable=true делает грип drag-source. dragstart всплывает на
+          // контейнер, который через delegation (data-priority-idx) поймает.
           draggable={hydrated}
-          onDragStart={(e) => {
-            const card = (e.currentTarget as HTMLElement).closest('article')
-            if (card) e.dataTransfer.setDragImage(card, 0, 0)
-            onDragStart(e)
-          }}
           title="Перетащи чтобы поменять порядок"
           style={{
             cursor: isDragging ? 'grabbing' : 'grab',
