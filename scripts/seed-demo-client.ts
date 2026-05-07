@@ -135,15 +135,23 @@ const DEMO_ROADMAP_DATA = {
   sent_by_name: 'Анна Куратор',
 }
 
-// 7 вузов: подбор разнообразный — 2 топ, 3 средние, 2 запасные
-const SHORTLIST = [
-  { schoolName: 'University of Edinburgh', country: 'Великобритания', city: 'Эдинбург', programName: 'BSc Computer Science', tuition: 26500, currency: 'GBP', priority: 1 },
-  { schoolName: 'Imperial College London', country: 'Великобритания', city: 'Лондон', programName: 'BSc Computing', tuition: 40940, currency: 'GBP', priority: 2 },
-  { schoolName: 'University of Toronto', country: 'Канада', city: 'Торонто', programName: 'BSc Computer Science', tuition: 60160, currency: 'CAD', priority: 3 },
-  { schoolName: 'University of Manchester', country: 'Великобритания', city: 'Манчестер', programName: 'BSc Computer Science', tuition: 32000, currency: 'GBP', priority: null },
-  { schoolName: 'McGill University', country: 'Канада', city: 'Монреаль', programName: 'BSc Computer Science', tuition: 56500, currency: 'CAD', priority: null },
-  { schoolName: 'TU Delft', country: 'Нидерланды', city: 'Делфт', programName: 'BSc Computer Science & Engineering', tuition: 19100, currency: 'EUR', priority: null },
-  { schoolName: 'KTH Royal Institute of Technology', country: 'Швеция', city: 'Стокгольм', programName: 'BSc ICT', tuition: 12500, currency: 'EUR', priority: null },
+// 7 программ из parser DB у которых УЖЕ есть данные от ИИ (qs / description /
+// curator_note / program_curator_data). Демо открывается на reach-страницы
+// без необходимости вызывать ИИ заново.
+const SHORTLIST: Array<{
+  schoolId: number; programId: number;
+  schoolName: string; programName: string; country: string; city: string;
+  tuition: number | null; currency: string | null; priority: number | null;
+}> = [
+  // Топ-3 (приоритетные)
+  { schoolId: 4218, programId: 427914, schoolName: 'Universität Wien',                country: 'Австрия',         city: 'Вена',     programName: 'Бизнес и управление',                                    tuition: null, currency: null,  priority: 1 },
+  { schoolId: 2639, programId: 359238, schoolName: 'Lancaster University - Leipzig',  country: 'Германия',        city: 'Лейпциг',  programName: '2 Semester Business Foundation + BSc Business Analytics', tuition: 14000, currency: 'EUR', priority: 2 },
+  { schoolId: 4235, programId: 427952, schoolName: 'Universität Innsbruck (UIBK)',    country: 'Австрия',         city: 'Инсбрук',  programName: 'Бизнес и управление',                                    tuition: null, currency: null,  priority: 3 },
+  // Резерв
+  { schoolId: 2639, programId: 359231, schoolName: 'Lancaster University - Leipzig',  country: 'Германия',        city: 'Лейпциг',  programName: '3 Semester Business Foundation + BSc Accounting and Finance', tuition: 14000, currency: 'EUR', priority: null },
+  { schoolId: 4239, programId: 427966, schoolName: 'Universität für Weiterbildung Krems', country: 'Австрия',     city: 'Кремс',    programName: 'Бизнес и управление',                                    tuition: null, currency: null,  priority: null },
+  { schoolId: 1527, programId: 280866, schoolName: 'Bournemouth University - Talbot Campus', country: 'Великобритания', city: 'Борнмут', programName: 'BA (Hons) Business and Management',                tuition: null, currency: null,  priority: null },
+  { schoolId: 3837, programId: 426886, schoolName: 'SP Jain School of Global Management', country: 'ОАЭ',         city: 'Дубай',    programName: 'IT и технологии',                                       tuition: null, currency: null,  priority: null },
 ]
 
 // Реальные IDP scholarship_ids из scholarships DB чтоб клик «к деталям» работал
@@ -156,20 +164,7 @@ const SCHOLARSHIPS = [
 async function seedShortlist(clientId: number) {
   console.log('Сидую подборку…')
   for (const u of SHORTLIST) {
-    // Найдём настоящий school+program в parser DB по имени, чтоб ссылки работали
-    const { data: school } = await sbParser
-      .from('schools').select('id, country_code, city')
-      .ilike('name', u.schoolName).limit(1).maybeSingle()
-    let programId: number | null = null
-    if (school) {
-      const { data: prog } = await sbParser
-        .from('programs').select('id')
-        .eq('school_id', school.id)
-        .ilike('name', `%${u.programName.split(' ').slice(-2).join(' ')}%`)
-        .limit(1).maybeSingle()
-      programId = prog?.id || null
-    }
-    const notes = JSON.stringify({ school_id: school?.id || null, program_id: programId })
+    const notes = JSON.stringify({ school_id: u.schoolId, program_id: u.programId })
     await sb.from('client_universities').insert({
       client_id: clientId,
       university_name: u.schoolName,
@@ -209,17 +204,17 @@ async function seedActivities(clientId: number) {
     { days: 28, type: 'note',             content: 'Стратегическая сессия проведена. Зафиксирован профиль и цели.' },
     { days: 25, type: 'project_field_filled', content: 'Куратор заполнил поле «Цели и мотивация» в проекте студента' },
     { days: 24, type: 'project_confirmed', content: 'Профиль студента утверждён — переходим к подбору программ' },
-    { days: 20, type: 'shortlist_added',  content: 'Куратор добавил вуз: University of Edinburgh — BSc Computer Science' },
-    { days: 19, type: 'shortlist_added',  content: 'Куратор добавил вуз: Imperial College London — BSc Computing' },
-    { days: 18, type: 'shortlist_added',  content: 'Куратор добавил вуз: University of Toronto — BSc Computer Science' },
+    { days: 20, type: 'shortlist_added',  content: 'Куратор добавил вуз: Universität Wien — Бизнес и управление' },
+    { days: 19, type: 'shortlist_added',  content: 'Куратор добавил вуз: Lancaster University Leipzig — BSc Business Analytics' },
+    { days: 18, type: 'shortlist_added',  content: 'Куратор добавил вуз: Universität Innsbruck (UIBK) — Бизнес и управление' },
     { days: 17, type: 'shortlist_published', content: 'Подборка из 7 программ отправлена клиенту' },
     { days: 14, type: 'roadmap_sent',     content: 'Куратор отправил дорожную карту на согласование' },
     { days: 13, type: 'roadmap_approved', content: 'Клиент утвердил дорожную карту' },
-    { days: 10, type: 'scholarship_added', content: 'Раскрыта стипендия Edinburgh Global Undergraduate Scholarship (£8,000/год)' },
+    { days: 10, type: 'scholarship_added', content: 'Раскрыта стипендия Edinburgh Global Undergraduate Mathematics Scholarships (£5,000/год)' },
     { days: 8,  type: 'essay_approved',    content: 'Резюме (CV) утверждено куратором' },
     { days: 7,  type: 'essay_approved',    content: 'Мотивационное письмо утверждено куратором' },
     { days: 5,  type: 'note',              content: 'Запрошены транскрипты школы — нужны сканы за 10-11 классы' },
-    { days: 2,  type: 'application_created', content: 'Создана заявка в University of Edinburgh' },
+    { days: 2,  type: 'application_created', content: 'Создана заявка в Universität Wien' },
   ]
   for (const e of events) {
     const t = new Date(Date.now() - e.days * 24 * 3600e3).toISOString()
@@ -239,21 +234,21 @@ async function seedEssays(clientId: number) {
   const motivationLetter = {
     authorName: 'Алексей Демо',
     whyApplying:
-      'Я подаюсь на BSc Computer Science в University of Edinburgh, потому что хочу заниматься machine learning и AI на самом высоком уровне. После победы во Всероссийской олимпиаде по математике я понял, что хочу глубоко разобраться в алгоритмах, которые делают возможным современный AI.',
+      'Я подаюсь на программу «Бизнес и управление» в Universität Wien, потому что хочу строить международную карьеру в управлении технологическими компаниями. Старейший университет немецкоязычного мира, сильная школа экономики и контакт с европейским tech-рынком — то, что мне нужно.',
     whyInterest:
-      'Мой интерес к Computer Science начался с курса CS50 в 9 классе и не остыл с тех пор. Я прочитал «Designing Data-Intensive Applications» Мартина Клеппмана и провёл лето, разбирая как устроены распределённые системы. Хочу заниматься этим всерьёз.',
+      'Мой интерес к бизнесу начался с собственного pet-проекта в 10 классе — я организовал онлайн-репетиторство по математике для младших школьников и довёл оборот до 80 000 ₽/мес. Это показало мне, насколько интересно превращать идею в работающий продукт.',
     whySuitable:
-      'IELTS 7.0, GPA 4.7, призёр All-Russian Math Olympiad 2025, опыт лидерства в школьной команде по робототехнике. На данный момент изучаю Python и базовый PyTorch — закончил курс fast.ai. Готов к нагрузке топового технического университета.',
+      'IELTS 7.0, GPA 4.7, призёр All-Russian Math Olympiad 2025, опыт лидерства в школьной команде по робототехнике. Имею собственный успешный микро-бизнес. Готов к нагрузке европейского университета.',
     studiesRelated:
-      'В 10-11 классах углублённо изучал алгебру, мат-анализ, дискретку. Школьный проект — pet-tracker на Raspberry Pi с мобильным приложением (React Native). Прошёл Stanford CS229 на Coursera. Всё это напрямую готовит меня к программе.',
+      'В 10-11 классах углублённо изучал алгебру, мат-анализ, экономику. Прошёл онлайн-курс «Foundations of Business Strategy» от Coursera. Школьный проект — анализ unit-экономики моего репетиторского проекта. Всё это напрямую готовит к выбранной программе.',
     skills:
-      'Алгоритмическое мышление (5+ призовых мест на олимпиадах), Python, базовые ML-фреймворки (scikit-learn, PyTorch), Git, английский C1. Умею читать научные статьи и доводить проекты до продакшена.',
+      'Аналитическое мышление, базовое знание Excel и SQL, опыт презентаций, английский C1, немецкий A2 (учу). Умею читать финансовые отчёты, провожу cohort-анализ когорт своих учеников.',
     otherAchievements:
-      'Капитан школьной команды по робототехнике (3 место в RoboCup Junior 2025). Волонтёр на отборе ВсОШ по информатике. Запустил еженедельный math-club для младших классов.',
+      'Капитан школьной команды по робототехнике (3 место в RoboCup Junior 2025). Запустил math-club для младших классов. Прошёл за 4 месяца от 0 до 80k ₽/мес операционной прибыли в своём репетиторском проекте.',
     workExperience:
-      'Стажировался 2 месяца в локальной IT-компании летом 2025 — писал автотесты на Python. Также участвовал в open-source — два мерджа в репозиторий educational-content по математике для школьников.',
+      'Основатель и оператор онлайн-репетиторской платформы (2024–2025) — 12 учеников, 80k ₽/мес. Стажировался 2 месяца в локальной IT-компании летом 2025 — писал автотесты на Python. Участвовал в школьном бизнес-кейс-чемпионате (2 место).',
     futurePlans:
-      'После бакалавриата планирую магистратуру в области AI (Edinburgh / Cambridge / ETH) и работу в research-команде крупного tech (DeepMind / OpenAI / Google Research). В долгосрочной перспективе — собственная AI-лаборатория в России.',
+      'После бакалавриата планирую магистратуру по management (WU Vienna / IE Business School / HEC Paris) и работу в стратегическом консалтинге или product-management в tech. В долгосрочной перспективе — собственная edtech-компания на европейском рынке.',
   }
 
   await sb.from('client_essays').insert([
