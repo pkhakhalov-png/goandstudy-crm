@@ -229,8 +229,18 @@ export default async function ProgramPage({
                   </div>
                 )
               })()}
-              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--purple)' }}>
-                К вузу →
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: 8,
+                fontSize: 14, fontWeight: 600, color: '#fff',
+                background: 'var(--purple)',
+                padding: '10px 18px', borderRadius: 10,
+                whiteSpace: 'nowrap',
+                boxShadow: '0 2px 8px rgba(177,94,204,.35)',
+              }}>
+                Посмотреть вуз
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M5 12h14M13 5l7 7-7 7" />
+                </svg>
               </span>
             </Link>
 
