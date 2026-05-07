@@ -339,14 +339,6 @@ export default async function ProgramPage({
                 ].filter(Boolean) as { value: string; label: string }[]}
               />
 
-              {/* Hero price card — крупный блок стоимости / проживания */}
-              <PriceHero
-                tuition={curatorData?.gross_tuition_label || tuitionText || (tuition != null ? `${fmt(tuition)} ${currency} / год` : null)}
-                living={curatorData?.cost_of_living_label
-                  || (program.living_cost_text ? `${program.living_cost_text}${program.living_cost_period ? ' ' + program.living_cost_period : ''}` : null)
-                  || (school.cost_of_living != null ? `${fmt(school.cost_of_living)} ${currency} / мес.` : null)}
-              />
-
               {/* Two-column block: требования | проживание */}
               {((program.entry_requirements?.length || 0) > 0 || (program.accommodation_options?.length || 0) > 0) && (
                 <div className="prog-pair" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
