@@ -140,10 +140,7 @@ export default async function ClientHomePage({ searchParams }: { searchParams: P
   // Онбординг показываем если: 1) клиент сам не прошёл (clients.onboarded=false)
   //   и 2) это его настоящий вход (не preview-куратор/админ).
   //   ?onboarding=1 в URL форсит показ (пришёл с /invite активации).
-  //   Для demo-клиента (email demo@goandstudy.com) тур всегда форсится — показываем
-  //   при каждом входе, чтобы лид мог пройти продуктовое демо.
-  const isDemo = client.email === 'demo@goandstudy.com'
-  const showOnboarding = !isPreview && (isDemo || params.onboarding === '1' || !client.onboarded)
+  const showOnboarding = !isPreview && (params.onboarding === '1' || !client.onboarded)
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--ds-bg)' }}>

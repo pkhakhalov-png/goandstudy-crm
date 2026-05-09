@@ -31,17 +31,15 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl
 
-  // Публичные маршруты (webhook'и, booking, tbank callback, invite, demo)
+  // Публичные маршруты (webhook'и, booking, tbank callback, invite)
   const isPublic =
     pathname === '/login' ||
-    pathname === '/demo' ||
     pathname.startsWith('/book') ||
     pathname.startsWith('/invite') ||
     pathname.startsWith('/api/book') ||
     pathname.startsWith('/api/wazzup') ||
     pathname.startsWith('/api/telegram') ||
     pathname.startsWith('/api/tbank') ||
-    pathname.startsWith('/api/cron') ||
     pathname.startsWith('/api/debug')
 
   // Не авторизован — редирект на /login
