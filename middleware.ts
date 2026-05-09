@@ -34,6 +34,7 @@ export async function middleware(request: NextRequest) {
   // Публичные маршруты (webhook'и, booking, tbank callback, invite)
   const isPublic =
     pathname === '/login' ||
+    pathname === '/demo' || pathname.startsWith('/demo/') ||
     pathname.startsWith('/book') ||
     pathname.startsWith('/invite') ||
     pathname.startsWith('/api/book') ||

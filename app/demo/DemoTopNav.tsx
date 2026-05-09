@@ -1,0 +1,84 @@
+import Link from 'next/link'
+
+interface Props {
+  activePage?: 'home' | 'shortlist' | 'scholarships' | 'updates' | 'documents'
+}
+
+const navItems: { key: NonNullable<Props['activePage']>; href: string; label: string }[] = [
+  { key: 'home',         href: '/demo',               label: 'Обзор' },
+  { key: 'documents',    href: '/demo/documents',     label: 'Документы' },
+  { key: 'shortlist',    href: '/demo/shortlist',     label: 'Вузы' },
+  { key: 'scholarships', href: '/demo/scholarships',  label: 'Стипендии' },
+  { key: 'updates',      href: '/demo/updates',       label: 'Обновления' },
+]
+
+export function DemoTopNav({ activePage = 'home' }: Props) {
+  return (
+    <nav
+      style={{
+        position: 'sticky', top: 0, zIndex: 50,
+        background: 'rgba(255,255,255,0.78)',
+        backdropFilter: 'saturate(180%) blur(20px)',
+        borderBottom: '1px solid var(--ds-border-soft)',
+      }}
+    >
+      {/* Демо-баннер */}
+      <div style={{
+        background: 'linear-gradient(90deg, var(--ds-purple) 0%, var(--ds-purple-deep) 100%)',
+        color: '#fff', textAlign: 'center', fontSize: 11, fontWeight: 700,
+        letterSpacing: '0.12em', textTransform: 'uppercase',
+        padding: '6px 16px',
+      }}>
+        ✨ Это демо-режим — данные не сохраняются. Тыкай всё что хочешь
+      </div>
+
+      <div
+        style={{
+          maxWidth: 1200, margin: '0 auto', padding: '0 32px',
+          height: 60, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 24,
+        }}
+      >
+        <Link href="/demo" style={{ display: 'flex', alignItems: 'center', gap: 12, textDecoration: 'none', color: 'inherit' }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/gas-logo.png" alt="Go And Study" style={{ height: 36, width: 'auto', objectFit: 'contain', display: 'block' }} />
+          <span style={{
+            fontFamily: 'var(--ds-font-display-stack)', fontWeight: 700, fontSize: 14,
+            letterSpacing: '0.04em', textTransform: 'uppercase',
+          }}>
+            Демо-кабинет
+          </span>
+        </Link>
+
+        <div style={{ display: 'flex', gap: 28 }}>
+          {navItems.map(item => (
+            <Link
+              key={item.key} href={item.href}
+              style={{
+                fontSize: 12, fontWeight: 600, letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                color: item.key === activePage ? 'var(--ds-ink)' : 'var(--ds-ink-dim)',
+                textDecoration: 'none', position: 'relative',
+                paddingBottom: 20, marginBottom: -20,
+                borderBottom: item.key === activePage ? '2px solid var(--ds-purple)' : '2px solid transparent',
+              }}
+            >
+              {item.label}
+            </Link>
+          ))}
+        </div>
+
+        <Link
+          href="/login"
+          style={{
+            fontSize: 12, fontWeight: 600,
+            color: 'var(--ds-purple)', textDecoration: 'none',
+            padding: '8px 16px', border: '1px solid var(--ds-purple)',
+            borderRadius: 8,
+          }}
+        >
+          К покупке →
+        </Link>
+      </div>
+    </nav>
+  )
+}
