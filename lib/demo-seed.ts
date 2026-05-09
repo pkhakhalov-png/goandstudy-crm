@@ -145,7 +145,12 @@ export async function resetDemoClient(sb: SupabaseClient): Promise<{ clientId: n
   }
 
   // 4. clients (curator_id=null — изоляция от кураторов)
-  const { data: salesp } = await sb.from('users').select('id').eq('role', 'salesperson').limit(1).maybeSingle()
+  // Берём ТОЛЬКО активных не-тестовых продажников
+  const { data: salesp } = await sb.from('users').select('id')
+    .eq('role', 'salesperson')
+    .eq('is_active', true)
+    .neq('email', 'test@goandstudy.com')
+    .limit(1).maybeSingle()
   const { data: client, error: cErr } = await sb.from('clients').insert({
     name: DEMO_NAME,
     email: DEMO_EMAIL,
