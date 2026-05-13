@@ -60,7 +60,7 @@ const PACKAGES: Package[] = [
       { text: 'Переписка с университетами',     included: true },
       { text: 'Визовое сопровождение',          included: true },
       { text: 'Личный кабинет',                 included: true },
-      { text: 'Гарантия поступления',           included: false },
+      { text: 'Гарантия поступления',           included: true },
     ],
     detail: {
       title: 'СОПРОВОЖДЕНИЕ ПОД КЛЮЧ',
