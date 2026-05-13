@@ -35,9 +35,9 @@ const STEPS: { title: string; body: string; selector?: string }[] = [
 ]
 
 export function DemoOnboardingTour() {
-  const { markTourSeen } = useDemoState()
   const [step, setStep] = useState(0)
   const [rect, setRect] = useState<DOMRect | null>(null)
+  const [dismissed, setDismissed] = useState(false)
 
   const current = STEPS[step]
 
@@ -57,15 +57,17 @@ export function DemoOnboardingTour() {
 
   function next() {
     if (step + 1 >= STEPS.length) {
-      markTourSeen()
+      setDismissed(true)
     } else {
       setStep(step + 1)
     }
   }
 
   function skip() {
-    markTourSeen()
+    setDismissed(true)
   }
+
+  if (dismissed) return null
 
   const isSpotlight = !!rect
   const isFirst = step === 0

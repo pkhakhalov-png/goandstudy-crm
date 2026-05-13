@@ -64,7 +64,8 @@ export default function DemoDashboard() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--ds-bg)' }}>
-      {!state.tourSeen && <DemoOnboardingTour />}
+      <DemoOnboardingTour />
+
       <DemoTopNav activePage="home" />
 
       <div data-tour="timeline">
