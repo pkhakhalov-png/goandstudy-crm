@@ -19,7 +19,7 @@ import {
 import type { RequiredDoc, Essay, University } from '@/app/client/mock-data'
 import type { ApplicationRow } from '@/lib/client-data'
 
-const STORAGE_KEY = 'gastudy-demo-state-v1'
+const STORAGE_KEY = 'gastudy-demo-state-v3'
 
 export type DemoUploadedDoc = {
   key: string

@@ -7,7 +7,7 @@ import type { StudentProjectData } from '@/lib/student-project-types'
 import type { RoadmapData } from '@/lib/roadmap-types'
 import type { ApplicationRow } from '@/lib/client-data'
 
-export const DEMO_CLIENT_NAME = 'Алексей Демо'
+export const DEMO_CLIENT_NAME = 'Alexey Demo'
 
 /* ─── Timeline (12 этапов, текущий — Подача 7/12) ─── */
 export const DEMO_TIMELINE: TimelineStage[] = [
@@ -220,14 +220,14 @@ export const DEMO_ESSAYS: Essay[] = [
 
 export const DEMO_MOTIVATION_LETTER = {
   authorName: DEMO_CLIENT_NAME,
-  whyApplying: 'Я подаюсь на программу «Бизнес и управление» в Universität Wien, потому что хочу строить международную карьеру в управлении технологическими компаниями. Старейший университет немецкоязычного мира, сильная школа экономики и контакт с европейским tech-рынком — то, что мне нужно.',
-  whyInterest: 'Мой интерес к бизнесу начался с собственного pet-проекта в 10 классе — я организовал онлайн-репетиторство по математике для младших школьников и довёл оборот до 80 000 ₽/мес. Это показало мне, насколько интересно превращать идею в работающий продукт.',
-  whySuitable: 'IELTS 7.0, GPA 4.7, призёр All-Russian Math Olympiad 2025, опыт лидерства в школьной команде по робототехнике. Имею собственный успешный микро-бизнес. Готов к нагрузке европейского университета.',
-  studiesRelated: 'В 10-11 классах углублённо изучал алгебру, мат-анализ, экономику. Прошёл онлайн-курс «Foundations of Business Strategy» от Coursera. Школьный проект — анализ unit-экономики моего репетиторского проекта. Всё это напрямую готовит к выбранной программе.',
-  skills: 'Аналитическое мышление, базовое знание Excel и SQL, опыт презентаций, английский C1, немецкий A2 (учу). Умею читать финансовые отчёты, провожу cohort-анализ когорт своих учеников.',
-  otherAchievements: 'Капитан школьной команды по робототехнике (3 место в RoboCup Junior 2025). Запустил math-club для младших классов. Прошёл за 4 месяца от 0 до 80k ₽/мес операционной прибыли в своём репетиторском проекте.',
-  workExperience: 'Основатель и оператор онлайн-репетиторской платформы (2024–2025) — 12 учеников, 80k ₽/мес. Стажировался 2 месяца в локальной IT-компании летом 2025 — писал автотесты на Python. Участвовал в школьном бизнес-кейс-чемпионате (2 место).',
-  futurePlans: 'После бакалавриата планирую магистратуру по management (WU Vienna / IE Business School / HEC Paris) и работу в стратегическом консалтинге или product-management в tech. В долгосрочной перспективе — собственная edtech-компания на европейском рынке.',
+  whyApplying: "I am applying for the Bachelor's programme in Business Administration at the University of Vienna because this is the logical next step for me — and because I want a serious European education without the financial trap that comes with studying in the UK or the US. The Austrian academic tradition in economics and management is one of the strongest in the world, and the fact that the University of Vienna treats education as a public good rather than a luxury product matters to me. I do not want to start my professional life with significant debt. I want to start it with knowledge, a European network and the freedom to choose my next step on my own terms.",
+  whyInterest: "Two years ago I started tutoring younger students in mathematics. What began as a side project gradually turned into something I had not planned: a small online tutoring business. Running it taught me that even a tiny business is mostly about decisions made with incomplete information — and that this is exactly the kind of work I want to do for the rest of my life. Business is where rigorous analysis and human judgement meet, and that combination is what genuinely fascinates me about the field.",
+  whySuitable: "I bring a strong analytical foundation: GPA 4.7/5.0 at a mathematics-focused school, prize-winner of the All-Russian Mathematics Olympiad 2025, IELTS 7.0 and active German learner (currently A2, targeting B2). I have already proven I can launch and operate a real business — 12 students, around 80,000 RUB/month revenue. I take initiative, I follow through on long-term projects (captain of the robotics team for two years) and I can hold technical conversations after a summer as a Python QA intern.",
+  studiesRelated: "My current studies are directly relevant. Advanced mathematics, calculus and economics in the school programme, GPA 4.7/5.0. To deepen my business understanding I completed Foundations of Business Strategy by the University of Virginia on Coursera with an A grade across four modules. My school project analysed the unit economics of my own tutoring business — turning numbers from a real operation into a structured case study. All of this directly prepares me for an undergraduate business programme.",
+  skills: "Analytical thinking, working knowledge of Excel and SQL, basic Python (enough to write pytest suites), English C1 and German A2 (in progress). I can read financial statements, run cohort analysis on my tutoring students every month and present results clearly — both in writing and in front of an audience. As a robotics captain I have spent two years coordinating a team of six and managing project deadlines.",
+  otherAchievements: "Captain of the school robotics team — 3rd place at RoboCup Junior 2025 (Soccer Lightweight category). Prize-winner of the All-Russian Mathematics Olympiad 2025. Founded a math club for younger students, where I run weekly olympiad-prep sessions. Reached the finals of two school-organised business case championships.",
+  workExperience: "Founder and operator of an online maths tutoring platform (2024 — present): 12 students, around 80,000 RUB/month revenue. I personally handle marketing (Instagram and VKontakte), teacher recruitment and customer service. Summer 2025: Python QA intern at a local IT company — wrote pytest suites for a backend microservice, raised test coverage from 35% to 71% and received a written recommendation from the tech lead. 2nd place in the school business-case championship (2024).",
+  futurePlans: "After the bachelor's I plan to pursue a Master's in management (WU Vienna, IE Business School or HEC Paris are my current target schools) and work in strategic consulting or tech product management. In the long run I want to return to entrepreneurship — but with the foundation, the European network and the macro perspective that only a proper university education in Europe can provide. An edtech company on the European market is the long-term goal.",
 }
 
 /* ─── Документы — используем тот же список что в /client с образцами в /public/samples/ ─── */
@@ -493,17 +493,17 @@ export const DEMO_UNI_DETAILS: Record<string, DemoUniDetail> = {
 /* ─── Начальное состояние резюме для демо ─── */
 export const DEMO_INITIAL_RESUME = {
   personal: {
-    jobTitle: 'Школьник, 11 класс — готовлюсь к бакалавриату',
-    firstName: 'Алексей',
-    lastName: 'Демо',
+    jobTitle: 'High-school senior — preparing for a Bachelor in Business',
+    firstName: 'Alexey',
+    lastName: 'Demo',
     email: 'demo@goandstudy.com',
     phone: '+7 (900) 000-00-00',
     linkedIn: '',
     postcode: '125009',
-    city: 'Москва',
-    country: 'Россия',
+    city: 'Moscow',
+    country: 'Russia',
     dateOfBirth: '2008-03-15',
-    profileSummary: 'Школьник 11 класса со страстью к бизнесу и технологиям. Запустил собственное онлайн-репетиторство (80k ₽/мес). Капитан команды робототехники, призёр математической олимпиады. Готовлюсь к бакалавриату по management в Австрии или Германии.',
+    profileSummary: 'Final-year high-school student with a strong analytical foundation (GPA 4.7/5.0) and real entrepreneurial track record. Founded and operates an online maths tutoring platform — 12 students, ~80,000 RUB/month revenue. Captain of the school robotics team, prize-winner of the All-Russian Mathematics Olympiad 2025. Preparing for a Bachelor in Business Administration at a top European university.',
   },
   links: [
     { id: 'l1', title: 'GitHub', url: 'https://github.com/demo' },
@@ -511,61 +511,61 @@ export const DEMO_INITIAL_RESUME = {
   workExperience: [
     {
       id: 'w1',
-      jobTitle: 'Основатель',
-      company: 'Онлайн-репетиторство (свой проект)',
-      city: 'Москва',
+      jobTitle: 'Founder',
+      company: 'Online Maths Tutoring (own project)',
+      city: 'Moscow',
       startDate: '2024-09',
       endDate: 'present',
-      description: 'Запустил с нуля платформу онлайн-репетиторства по математике для 7-9 классов. За 8 месяцев — 12 учеников, оборот 80 000 ₽/мес. Занимаюсь маркетингом (Instagram, ВКонтакте), отбором преподавателей и customer service.',
+      description: 'Built from scratch an online maths tutoring platform for grades 7–9. Within 8 months: 12 students, ~80,000 RUB/month revenue. Personally handle marketing on Instagram and VKontakte, interview and select teachers, and run end-to-end customer service.',
     },
     {
       id: 'w2',
-      jobTitle: 'Стажёр Python QA',
-      company: 'Локальная IT-компания',
-      city: 'Москва',
+      jobTitle: 'Python QA Intern',
+      company: 'Local IT company',
+      city: 'Moscow',
       startDate: '2025-06',
       endDate: '2025-08',
-      description: 'Написал автотесты на pytest для backend-микросервиса. Покрытие выросло с 35% до 71%. Получил рекомендацию от tech-lead.',
+      description: 'Wrote pytest suites for a backend microservice. Increased test coverage from 35% to 71%. Received a written recommendation from the tech lead.',
     },
   ],
   education: [
     {
       id: 'e1',
-      school: 'Школа №1234 с углублённым изучением математики',
-      degree: 'Средняя школа, 11 класс',
+      school: 'School No. 1234, mathematics-focused track',
+      degree: 'High School Diploma (grade 11)',
       startDate: '2018-09',
       endDate: '2026-06',
-      city: 'Москва',
-      description: 'Углублённая математика (5/5), физика (5/5), английский (С1). GPA 4.7/5.0. IELTS 7.0.',
+      city: 'Moscow',
+      description: 'Advanced mathematics (5/5), Physics (5/5), English (C1). GPA 4.7/5.0. IELTS 7.0.',
     },
   ],
   courses: [
-    { id: 'c1', title: 'Foundations of Business Strategy', city: 'Coursera (University of Virginia)', year: '2025', description: 'Сертификат, 4 модуля, оценка А.' },
+    { id: 'c1', title: 'Foundations of Business Strategy', city: 'Coursera — University of Virginia', year: '2025', description: 'Certificate, 4 modules, A grade.' },
   ],
   skills: [
     { id: 's1', name: 'Excel / Google Sheets', level: 'Intermediate' as const },
-    { id: 's2', name: 'Python (базовый)', level: 'Beginner' as const },
-    { id: 's3', name: 'Презентации (Keynote)', level: 'Advanced' as const },
-    { id: 's4', name: 'Бизнес-анализ', level: 'Intermediate' as const },
+    { id: 's2', name: 'Python (basics)',         level: 'Beginner' as const },
+    { id: 's3', name: 'Presentations (Keynote)', level: 'Advanced' as const },
+    { id: 's4', name: 'Business analysis',       level: 'Intermediate' as const },
   ],
   languages: [
-    { id: 'l1', name: 'Русский', level: 'Native' as const },
-    { id: 'l2', name: 'Английский', level: 'C1' as const },
-    { id: 'l3', name: 'Немецкий', level: 'A2' as const },
+    { id: 'l1', name: 'Russian',  level: 'Native speaker' as const },
+    { id: 'l2', name: 'English',  level: 'Highly proficient' as const },
+    { id: 'l3', name: 'German',   level: 'Beginner' as const },
   ],
   awards: [
-    { id: 'a1', title: 'Призёр всероссийской олимпиады по математике', year: '2025', description: '3 место в региональном этапе' },
-    { id: 'a2', title: 'RoboCup Junior 2025', year: '2025', description: '3 место в категории Soccer Lightweight' },
+    { id: 'a1', title: 'Prize-winner, All-Russian Mathematics Olympiad', year: '2025', description: '3rd place at the regional stage' },
+    { id: 'a2', title: 'RoboCup Junior 2025',                            year: '2025', description: '3rd place — Soccer Lightweight category' },
   ],
   volunteering: [
-    { id: 'v1', title: 'Math Club для 5-7 классов', year: '2024-2025', description: 'Проводил еженедельные занятия по олимпиадной математике для младших классов школы.' },
+    { id: 'v1', title: 'Math Club for grades 5–7', year: '2024–2025', description: 'Led weekly olympiad-prep sessions for younger students at my school.' },
   ],
   olympiads: [],
   conferences: [],
   hobbies: [
-    { id: 'h1', name: 'Шахматы (1 разряд)' },
-    { id: 'h2', name: 'Робототехника' },
-    { id: 'h3', name: 'Сноубординг' },
+    { id: 'h1', name: 'Chess (1st category)' },
+    { id: 'h2', name: 'Robotics' },
+    { id: 'h3', name: 'Snowboarding' },
   ],
 }
 

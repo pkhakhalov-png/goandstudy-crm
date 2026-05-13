@@ -69,7 +69,7 @@ export default function DemoDashboard() {
       <div data-tour="timeline">
         <DemoHero
           parentName={DEMO_CLIENT_NAME}
-          childFirstName="Алексей"
+          childFirstName="Alexey"
           childFullName={DEMO_CLIENT_NAME}
           stages={DEMO_TIMELINE}
         />
