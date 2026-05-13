@@ -52,11 +52,7 @@ const DEFAULT_STATE: DemoState = {
   motivationStatus: 'ready',
   resume: DEMO_INITIAL_RESUME,
   resumeStatus: 'in_progress',
-  uploadedDocs: {
-    motivation: { key: 'motivation', fileName: 'Мотивационное письмо — финал', fileSize: '24 КБ', url: '' },
-    passport: { key: 'passport', fileName: 'passport.pdf', fileSize: '1.2 МБ', url: '' },
-    ielts: { key: 'ielts', fileName: 'IELTS_Akademik_Demo.pdf', fileSize: '420 КБ', url: '' },
-  },
+  uploadedDocs: {},
   removedDocKeys: [],
   tourSeen: false,
 }

@@ -155,7 +155,7 @@ export function ResumeEditor({ initialResume, clientId, status = 'draft', viewer
   }
 
   function handleDownloadPdf() {
-    window.print()
+    window.open('/demo/resume/print', '_blank', 'noopener')
   }
 
   /* ── helpers to update immutably ── */

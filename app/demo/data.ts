@@ -230,14 +230,28 @@ export const DEMO_MOTIVATION_LETTER = {
   futurePlans: 'После бакалавриата планирую магистратуру по management (WU Vienna / IE Business School / HEC Paris) и работу в стратегическом консалтинге или product-management в tech. В долгосрочной перспективе — собственная edtech-компания на европейском рынке.',
 }
 
-/* ─── Документы ─── */
+/* ─── Документы — используем тот же список что в /client с образцами в /public/samples/ ─── */
 export const DEMO_REQUIRED_DOCS: RequiredDoc[] = [
-  { key: 'resume',         title: 'Резюме (CV)',                  status: 'pending',  hint: 'Отправлено куратору, ждёт финал', href: '/demo/motivation' },
-  { key: 'motivation',     title: 'Мотивационное письмо',         status: 'uploaded', hint: 'Готово, куратор утвердил.', fileName: 'Мотивационное письмо — финал', href: '/demo/motivation' },
-  { key: 'transcript',     title: 'Транскрипты школы',            status: 'missing',  hint: 'Нужны сканы за 10-11 классы' },
-  { key: 'passport',       title: 'Скан паспорта',                status: 'uploaded', fileName: 'passport.pdf', fileSize: '1.2 МБ' },
-  { key: 'ielts',          title: 'Сертификат IELTS',             status: 'uploaded', fileName: 'IELTS_Akademik_Demo.pdf', fileSize: '420 КБ' },
-  { key: 'recommendation', title: 'Рекомендательное письмо',      status: 'missing',  hint: 'От школьного учителя по математике' },
+  { key: 'passport',       title: 'Паспорт',                   hint: 'Заграничный, скан первой страницы',           status: 'missing', hasExample: true, exampleTitle: 'Паспорт — образец',          samplePath: '/samples/passport.jpg' },
+  { key: 'diploma',        title: 'Диплом',                    hint: 'Диплом о высшем/среднем образовании',         status: 'missing', hasExample: true, exampleTitle: 'Диплом — образец',           samplePath: '/samples/diploma.jpg' },
+  { key: 'transcript',     title: 'Транскрипт',                hint: 'Выписка оценок (с переводом если требуется)', status: 'missing', hasExample: true, exampleTitle: 'Транскрипт — образец',       samplePath: '/samples/transcript.jpg' },
+  { key: 'attestat',       title: 'Аттестат',                  hint: 'Школьный аттестат с приложением оценок',      status: 'missing', hasExample: true, exampleTitle: 'Аттестат — образец',         samplePath: '/samples/attestat.jpeg' },
+  { key: 'ielts',          title: 'IELTS / TOEFL',             hint: 'Сертификат языкового теста',                  status: 'missing', hasExample: true, exampleTitle: 'IELTS — образец',            samplePath: '/samples/ielts.jpg' },
+  { key: 'recommendation', title: 'Рекомендательное письмо',   hint: 'От школы / преподавателя / работодателя',     status: 'missing', hasExample: true, exampleTitle: 'Рекомендательное письмо — образец', samplePath: '/samples/recomm.pdf' },
+  {
+    key: 'resume',
+    title: 'Резюме',
+    hint: 'Академический и внеклассный опыт, портфолио',
+    status: 'locked',
+    lockedHint: 'Создаётся через блок «Резюме» выше. Загорится когда вы заполните, а куратор подготовит финальную версию.',
+  },
+  {
+    key: 'motivation',
+    title: 'Мотивационное письмо',
+    hint: 'Почему именно эти вузы и эта программа',
+    status: 'locked',
+    lockedHint: 'Создаётся через блок «Мотивационное письмо» выше. Загорится когда вы заполните, а куратор подготовит финальную версию.',
+  },
 ]
 
 /* ─── Активности ─── */

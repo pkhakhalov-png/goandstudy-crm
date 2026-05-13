@@ -43,7 +43,7 @@ export function DemoMotivationEditor({ authorName }: Props) {
   }
 
   function handleDownloadPdf() {
-    window.print()
+    window.open('/demo/motivation/print', '_blank', 'noopener')
   }
 
   function handleSubmit() {
