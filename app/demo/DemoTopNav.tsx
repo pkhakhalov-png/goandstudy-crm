@@ -67,17 +67,8 @@ export function DemoTopNav({ activePage = 'home' }: Props) {
           ))}
         </div>
 
-        <Link
-          href="/login"
-          style={{
-            fontSize: 12, fontWeight: 600,
-            color: 'var(--ds-purple)', textDecoration: 'none',
-            padding: '8px 16px', border: '1px solid var(--ds-purple)',
-            borderRadius: 8,
-          }}
-        >
-          К покупке →
-        </Link>
+        <div />
+
       </div>
     </nav>
   )
