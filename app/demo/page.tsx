@@ -9,6 +9,7 @@ import { DemoDocumentsSection } from './components/DemoDocumentsSection'
 import { DemoApplicationsBlock } from './components/DemoApplicationsBlock'
 import { DemoOnboardingTour } from './components/DemoOnboardingTour'
 import { DemoProjectAndRoadmap } from './components/DemoProjectAndRoadmap'
+import { DemoPricingSection } from './components/DemoPricingSection'
 import { DEMO_TIMELINE, DEMO_APPLICATIONS, DEMO_CLIENT_NAME, DEMO_REQUIRED_DOCS } from './data'
 import type { Essay } from '@/app/client/mock-data'
 
@@ -88,6 +89,8 @@ export default function DemoDashboard() {
           <DemoDocumentsSection required={docs} />
         </div>
       </main>
+
+      <DemoPricingSection />
     </div>
   )
 }

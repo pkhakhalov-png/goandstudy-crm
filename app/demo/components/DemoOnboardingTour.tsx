@@ -71,30 +71,56 @@ export function DemoOnboardingTour() {
   const isFirst = step === 0
   const isLast = step === STEPS.length - 1
 
-  return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 1000, pointerEvents: 'none' }}>
-      {/* затемнение */}
-      <div style={{
-        position: 'absolute', inset: 0,
-        background: 'rgba(20,12,32,0.65)',
-        pointerEvents: 'auto',
-        transition: 'opacity .2s ease',
-      }} onClick={skip} />
+  const PADDING = 8
 
-      {/* spotlight (вырезаем подсвеченный элемент) */}
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, pointerEvents: 'auto', fontFamily: 'var(--ds-font)' }}>
+      {/* SPOTLIGHT режим — 4 затемняющих блока вокруг таргета, сам элемент остаётся в полной яркости */}
       {isSpotlight && rect && (
+        <>
+          <div style={{
+            position: 'fixed', top: 0, left: 0, right: 0,
+            height: Math.max(0, rect.top - PADDING),
+            background: 'rgba(20,18,30,0.6)', backdropFilter: 'blur(4px)',
+          }} onClick={skip} />
+          <div style={{
+            position: 'fixed', top: rect.bottom + PADDING, left: 0, right: 0, bottom: 0,
+            background: 'rgba(20,18,30,0.6)', backdropFilter: 'blur(4px)',
+          }} onClick={skip} />
+          <div style={{
+            position: 'fixed',
+            top: Math.max(0, rect.top - PADDING),
+            height: rect.height + PADDING * 2,
+            left: 0, width: Math.max(0, rect.left - PADDING),
+            background: 'rgba(20,18,30,0.6)', backdropFilter: 'blur(4px)',
+          }} onClick={skip} />
+          <div style={{
+            position: 'fixed',
+            top: Math.max(0, rect.top - PADDING),
+            height: rect.height + PADDING * 2,
+            left: rect.right + PADDING, right: 0,
+            background: 'rgba(20,18,30,0.6)', backdropFilter: 'blur(4px)',
+          }} onClick={skip} />
+          <div style={{
+            position: 'fixed',
+            top: rect.top - PADDING,
+            left: rect.left - PADDING,
+            width: rect.width + PADDING * 2,
+            height: rect.height + PADDING * 2,
+            borderRadius: 14,
+            border: '2px solid #B15ECC',
+            boxShadow: '0 0 0 4px rgba(177,94,204,0.2), 0 12px 32px rgba(177,94,204,0.3)',
+            pointerEvents: 'none',
+          }} />
+        </>
+      )}
+
+      {/* CENTER режим — единый затемняющий слой */}
+      {!isSpotlight && (
         <div style={{
-          position: 'absolute',
-          top: rect.top - 8,
-          left: rect.left - 8,
-          width: rect.width + 16,
-          height: rect.height + 16,
-          boxShadow: '0 0 0 9999px rgba(20,12,32,0.65)',
-          border: '2px solid var(--ds-purple)',
-          borderRadius: 16,
-          pointerEvents: 'none',
-          transition: 'all .3s ease',
-        }} />
+          position: 'fixed', inset: 0,
+          background: 'rgba(20,18,30,0.6)', backdropFilter: 'blur(8px)',
+        }} onClick={skip} />
       )}
 
       {/* карточка-tooltip — всегда по центру экрана, ничего не обрезается */}
