@@ -1,9 +1,6 @@
 /**
- * ХАРДКОД-ДАННЫЕ для /demo. НИКАКОЙ связи с БД. Лиды могут править что
- * угодно — изменения живут только в их браузере и сбрасываются при рефреше.
- *
- * Все типы — из mock-data.ts (тех же что использует /client). Компоненты
- * клиент-кабинета переиспользуются как есть.
+ * ХАРДКОД-ДАННЫЕ для /demo. НИКАКОЙ связи с БД.
+ * Все правки клиента живут в sessionStorage и сбрасываются при закрытии вкладки.
  */
 import type { TimelineStage, University, RequiredDoc, Essay } from '@/app/client/mock-data'
 import type { StudentProjectData } from '@/lib/student-project-types'
@@ -289,3 +286,318 @@ export const DEMO_APPLICATIONS: ApplicationRow[] = [
     updated_at: '2026-05-08T10:00:00.000Z',
   },
 ] as any
+
+/* ─── Богатая информация по вузам для /demo/universities/[key] ─── */
+export type DemoUniDetail = {
+  description: string
+  founded: number
+  type: string
+  studentsTotal: string
+  rankNote: string
+  language: string
+  intakes: { term: string; deadline: string }[]
+  requirements: string[]
+  programs: { name: string; tuition: string; duration: string; fee: string }[]
+  accommodation: string
+  scholarshipsHint: string
+  whyHere: string
+}
+
+export const DEMO_UNI_DETAILS: Record<string, DemoUniDetail> = {
+  'demo-u1': {
+    description: 'Старейший университет немецкоязычного мира (основан в 1365), один из самых престижных в Европе. Сильная школа бизнеса и экономики, обширная сеть международных партнёрств. Кампус в центре Вены — рядом с Бельведером, Хофбургом и Венским университетом театра и музыки.',
+    founded: 1365,
+    type: 'Государственный, исследовательский',
+    studentsTotal: '~88 000',
+    rankNote: 'QS World Rank #152 (2025). Топ-1 в Австрии. Сильные позиции в Theology, Philosophy, Modern Languages.',
+    language: 'Немецкий B2 / некоторые программы English',
+    intakes: [
+      { term: 'Зимний семестр (октябрь 2026)', deadline: '5 сентября 2026' },
+      { term: 'Летний семестр (март 2027)', deadline: '5 февраля 2027' },
+    ],
+    requirements: [
+      'Аттестат с переводом + апостиль',
+      'Знание немецкого B2 (ÖSD / Goethe) или IELTS 6.5 для English-track',
+      'Мотивационное письмо (2 стр.)',
+      'CV',
+      'Транскрипты последних 2 лет',
+    ],
+    programs: [
+      { name: 'Bachelor Business and Economics', tuition: '€726.72 / семестр', duration: '6 семестров', fee: '€0' },
+      { name: 'Bachelor International Business Administration', tuition: '€726.72 / семестр', duration: '6 семестров', fee: '€0' },
+    ],
+    accommodation: 'Студенческие общежития ÖAD (€280-450/мес) + частный сектор (€500-800/мес). Бронируй за 4-6 месяцев — Вена популярна.',
+    scholarshipsHint: 'OeAD стипендии до €1100/мес для отличников, Erasmus+ обмены, факультетские гранты для научных проектов.',
+    whyHere: 'Бюджетная программа в столице с мировым рейтингом + возможность подработки 20 часов в неделю для не-EU студентов. После 5 лет учёбы и работы в Австрии — возможность ВНЖ.',
+  },
+  'demo-u2': {
+    description: 'Британский Lancaster University открыл кампус в Лейпциге в 2018 году — это полноценный филиал с дипломом UK. Учёба на английском, преподаватели из UK, всё под британский стандарт качества. Лейпциг — динамичный молодой город с очень низкой стоимостью жизни относительно других столиц.',
+    founded: 1964,
+    type: 'Частный кампус британского ВУЗа',
+    studentsTotal: '~600 (Лейпциг) / ~16 000 (Lancaster UK)',
+    rankNote: 'QS World Rank #157. Lancaster в топ-10 UK по Business, Marketing, Linguistics.',
+    language: 'Английский',
+    intakes: [
+      { term: 'Октябрь 2026', deadline: '1 августа 2026' },
+      { term: 'Январь 2027', deadline: '15 ноября 2026' },
+    ],
+    requirements: [
+      'IELTS 5.5+ (Foundation) / 6.0+ (прямой Year 1)',
+      'Аттестат, транскрипты',
+      'Personal Statement',
+      '1 рекомендательное письмо',
+    ],
+    programs: [
+      { name: '2 Semester Business Foundation + BSc Business Analytics', tuition: '€14 000 / год', duration: '4 года', fee: '€0' },
+      { name: '3 Semester Business Foundation + BSc Accounting and Finance', tuition: '€14 000 / год', duration: '4-4.5 года', fee: '€0' },
+    ],
+    accommodation: 'Lancaster Hostel Leipzig — собственное общежитие кампуса €350-550/мес. Альтернатива — съём в Лейпциге €300-450/мес.',
+    scholarshipsHint: 'Lancaster Excellence Award €2000-4000, ранние bird discounts, family discount для второго ребёнка.',
+    whyHere: 'Британский диплом по цене Австрии. Foundation year даёт время довести английский до C1, профильную подготовку и адаптироваться к UK-стилю обучения.',
+  },
+  'demo-u3': {
+    description: 'Universität Innsbruck — крупнейший университет в западной Австрии, в горном городе у самых Альп. Сильная школа экономики и менеджмента, активное международное сообщество. Идеален если хочется тихий студенческий город с европейской инфраструктурой и снежной зимой.',
+    founded: 1669,
+    type: 'Государственный',
+    studentsTotal: '~28 000',
+    rankNote: 'QS World Rank #351. Топ-3 в Австрии в Earth Sciences, Sports Sciences.',
+    language: 'Немецкий B2 (обязательно)',
+    intakes: [
+      { term: 'Зимний семестр (октябрь 2026)', deadline: '5 сентября 2026' },
+      { term: 'Летний семестр (март 2027)', deadline: '5 февраля 2027' },
+    ],
+    requirements: [
+      'Немецкий B2 (ÖSD / Goethe / TestDaF)',
+      'Аттестат + апостиль',
+      'Заявление + мотивашка',
+    ],
+    programs: [
+      { name: 'Bachelor Wirtschaftswissenschaften (Management)', tuition: '€726.72 / семестр', duration: '6 семестров', fee: '€0' },
+      { name: 'Bachelor International Economic and Business Studies', tuition: '€726.72 / семестр', duration: '6 семестров', fee: '€0' },
+    ],
+    accommodation: 'Студенческие общежития ÖAD €240-380/мес. Город небольшой — пешком до универа 15 минут.',
+    scholarshipsHint: 'Universitätsförderung Tirol, Innsbruck Scholarship for International Excellence.',
+    whyHere: 'Самая дешёвая жизнь среди вузов в подборке + горы, snowboard и активное outdoor-комьюнити. После 5 лет работы в регионе — путь к ВНЖ Австрии.',
+  },
+  'demo-u4': {
+    description: 'То же кампус Lancaster в Лейпциге, но программа Accounting and Finance — с 3 семестрами Foundation для более глубокой математической и финансовой подготовки. Подходит если хочешь сразу углубиться в финансы.',
+    founded: 1964,
+    type: 'Частный кампус британского ВУЗа',
+    studentsTotal: '~600 (Лейпциг) / ~16 000 (Lancaster UK)',
+    rankNote: 'QS World Rank #157. Lancaster Accounting and Finance — Top-3 в UK.',
+    language: 'Английский',
+    intakes: [
+      { term: 'Январь 2027', deadline: '15 ноября 2026' },
+    ],
+    requirements: [
+      'IELTS 5.5+ (Foundation)',
+      'Аттестат, транскрипты',
+      'Personal Statement',
+      'Базовая математика — extra plus',
+    ],
+    programs: [
+      { name: '3 Semester Business Foundation + BSc Accounting and Finance', tuition: '€14 000 / год', duration: '4.5 года', fee: '€0' },
+    ],
+    accommodation: 'Lancaster Hostel Leipzig €350-550/мес. Лейпциг — один из самых доступных немецких городов.',
+    scholarshipsHint: 'Lancaster Excellence Award, early bird до 15 ноября.',
+    whyHere: 'Сильное финансовое ядро + британский диплом. Бакалавриат с CFA-ready подготовкой и стажировкой в финсекторе UK/EU.',
+  },
+  'demo-u5': {
+    description: 'Donau-Universität Krems — частный исследовательский университет послевузовского образования (Postgraduate). Основан в 1994, специализируется на executive-программах и professional development. Кампус — на берегу Дуная, в винодельческом регионе Вахау.',
+    founded: 1994,
+    type: 'Государственный, postgraduate-фокус',
+    studentsTotal: '~9 000',
+    rankNote: 'Webometrics #3548. Молодой университет, без global QS-ранжирования. Сильные позиции в Healthcare Management и Public Administration.',
+    language: 'Немецкий B2 / English (по программе)',
+    intakes: [
+      { term: 'Сентябрь 2026', deadline: '15 июля 2026' },
+    ],
+    requirements: [
+      'Бакалавр (постбакалаврская программа)',
+      'IELTS 6.0 / DSH 2',
+      'Мотивашка + CV',
+      'Интервью (Zoom)',
+    ],
+    programs: [
+      { name: 'Master Business and Management', tuition: '€7 500 / семестр', duration: '4 семестра', fee: '€100' },
+    ],
+    accommodation: 'Krems Studentenheim €300-400/мес. Кремс — маленький город, всё пешком.',
+    scholarshipsHint: 'BMBWF stipendien до €1100/мес, BAföG для немецких студентов.',
+    whyHere: 'Сфокусированные executive-программы, маленькие группы, доступ к преподавателям. Подходит для целеустремлённых студентов которые хотят быстро вернуться в карьеру.',
+  },
+  'demo-u6': {
+    description: 'Bournemouth University — современный британский университет на южном побережье Англии. Известен сильной школой Media, Tourism, Business. Кампус Talbot — главный, в 5 минутах от центра Борнмута. Сам город — курорт у моря с пляжами.',
+    founded: 1992,
+    type: 'Государственный (University status с 1992, корни с 1913)',
+    studentsTotal: '~17 000',
+    rankNote: 'Без QS World Rank. Top-50 в UK Modern University rankings. Лидер по Tourism, Animation, Media Production.',
+    language: 'Английский',
+    intakes: [
+      { term: 'Сентябрь 2026', deadline: '15 января 2026 (UCAS Equal Consideration)' },
+    ],
+    requirements: [
+      'IELTS 6.0 (минимум 5.5 в каждой секции)',
+      'Аттестат UK A-Levels equivalent (3 предмета по выбору)',
+      'UCAS Personal Statement',
+      '1 рекомендация',
+    ],
+    programs: [
+      { name: 'BA (Hons) Business and Management', tuition: '£17 500 / год', duration: '3 года (4 с placement)', fee: '£0' },
+      { name: 'BA (Hons) International Business', tuition: '£17 500 / год', duration: '3 года', fee: '£0' },
+    ],
+    accommodation: 'Студенческие резиденции £150-200/нед. Аренда в Борнмуте £500-700/мес.',
+    scholarshipsHint: 'International Excellence Scholarship £2 000-5 000, Country-specific awards.',
+    whyHere: 'Англоязычный диплом UK, более доступная цена чем Лондон, прибрежный кампус с активным студенческим комьюнити. Placement year даёт оплачиваемую годовую стажировку.',
+  },
+  'demo-u7': {
+    description: 'SP Jain School of Global Management — частная бизнес-школа с кампусами в Дубае, Сингапуре, Сиднее и Мумбае. Тристранничная программа: студенты учатся по году в каждой из стран, получая глобальный опыт. Сильный фокус на Asian/Middle East markets и tech-business.',
+    founded: 2004,
+    type: 'Частная, аккредитованная',
+    studentsTotal: '~2 000',
+    rankNote: 'Top-3 в ОАЭ. Forbes #3 Best International Business Programs (US-based ranking).',
+    language: 'Английский',
+    intakes: [
+      { term: 'Октябрь 2026', deadline: '30 июня 2026' },
+      { term: 'Февраль 2027', deadline: '30 октября 2026' },
+    ],
+    requirements: [
+      'IELTS 6.5 / TOEFL 79',
+      'SP-Jain Entrance Test (онлайн) ИЛИ SAT 1100+',
+      'Mini-interview',
+      'CV + Personal Statement',
+    ],
+    programs: [
+      { name: 'BBA in Technology Management', tuition: '$28 000 / год', duration: '4 года', fee: '$100' },
+      { name: 'BBA Marketing & Branding', tuition: '$28 000 / год', duration: '4 года', fee: '$100' },
+    ],
+    accommodation: 'On-campus residence $4 000-6 000/год. Дубай-кампус современный, всё включено.',
+    scholarshipsHint: 'Merit Scholarship до 25% от tuition, Early-bird discount $2 000.',
+    whyHere: 'Глобальный мультистрановой опыт за 4 года, английский язык, программа в Дубае — солнце, безопасность, low-tax, выход на стажировки в Эмиратах/Сингапуре. Conditional offer возможен без полного пакета.',
+  },
+}
+
+/* ─── Начальное состояние резюме для демо ─── */
+export const DEMO_INITIAL_RESUME = {
+  personal: {
+    jobTitle: 'Школьник, 11 класс — готовлюсь к бакалавриату',
+    firstName: 'Алексей',
+    lastName: 'Демо',
+    email: 'demo@goandstudy.com',
+    phone: '+7 (900) 000-00-00',
+    linkedIn: '',
+    postcode: '125009',
+    city: 'Москва',
+    country: 'Россия',
+    dateOfBirth: '2008-03-15',
+    profileSummary: 'Школьник 11 класса со страстью к бизнесу и технологиям. Запустил собственное онлайн-репетиторство (80k ₽/мес). Капитан команды робототехники, призёр математической олимпиады. Готовлюсь к бакалавриату по management в Австрии или Германии.',
+  },
+  links: [
+    { id: 'l1', title: 'GitHub', url: 'https://github.com/demo' },
+  ],
+  workExperience: [
+    {
+      id: 'w1',
+      jobTitle: 'Основатель',
+      company: 'Онлайн-репетиторство (свой проект)',
+      city: 'Москва',
+      startDate: '2024-09',
+      endDate: 'present',
+      description: 'Запустил с нуля платформу онлайн-репетиторства по математике для 7-9 классов. За 8 месяцев — 12 учеников, оборот 80 000 ₽/мес. Занимаюсь маркетингом (Instagram, ВКонтакте), отбором преподавателей и customer service.',
+    },
+    {
+      id: 'w2',
+      jobTitle: 'Стажёр Python QA',
+      company: 'Локальная IT-компания',
+      city: 'Москва',
+      startDate: '2025-06',
+      endDate: '2025-08',
+      description: 'Написал автотесты на pytest для backend-микросервиса. Покрытие выросло с 35% до 71%. Получил рекомендацию от tech-lead.',
+    },
+  ],
+  education: [
+    {
+      id: 'e1',
+      school: 'Школа №1234 с углублённым изучением математики',
+      degree: 'Средняя школа, 11 класс',
+      startDate: '2018-09',
+      endDate: '2026-06',
+      city: 'Москва',
+      description: 'Углублённая математика (5/5), физика (5/5), английский (С1). GPA 4.7/5.0. IELTS 7.0.',
+    },
+  ],
+  courses: [
+    { id: 'c1', title: 'Foundations of Business Strategy', city: 'Coursera (University of Virginia)', year: '2025', description: 'Сертификат, 4 модуля, оценка А.' },
+  ],
+  skills: [
+    { id: 's1', name: 'Excel / Google Sheets', level: 'Intermediate' as const },
+    { id: 's2', name: 'Python (базовый)', level: 'Beginner' as const },
+    { id: 's3', name: 'Презентации (Keynote)', level: 'Advanced' as const },
+    { id: 's4', name: 'Бизнес-анализ', level: 'Intermediate' as const },
+  ],
+  languages: [
+    { id: 'l1', name: 'Русский', level: 'Native' as const },
+    { id: 'l2', name: 'Английский', level: 'C1' as const },
+    { id: 'l3', name: 'Немецкий', level: 'A2' as const },
+  ],
+  awards: [
+    { id: 'a1', title: 'Призёр всероссийской олимпиады по математике', year: '2025', description: '3 место в региональном этапе' },
+    { id: 'a2', title: 'RoboCup Junior 2025', year: '2025', description: '3 место в категории Soccer Lightweight' },
+  ],
+  volunteering: [
+    { id: 'v1', title: 'Math Club для 5-7 классов', year: '2024-2025', description: 'Проводил еженедельные занятия по олимпиадной математике для младших классов школы.' },
+  ],
+  olympiads: [],
+  conferences: [],
+  hobbies: [
+    { id: 'h1', name: 'Шахматы (1 разряд)' },
+    { id: 'h2', name: 'Робототехника' },
+    { id: 'h3', name: 'Сноубординг' },
+  ],
+}
+
+/* ─── Стипендии (полная инфа для /demo/scholarships) ─── */
+export const DEMO_SCHOLARSHIPS_FULL = [
+  {
+    id: 'demo-s1',
+    title: 'Edinburgh Global Undergraduate Mathematics Scholarships',
+    institution: 'University of Edinburgh',
+    country: 'Великобритания',
+    flag: '🇬🇧',
+    amount: '£5,000 / год',
+    deadline: '2026-03-31',
+    level: 'Undergraduate',
+    fundingType: 'Partial',
+    description: 'Стипендия для иностранных студентов, поступающих на программы по математике в University of Edinburgh. Покрывает £5 000 / год обучения, продлевается ежегодно при поддержании высокого GPA.',
+    eligibility: 'Иностранные студенты (non-UK/EU), поступающие на BSc Mathematics. GPA ≥ 4.5, IELTS 6.5+.',
+    status: 'preparing',
+  },
+  {
+    id: 'demo-s2',
+    title: 'Rosedale OSSD University of Edinburgh Scholarship',
+    institution: 'University of Edinburgh',
+    country: 'Великобритания',
+    flag: '🇬🇧',
+    amount: '£10,000 / год',
+    deadline: '2026-04-30',
+    level: 'Undergraduate',
+    fundingType: 'Partial',
+    description: 'Партнёрская стипендия для выпускников Rosedale OSSD (Ontario Secondary School Diploma) программ. Покрывает £10 000 / год.',
+    eligibility: 'Выпускники Rosedale OSSD программ. GPA ≥ 90% по предметам.',
+    status: 'preparing',
+  },
+  {
+    id: 'demo-s3',
+    title: "Haworth Charitable Trust Manchester's Artist Community Studio Space Scholarship",
+    institution: 'University of Manchester',
+    country: 'Великобритания',
+    flag: '🇬🇧',
+    amount: '£8,000 / год',
+    deadline: null,
+    level: 'Undergraduate',
+    fundingType: 'Partial',
+    description: 'Стипендия + студийное пространство для иностранных студентов на программах по визуальному искусству и архитектуре в Манчестере.',
+    eligibility: 'Иностранные студенты, поступающие на BA Architecture, Fine Art или связанные программы.',
+    status: 'preparing',
+  },
+]
+

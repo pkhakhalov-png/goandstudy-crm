@@ -1,39 +1,49 @@
+'use client'
+
 import { DemoTopNav } from './DemoTopNav'
-import { DashboardHero } from '@/app/client/DashboardHero'
-import { ShortlistBlock } from '@/app/client/ShortlistBlock'
-import { EssayCards } from '@/app/client/EssayCards'
-import { DocumentsSection } from '@/app/client/DocumentsSection'
-import { ApplicationsBlock } from '@/app/client/ApplicationsBlock'
-import { CLIENT_CTX } from '@/app/client/mock-data'
-import {
-  DEMO_CLIENT_NAME,
-  DEMO_TIMELINE,
-  DEMO_UNIVERSITIES,
-  DEMO_REQUIRED_DOCS,
-  DEMO_ESSAYS,
-  DEMO_APPLICATIONS,
-} from './data'
+import { useDemoState, DEMO_UNIVERSITIES } from './DemoState'
+import { DemoHero } from './components/DemoHero'
+import { DemoShortlistBlock } from './components/DemoShortlistBlock'
+import { DemoEssayCards } from './components/DemoEssayCards'
+import { DemoDocumentsSection } from './components/DemoDocumentsSection'
+import { DemoApplicationsBlock } from './components/DemoApplicationsBlock'
+import { DemoOnboardingTour } from './components/DemoOnboardingTour'
+import { DEMO_TIMELINE, DEMO_APPLICATIONS, DEMO_CLIENT_NAME } from './data'
 
-export const dynamic = 'force-static'
-
-/**
- * Изолированный демо-кабинет. НЕ ТРОГАЕТ БД. Всё данные — hardcoded в data.ts.
- * Любой может зайти на /demo без авторизации.
- */
 export default function DemoDashboard() {
+  const { state, ready } = useDemoState()
+
+  if (!ready) {
+    return (
+      <div style={{ minHeight: '100vh', background: 'var(--ds-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ color: 'var(--ds-ink-dim)', fontSize: 12, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Загружаем демо…</div>
+      </div>
+    )
+  }
+
+  // Сортируем подборку: приоритеты сверху по порядку
+  const sortedUniversities = [...DEMO_UNIVERSITIES].sort((a, b) => {
+    const aP = state.priorityKeys.indexOf(a.key)
+    const bP = state.priorityKeys.indexOf(b.key)
+    if (aP < 0 && bP < 0) return 0
+    if (aP < 0) return 1
+    if (bP < 0) return -1
+    return aP - bP
+  })
+
   return (
     <div style={{ minHeight: '100vh', background: 'var(--ds-bg)' }}>
+      {!state.tourSeen && <DemoOnboardingTour />}
       <DemoTopNav activePage="home" />
 
-      <DashboardHero
-        ctx={{
-          ...CLIENT_CTX,
-          parentName: DEMO_CLIENT_NAME,
-          childFirstName: 'Алексей',
-          childFullName: DEMO_CLIENT_NAME,
-        }}
-        stages={DEMO_TIMELINE}
-      />
+      <div data-tour="timeline">
+        <DemoHero
+          parentName={DEMO_CLIENT_NAME}
+          childFirstName="Алексей"
+          childFullName={DEMO_CLIENT_NAME}
+          stages={DEMO_TIMELINE}
+        />
+      </div>
 
       <main
         style={{
@@ -41,15 +51,19 @@ export default function DemoDashboard() {
           display: 'flex', flexDirection: 'column', gap: 56,
         }}
       >
-        <ShortlistBlock items={DEMO_UNIVERSITIES} total={DEMO_UNIVERSITIES.length} />
-        <ApplicationsBlock applications={DEMO_APPLICATIONS} previewQuery="" />
-        <EssayCards essays={DEMO_ESSAYS} />
-        <DocumentsSection
-          required={DEMO_REQUIRED_DOCS}
-          optionalUploads={[]}
-          clientId={0}
-          requiredRowsByType={{}}
-        />
+        <div data-tour="shortlist">
+          <DemoShortlistBlock items={sortedUniversities} priorities={state.priorityKeys} />
+        </div>
+        <DemoApplicationsBlock applications={DEMO_APPLICATIONS} />
+        <div data-tour="essays">
+          <DemoEssayCards
+            motivationStatus={state.motivationStatus}
+            resumeStatus={state.resumeStatus}
+          />
+        </div>
+        <div data-tour="documents">
+          <DemoDocumentsSection />
+        </div>
       </main>
     </div>
   )
