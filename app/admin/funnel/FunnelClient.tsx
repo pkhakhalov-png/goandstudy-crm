@@ -45,6 +45,10 @@ export function FunnelClient({ stages: serverStages, deals: serverDeals, salespe
   // Onboarding modal
   const [onboardingModal, setOnboardingModal] = useState<{ dealId: string; stageId: string; stageName: string; oldStageName: string } | null>(null)
   const [inviteModal, setInviteModal] = useState<{ url: string; emailSent: boolean } | null>(null)
+  // НЕ ЦЕЛЕВЫЕ: основание переноса
+  const [nonTargetModal, setNonTargetModal] = useState<{ dealId: string; stageId: string; stageName: string; oldStageName: string } | null>(null)
+  const [nonTargetReason, setNonTargetReason] = useState('')
+  const [nonTargetSaving, setNonTargetSaving] = useState(false)
   const [inviteCopied, setInviteCopied] = useState(false)
   const [obCuratorId, setObCuratorId] = useState('')
   const [obTotalAmount, setObTotalAmount] = useState('')
@@ -199,6 +203,7 @@ export function FunnelClient({ stages: serverStages, deals: serverDeals, salespe
   }
 
   const ONBOARDING_STAGES = ['Первичная продажа', 'Оплата услуг']
+  const NON_TARGET_STAGE = 'НЕ ЦЕЛЕВЫЕ'
 
   async function handleDrop(stageId: string) {
     if (!dragDealId) return
@@ -211,6 +216,19 @@ export function FunnelClient({ stages: serverStages, deals: serverDeals, salespe
     const movedDealId = dragDealId
     const oldStage = localStages.find(s => s.id === deal.stage_id)
     const newStage = localStages.find(s => s.id === stageId)
+
+    // НЕ ЦЕЛЕВЫЕ — обязательно спрашиваем основание, без него не переносим
+    if (newStage && newStage.name === NON_TARGET_STAGE) {
+      resetDrag()
+      setNonTargetModal({
+        dealId: movedDealId,
+        stageId,
+        stageName: newStage.name,
+        oldStageName: oldStage?.name || '',
+      })
+      setNonTargetReason('')
+      return
+    }
 
     // If dropping on payment stage — show onboarding modal
     if (newStage && ONBOARDING_STAGES.includes(newStage.name)) {
@@ -278,6 +296,28 @@ export function FunnelClient({ stages: serverStages, deals: serverDeals, salespe
         emailSent: !!(result as any).emailSent,
       })
     }
+  }
+
+  async function handleNonTargetSubmit() {
+    if (!nonTargetModal) return
+    const reason = nonTargetReason.trim()
+    if (!reason) return
+    setNonTargetSaving(true)
+
+    // Optimistic
+    setMoveOverrides(prev => new Map(prev).set(nonTargetModal.dealId, nonTargetModal.stageId))
+
+    const fd = new FormData()
+    fd.append('deal_id', nonTargetModal.dealId)
+    fd.append('stage_id', nonTargetModal.stageId)
+    fd.append('old_stage_name', nonTargetModal.oldStageName)
+    fd.append('new_stage_name', nonTargetModal.stageName)
+    fd.append('lost_reason', reason)
+    await moveDeal(fd)
+
+    setNonTargetSaving(false)
+    setNonTargetModal(null)
+    setNonTargetReason('')
   }
 
   function resetDrag() {
@@ -860,6 +900,57 @@ export function FunnelClient({ stages: serverStages, deals: serverDeals, salespe
         .stage-delete-btn:hover { opacity: 1 !important; color: var(--red) !important; }
         .stage-divider:hover .stage-divider-btn { opacity: 1 !important; transform: scale(1) !important; }
       `}</style>
+
+      {/* ═══ НЕ ЦЕЛЕВЫЕ — основание переноса ═══ */}
+      {nonTargetModal && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 100,
+          background: 'rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }} onClick={() => { if (!nonTargetSaving) { setNonTargetModal(null); setNonTargetReason('') } }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: 'var(--surf)', borderRadius: 16, padding: '24px 28px',
+            width: 440, maxHeight: '80vh', overflowY: 'auto',
+            boxShadow: '0 20px 60px rgba(0,0,0,.3)',
+          }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>
+              Перенос в «НЕ ЦЕЛЕВЫЕ»
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 16 }}>
+              Укажи основание — почему лид не целевой. Это видно всем менеджерам и роп-у в истории сделки.
+            </div>
+            <textarea
+              value={nonTargetReason}
+              onChange={e => setNonTargetReason(e.target.value)}
+              placeholder="Например: не подходит возраст, нет бюджета, другая страна, ошибочная заявка..."
+              autoFocus
+              rows={4}
+              style={{
+                width: '100%', padding: '10px 12px', borderRadius: 8,
+                border: '1px solid var(--bor2)', fontSize: 13, fontFamily: 'inherit',
+                background: 'var(--bg)', resize: 'vertical', boxSizing: 'border-box',
+              }}
+            />
+            <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+              <button
+                onClick={handleNonTargetSubmit}
+                disabled={nonTargetSaving || !nonTargetReason.trim()}
+                className="btn-p"
+                style={{ flex: 1, padding: '10px', fontSize: 13, opacity: !nonTargetReason.trim() ? 0.5 : 1 }}
+              >
+                {nonTargetSaving ? 'Переносим...' : 'Перенести'}
+              </button>
+              <button
+                onClick={() => { setNonTargetModal(null); setNonTargetReason('') }}
+                disabled={nonTargetSaving}
+                className="btn-s"
+                style={{ padding: '10px 20px', fontSize: 13 }}
+              >
+                Отмена
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ═══ Onboarding Modal ═══ */}
       {onboardingModal && (

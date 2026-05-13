@@ -22,15 +22,22 @@ export async function moveDeal(formData: FormData) {
   const stageId = formData.get('stage_id') as string
   const oldStageName = formData.get('old_stage_name') as string
   const newStageName = formData.get('new_stage_name') as string
+  const lostReason = (formData.get('lost_reason') as string | null)?.trim() || null
+
+  const updatePayload: Record<string, unknown> = {
+    stage_id: stageId,
+    updated_at: new Date().toISOString(),
+  }
+  if (lostReason) updatePayload.lost_reason = lostReason
 
   const { error } = await supabase
     .from('deals')
-    .update({ stage_id: stageId, updated_at: new Date().toISOString() })
+    .update(updatePayload)
     .eq('id', dealId)
 
   if (error) return { error: error.message }
 
-  // Log activity
+  // Log activity — stage move
   await supabase.from('deal_activities').insert({
     deal_id: dealId,
     user_id: user.id,
@@ -38,6 +45,17 @@ export async function moveDeal(formData: FormData) {
     content: `${oldStageName} → ${newStageName}`,
     metadata: { from_stage: oldStageName, to_stage: newStageName },
   })
+
+  // Отдельная запись с основанием — отображается в истории как комментарий менеджера
+  if (lostReason) {
+    await supabase.from('deal_activities').insert({
+      deal_id: dealId,
+      user_id: user.id,
+      activity_type: 'note',
+      content: `Основание «НЕ ЦЕЛЕВЫЕ»: ${lostReason}`,
+      metadata: { reason: lostReason, stage: newStageName },
+    })
+  }
 
   // Auto-link to client when reaching payment stages
   if (newStageName === 'Договор' || newStageName === 'Первичная продажа' || newStageName === 'Оплата услуг') {
