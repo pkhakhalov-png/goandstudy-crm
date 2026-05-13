@@ -112,6 +112,7 @@ async function processMessage(supabase: SupabaseAdmin, msg: WazzupMessage) {
       `custom_fields->>group_chat_id.eq.${msg.chatId},custom_fields->>wazzup_chat_id.eq.${msg.chatId},custom_fields->>tg_chat_id.eq.${msg.chatId}`,
     )
     .is('deleted_at', null)
+    .order('created_at', { ascending: true })
     .limit(1)
     .maybeSingle()
 
@@ -120,9 +121,10 @@ async function processMessage(supabase: SupabaseAdmin, msg: WazzupMessage) {
   } else {
     const { data: prevMsg } = await supabase
       .from('deal_messages')
-      .select('deal_id')
+      .select('deal_id, created_at')
       .or(`metadata->>chatId.eq.${msg.chatId},metadata->>tgChatId.eq.${msg.chatId}`)
       .not('deal_id', 'is', null)
+      .order('created_at', { ascending: true })
       .limit(1)
       .maybeSingle()
     if (prevMsg?.deal_id) {
@@ -232,7 +234,7 @@ async function processMessage(supabase: SupabaseAdmin, msg: WazzupMessage) {
 
     const assignedId = salespersons?.[0]?.id ?? null
 
-    const { data: newDeal } = await supabase
+    const { data: newDeal, error: insertErr } = await supabase
       .from('deals')
       .insert({
         title: isGroup ? `Группа: ${groupTitle}` : `Сообщение от ${senderName}`,
@@ -246,12 +248,28 @@ async function processMessage(supabase: SupabaseAdmin, msg: WazzupMessage) {
         source: isGroup ? `${channelLabel}_group` : channelLabel,
         custom_fields: isGroup
           ? { group_chat_id: msg.chatId, wazzup_chat_id: msg.chatId, is_group: true }
-          : {},
+          : { wazzup_chat_id: msg.chatId },
       })
       .select('id')
       .single()
 
-    if (newDeal) {
+    // Race: a parallel webhook for the same chatId just inserted — unique index raises conflict,
+    // re-fetch that deal instead of duplicating. Round-robin counter is only bumped for the winner.
+    if (insertErr) {
+      const { data: raceDeal } = await supabase
+        .from('deals')
+        .select('id')
+        .eq('custom_fields->>wazzup_chat_id', msg.chatId)
+        .is('deleted_at', null)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle()
+      if (raceDeal) {
+        dealId = raceDeal.id
+      } else {
+        console.error('[wazzup] insert failed and no race-winner found:', insertErr)
+      }
+    } else if (newDeal) {
       dealId = newDeal.id
 
       if (assignedId) {
