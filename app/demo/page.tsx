@@ -8,6 +8,7 @@ import { DemoEssayCards } from './components/DemoEssayCards'
 import { DemoDocumentsSection } from './components/DemoDocumentsSection'
 import { DemoApplicationsBlock } from './components/DemoApplicationsBlock'
 import { DemoOnboardingTour } from './components/DemoOnboardingTour'
+import { DemoProjectAndRoadmap } from './components/DemoProjectAndRoadmap'
 import { DEMO_TIMELINE, DEMO_APPLICATIONS, DEMO_CLIENT_NAME } from './data'
 
 export default function DemoDashboard() {
@@ -51,8 +52,9 @@ export default function DemoDashboard() {
           display: 'flex', flexDirection: 'column', gap: 56,
         }}
       >
+        <DemoProjectAndRoadmap />
         <div data-tour="shortlist">
-          <DemoShortlistBlock items={sortedUniversities} priorities={state.priorityKeys} />
+          <DemoShortlistBlock items={sortedUniversities} total={sortedUniversities.length} />
         </div>
         <DemoApplicationsBlock applications={DEMO_APPLICATIONS} />
         <div data-tour="essays">

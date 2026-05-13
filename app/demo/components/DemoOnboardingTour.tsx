@@ -97,20 +97,23 @@ export function DemoOnboardingTour() {
         }} />
       )}
 
-      {/* карточка-tooltip */}
+      {/* карточка-tooltip — всегда по центру экрана, ничего не обрезается */}
       <div style={{
-        position: 'absolute',
-        top: isSpotlight && rect ? (rect.bottom + 24 + 200 < window.innerHeight ? rect.bottom + 16 : rect.top - 200) : '50%',
+        position: 'fixed',
+        top: '50%',
         left: '50%',
-        transform: isSpotlight ? 'translateX(-50%)' : 'translate(-50%, -50%)',
+        transform: 'translate(-50%, -50%)',
         background: '#fff',
         color: '#1a1129',
         borderRadius: 16,
-        padding: '24px 28px',
-        width: 440,
+        padding: '28px 32px',
+        width: 480,
         maxWidth: 'calc(100vw - 40px)',
-        boxShadow: '0 20px 60px rgba(0,0,0,.3)',
+        maxHeight: 'calc(100vh - 40px)',
+        overflowY: 'auto',
+        boxShadow: '0 24px 80px rgba(20,12,32,.4)',
         pointerEvents: 'auto',
+        zIndex: 1001,
       }}>
         <div style={{ fontSize: 10, color: 'var(--ds-purple)', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 8 }}>
           Шаг {step + 1} из {STEPS.length}
