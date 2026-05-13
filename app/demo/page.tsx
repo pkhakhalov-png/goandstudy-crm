@@ -9,7 +9,8 @@ import { DemoDocumentsSection } from './components/DemoDocumentsSection'
 import { DemoApplicationsBlock } from './components/DemoApplicationsBlock'
 import { DemoOnboardingTour } from './components/DemoOnboardingTour'
 import { DemoProjectAndRoadmap } from './components/DemoProjectAndRoadmap'
-import { DEMO_TIMELINE, DEMO_APPLICATIONS, DEMO_CLIENT_NAME } from './data'
+import { DEMO_TIMELINE, DEMO_APPLICATIONS, DEMO_CLIENT_NAME, DEMO_REQUIRED_DOCS } from './data'
+import type { Essay } from '@/app/client/mock-data'
 
 export default function DemoDashboard() {
   const { state, ready } = useDemoState()
@@ -32,6 +33,34 @@ export default function DemoDashboard() {
     return aP - bP
   })
 
+  const essays: Essay[] = [
+    { key: 'resume',     title: 'Резюме',                  subtitle: 'CV в формате resume.io',     emoji: '📄', state: state.resumeStatus,     updatedAt: '2026-05-02' },
+    { key: 'motivation', title: 'Мотивационное письмо',    subtitle: 'Personal Statement по UCAS', emoji: '✍️', state: state.motivationStatus, updatedAt: '2026-05-03' },
+  ]
+
+  // Документы: locked для resume/motivation если эссе ещё не "ready"
+  const docs = DEMO_REQUIRED_DOCS.map(d => {
+    if (d.key === 'resume') {
+      if (state.resumeStatus === 'ready') {
+        return { ...d, status: 'uploaded' as const, hint: 'Готово, куратор утвердил.', href: '/demo/resume', fileName: 'Резюме — финал', fileSize: '24 КБ' }
+      }
+      if (state.resumeStatus === 'sent' || state.resumeStatus === 'editing') {
+        return { ...d, status: 'pending' as const, href: '/demo/resume', hint: 'Отправлено куратору, ждёт финал' }
+      }
+      return { ...d, status: 'locked' as const, lockedHint: 'Создаётся через блок «Резюме» выше. Загорится когда вы заполните, а куратор подготовит финальную версию.' }
+    }
+    if (d.key === 'motivation') {
+      if (state.motivationStatus === 'ready') {
+        return { ...d, status: 'uploaded' as const, hint: 'Готово, куратор утвердил.', href: '/demo/motivation', fileName: 'Мотивационное письмо — финал', fileSize: '24 КБ' }
+      }
+      if (state.motivationStatus === 'sent' || state.motivationStatus === 'editing') {
+        return { ...d, status: 'pending' as const, href: '/demo/motivation', hint: 'Отправлено куратору, ждёт финал' }
+      }
+      return { ...d, status: 'locked' as const, lockedHint: 'Создаётся через блок «Мотивационное письмо» выше. Загорится когда вы заполните, а куратор подготовит финальную версию.' }
+    }
+    return d
+  })
+
   return (
     <div style={{ minHeight: '100vh', background: 'var(--ds-bg)' }}>
       {!state.tourSeen && <DemoOnboardingTour />}
@@ -46,25 +75,17 @@ export default function DemoDashboard() {
         />
       </div>
 
-      <main
-        style={{
-          maxWidth: 1200, margin: '0 auto', padding: '40px 32px 80px',
-          display: 'flex', flexDirection: 'column', gap: 56,
-        }}
-      >
+      <main style={{ maxWidth: 1200, margin: '0 auto', padding: '40px 32px 80px', display: 'flex', flexDirection: 'column', gap: 56 }}>
         <DemoProjectAndRoadmap />
         <div data-tour="shortlist">
           <DemoShortlistBlock items={sortedUniversities} total={sortedUniversities.length} />
         </div>
         <DemoApplicationsBlock applications={DEMO_APPLICATIONS} />
         <div data-tour="essays">
-          <DemoEssayCards
-            motivationStatus={state.motivationStatus}
-            resumeStatus={state.resumeStatus}
-          />
+          <DemoEssayCards essays={essays} />
         </div>
         <div data-tour="documents">
-          <DemoDocumentsSection />
+          <DemoDocumentsSection required={docs} />
         </div>
       </main>
     </div>

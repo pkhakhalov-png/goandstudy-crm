@@ -1,57 +1,130 @@
 'use client'
 
 import Link from 'next/link'
+import type { Essay } from '@/app/client/mock-data'
 
 interface Props {
-  motivationStatus: 'in_progress' | 'sent' | 'editing' | 'ready'
-  resumeStatus: 'in_progress' | 'sent' | 'editing' | 'ready'
+  essays: Essay[]
 }
 
-const statusBadge: Record<Props['motivationStatus'], { label: string; color: string }> = {
-  in_progress: { label: 'В работе',    color: 'var(--ds-amber)' },
-  sent:        { label: 'У куратора',   color: 'var(--ds-purple)' },
-  editing:     { label: 'На правках',  color: 'var(--ds-purple)' },
-  ready:       { label: 'Утверждено',  color: 'var(--ds-green)' },
+const HREFS: Record<string, string | undefined> = {
+  resume: '/demo/resume',
+  motivation: '/demo/motivation',
 }
 
-export function DemoEssayCards({ motivationStatus, resumeStatus }: Props) {
-  const cards = [
-    { key: 'resume',     title: 'Резюме (CV)',          subtitle: 'в стиле resume.io',          emoji: '📄', status: resumeStatus,     href: '/demo/resume' },
-    { key: 'motivation', title: 'Мотивационное письмо', subtitle: 'Personal Statement по UCAS', emoji: '✍️', status: motivationStatus, href: '/demo/motivation' },
-  ]
+export function DemoEssayCards({ essays }: Props) {
+  return (
+    <div
+      className="essay-grid"
+      style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 20 }}
+    >
+      <style>{`
+        @media (max-width: 720px) {
+          .essay-grid { grid-template-columns: 1fr !important; }
+        }
+      `}</style>
+
+      {essays.map(essay => (
+        <EssayCard key={essay.key} essay={essay} />
+      ))}
+    </div>
+  )
+}
+
+function EssayCard({ essay }: { essay: Essay }) {
+  const meta = stateMeta(essay.state)
+  const ctaText =
+    essay.state === 'not_started' ? 'Создать' :
+    essay.state === 'in_progress' ? 'Продолжить' :
+    'Открыть'
 
   return (
-    <section>
-      <header style={{ marginBottom: 20 }}>
-        <h2 style={{ fontFamily: 'var(--ds-font-display-stack)', fontWeight: 700, fontSize: 22, letterSpacing: '0.04em', textTransform: 'uppercase', margin: 0 }}>
-          Письма и резюме
-        </h2>
-        <p style={{ fontSize: 12, color: 'var(--ds-ink-dim)', marginTop: 4, letterSpacing: '0.04em' }}>
-          Заполняй прямо в кабинете — куратор увидит и подготовит финал
-        </p>
-      </header>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
-        {cards.map(c => {
-          const badge = statusBadge[c.status]
-          return (
-            <Link key={c.key} href={c.href}
-              style={{
-                display: 'block', padding: 24, borderRadius: 16,
-                background: 'var(--ds-surface)', border: '1px solid var(--ds-border-soft)',
-                textDecoration: 'none', color: 'inherit',
-              }}
-              className="ds-card-hover"
-            >
-              <div style={{ fontSize: 36, marginBottom: 12 }}>{c.emoji}</div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--ds-ink)', marginBottom: 4 }}>{c.title}</div>
-              <div style={{ fontSize: 12, color: 'var(--ds-ink-dim)', marginBottom: 14 }}>{c.subtitle}</div>
-              <div style={{ display: 'inline-block', fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', padding: '4px 10px', borderRadius: 4, background: badge.color + '15', color: badge.color }}>
-                {badge.label}
-              </div>
-            </Link>
-          )
-        })}
+    <article
+      className="ds-card"
+      style={{
+        padding: 32,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        textAlign: 'center',
+        gap: 18,
+        minHeight: 300,
+        position: 'relative',
+      }}
+    >
+      {meta.chipText && (
+        <span
+          className={`ds-chip ${meta.chipClass}`}
+          style={{
+            position: 'absolute',
+            top: 16,
+            right: 16,
+            textTransform: 'uppercase',
+            letterSpacing: '0.06em',
+            fontSize: 10,
+            fontWeight: 700,
+          }}
+        >
+          {meta.chipText}
+        </span>
+      )}
+
+      <div
+        style={{
+          fontSize: 72,
+          lineHeight: 1,
+          filter: 'grayscale(1) contrast(1.15)',
+          opacity: 0.85,
+          marginTop: 8,
+        }}
+      >
+        {essay.emoji}
       </div>
-    </section>
+
+      <div>
+        <h3
+          style={{
+            fontFamily: 'var(--ds-font-display-stack)',
+            fontWeight: 700,
+            fontSize: 20,
+            textTransform: 'uppercase',
+            letterSpacing: '0.04em',
+            color: 'var(--ds-ink)',
+            margin: '0 0 8px 0',
+            lineHeight: 1.1,
+          }}
+        >
+          {essay.title}
+        </h3>
+        <p style={{ fontSize: 13, color: 'var(--ds-muted)', margin: 0, lineHeight: 1.45, maxWidth: 320 }}>
+          {essay.subtitle}
+        </p>
+      </div>
+
+      <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+        {HREFS[essay.key] ? (
+          <Link href={HREFS[essay.key]!} className="ds-btn ds-btn-primary" style={{ minWidth: 160, textDecoration: 'none' }}>
+            {ctaText}
+          </Link>
+        ) : (
+          <button className="ds-btn ds-btn-primary" type="button" style={{ minWidth: 160 }}>
+            {ctaText}
+          </button>
+        )}
+        <div style={{ fontSize: 11, color: 'var(--ds-muted)', fontWeight: 500 }}>
+          {meta.label}
+        </div>
+      </div>
+    </article>
   )
+}
+
+function stateMeta(state: Essay['state']): { label: string; chipText: string | null; chipClass: string } {
+  switch (state) {
+    case 'not_started': return { label: 'Нужно сделать',           chipText: null,             chipClass: '' }
+    case 'in_progress': return { label: 'Заполняешь',              chipText: 'в работе',       chipClass: 'ds-chip-warning' }
+    case 'sent':        return { label: 'Отправлено куратору',     chipText: 'у куратора',     chipClass: 'ds-chip-info' }
+    case 'editing':     return { label: 'Куратор дорабатывает',    chipText: 'у куратора',     chipClass: 'ds-chip-info' }
+    case 'ready':       return { label: 'Готово, финальная версия', chipText: '✓ готово',       chipClass: 'ds-chip-success' }
+  }
 }
