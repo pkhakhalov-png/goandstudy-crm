@@ -88,18 +88,30 @@ export default async function UniversitiesPage({
   }
   const schoolsList = allSchoolsForFilters
 
-  // Считаем количество ПРОГРАММ по странам (не школ) — параллельные head-count запросы
+  // Считаем количество ПРОГРАММ по странам — без inner-join (на проде он давал ложные count=0).
+  // Группируем school_id по country_code один раз, потом считаем programs с .in() по списку id.
   const COUNTRY_CODES_FOR_COUNT = ['us', 'gb', 'ca', 'de', 'fr', 'it', 'es', 'nl', 'at', 'au', 'ie', 'ae', 'hu']
-  const countResults = await Promise.all(
-    COUNTRY_CODES_FOR_COUNT.map(c =>
-      parser.from('programs')
-        .select('id, school:schools!inner(country_code)', { count: 'exact', head: true })
-        .eq('school.country_code', c)
-        .then(r => ({ code: c, count: r.count || 0 }))
-    )
+  const idsByCountry = new Map<string, number[]>()
+  for (const s of schoolsList) {
+    const cc = (s.country_code || '').toLowerCase()
+    if (!cc) continue
+    if (!idsByCountry.has(cc)) idsByCountry.set(cc, [])
+    idsByCountry.get(cc)!.push(s.id)
+  }
+  const countResults = await Promise.allSettled(
+    COUNTRY_CODES_FOR_COUNT.map(async c => {
+      const ids = idsByCountry.get(c) || []
+      if (ids.length === 0) return { code: c, count: 0 }
+      const r = await parser.from('programs')
+        .select('id', { count: 'exact', head: true })
+        .in('school_id', ids)
+      return { code: c, count: r.count || 0 }
+    })
   )
   const countryCounts: Record<string, number> = {}
-  for (const r of countResults) countryCounts[r.code] = r.count
+  for (const r of countResults) {
+    if (r.status === 'fulfilled') countryCounts[r.value.code] = r.value.count
+  }
 
   const programs = searchResult.rows
   const count = searchResult.total
