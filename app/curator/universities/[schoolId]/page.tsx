@@ -14,6 +14,8 @@ import { CoverPhotoUploader } from '@/app/_shared/CuratorEdit/CoverPhotoUploader
 import { SchoolEditPanel } from './SchoolEditPanel'
 import { getCoverPhoto, getEffective, applyOverrides } from '@/lib/curator-overrides'
 
+export const dynamic = 'force-dynamic'
+
 const COUNTRY_LABEL: Record<string, string> = {
   ca: 'Канада', au: 'Австралия', gb: 'Великобритания', de: 'Германия', us: 'США',
 }

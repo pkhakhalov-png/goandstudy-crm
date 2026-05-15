@@ -10,6 +10,8 @@ import { EditModeProvider, EditModeToggle } from '@/app/_shared/CuratorEdit/Edit
 import { ProgramEditPanel } from './ProgramEditPanel'
 import { applyOverrides } from '@/lib/curator-overrides'
 
+export const dynamic = 'force-dynamic'
+
 const COUNTRY_LABEL: Record<string, string> = {
   ca: 'Канада', au: 'Австралия', gb: 'Великобритания', de: 'Германия',
   us: 'США', ie: 'Ирландия',
