@@ -293,6 +293,41 @@ function MarkdownTextarea({ value, onChange, onBlur, placeholder, disabled, styl
     })
   }
 
+  /** Превращает ВЫДЕЛЕННЫЙ кусок текста в отдельную строку-заголовок (с разрывами до/после).
+   *  Если ничего не выделено — просто префиксит текущую строку (как раньше). */
+  function makeHeading(prefix: string) {
+    const ta = ref.current
+    if (!ta) return
+    const start = ta.selectionStart
+    const end = ta.selectionEnd
+    const sel = value.slice(start, end)
+
+    // Пустое выделение → префиксим всю текущую строку
+    if (sel.trim().length === 0) {
+      prefixLines(prefix)
+      return
+    }
+
+    const before = value.slice(0, start)
+    const after = value.slice(end)
+    const needsLeadingNewline = before.length > 0 && !before.endsWith('\n')
+    const needsTrailingNewline = after.length > 0 && !after.startsWith('\n')
+
+    const leading = needsLeadingNewline ? '\n' : ''
+    const trailing = needsTrailingNewline ? '\n' : ''
+    const heading = prefix + sel.trim()
+    const next = before + leading + heading + trailing + after
+
+    onChange(next)
+    requestAnimationFrame(() => {
+      ta.focus()
+      // Курсор после новой строки заголовка
+      const headStart = before.length + leading.length + prefix.length
+      ta.selectionStart = headStart
+      ta.selectionEnd = headStart + sel.trim().length
+    })
+  }
+
   return (
     <div>
       <div style={{
@@ -304,15 +339,15 @@ function MarkdownTextarea({ value, onChange, onBlur, placeholder, disabled, styl
         borderRight: '1px solid var(--bor, #E5E5E7)',
       }}>
         <ToolbarBtn
-          onClick={() => prefixLines('## ')}
-          title="БОЛЬШОЙ заголовок раздела — розовый, заглавными буквами (как «СИЛЬНЫЕ СТОРОНЫ» на странице вуза). Поставь курсор на строку → нажми."
+          onClick={() => makeHeading('## ')}
+          title="БОЛЬШОЙ заголовок раздела — розовый, заглавными буквами (как «СИЛЬНЫЕ СТОРОНЫ»). Выдели текст → нажми, и только этот фрагмент станет заголовком на отдельной строке."
         >
           <span style={{ color: '#B15ECC', fontSize: 14, fontWeight: 700, letterSpacing: '0.04em' }}>H₂</span>
           <span style={{ marginLeft: 4, fontSize: 10, color: 'var(--muted, #86868B)' }}>заголовок раздела</span>
         </ToolbarBtn>
         <ToolbarBtn
-          onClick={() => prefixLines('### ')}
-          title="Меньший заголовок-подсекции — серый, обычным шрифтом"
+          onClick={() => makeHeading('### ')}
+          title="Меньший заголовок-подсекции — серый, обычным шрифтом. Выдели текст → нажми."
         >
           <span style={{ color: '#1D1D1F', fontSize: 13, fontWeight: 700 }}>H₃</span>
           <span style={{ marginLeft: 4, fontSize: 10, color: 'var(--muted, #86868B)' }}>под-заголовок</span>
