@@ -8,7 +8,6 @@ interface Props {
   clientStages: any[]
   universities: any[]
   messages: any[]
-  tasks: any[]
   curatorId: string | null
 }
 
@@ -24,14 +23,9 @@ const badgeColors: Record<string, { bg: string; color: string }> = {
   'ФИНАЛ': { bg: 'rgba(22,163,97,.12)', color: 'var(--green)' },
 }
 
-export function CuratorDashboard({ clients, stages, clientStages, universities, messages, tasks, curatorId }: Props) {
+export function CuratorDashboard({ clients, stages, clientStages, universities, messages, curatorId }: Props) {
   const now = Date.now()
-
-  // ═══ TODAY'S TASKS ═══
   const today = new Date().toISOString().split('T')[0]
-  const overdueTasks = tasks.filter(t => !t.is_done && t.deadline && t.deadline.split('T')[0] < today)
-  const todayTasks = tasks.filter(t => !t.is_done && t.deadline && t.deadline.split('T')[0] === today)
-  const urgentTasks = [...overdueTasks, ...todayTasks]
 
   // ═══ UNREPLIED CLIENTS ═══
   const clientIds = new Set(clients.map(c => c.id))
@@ -79,31 +73,6 @@ export function CuratorDashboard({ clients, stages, clientStages, universities, 
 
   return (
     <>
-      {/* ═══ TODAY / OVERDUE TASKS ═══ */}
-      {urgentTasks.length > 0 && (
-        <div style={cardStyle}>
-          <div style={sectionTitle}>Сегодня ({todayTasks.length}) / Просрочено ({overdueTasks.length})</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {urgentTasks.slice(0, 8).map(t => {
-              const isOverdue = overdueTasks.includes(t)
-              return (
-                <div key={t.id} style={{
-                  display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 10,
-                  background: isOverdue ? 'rgba(220,53,69,.06)' : 'rgba(201,125,0,.06)',
-                  border: `1px solid ${isOverdue ? 'rgba(220,53,69,.2)' : 'rgba(201,125,0,.2)'}`,
-                }}>
-                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: isOverdue ? 'var(--red)' : 'var(--gold)', flexShrink: 0 }} />
-                  <div style={{ flex: 1, fontSize: 12, fontWeight: 600 }}>{t.title}</div>
-                  <div style={{ fontSize: 10, color: isOverdue ? 'var(--red)' : 'var(--gold)' }}>
-                    {t.deadline?.split('T')[0]}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
-
       {/* ═══ UNREPLIED ═══ */}
       {unreplied.length > 0 && (
         <div style={cardStyle}>

@@ -22,21 +22,27 @@ export default async function CuratorHomePage() {
 
   const curatorId = curatorRecord?.id
 
+  // Сразу выясняем id клиентов этого куратора — чтобы дочерние таблицы
+  // (universities, messages) не тянуть глобально.
+  const { data: myClients } = await admin
+    .from('clients')
+    .select('id, name, country, status, curator_id, current_stage_code, created_at')
+    .eq('curator_id', curatorId || '')
+    .eq('status', 'active')
+  const clientIdList = (myClients ?? []).map(c => c.id)
+
   const [
-    { data: clients },
     { data: stages },
     { data: clientStages },
     { data: universities },
     { data: messages },
-    { data: tasks },
   ] = await Promise.all([
-    admin.from('clients').select('id, name, country, status, curator_id, current_stage_code, created_at').eq('curator_id', curatorId || '').eq('status', 'active'),
     admin.from('curator_stages').select('id, code, title, position, badge').order('position'),
-    admin.from('client_stages').select('id, client_id, stage_id, status'),
-    admin.from('client_universities').select('id, client_id, university_name, deadline, status'),
-    admin.from('client_tg_messages').select('id, client_id, direction, sender_role, created_at').order('created_at', { ascending: false }),
-    admin.from('deal_tasks').select('id, deal_id, title, deadline, is_done, assigned_to').eq('is_done', false),
+    admin.from('client_stages').select('id, client_id, stage_id, status').in('client_id', clientIdList.length > 0 ? clientIdList : [-1]),
+    admin.from('client_universities').select('id, client_id, university_name, deadline, status').in('client_id', clientIdList.length > 0 ? clientIdList : [-1]),
+    admin.from('client_tg_messages').select('id, client_id, direction, sender_role, created_at').in('client_id', clientIdList.length > 0 ? clientIdList : [-1]).order('created_at', { ascending: false }),
   ])
+  const clients = myClients
 
   const initials = (profile?.name || user.email || 'КР')
     .split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)
@@ -53,7 +59,6 @@ export default async function CuratorHomePage() {
             clientStages={clientStages ?? []}
             universities={universities ?? []}
             messages={messages ?? []}
-            tasks={tasks ?? []}
             curatorId={curatorId || null}
           />
         </div>
