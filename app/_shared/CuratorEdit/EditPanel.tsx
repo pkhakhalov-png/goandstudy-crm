@@ -8,7 +8,8 @@
  * После blur — сохраняем через onSave(field, value).
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { useEditMode } from './EditMode'
 import { OverrideBadge } from './EditMode'
 import type { OverrideMeta } from '@/lib/curator-overrides'
@@ -40,6 +41,7 @@ interface Props {
 }
 
 export function EditPanel({ title, sections, onSave }: Props) {
+  const router = useRouter()
   const { enabled, setEnabled } = useEditMode()
   const [drafts, setDrafts] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState<Set<string>>(new Set())
@@ -74,6 +76,7 @@ export function EditPanel({ title, sections, onSave }: Props) {
     if (res.ok) {
       setSavedFields(s => new Set(s).add(field))
       setTimeout(() => setSavedFields(s => { const n = new Set(s); n.delete(field); return n }), 1500)
+      router.refresh()  // обновляем серверную страницу чтобы applyOverrides подхватил новое значение
     } else {
       setErrors(e => ({ ...e, [field]: res.error }))
     }
@@ -85,6 +88,7 @@ export function EditPanel({ title, sections, onSave }: Props) {
     setSaving(s => { const n = new Set(s); n.delete(field); return n })
     if (res.ok) {
       setDrafts(d => ({ ...d, [field]: '' }))
+      router.refresh()
     } else {
       setErrors(e => ({ ...e, [field]: res.error }))
     }
@@ -219,14 +223,13 @@ function FieldRow({ spec, draft, onChange, onBlur, onReset, saving, savedJustNow
         )}
       </label>
       {spec.type === 'textarea' ? (
-        <textarea
+        <MarkdownTextarea
           value={draft}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={onChange}
           onBlur={onBlur}
-          rows={Math.min(15, Math.max(4, draft.split('\n').length + 1))}
           placeholder={spec.placeholder}
           disabled={saving}
-          style={{ ...inputStyle, resize: 'vertical' }}
+          style={inputStyle}
         />
       ) : (
         <input
@@ -242,5 +245,102 @@ function FieldRow({ spec, draft, onChange, onBlur, onReset, saving, savedJustNow
       {spec.hint && <div style={{ fontSize: 10, color: 'var(--muted, #86868B)', marginTop: 4 }}>{spec.hint}</div>}
       {error && <div style={{ fontSize: 11, color: '#C92D22', marginTop: 4 }}>Ошибка: {error}</div>}
     </div>
+  )
+}
+
+/* ─── Markdown textarea с мини-тулбаром (жирный / заголовки / списки) ─── */
+
+function MarkdownTextarea({ value, onChange, onBlur, placeholder, disabled, style }: {
+  value: string
+  onChange: (v: string) => void
+  onBlur: () => void
+  placeholder?: string
+  disabled: boolean
+  style: React.CSSProperties
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null)
+
+  function wrap(before: string, after = '') {
+    const ta = ref.current
+    if (!ta) return
+    const start = ta.selectionStart
+    const end = ta.selectionEnd
+    const sel = value.slice(start, end)
+    const next = value.slice(0, start) + before + sel + after + value.slice(end)
+    onChange(next)
+    requestAnimationFrame(() => {
+      ta.focus()
+      ta.selectionStart = start + before.length
+      ta.selectionEnd = end + before.length
+    })
+  }
+
+  function prefixLines(prefix: string) {
+    const ta = ref.current
+    if (!ta) return
+    const start = ta.selectionStart
+    const end = ta.selectionEnd
+    const lineStart = value.lastIndexOf('\n', start - 1) + 1
+    const before = value.slice(0, lineStart)
+    const region = value.slice(lineStart, end)
+    const replaced = region.split('\n').map(line => line.startsWith(prefix) ? line : prefix + line).join('\n')
+    const next = before + replaced + value.slice(end)
+    onChange(next)
+    requestAnimationFrame(() => {
+      ta.focus()
+      ta.selectionStart = start + prefix.length
+      ta.selectionEnd = end + (replaced.length - region.length)
+    })
+  }
+
+  return (
+    <div>
+      <div style={{
+        display: 'flex', gap: 4, flexWrap: 'wrap',
+        padding: '4px 6px', borderRadius: '8px 8px 0 0',
+        background: 'var(--bg-alt, #F5F5F7)',
+        borderTop: '1px solid var(--bor, #E5E5E7)',
+        borderLeft: '1px solid var(--bor, #E5E5E7)',
+        borderRight: '1px solid var(--bor, #E5E5E7)',
+      }}>
+        <ToolbarBtn onClick={() => prefixLines('## ')} title="Заголовок H2 (отобразится в фирменном стиле)">H₂</ToolbarBtn>
+        <ToolbarBtn onClick={() => prefixLines('### ')} title="Заголовок H3">H₃</ToolbarBtn>
+        <ToolbarBtn onClick={() => wrap('**', '**')} title="Жирный"><b>B</b></ToolbarBtn>
+        <ToolbarBtn onClick={() => wrap('*', '*')} title="Курсив"><i>I</i></ToolbarBtn>
+        <ToolbarBtn onClick={() => prefixLines('- ')} title="Список">•</ToolbarBtn>
+        <span style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--muted, #86868B)', padding: '4px 8px' }}>
+          ## Заголовок · **жирный** · - список
+        </span>
+      </div>
+      <textarea
+        ref={ref}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onBlur={onBlur}
+        rows={Math.min(20, Math.max(6, value.split('\n').length + 1))}
+        placeholder={placeholder}
+        disabled={disabled}
+        style={{ ...style, borderRadius: '0 0 8px 8px', borderTop: 'none', resize: 'vertical' }}
+      />
+    </div>
+  )
+}
+
+function ToolbarBtn({ children, onClick, title }: { children: React.ReactNode; onClick: () => void; title: string }) {
+  return (
+    <button
+      type="button"
+      onMouseDown={(e) => e.preventDefault()}  // не теряем фокус textarea
+      onClick={onClick}
+      title={title}
+      style={{
+        background: '#fff', border: '1px solid var(--bor, #E5E5E7)',
+        borderRadius: 6, padding: '4px 10px', fontSize: 13, cursor: 'pointer',
+        fontFamily: 'inherit', color: 'var(--text, #1D1D1F)', fontWeight: 600,
+        minWidth: 32, lineHeight: 1.2,
+      }}
+    >
+      {children}
+    </button>
   )
 }
