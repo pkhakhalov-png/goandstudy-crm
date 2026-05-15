@@ -6,6 +6,7 @@ import { CuratorSidebar } from '../../CuratorSidebar'
 import { AddToShortlistButton } from '../../universities/[schoolId]/AddToShortlistButton'
 import { FillProgramButton } from './FillProgramButton'
 import { BackButton } from '../../universities/[schoolId]/BackButton'
+import { EditModeProvider, EditModeToggle } from '@/app/_shared/CuratorEdit/EditMode'
 
 const COUNTRY_LABEL: Record<string, string> = {
   ca: 'Канада', au: 'Австралия', gb: 'Великобритания', de: 'Германия',
@@ -131,12 +132,13 @@ export default async function ProgramPage({
   const length = fmtMonths(attr.min_length === attr.max_length ? attr.min_length : (attr.max_length || attr.min_length))
 
   return (
+    <EditModeProvider viewerRole={profile?.role || 'client'} asClient={asClient}>
     <div className="app">
       {!asClient && (
         <CuratorSidebar userName={profile?.name || ''} userEmail={user.email || ''} initials={initials} activePage="universities" />
       )}
       <div className="main">
-        <div className="topbar" style={{ gap: 12 }}>
+        <div className="topbar" style={{ gap: 12, justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
             <Link
               href={asClient
@@ -154,6 +156,7 @@ export default async function ProgramPage({
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             }}>{program.name}</span>
           </div>
+          {!asClient && <EditModeToggle />}
         </div>
 
         <div style={{ padding: '20px 28px 40px' }}>
@@ -421,6 +424,7 @@ export default async function ProgramPage({
         </div>
       </div>
     </div>
+    </EditModeProvider>
   )
 }
 
