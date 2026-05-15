@@ -50,3 +50,48 @@ export function getCoverPhoto(school: any): { url: string | null; isCuratorUploa
   // Куратор не трогал — показываем AI/parser-фото
   return { url: school?.campus_photo_url || null, isCuratorUploaded: false }
 }
+
+/**
+ * Возвращает «эффективный» объект школы/программы/стипендии — поверх
+ * исходных полей наложены curator_overrides. Используется в рендере чтобы
+ * не вызывать getEffective() для каждого поля отдельно.
+ *
+ * Логика для составных полей (application_fee, undergrad_length_months, и т.п.):
+ * - Если в curator_overrides есть значение → перекрывает соответствующее поле
+ * - Для application_fee — обновляет application_fee_range.value
+ * - Для длительности — обновляет avg_program_length.{undergraduate,graduate}
+ * - Для tuition_currency — обновляет raw_data.curator_extras.tuition_currency
+ */
+export function applyOverrides<T extends Record<string, any>>(entity: T): T {
+  const overrides = getOverrides(entity?.raw_data)
+  if (!overrides || Object.keys(overrides).filter(k => k !== '__meta').length === 0) return entity
+
+  const out: any = { ...entity }
+  for (const [k, v] of Object.entries(overrides)) {
+    if (k === '__meta') continue
+    if (v === null || v === '' || v === undefined) continue
+
+    // Спец-маппинг для составных полей
+    if (k === 'application_fee') {
+      out.application_fee_range = { value: Number(v) }
+      continue
+    }
+    if (k === 'undergrad_length_months') {
+      out.avg_program_length = { ...(out.avg_program_length || {}), undergraduate: Number(v) }
+      continue
+    }
+    if (k === 'grad_length_months') {
+      out.avg_program_length = { ...(out.avg_program_length || {}), graduate: Number(v) }
+      continue
+    }
+    if (k === 'tuition_currency') {
+      const rd = { ...(out.raw_data || {}) }
+      rd.curator_extras = { ...(rd.curator_extras || {}), tuition_currency: v }
+      out.raw_data = rd
+      continue
+    }
+    // Обычные поля — на верхнем уровне
+    out[k] = v
+  }
+  return out
+}

@@ -11,8 +11,8 @@ import { SchoolHeroPhoto } from './SchoolHeroPhoto'
 import { BackButton } from './BackButton'
 import { EditModeProvider, EditModeToggle } from '@/app/_shared/CuratorEdit/EditMode'
 import { CoverPhotoUploader } from '@/app/_shared/CuratorEdit/CoverPhotoUploader'
-import { SchoolField } from '@/app/_shared/CuratorEdit/SchoolEditableField'
-import { getCoverPhoto, getEffective } from '@/lib/curator-overrides'
+import { SchoolEditPanel } from './SchoolEditPanel'
+import { getCoverPhoto, getEffective, applyOverrides } from '@/lib/curator-overrides'
 
 const COUNTRY_LABEL: Record<string, string> = {
   ca: 'Канада', au: 'Австралия', gb: 'Великобритания', de: 'Германия', us: 'США',
@@ -39,12 +39,16 @@ export default async function SchoolPage({
   if (profile?.role !== 'curator' && profile?.role !== 'admin' && profile?.role !== 'rop' && profile?.role !== 'client') redirect('/login')
 
   const parser = createParserClient()
-  const [{ data: school }, { data: programs }] = await Promise.all([
+  const [{ data: schoolRaw }, { data: programs }] = await Promise.all([
     parser.from('schools').select('*').eq('id', id).maybeSingle(),
     parser.from('programs').select('id, name, tuition, application_fee, raw_data').eq('school_id', id).order('name'),
   ])
 
-  if (!school) notFound()
+  if (!schoolRaw) notFound()
+
+  // Применяем curator_overrides поверх — все правки куратора видны и кураторам и клиентам.
+  // schoolRaw — оригинал из парсера, school — с наложенными правками куратора.
+  const school = applyOverrides(schoolRaw)
 
   // Стипендии: IDP по school_id + TopUni по institution_title (best-effort, ilike)
   const sch = createScholarshipsClient()
@@ -171,20 +175,11 @@ export default async function SchoolPage({
                 )}
               </div>
               {(() => {
-                const curatorNote = getEffective(school.raw_data, 'curator_note', school.curator_note || '')
-                if (!curatorNote.value && !curatorNote.isOverridden) return null
+                const curatorNote = getEffective<string>(school.raw_data, 'curator_note', school.curator_note || '')
+                if (!curatorNote.value) return null
                 return (
                   <div style={{ marginTop: 12, fontSize: 13, lineHeight: 1.5, color: 'var(--text)', background: 'rgba(177,94,204,.06)', borderLeft: '3px solid var(--purple)', padding: '10px 12px', borderRadius: 4 }}>
-                    <SchoolField
-                      schoolId={school.id}
-                      value={curatorNote.value}
-                      isOverridden={curatorNote.isOverridden}
-                      by={curatorNote.by}
-                      field="curator_note"
-                      label="Краткое описание (тизер)"
-                      multiline
-                      placeholder="Короткий тизер 1-2 предложения о вузе"
-                    />
+                    {curatorNote.value}
                   </div>
                 )
               })()}
@@ -221,6 +216,7 @@ export default async function SchoolPage({
           />
         </div>
       </div>
+      {!asClient && <SchoolEditPanel schoolId={school.id} school={school} />}
     </div>
     </EditModeProvider>
   )
