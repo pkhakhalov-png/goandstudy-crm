@@ -9,6 +9,10 @@ import { FillSchoolButton } from './FillSchoolButton'
 import { SchoolHeaderLogo } from './SchoolHeaderLogo'
 import { SchoolHeroPhoto } from './SchoolHeroPhoto'
 import { BackButton } from './BackButton'
+import { EditModeProvider, EditModeToggle } from '@/app/_shared/CuratorEdit/EditMode'
+import { CoverPhotoUploader } from '@/app/_shared/CuratorEdit/CoverPhotoUploader'
+import { SchoolField } from '@/app/_shared/CuratorEdit/SchoolEditableField'
+import { getCoverPhoto, getEffective } from '@/lib/curator-overrides'
 
 const COUNTRY_LABEL: Record<string, string> = {
   ca: 'Канада', au: 'Австралия', gb: 'Великобритания', de: 'Германия', us: 'США',
@@ -94,24 +98,34 @@ export default async function SchoolPage({
     return null
   })()
 
+  const cover = getCoverPhoto(school)
+
   return (
+    <EditModeProvider viewerRole={profile?.role || 'client'} asClient={asClient}>
     <div className="app">
       {!asClient && (
         <CuratorSidebar userName={profile?.name || ''} userEmail={user.email || ''} initials={initials} activePage="universities" />
       )}
       <div className="main">
-        <div className="topbar" style={{ gap: 12 }}>
+        <div className="topbar" style={{ gap: 12, justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span className="pt" style={{
               display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', overflow: 'hidden',
             }}>{school.name}</span>
           </div>
+          {!asClient && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <CoverPhotoUploader schoolId={school.id} hasCustomCover={cover.isCuratorUploaded} />
+              <EditModeToggle />
+            </div>
+          )}
         </div>
 
         <div style={{ padding: '20px 28px 40px' }}>
-          {/* Hero-фото кампуса от ИИ (если 404 — клиент-компонент сам спрячет) */}
-          {school.campus_photo_url && (
-            <SchoolHeroPhoto src={school.campus_photo_url} name={school.name} />
+          {/* Hero-фото: приоритет — куратор-обложка, fallback — AI campus_photo_url.
+              Если куратор удалил → cover.url=null, пустое место. */}
+          {cover.url && (
+            <SchoolHeroPhoto src={cover.url} name={school.name} />
           )}
 
           {/* Шапка */}
@@ -156,11 +170,24 @@ export default async function SchoolPage({
                   </span>
                 )}
               </div>
-              {school.curator_note && (
-                <div style={{ marginTop: 12, fontSize: 13, lineHeight: 1.5, color: 'var(--text)', background: 'rgba(177,94,204,.06)', borderLeft: '3px solid var(--purple)', padding: '10px 12px', borderRadius: 4 }}>
-                  {school.curator_note}
-                </div>
-              )}
+              {(() => {
+                const curatorNote = getEffective(school.raw_data, 'curator_note', school.curator_note || '')
+                if (!curatorNote.value && !curatorNote.isOverridden) return null
+                return (
+                  <div style={{ marginTop: 12, fontSize: 13, lineHeight: 1.5, color: 'var(--text)', background: 'rgba(177,94,204,.06)', borderLeft: '3px solid var(--purple)', padding: '10px 12px', borderRadius: 4 }}>
+                    <SchoolField
+                      schoolId={school.id}
+                      value={curatorNote.value}
+                      isOverridden={curatorNote.isOverridden}
+                      by={curatorNote.by}
+                      field="curator_note"
+                      label="Краткое описание (тизер)"
+                      multiline
+                      placeholder="Короткий тизер 1-2 предложения о вузе"
+                    />
+                  </div>
+                )
+              })()}
               {!asClient && (
                 <div style={{ marginTop: 12 }}>
                   <FillSchoolButton schoolId={school.id} hasData={!!(school.qs_rank || school.curator_note || school.university_type)} />
@@ -195,6 +222,7 @@ export default async function SchoolPage({
         </div>
       </div>
     </div>
+    </EditModeProvider>
   )
 }
 
