@@ -1,15 +1,27 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 export function SchoolHeroPhoto({ src, name }: { src: string; name: string }) {
+  const ref = useRef<HTMLImageElement>(null)
   const [state, setState] = useState<'loading' | 'loaded' | 'broken'>('loading')
+
+  // Если картинка уже в кеше браузера — onLoad не сработает после маунта,
+  // поэтому проверяем complete/naturalWidth вручную.
+  useEffect(() => {
+    const img = ref.current
+    if (!img) return
+    if (img.complete) {
+      setState(img.naturalWidth > 0 ? 'loaded' : 'broken')
+    }
+  }, [src])
 
   if (state === 'broken') return null
 
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
+      ref={ref}
       src={src}
       alt=""
       title={name}
@@ -17,15 +29,15 @@ export function SchoolHeroPhoto({ src, name }: { src: string; name: string }) {
       onError={() => setState('broken')}
       style={{
         width: '100%',
-        height: state === 'loaded' ? 320 : 0,
+        height: 320,
         objectFit: 'cover',
-        borderRadius: state === 'loaded' ? 14 : 0,
-        border: state === 'loaded' ? '1px solid var(--bor)' : 'none',
-        marginBottom: state === 'loaded' ? 16 : 0,
+        borderRadius: 14,
+        border: '1px solid var(--bor)',
+        marginBottom: 16,
         display: 'block',
         background: 'var(--surf)',
         opacity: state === 'loaded' ? 1 : 0,
-        transition: 'opacity 0.2s, height 0.2s, margin-bottom 0.2s',
+        transition: 'opacity 0.2s',
       }}
     />
   )

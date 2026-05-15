@@ -108,10 +108,10 @@ export function SchoolEditPanel({ schoolId, school }: Props) {
       title: 'Медиа',
       fields: [
         {
-          field: 'video_link', label: 'Видео-тур (YouTube embed)', type: 'text',
-          placeholder: 'https://www.youtube.com/embed/...',
+          field: 'video_link', label: 'Видео-тур', type: 'text',
+          placeholder: 'https://youtu.be/VIDEO_ID или https://vk.com/video-X_Y',
           ...eff('video_link', videoLink),
-          hint: 'Формат: youtube.com/embed/VIDEO_ID',
+          hint: 'Поддерживаем YouTube (youtu.be, watch?v=, /embed/), VK Video и Vimeo — преобразуем сами',
         },
       ],
     },

@@ -269,19 +269,23 @@ function OverviewTab({ school, raw }: { school: any; raw: any }) {
           )}
         </div>
 
-        {videoLink && (
-          <div style={cardStyle}>
-            <div style={sectionTitle}>Видео-тур</div>
-            <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0, borderRadius: 10, overflow: 'hidden', background: '#000' }}>
-              <iframe
-                src={videoLink}
-                title="Video tour"
-                style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 0 }}
-                allowFullScreen
-              />
+        {videoLink && (() => {
+          const embedUrl = toEmbedUrl(videoLink)
+          if (!embedUrl) return null
+          return (
+            <div style={cardStyle}>
+              <div style={sectionTitle}>Видео-тур</div>
+              <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0, borderRadius: 10, overflow: 'hidden', background: '#000' }}>
+                <iframe
+                  src={embedUrl}
+                  title="Video tour"
+                  style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 0 }}
+                  allowFullScreen
+                />
+              </div>
             </div>
-          </div>
-        )}
+          )
+        })()}
 
         {programLevelCounts && typeof programLevelCounts === 'object' && (
           <div style={cardStyle}>
@@ -379,6 +383,48 @@ function OverviewTab({ school, raw }: { school: any; raw: any }) {
       </div>
     </div>
   )
+}
+
+function toEmbedUrl(raw: string): string | null {
+  const s = (raw || '').trim()
+  if (!s) return null
+  try {
+    const u = new URL(s)
+    const host = u.hostname.replace(/^www\./, '')
+
+    // youtu.be/VIDEO_ID
+    if (host === 'youtu.be') {
+      const id = u.pathname.replace(/^\//, '').split('/')[0]
+      return id ? `https://www.youtube.com/embed/${id}` : null
+    }
+    // youtube.com/watch?v=VIDEO_ID или /shorts/ID или уже /embed/
+    if (host === 'youtube.com' || host === 'm.youtube.com' || host === 'youtube-nocookie.com') {
+      if (u.pathname.startsWith('/embed/')) return s
+      const v = u.searchParams.get('v')
+      if (v) return `https://www.youtube.com/embed/${v}`
+      const shorts = u.pathname.match(/^\/shorts\/([^/]+)/)
+      if (shorts) return `https://www.youtube.com/embed/${shorts[1]}`
+      return null
+    }
+    // VK Video — поддерживаем embed-ссылки
+    if (host === 'vk.com' || host === 'vkvideo.ru') {
+      if (u.pathname.startsWith('/video_ext.php')) return s
+      // /video-OID_VID → /video_ext.php?oid=-OID&id=VID
+      const m = u.pathname.match(/^\/video(-?\d+)_(\d+)/)
+      if (m) return `https://vk.com/video_ext.php?oid=${m[1]}&id=${m[2]}&hd=2`
+      return s
+    }
+    // Vimeo
+    if (host === 'vimeo.com') {
+      const id = u.pathname.replace(/^\//, '').split('/')[0]
+      return /^\d+$/.test(id) ? `https://player.vimeo.com/video/${id}` : s
+    }
+    if (host === 'player.vimeo.com') return s
+    // Прочее — отдаём как есть (видимо это iframe-готовая ссылка)
+    return s
+  } catch {
+    return null
+  }
 }
 
 function formatFeeRange(v: any, currency: string): string {
