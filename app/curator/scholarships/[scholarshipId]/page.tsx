@@ -6,6 +6,9 @@ import { CuratorSidebar } from '../../CuratorSidebar'
 import { AddScholarshipButton } from '../AddScholarshipButton'
 import { ScholarshipLogo } from '../ScholarshipLogo'
 import { BackButton } from '../../universities/[schoolId]/BackButton'
+import { EditModeProvider, EditModeToggle } from '@/app/_shared/CuratorEdit/EditMode'
+import { TopUniScholarshipEditPanel } from './TopUniScholarshipEditPanel'
+import { applyOverrides } from '@/lib/curator-overrides'
 
 export const dynamic = 'force-dynamic'
 
@@ -42,12 +45,13 @@ export default async function ScholarshipDetailPage({
   if (profile?.role !== 'curator' && profile?.role !== 'admin' && profile?.role !== 'rop') redirect('/login')
 
   const sb = createScholarshipsClient()
-  const { data: scholarship } = await sb
+  const { data: scholarshipRaw } = await sb
     .from('scholarships_topuni')
     .select('*')
     .eq('scholarship_id', id)
     .maybeSingle<Scholarship>()
-  if (!scholarship) notFound()
+  if (!scholarshipRaw) notFound()
+  const scholarship = applyOverrides(scholarshipRaw) as Scholarship
 
   const admin = await createAdminClient()
   const { data: curator } = await admin.from('curators').select('id').eq('user_id', user.id).maybeSingle()
@@ -82,10 +86,11 @@ export default async function ScholarshipDetailPage({
     : scholarship.apply_link_qs
 
   return (
+    <EditModeProvider viewerRole={profile?.role || 'client'} asClient={asClient}>
     <div className="app">
       <CuratorSidebar userName={profile?.name || ''} userEmail={user.email || ''} initials={initials} activePage="scholarships" />
       <div className="main">
-        <div className="topbar" style={{ gap: 12 }}>
+        <div className="topbar" style={{ gap: 12, justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
             <BackButton
               fallbackHref={asClient ? `/curator/scholarships?asClient=1${sp.clientId ? `&clientId=${sp.clientId}` : ''}` : '/curator/scholarships'}
@@ -96,6 +101,7 @@ export default async function ScholarshipDetailPage({
               {scholarship.title}
             </span>
           </div>
+          {!asClient && <EditModeToggle />}
         </div>
 
         <div style={{ padding: '20px 28px 40px' }}>
@@ -227,6 +233,8 @@ export default async function ScholarshipDetailPage({
           </div>
         </div>
       </div>
+      {!asClient && <TopUniScholarshipEditPanel scholarshipId={String(scholarship.scholarship_id)} row={scholarship} />}
     </div>
+    </EditModeProvider>
   )
 }

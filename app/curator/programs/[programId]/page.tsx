@@ -7,6 +7,8 @@ import { AddToShortlistButton } from '../../universities/[schoolId]/AddToShortli
 import { FillProgramButton } from './FillProgramButton'
 import { BackButton } from '../../universities/[schoolId]/BackButton'
 import { EditModeProvider, EditModeToggle } from '@/app/_shared/CuratorEdit/EditMode'
+import { ProgramEditPanel } from './ProgramEditPanel'
+import { applyOverrides } from '@/lib/curator-overrides'
 
 const COUNTRY_LABEL: Record<string, string> = {
   ca: 'Канада', au: 'Австралия', gb: 'Великобритания', de: 'Германия',
@@ -47,7 +49,7 @@ export default async function ProgramPage({
   if (profile?.role !== 'curator' && profile?.role !== 'admin' && profile?.role !== 'rop' && profile?.role !== 'client') redirect('/login')
 
   const parser = createParserClient()
-  const { data: program } = await parser
+  const { data: programRaw } = await parser
     .from('programs')
     .select(`
       *,
@@ -56,9 +58,11 @@ export default async function ProgramPage({
     .eq('id', id)
     .maybeSingle()
 
-  if (!program) notFound()
+  if (!programRaw) notFound()
 
-  const school = program.school || {}
+  // Применяем curator_overrides поверх — оригинал из парсера + правки куратора.
+  const program = applyOverrides(programRaw)
+  const school = applyOverrides(programRaw.school || {})
   const attr = program.raw_data?.attributes || {}
   const schoolRaw = school.raw_data?.attributes || {}
 
@@ -423,6 +427,7 @@ export default async function ProgramPage({
           </div>
         </div>
       </div>
+      {!asClient && <ProgramEditPanel programId={program.id} program={program} curatorData={curatorData} />}
     </div>
     </EditModeProvider>
   )

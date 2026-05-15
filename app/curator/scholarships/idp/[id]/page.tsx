@@ -7,6 +7,9 @@ import { AddScholarshipButton } from '../../AddScholarshipButton'
 import { ScholarshipLogo } from '../../ScholarshipLogo'
 import { FillIdpScholarshipButton } from './FillIdpScholarshipButton'
 import { BackButton } from '../../../universities/[schoolId]/BackButton'
+import { EditModeProvider, EditModeToggle } from '@/app/_shared/CuratorEdit/EditMode'
+import { IdpScholarshipEditPanel } from './IdpScholarshipEditPanel'
+import { applyOverrides } from '@/lib/curator-overrides'
 
 export const dynamic = 'force-dynamic'
 
@@ -61,12 +64,13 @@ export default async function IdpScholarshipDetailPage({
   if (profile?.role !== 'curator' && profile?.role !== 'admin' && profile?.role !== 'rop') redirect('/login')
 
   const sb = createScholarshipsClient()
-  const { data: row } = await sb
+  const { data: rowRaw } = await sb
     .from('idp_scholarships')
     .select('*, school:schools(id, name, logo_url, website)')
     .eq('id', num)
     .maybeSingle<IdpRow>()
-  if (!row) notFound()
+  if (!rowRaw) notFound()
+  const row = applyOverrides(rowRaw) as IdpRow
 
   const admin = await createAdminClient()
   const { data: curator } = await admin.from('curators').select('id').eq('user_id', user.id).maybeSingle()
@@ -106,10 +110,11 @@ export default async function IdpScholarshipDetailPage({
   const hasFilledData = !!(row.description || row.eligibility || extras.gpa_requirement || extras.application_process)
 
   return (
+    <EditModeProvider viewerRole={profile?.role || 'client'} asClient={asClient}>
     <div className="app">
       <CuratorSidebar userName={profile?.name || ''} userEmail={user.email || ''} initials={initials} activePage="scholarships" />
       <div className="main">
-        <div className="topbar" style={{ gap: 12 }}>
+        <div className="topbar" style={{ gap: 12, justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
             <BackButton fallbackHref="/curator/scholarships?source=idp" label="← Стипендии" />
             <span style={{ color: 'var(--bor2)' }}>/</span>
@@ -117,6 +122,7 @@ export default async function IdpScholarshipDetailPage({
               {row.name}
             </span>
           </div>
+          {!isAsClient && <EditModeToggle />}
         </div>
 
         <div style={{ padding: '20px 28px 40px' }}>
@@ -294,7 +300,9 @@ export default async function IdpScholarshipDetailPage({
           </div>
         </div>
       </div>
+      {!isAsClient && <IdpScholarshipEditPanel id={row.id} row={row} />}
     </div>
+    </EditModeProvider>
   )
 }
 
