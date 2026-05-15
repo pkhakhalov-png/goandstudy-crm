@@ -155,7 +155,7 @@ export function DemoPricingSection() {
         {/* Header */}
         <header className="demo-pricing-header" style={{ textAlign: 'center', marginBottom: 56 }}>
           <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--ds-purple)', marginBottom: 12 }}>
-            Полное сопровождение от Go &amp; Study
+            Полное сопровождение от goandstudy
           </div>
           <h2 style={{
             fontFamily: 'var(--ds-font-display-stack)', fontWeight: 700,
@@ -182,7 +182,7 @@ export function DemoPricingSection() {
               style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 0 }}
               allow="autoplay; encrypted-media; fullscreen; picture-in-picture; screen-wake-lock;"
               allowFullScreen
-              title="О компании Go &amp; Study"
+              title="О компании goandstudy"
             />
           </div>
         </div>

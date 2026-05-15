@@ -54,7 +54,7 @@ export function DemoTopNav({ activePage = 'home' }: Props) {
       >
         <Link href="/demo" className="demo-topnav-logo" style={{ display: 'flex', alignItems: 'center', gap: 12, textDecoration: 'none', color: 'inherit', flexShrink: 0 }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/gas-logo.png" alt="Go And Study" style={{ height: 36, width: 'auto', objectFit: 'contain', display: 'block' }} />
+          <img src="/gas-logo.png" alt="goandstudy" style={{ height: 36, width: 'auto', objectFit: 'contain', display: 'block' }} />
           <span className="demo-topnav-logo-text" style={{
             fontFamily: 'var(--ds-font-display-stack)', fontWeight: 700, fontSize: 14,
             letterSpacing: '0.04em', textTransform: 'uppercase',
