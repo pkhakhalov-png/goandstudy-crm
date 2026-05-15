@@ -465,40 +465,72 @@ function ProgramLevelCounts({ counts }: { counts: Record<string, number> | any }
   )
 }
 
+function renderInlineMarkdown(text: string): React.ReactNode[] {
+  // Парсим **жирный** + *курсив*
+  const parts: React.ReactNode[] = []
+  let i = 0
+  const re = /\*\*([^*\n]+)\*\*|\*([^*\n]+)\*/g
+  let m: RegExpExecArray | null
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > i) parts.push(text.slice(i, m.index))
+    if (m[1] !== undefined) parts.push(<strong key={parts.length}>{m[1]}</strong>)
+    else if (m[2] !== undefined) parts.push(<em key={parts.length}>{m[2]}</em>)
+    i = m.index + m[0].length
+  }
+  if (i < text.length) parts.push(text.slice(i))
+  return parts.length > 0 ? parts : [text]
+}
+
 function MarkdownDescription({ text }: { text: string }) {
   const [expanded, setExpanded] = useState(false)
-  // Парсим простой markdown: ## Заголовок\nабзац\n
-  const blocks: { type: 'heading' | 'paragraph'; content: string }[] = []
+  // Парсим: ## Заголовок · - bullet · абзац · **жирный** inline
+  type Block =
+    | { type: 'heading'; content: string }
+    | { type: 'paragraph'; content: string }
+    | { type: 'list'; items: string[] }
+  const blocks: Block[] = []
   const lines = text.split(/\r?\n/)
-  let buf: string[] = []
-  const flush = () => {
-    if (buf.length === 0) return
-    const para = buf.join(' ').trim()
-    if (para) blocks.push({ type: 'paragraph', content: para })
-    buf = []
+  let para: string[] = []
+  let bullets: string[] = []
+  const flushPara = () => {
+    if (para.length === 0) return
+    const joined = para.join(' ').trim()
+    if (joined) blocks.push({ type: 'paragraph', content: joined })
+    para = []
+  }
+  const flushList = () => {
+    if (bullets.length === 0) return
+    blocks.push({ type: 'list', items: [...bullets] })
+    bullets = []
   }
   for (const raw of lines) {
     const line = raw.trim()
-    if (!line) { flush(); continue }
+    if (!line) { flushPara(); flushList(); continue }
     const h = /^#{1,3}\s+(.+)$/.exec(line)
+    const b = /^[-•*]\s+(.+)$/.exec(line)
     if (h) {
-      flush()
+      flushPara(); flushList()
       blocks.push({ type: 'heading', content: h[1].trim() })
+    } else if (b) {
+      flushPara()
+      bullets.push(b[1].trim())
     } else {
-      buf.push(line)
+      flushList()
+      para.push(line)
     }
   }
-  flush()
+  flushPara(); flushList()
 
   // Если очень длинно — collapse
-  const fullLength = blocks.reduce((n, b) => n + b.content.length, 0)
+  const fullLength = blocks.reduce((n, b) => n + (b.type === 'list' ? b.items.join(' ').length : b.content.length), 0)
   const isLong = fullLength > 1200
   const visible = expanded || !isLong ? blocks : (() => {
     const out: typeof blocks = []
     let used = 0
     for (const b of blocks) {
       if (used > 800) break
-      out.push(b); used += b.content.length
+      out.push(b)
+      used += (b.type === 'list' ? b.items.join(' ').length : b.content.length)
     }
     return out
   })()
@@ -506,29 +538,23 @@ function MarkdownDescription({ text }: { text: string }) {
   return (
     <div>
       <div style={{ display: 'grid', gap: 10, color: 'var(--text)' }}>
-        {visible.map((b, i) =>
-          b.type === 'heading' ? (
-            <div
-              key={i}
-              style={{
-                fontSize: 13, fontWeight: 700, color: 'var(--purple)',
-                textTransform: 'none', letterSpacing: 0, marginTop: i === 0 ? 0 : 6,
-              }}
-            >
-              {b.content}
-            </div>
-          ) : (
-            <div
-              key={i}
-              style={{
-                fontSize: 13, lineHeight: 1.6, color: 'var(--text)',
-                whiteSpace: 'pre-wrap',
-              }}
-            >
+        {visible.map((b, i) => {
+          if (b.type === 'heading') return (
+            <div key={i} style={{ fontSize: 13, fontWeight: 700, color: 'var(--purple)', textTransform: 'none', letterSpacing: 0, marginTop: i === 0 ? 0 : 6 }}>
               {b.content}
             </div>
           )
-        )}
+          if (b.type === 'list') return (
+            <ul key={i} style={{ paddingLeft: 18, margin: 0, fontSize: 13, lineHeight: 1.6, color: 'var(--text)' }}>
+              {b.items.map((it, j) => <li key={j} style={{ marginBottom: 4 }}>{renderInlineMarkdown(it)}</li>)}
+            </ul>
+          )
+          return (
+            <div key={i} style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--text)', whiteSpace: 'pre-wrap' }}>
+              {renderInlineMarkdown(b.content)}
+            </div>
+          )
+        })}
       </div>
       {isLong && (
         <button
