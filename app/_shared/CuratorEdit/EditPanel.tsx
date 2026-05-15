@@ -296,21 +296,35 @@ function MarkdownTextarea({ value, onChange, onBlur, placeholder, disabled, styl
   return (
     <div>
       <div style={{
-        display: 'flex', gap: 4, flexWrap: 'wrap',
-        padding: '4px 6px', borderRadius: '8px 8px 0 0',
+        display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center',
+        padding: '6px 8px', borderRadius: '8px 8px 0 0',
         background: 'var(--bg-alt, #F5F5F7)',
         borderTop: '1px solid var(--bor, #E5E5E7)',
         borderLeft: '1px solid var(--bor, #E5E5E7)',
         borderRight: '1px solid var(--bor, #E5E5E7)',
       }}>
-        <ToolbarBtn onClick={() => prefixLines('## ')} title="Заголовок H2 (отобразится в фирменном стиле)">H₂</ToolbarBtn>
-        <ToolbarBtn onClick={() => prefixLines('### ')} title="Заголовок H3">H₃</ToolbarBtn>
-        <ToolbarBtn onClick={() => wrap('**', '**')} title="Жирный"><b>B</b></ToolbarBtn>
-        <ToolbarBtn onClick={() => wrap('*', '*')} title="Курсив"><i>I</i></ToolbarBtn>
-        <ToolbarBtn onClick={() => prefixLines('- ')} title="Список">•</ToolbarBtn>
-        <span style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--muted, #86868B)', padding: '4px 8px' }}>
-          ## Заголовок · **жирный** · - список
-        </span>
+        <ToolbarBtn
+          onClick={() => prefixLines('## ')}
+          title="БОЛЬШОЙ заголовок раздела — розовый, заглавными буквами (как «СИЛЬНЫЕ СТОРОНЫ» на странице вуза). Поставь курсор на строку → нажми."
+        >
+          <span style={{ color: '#B15ECC', fontSize: 14, fontWeight: 700, letterSpacing: '0.04em' }}>H₂</span>
+          <span style={{ marginLeft: 4, fontSize: 10, color: 'var(--muted, #86868B)' }}>заголовок раздела</span>
+        </ToolbarBtn>
+        <ToolbarBtn
+          onClick={() => prefixLines('### ')}
+          title="Меньший заголовок-подсекции — серый, обычным шрифтом"
+        >
+          <span style={{ color: '#1D1D1F', fontSize: 13, fontWeight: 700 }}>H₃</span>
+          <span style={{ marginLeft: 4, fontSize: 10, color: 'var(--muted, #86868B)' }}>под-заголовок</span>
+        </ToolbarBtn>
+        <ToolbarBtn onClick={() => wrap('**', '**')} title="Выделить жирным. Сначала выдели текст мышкой, потом нажми.">
+          <b style={{ fontSize: 13 }}>B</b>
+          <span style={{ marginLeft: 4, fontSize: 10, color: 'var(--muted, #86868B)' }}>жирный</span>
+        </ToolbarBtn>
+        <ToolbarBtn onClick={() => prefixLines('- ')} title="Маркированный список — каждый пункт с новой строки">
+          <span style={{ fontSize: 14 }}>•</span>
+          <span style={{ marginLeft: 4, fontSize: 10, color: 'var(--muted, #86868B)' }}>список</span>
+        </ToolbarBtn>
       </div>
       <textarea
         ref={ref}
@@ -320,8 +334,88 @@ function MarkdownTextarea({ value, onChange, onBlur, placeholder, disabled, styl
         rows={Math.min(20, Math.max(6, value.split('\n').length + 1))}
         placeholder={placeholder}
         disabled={disabled}
-        style={{ ...style, borderRadius: '0 0 8px 8px', borderTop: 'none', resize: 'vertical' }}
+        style={{ ...style, borderRadius: 0, borderTop: 'none', resize: 'vertical', fontFamily: 'ui-monospace, "SF Mono", monospace', fontSize: 12 }}
       />
+      <MarkdownPreview text={value} />
+    </div>
+  )
+}
+
+/* ─── Превью markdown: парсит ## / ### / **жирный** / - списки и рендерит как на странице вуза ─── */
+
+function MarkdownPreview({ text }: { text: string }) {
+  if (!text.trim()) return null
+  const lines = text.split(/\r?\n/)
+  type Block =
+    | { kind: 'h2'; text: string }
+    | { kind: 'h3'; text: string }
+    | { kind: 'p'; text: string }
+    | { kind: 'list'; items: string[] }
+  const blocks: Block[] = []
+  let para: string[] = []
+  let bullets: string[] = []
+  const flushPara = () => { if (para.length) { blocks.push({ kind: 'p', text: para.join(' ').trim() }); para = [] } }
+  const flushList = () => { if (bullets.length) { blocks.push({ kind: 'list', items: bullets }); bullets = [] } }
+  for (const raw of lines) {
+    const line = raw.trim()
+    if (!line) { flushPara(); flushList(); continue }
+    const h2 = /^##\s+(.+)$/.exec(line)
+    const h3 = /^###\s+(.+)$/.exec(line)
+    const bullet = /^[-•*]\s+(.+)$/.exec(line)
+    if (h2 && !h3) { flushPara(); flushList(); blocks.push({ kind: 'h2', text: h2[1].trim() }); continue }
+    if (h3) { flushPara(); flushList(); blocks.push({ kind: 'h3', text: h3[1].trim() }); continue }
+    if (bullet) { flushPara(); bullets.push(bullet[1].trim()); continue }
+    flushList(); para.push(line)
+  }
+  flushPara(); flushList()
+
+  function renderInline(t: string) {
+    // **bold**
+    const parts: React.ReactNode[] = []
+    let i = 0
+    const re = /\*\*([^*]+)\*\*/g
+    let m: RegExpExecArray | null
+    while ((m = re.exec(t)) !== null) {
+      if (m.index > i) parts.push(t.slice(i, m.index))
+      parts.push(<strong key={parts.length}>{m[1]}</strong>)
+      i = m.index + m[0].length
+    }
+    if (i < t.length) parts.push(t.slice(i))
+    return parts.length > 0 ? parts : t
+  }
+
+  return (
+    <div style={{
+      marginTop: 0,
+      border: '1px solid var(--bor, #E5E5E7)',
+      borderTop: 'none',
+      borderRadius: '0 0 8px 8px',
+      padding: '14px 16px',
+      background: '#fff',
+    }}>
+      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--muted, #86868B)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span>👁 Как увидит клиент</span>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13, lineHeight: 1.55, color: 'var(--text, #1D1D1F)' }}>
+        {blocks.map((b, i) => {
+          if (b.kind === 'h2') return (
+            <h3 key={i} style={{ fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#B15ECC', margin: '10px 0 4px' }}>
+              {b.text}
+            </h3>
+          )
+          if (b.kind === 'h3') return (
+            <h4 key={i} style={{ fontSize: 13, fontWeight: 700, color: 'var(--text, #1D1D1F)', margin: '6px 0 2px' }}>
+              {b.text}
+            </h4>
+          )
+          if (b.kind === 'list') return (
+            <ul key={i} style={{ paddingLeft: 18, margin: 0 }}>
+              {b.items.map((it, j) => <li key={j}>{renderInline(it)}</li>)}
+            </ul>
+          )
+          return <p key={i} style={{ margin: 0 }}>{renderInline(b.text)}</p>
+        })}
+      </div>
     </div>
   )
 }
@@ -335,9 +429,10 @@ function ToolbarBtn({ children, onClick, title }: { children: React.ReactNode; o
       title={title}
       style={{
         background: '#fff', border: '1px solid var(--bor, #E5E5E7)',
-        borderRadius: 6, padding: '4px 10px', fontSize: 13, cursor: 'pointer',
+        borderRadius: 6, padding: '6px 10px', cursor: 'pointer',
         fontFamily: 'inherit', color: 'var(--text, #1D1D1F)', fontWeight: 600,
-        minWidth: 32, lineHeight: 1.2,
+        lineHeight: 1.2,
+        display: 'inline-flex', alignItems: 'center', gap: 2, whiteSpace: 'nowrap',
       }}
     >
       {children}
