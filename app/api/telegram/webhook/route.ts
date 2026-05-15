@@ -86,6 +86,42 @@ async function processTelegramMessage(
     }
   }
 
+  // STEP 2.5: миграция Telegram group → supergroup меняет chat_id (например
+  // -5143010936 → -1003944967313). Если в БД уже есть групповая сделка с тем же
+  // chat.title, переиспользуем её и обновляем chat_id вместо создания дубля.
+  if (!dealId && isGroup && msg.chat.title) {
+    const { data: existingByTitle } = await supabase
+      .from('deals')
+      .select('id, custom_fields')
+      .eq('contact_name', msg.chat.title)
+      .contains('custom_fields', { is_group: true })
+      .is('deleted_at', null)
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle()
+    if (existingByTitle) {
+      dealId = existingByTitle.id
+      // Обновляем chat_id в custom_fields на новый (после миграции в supergroup)
+      const oldCustom = (existingByTitle.custom_fields as any) || {}
+      await supabase.from('deals').update({
+        custom_fields: {
+          ...oldCustom,
+          group_chat_id: chatIdStr,
+          tg_chat_id: msg.chat.id,
+          tg_chat_type: msg.chat.type,
+          tg_chat_title: msg.chat.title,
+          is_group: true,
+          previous_chat_id: oldCustom.tg_chat_id || oldCustom.group_chat_id,
+        },
+      }).eq('id', dealId)
+      await supabase.from('deal_activities').insert({
+        deal_id: dealId,
+        activity_type: 'system',
+        content: `Telegram-чат мигрировал в supergroup: ${oldCustom.tg_chat_id || oldCustom.group_chat_id} → ${chatIdStr}`,
+      })
+    }
+  }
+
   // Create new deal if not found
   if (!dealId) {
     // Pick stage: groups whose title starts with "Релокац" → "Релокац" stage;
