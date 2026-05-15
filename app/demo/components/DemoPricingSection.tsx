@@ -130,6 +130,7 @@ export function DemoPricingSection() {
 
   return (
     <section
+      className="demo-pricing"
       style={{
         position: 'relative',
         marginTop: 80,
@@ -138,9 +139,21 @@ export function DemoPricingSection() {
         borderTop: '1px solid var(--ds-border-soft)',
       }}
     >
+      <style>{`
+        @media (max-width: 720px) {
+          .demo-pricing { padding: 50px 16px 70px !important; margin-top: 40px !important; }
+          .demo-pricing-header { margin-bottom: 32px !important; }
+          .demo-pricing-header h2 { font-size: 28px !important; }
+          .demo-pricing-video { margin-bottom: 40px !important; border-radius: 16px !important; }
+          .demo-pricing-card { padding: 22px !important; }
+          .demo-pricing-card[data-highlight="true"] { transform: none !important; }
+          .demo-pricing-modal { padding: 24px 22px !important; border-radius: 20px !important; }
+          .demo-pricing-modal-title { font-size: 18px !important; }
+        }
+      `}</style>
       <div style={{ maxWidth: 1200, margin: '0 auto' }}>
         {/* Header */}
-        <header style={{ textAlign: 'center', marginBottom: 56 }}>
+        <header className="demo-pricing-header" style={{ textAlign: 'center', marginBottom: 56 }}>
           <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--ds-purple)', marginBottom: 12 }}>
             Полное сопровождение от Go &amp; Study
           </div>
@@ -157,7 +170,7 @@ export function DemoPricingSection() {
         </header>
 
         {/* Video */}
-        <div style={{
+        <div className="demo-pricing-video" style={{
           maxWidth: 960, margin: '0 auto 64px',
           borderRadius: 24, overflow: 'hidden',
           boxShadow: '0 30px 80px -20px rgba(20,18,30,0.25)',
@@ -206,6 +219,8 @@ function PackageCard({ pkg, onOpen }: { pkg: Package; onOpen: () => void }) {
 
   return (
     <article
+      className="demo-pricing-card"
+      data-highlight={isHighlight ? 'true' : 'false'}
       style={{
         background: bg,
         border: `1px solid ${border}`,
@@ -315,6 +330,7 @@ function PackageModal({ pkg, onClose }: { pkg: Package; onClose: () => void }) {
       }}
     >
       <div
+        className="demo-pricing-modal"
         onClick={e => e.stopPropagation()}
         style={{
           width: '100%', maxWidth: 720, maxHeight: '90vh', overflowY: 'auto',
@@ -339,7 +355,7 @@ function PackageModal({ pkg, onClose }: { pkg: Package; onClose: () => void }) {
 
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 24, paddingRight: 50 }}>
-          <h3 style={{
+          <h3 className="demo-pricing-modal-title" style={{
             fontFamily: 'var(--ds-font-display-stack)', fontWeight: 700,
             fontSize: 'clamp(22px, 3vw, 30px)', letterSpacing: '0.02em',
             textTransform: 'uppercase', margin: 0, color: 'var(--ds-ink)',

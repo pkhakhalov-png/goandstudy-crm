@@ -2,6 +2,7 @@ import { Geist, Oswald } from 'next/font/google'
 import type { ReactNode } from 'react'
 import { DemoProvider } from './DemoState'
 import '../curator/ds.css'
+import './demo-mobile.css'
 
 const geist = Geist({
   subsets: ['latin', 'cyrillic'],

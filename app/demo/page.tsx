@@ -77,7 +77,12 @@ export default function DemoDashboard() {
         />
       </div>
 
-      <main style={{ maxWidth: 1200, margin: '0 auto', padding: '40px 32px 80px', display: 'flex', flexDirection: 'column', gap: 56 }}>
+      <main className="demo-main" style={{ maxWidth: 1200, margin: '0 auto', padding: '40px 32px 80px', display: 'flex', flexDirection: 'column', gap: 56 }}>
+        <style>{`
+          @media (max-width: 720px) {
+            .demo-main { padding: 24px 16px 60px !important; gap: 36px !important; }
+          }
+        `}</style>
         <DemoProjectAndRoadmap />
         <div data-tour="shortlist">
           <DemoShortlistBlock items={sortedUniversities} total={sortedUniversities.length} />

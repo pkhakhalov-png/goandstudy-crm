@@ -1,0 +1,27 @@
+/* Глобальные мобильные правила для /demo/* — снижают паддинги/шрифты/гриды на узких экранах */
+
+@media (max-width: 720px) {
+  .ds-scope main { padding-left: 16px !important; padding-right: 16px !important; }
+
+  /* Hero-секции подстраниц (motivation / resume / scholarships / updates / shortlist) */
+  .ds-scope section[style*="padding: 40px 32px"] { padding: 28px 16px 22px !important; }
+  .ds-scope section[style*="padding: '40px 32px 32px'"],
+  .ds-scope section[style*="40px 32px 28px"] { padding: 28px 16px 20px !important; }
+
+  /* Большие display-заголовки */
+  .ds-scope h1 { font-size: clamp(24px, 7vw, 36px) !important; }
+
+  /* Карточки ds-card — меньший padding */
+  .ds-scope .ds-card { padding: 18px !important; }
+
+  /* Подстраничные main-padding */
+  .ds-scope main[style*="padding: '32px 32px 80px'"],
+  .ds-scope main[style*="padding: 32px 32px 80px"] { padding: 22px 16px 60px !important; }
+  .ds-scope main[style*="padding: '24px 32px 80px'"] { padding: 18px 16px 60px !important; }
+}
+
+/* Очень узкие экраны (~360px и меньше) */
+@media (max-width: 380px) {
+  .ds-scope .ds-card { padding: 14px !important; }
+  .ds-scope h1 { font-size: 22px !important; }
+}

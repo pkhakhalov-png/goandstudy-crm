@@ -26,7 +26,13 @@ export function DemoShortlistBlock({ items, total }: Props) {
   const moreCount = selectedCount - shown.length
 
   return (
-    <div className="ds-card" style={{ padding: 32 }}>
+    <div className="ds-card demo-shortlist-card" style={{ padding: 32 }}>
+      <style>{`
+        @media (max-width: 720px) {
+          .demo-shortlist-card { padding: 20px !important; }
+          .demo-shortlist-card h2 { font-size: 22px !important; }
+        }
+      `}</style>
       <header style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 16, marginBottom: 24, flexWrap: 'wrap' }}>
         <div>
           <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ds-purple)', marginBottom: 6 }}>

@@ -90,6 +90,7 @@ export function DashboardHero({ ctx, stages }: Props) {
         }}
       />
       <div
+        className="dash-hero-inner"
         style={{
           position: 'relative',
           maxWidth: 1200,
@@ -97,14 +98,29 @@ export function DashboardHero({ ctx, stages }: Props) {
           padding: '56px 32px 48px',
         }}
       >
+        <style>{`
+          @media (max-width: 720px) {
+            .dash-hero-inner { padding: 32px 18px 28px !important; }
+            .dash-hero-progress-num { font-size: 48px !important; }
+            .dash-hero-timeline {
+              grid-template-columns: repeat(var(--steps, 12), minmax(96px, 1fr)) !important;
+              overflow-x: auto;
+              -webkit-overflow-scrolling: touch;
+              padding-bottom: 8px;
+              gap: 14px !important;
+            }
+            .dash-hero-timeline::-webkit-scrollbar { display: none; }
+            .dash-hero-step-title { font-size: 11px !important; }
+          }
+        `}</style>
         <h1
           style={{
             fontFamily: 'var(--ds-font-display-stack)',
             fontWeight: 700,
-            fontSize: 'clamp(36px, 5vw, 64px)',
+            fontSize: 'clamp(28px, 5vw, 64px)',
             letterSpacing: '0.01em',
             lineHeight: 1,
-            margin: '0 0 24px 0',
+            margin: '0 0 20px 0',
             textTransform: 'uppercase',
           }}
         >
@@ -112,8 +128,9 @@ export function DashboardHero({ ctx, stages }: Props) {
         </h1>
 
         {/* Прогресс — крупный % + метка */}
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 16, marginBottom: 32 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 16, marginBottom: 32, flexWrap: 'wrap' }}>
           <span
+            className="dash-hero-progress-num"
             style={{
               fontFamily: 'var(--ds-font-display-stack)',
               fontWeight: 700,
@@ -133,12 +150,14 @@ export function DashboardHero({ ctx, stages }: Props) {
 
         {/* Таймлайн */}
         <div
+          className="dash-hero-timeline"
           style={{
             display: 'grid',
             gridTemplateColumns: `repeat(${stages.length}, 1fr)`,
             gap: 12,
             paddingTop: 24,
             borderTop: '1px solid var(--ds-border-soft)',
+            ['--steps' as any]: stages.length,
           }}
         >
           {stages.map((stage, idx) => (
@@ -191,6 +210,7 @@ function TimelineStep({ stage, isLast }: { stage: TimelineStage; isLast: boolean
         {done ? '✓' : stage.num}
       </div>
       <div
+        className="dash-hero-step-title"
         style={{
           fontSize: 12,
           fontWeight: 500,
