@@ -19,8 +19,8 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { createParserClient } from '@/lib/supabase/parser'
-import { createScholarshipsClient } from '@/lib/supabase/scholarships'
+import { createParserAdminClient } from '@/lib/supabase/parser'
+import { createScholarshipsAdminClient } from '@/lib/supabase/scholarships'
 import { createAdminClient } from '@/lib/supabase/server'
 
 const STAFF_ROLES = new Set(['curator', 'admin', 'rop'])
@@ -68,15 +68,15 @@ export async function saveSchoolOverride(opts: { schoolId: number; patch: Record
   const auth = await checkStaff()
   if (!auth.ok) return auth
 
-  const parser = createParserClient()
-  const { data: school } = await parser.from('schools').select('raw_data').eq('id', opts.schoolId).maybeSingle()
+  const parserAdmin = createParserAdminClient()
+  const { data: school } = await parserAdmin.from('schools').select('raw_data').eq('id', opts.schoolId).maybeSingle()
   if (!school) return { ok: false, error: 'Вуз не найден' }
 
   const rawData = (school.raw_data as any) || {}
   const overrides = mergeOverrides(rawData.curator_overrides || null, opts.patch, auth)
   rawData.curator_overrides = overrides
 
-  const { error } = await parser.from('schools').update({ raw_data: rawData }).eq('id', opts.schoolId)
+  const { error } = await parserAdmin.from('schools').update({ raw_data: rawData }).eq('id', opts.schoolId)
   if (error) return { ok: false, error: error.message }
 
   revalidatePath(`/curator/universities/${opts.schoolId}`)
@@ -116,8 +116,8 @@ export async function finalizeSchoolCover(opts: { schoolId: number; storagePath:
   const { data: pub } = admin.storage.from('school-covers').getPublicUrl(opts.storagePath)
   if (!pub.publicUrl) return { ok: false, error: 'не удалось получить URL' }
 
-  const parser = createParserClient()
-  const { data: school } = await parser.from('schools').select('raw_data').eq('id', opts.schoolId).maybeSingle()
+  const parserAdmin = createParserAdminClient()
+  const { data: school } = await parserAdmin.from('schools').select('raw_data').eq('id', opts.schoolId).maybeSingle()
   if (!school) return { ok: false, error: 'Вуз не найден' }
 
   const rawData = (school.raw_data as any) || {}
@@ -126,7 +126,7 @@ export async function finalizeSchoolCover(opts: { schoolId: number; storagePath:
   extras.cover_photo_by = { by_name: auth.name, by_id: auth.userId, at: new Date().toISOString() }
   rawData.curator_extras = extras
 
-  const { error } = await parser.from('schools').update({ raw_data: rawData }).eq('id', opts.schoolId)
+  const { error } = await parserAdmin.from('schools').update({ raw_data: rawData }).eq('id', opts.schoolId)
   if (error) return { ok: false, error: error.message }
 
   revalidatePath(`/curator/universities/${opts.schoolId}`)
@@ -137,8 +137,8 @@ export async function removeSchoolCover(opts: { schoolId: number }): Promise<{ o
   const auth = await checkStaff()
   if (!auth.ok) return auth
 
-  const parser = createParserClient()
-  const { data: school } = await parser.from('schools').select('raw_data').eq('id', opts.schoolId).maybeSingle()
+  const parserAdmin = createParserAdminClient()
+  const { data: school } = await parserAdmin.from('schools').select('raw_data').eq('id', opts.schoolId).maybeSingle()
   if (!school) return { ok: false, error: 'Вуз не найден' }
 
   const rawData = (school.raw_data as any) || {}
@@ -149,7 +149,7 @@ export async function removeSchoolCover(opts: { schoolId: number }): Promise<{ o
   extras.cover_photo_by = { by_name: auth.name, by_id: auth.userId, at: new Date().toISOString(), removed: true }
   rawData.curator_extras = extras
 
-  const { error } = await parser.from('schools').update({ raw_data: rawData }).eq('id', opts.schoolId)
+  const { error } = await parserAdmin.from('schools').update({ raw_data: rawData }).eq('id', opts.schoolId)
   if (error) return { ok: false, error: error.message }
 
   revalidatePath(`/curator/universities/${opts.schoolId}`)
@@ -164,15 +164,15 @@ export async function saveProgramOverride(opts: { programId: number; patch: Reco
   const auth = await checkStaff()
   if (!auth.ok) return auth
 
-  const parser = createParserClient()
-  const { data: program } = await parser.from('programs').select('raw_data, school_id').eq('id', opts.programId).maybeSingle()
+  const parserAdmin = createParserAdminClient()
+  const { data: program } = await parserAdmin.from('programs').select('raw_data, school_id').eq('id', opts.programId).maybeSingle()
   if (!program) return { ok: false, error: 'Программа не найдена' }
 
   const rawData = (program.raw_data as any) || {}
   const overrides = mergeOverrides(rawData.curator_overrides || null, opts.patch, auth)
   rawData.curator_overrides = overrides
 
-  const { error } = await parser.from('programs').update({ raw_data: rawData }).eq('id', opts.programId)
+  const { error } = await parserAdmin.from('programs').update({ raw_data: rawData }).eq('id', opts.programId)
   if (error) return { ok: false, error: error.message }
 
   revalidatePath(`/curator/programs/${opts.programId}`)
@@ -188,7 +188,7 @@ export async function saveIdpScholarshipOverride(opts: { id: number; patch: Reco
   const auth = await checkStaff()
   if (!auth.ok) return auth
 
-  const sch = createScholarshipsClient()
+  const sch = createScholarshipsAdminClient()
   const { data: row } = await sch.from('idp_scholarships').select('raw_data').eq('id', opts.id).maybeSingle()
   if (!row) return { ok: false, error: 'Стипендия не найдена' }
 
@@ -207,7 +207,7 @@ export async function saveTopUniScholarshipOverride(opts: { scholarshipId: strin
   const auth = await checkStaff()
   if (!auth.ok) return auth
 
-  const sch = createScholarshipsClient()
+  const sch = createScholarshipsAdminClient()
   const { data: row } = await sch.from('scholarships_topuni').select('raw_data').eq('scholarship_id', opts.scholarshipId).maybeSingle()
   if (!row) return { ok: false, error: 'Стипендия не найдена' }
 
