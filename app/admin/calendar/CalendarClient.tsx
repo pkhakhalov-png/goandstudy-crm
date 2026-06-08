@@ -58,6 +58,7 @@ export function CalendarClient({ payments, salespersons }: Props) {
   const [filterStatus, setFilterStatus] = useState('')
   const [selectedDay, setSelectedDay] = useState<string | null>(null)
   const [hidePaid, setHidePaid] = useState(false)
+  const [categoryView, setCategoryView] = useState<null | 'plan' | 'paid' | 'overdue' | 'soon'>(null)
 
   function shiftMonth(dir: number) {
     let m = month + dir, y = year
@@ -119,28 +120,42 @@ export function CalendarClient({ payments, salespersons }: Props) {
       {/* Stats */}
       <div className="kw">
         <div className="kg k4">
-          <div className="kc">
+          <div className="kc" onClick={() => setCategoryView('plan')} style={{ cursor: 'pointer' }}>
             <div className="kl">План на месяц</div>
             <div className="kv" style={{ fontSize: 17 }}>{monthTotal.toLocaleString('ru')} ₽</div>
             <div className="ks">{monthPayments.length} платежей</div>
           </div>
-          <div className="kc">
+          <div className="kc" onClick={() => setCategoryView('paid')} style={{ cursor: 'pointer' }}>
             <div className="kl">Оплачено</div>
             <div className="kv g" style={{ fontSize: 17 }}>{monthPaid.toLocaleString('ru')} ₽</div>
             <div className="ks">{monthPayments.filter(p => p.is_paid).length} платежей</div>
           </div>
-          <div className="kc">
+          <div className="kc" onClick={() => setCategoryView('overdue')} style={{ cursor: 'pointer' }}>
             <div className="kl">Просрочено</div>
             <div className="kv r" style={{ fontSize: 17 }}>{monthOverdue.toLocaleString('ru')} ₽</div>
             <div className="ks">{monthPayments.filter(p => p.status === 'overdue').length} платежей</div>
           </div>
-          <div className="kc">
+          <div className="kc" onClick={() => setCategoryView('soon')} style={{ cursor: 'pointer' }}>
             <div className="kl">Скоро (7 дней)</div>
             <div className="kv o" style={{ fontSize: 17 }}>{monthSoon.toLocaleString('ru')} ₽</div>
             <div className="ks">{monthPayments.filter(p => p.status === 'soon').length} платежей</div>
           </div>
         </div>
       </div>
+
+      {categoryView && (
+        <CategoryModal
+          category={categoryView}
+          monthLabel={`${MONTHS[month]} ${year}`}
+          payments={
+            categoryView === 'plan' ? monthPayments
+              : categoryView === 'paid' ? monthPayments.filter(p => p.is_paid)
+              : categoryView === 'overdue' ? monthPayments.filter(p => p.status === 'overdue')
+              : monthPayments.filter(p => p.status === 'soon')
+          }
+          onClose={() => setCategoryView(null)}
+        />
+      )}
 
       <div style={{ padding: '0 28px 28px' }}>
         {/* Controls */}
@@ -319,5 +334,102 @@ export function CalendarClient({ payments, salespersons }: Props) {
         </div>
       </div>
     </>
+  )
+}
+
+const CATEGORY_TITLE: Record<'plan' | 'paid' | 'overdue' | 'soon', string> = {
+  plan: 'План на месяц',
+  paid: 'Оплачено',
+  overdue: 'Просрочено',
+  soon: 'Скоро (7 дней)',
+}
+
+const CATEGORY_COLOR: Record<'plan' | 'paid' | 'overdue' | 'soon', string> = {
+  plan: 'var(--text)',
+  paid: 'var(--green)',
+  overdue: 'var(--red)',
+  soon: 'var(--gold)',
+}
+
+function CategoryModal({
+  category, monthLabel, payments, onClose,
+}: {
+  category: 'plan' | 'paid' | 'overdue' | 'soon'
+  monthLabel: string
+  payments: Payment[]
+  onClose: () => void
+}) {
+  const total = payments.reduce((s, p) => s + Number(category === 'paid' ? (p.fact_sum || p.plan_sum) : p.plan_sum), 0)
+  const sorted = [...payments].sort((a, b) => a.plan_date.localeCompare(b.plan_date))
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,.4)', zIndex: 1000,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+      }}>
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          background: 'var(--surf)', borderRadius: 16, width: '100%', maxWidth: 720,
+          maxHeight: '85vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,.25)',
+        }}>
+        <div style={{ padding: '18px 22px', borderBottom: '1px solid var(--bor2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em' }}>
+              {CATEGORY_TITLE[category]} · {monthLabel}
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 3 }}>
+              {sorted.length} платежей · <span style={{ color: CATEGORY_COLOR[category], fontWeight: 700 }}>{total.toLocaleString('ru')} ₽</span>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            style={{ width: 32, height: 32, border: '1px solid var(--bor2)', borderRadius: 8, background: 'var(--surf)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)' }}>
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" width="14" height="14"><line x1="3" y1="3" x2="13" y2="13" /><line x1="13" y1="3" x2="3" y2="13" /></svg>
+          </button>
+        </div>
+
+        <div style={{ overflowY: 'auto', padding: '14px 18px' }}>
+          {sorted.length === 0 && (
+            <div style={{ padding: 32, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
+              Нет платежей в этой категории
+            </div>
+          )}
+          {sorted.map(p => (
+            <div key={p.id} style={{
+              display: 'grid', gridTemplateColumns: '90px 1fr auto', gap: 12, alignItems: 'center',
+              padding: '12px 14px', marginBottom: 8,
+              border: `1px solid ${p.status === 'overdue' ? 'rgba(255,59,48,.2)' : p.status === 'soon' ? 'rgba(255,149,0,.2)' : p.status === 'paid' ? 'rgba(52,199,89,.2)' : 'var(--bor2)'}`,
+              borderLeft: `3px solid ${statusColor[p.status]}`,
+              borderRadius: 10, background: statusBg[p.status],
+            }}>
+              <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>
+                {new Date(p.plan_date + 'T00:00:00').toLocaleDateString('ru-RU', { day: '2-digit', month: 'short' })}
+              </div>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 3 }}>
+                  {p.client_name} <span style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 500 }}>· #{p.num}</span>
+                </div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 6, background: 'rgba(52,199,89,.08)', border: '1px solid rgba(52,199,89,.15)', color: 'var(--green)', fontWeight: 600 }}>{p.salesperson_name}</span>
+                  <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 6, background: 'var(--pl)', border: '1px solid var(--pb)', color: 'var(--purple)', fontWeight: 600 }}>{p.curator_name}</span>
+                  {p.client_country && <span style={{ fontSize: 10, color: 'var(--muted)' }}>· {p.client_country}</span>}
+                </div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 15, fontWeight: 800, color: statusColor[p.status] }}>
+                  {Number(category === 'paid' ? (p.fact_sum || p.plan_sum) : p.plan_sum).toLocaleString('ru')} ₽
+                </div>
+                <div style={{ fontSize: 9, padding: '2px 7px', borderRadius: 12, background: statusBg[p.status], color: statusColor[p.status], fontWeight: 700, border: `1px solid ${statusColor[p.status]}22`, display: 'inline-block', marginTop: 3 }}>
+                  {statusLabel[p.status]}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
   )
 }
