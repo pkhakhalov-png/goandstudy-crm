@@ -38,9 +38,12 @@ export interface SearchProgramsResult {
   error?: string
 }
 
-/** Cap отключён — продакт хочет видеть реальное число программ.
- *  Если будут жалобы на скорость — снизим до 50000. */
-export const DEFAULT_COUNT_CAP = null
+/** Cap=5000: без него COUNT(*) над JOIN programs×schools на широких
+ *  выборках (например us+bachelor) упирается в statement_timeout
+ *  Supabase (8s), RPC возвращает ошибку, UI рисует «0 программ найдено» —
+ *  выглядит как сломанные фильтры. С cap-ом Postgres останавливает
+ *  скан на 5000-й строке, UI показывает «5000+». */
+export const DEFAULT_COUNT_CAP = 5000
 
 export async function searchPrograms(params: SearchProgramsParams): Promise<SearchProgramsResult> {
   const parser = createParserClient()
