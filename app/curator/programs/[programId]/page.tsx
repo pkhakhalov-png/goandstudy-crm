@@ -63,9 +63,11 @@ export default async function ProgramPage({
   if (!programRaw) notFound()
 
   // Применяем curator_overrides поверх — оригинал из парсера + правки куратора.
-  const program = applyOverrides(programRaw)
-  const school = applyOverrides(programRaw.school || {})
-  const attr = program.raw_data?.attributes || {}
+  const program: any = applyOverrides(programRaw)
+  const school: any = applyOverrides(programRaw.school || {})
+  // attr — мутируемая копия, чтобы overrides могли менять вложенные поля
+  // (earliest_intake.submission_deadline, currency_of_fees.code, min/max_length).
+  const attr: any = { ...(program.raw_data?.attributes || {}) }
   const schoolRaw = school.raw_data?.attributes || {}
 
   // Клиенты куратора + заполненные ИИ данные
@@ -73,12 +75,73 @@ export default async function ProgramPage({
   const { data: curatorRec } = await admin
     .from('curators').select('id').eq('user_id', user.id).maybeSingle()
   const curatorId = curatorRec?.id
-  const [{ data: myClients }, { data: curatorData }] = await Promise.all([
+  const [{ data: myClients }, { data: curatorDataDb }] = await Promise.all([
     curatorId
       ? admin.from('clients').select('id, name, country').eq('curator_id', curatorId).eq('status', 'active').order('name')
       : Promise.resolve({ data: [] as { id: number; name: string; country?: string | null }[] }),
     admin.from('program_curator_data').select('*').eq('program_id', id).maybeSingle(),
   ])
+
+  // EditPanel пишет правки плоско в raw_data.curator_overrides[field], а
+  // рендерер читает их по другим путям (program.program_description, .degree_text,
+  // attr.earliest_intake.submission_deadline, curatorData.ielts_min и т.д.).
+  // Без этого маппинга правки сохраняются в БД, но на карточке не появляются.
+  const overrides = (programRaw.raw_data?.curator_overrides || {}) as Record<string, any>
+  let curatorData: any = curatorDataDb
+  const ensureCD = () => { if (!curatorData) curatorData = {}; return curatorData }
+
+  if (overrides.description) program.program_description = overrides.description
+  if (overrides.level_text) program.degree_text = overrides.level_text
+  if (overrides.language) program.language_text = overrides.language
+  if (overrides.length_text) {
+    program.duration_text = overrides.length_text
+    if (curatorData) curatorData.program_length_text = overrides.length_text
+  }
+  if (overrides.min_length_months != null && overrides.min_length_months !== '') {
+    const n = Number(overrides.min_length_months)
+    if (Number.isFinite(n)) { attr.min_length = n; attr.max_length = n }
+  }
+  if (overrides.intake_text) {
+    program.start_date_text = overrides.intake_text
+    if (curatorData) curatorData.earliest_intake_label = overrides.intake_text
+  }
+  if (overrides.application_deadline) {
+    attr.earliest_intake = { ...(attr.earliest_intake || {}), submission_deadline: overrides.application_deadline }
+    if (curatorData) curatorData.deadline_label = null  // дать override победить через fmtDate ниже
+  }
+  if (overrides.tuition != null && overrides.tuition !== '') {
+    const n = Number(overrides.tuition)
+    if (Number.isFinite(n)) {
+      program.tuition = n
+      program.tuition_text = null
+      if (curatorData) curatorData.gross_tuition_label = null
+    }
+  }
+  if (overrides.currency) {
+    attr.currency_of_fees = { ...(attr.currency_of_fees || {}), code: overrides.currency }
+  }
+  if (overrides.application_fee != null && overrides.application_fee !== '') {
+    const n = Number(overrides.application_fee)
+    if (Number.isFinite(n)) {
+      program.application_fee = n
+      if (curatorData) curatorData.application_fee_label = null
+    }
+  }
+  if (overrides.tuition_deposit != null && overrides.tuition_deposit !== '') {
+    const n = Number(overrides.tuition_deposit)
+    if (Number.isFinite(n)) attr.tuition_deposit = { ...(attr.tuition_deposit || {}), amount: n }
+  }
+  // Поля Admission Requirements рендерятся из program_curator_data — мерджим overrides сверху.
+  if (overrides.min_education_level) ensureCD().min_education_level = String(overrides.min_education_level)
+  if (overrides.min_gpa_percent != null && overrides.min_gpa_percent !== '') {
+    const n = Number(overrides.min_gpa_percent); if (Number.isFinite(n)) ensureCD().min_gpa_percent = n
+  }
+  for (const k of ['ielts_min', 'toefl_min', 'pte_min', 'duolingo_min']) {
+    const v = overrides[k]
+    if (v != null && v !== '') {
+      const n = Number(v); if (Number.isFinite(n)) ensureCD()[k] = n
+    }
+  }
 
   // Кто последним обновлял — для подписи «обновил X»
   let lastUpdatedByName: string | null = null
