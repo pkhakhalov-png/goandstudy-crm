@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient_action } from './actions'
+import { SubmitButton } from '@/app/_shared/SubmitButton'
 
 export default async function NewClientPage() {
   const supabase = await createClient()
@@ -206,12 +207,12 @@ export default async function NewClientPage() {
                 <Link href="/admin/clients" style={{padding:'9px 18px', background:'var(--surf)', color:'var(--muted)', border:'1px solid var(--bor2)', borderRadius:9, fontSize:13, fontWeight:500, textDecoration:'none', display:'inline-flex', alignItems:'center'}}>
                   Отмена
                 </Link>
-                <button type="submit" className="btn-p">
+                <SubmitButton className="btn-p" pendingText="Добавление…">
                   <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="white" strokeWidth="2.2">
                     <line x1="6" y1="1" x2="6" y2="11"/><line x1="1" y1="6" x2="11" y2="6"/>
                   </svg>
                   Добавить клиента
-                </button>
+                </SubmitButton>
               </div>
             </div>
           </form>

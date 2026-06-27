@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClientSales } from './actions'
+import { SubmitButton } from '@/app/_shared/SubmitButton'
 
 const inputStyle = {
   width: '100%',
@@ -202,9 +203,9 @@ export default async function NewClientPage({ searchParams }: { searchParams: Pr
               <Link href="/sales" className="btn-s" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}>
                 Отмена
               </Link>
-              <button type="submit" className="btn-p">
+              <SubmitButton className="btn-p" pendingText="Создание…">
                 Создать клиента
-              </button>
+              </SubmitButton>
             </div>
 
           </form>
