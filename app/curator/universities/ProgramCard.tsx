@@ -5,7 +5,7 @@ import { AddToShortlistButton } from './[schoolId]/AddToShortlistButton'
 
 const COUNTRY_LABEL: Record<string, string> = {
   ca: 'Канада', au: 'Австралия', gb: 'Великобритания', de: 'Германия',
-  us: 'США', ie: 'Ирландия',
+  us: 'США', ie: 'Ирландия', pt: 'Португалия', si: 'Словения', tr: 'Турция',
 }
 
 interface Props {

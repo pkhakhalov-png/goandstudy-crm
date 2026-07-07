@@ -18,6 +18,7 @@ export const dynamic = 'force-dynamic'
 
 const COUNTRY_LABEL: Record<string, string> = {
   ca: 'Канада', au: 'Австралия', gb: 'Великобритания', de: 'Германия', us: 'США',
+  pt: 'Португалия', si: 'Словения', tr: 'Турция',
 }
 
 export default async function SchoolPage({

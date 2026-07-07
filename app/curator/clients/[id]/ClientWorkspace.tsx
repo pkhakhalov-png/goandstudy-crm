@@ -1436,6 +1436,7 @@ const CATALOG_COUNTRY_LABELS: Record<string, string> = {
   us: 'США', gb: 'Великобритания', ca: 'Канада', au: 'Австралия',
   de: 'Германия', fr: 'Франция', it: 'Италия', es: 'Испания',
   nl: 'Нидерланды', at: 'Австрия', ie: 'Ирландия', ae: 'ОАЭ', hu: 'Венгрия',
+  pt: 'Португалия', si: 'Словения', tr: 'Турция',
 }
 
 function UniLogo({ logoUrl, name, size = 40 }: { logoUrl: string | null | undefined; name: string; size?: number }) {

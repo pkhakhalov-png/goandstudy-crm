@@ -14,7 +14,7 @@ export const dynamic = 'force-dynamic'
 
 const COUNTRY_LABEL: Record<string, string> = {
   ca: 'Канада', au: 'Австралия', gb: 'Великобритания', de: 'Германия',
-  us: 'США', ie: 'Ирландия',
+  us: 'США', ie: 'Ирландия', pt: 'Португалия', si: 'Словения', tr: 'Турция',
 }
 
 const cardStyle: React.CSSProperties = {

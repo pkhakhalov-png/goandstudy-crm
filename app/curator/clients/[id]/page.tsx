@@ -199,7 +199,7 @@ export default async function CuratorClientPage({
 
     // Считаем количество ПРОГРАММ по странам — без inner-join (на проде он давал ложные count=0).
     // Группируем school_id по country_code один раз, потом считаем programs с .in() по списку id.
-    const COUNTRY_CODES_FOR_COUNT = ['us', 'gb', 'ca', 'de', 'fr', 'it', 'es', 'nl', 'at', 'au', 'ie', 'ae', 'hu']
+    const COUNTRY_CODES_FOR_COUNT = ['us', 'gb', 'ca', 'de', 'fr', 'it', 'es', 'nl', 'at', 'au', 'ie', 'ae', 'hu', 'pt', 'si', 'tr']
     const idsByCountry = new Map<string, number[]>()
     for (const s of allSchools) {
       const cc = (s.country_code || '').toLowerCase()
