@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { generateInviteForOwnClient, setClientEmail } from './actions'
+import { generateInviteForOwnClient, setClientEmail, resendInviteForOwnClient } from './actions'
 
 interface Props {
   clientId: number
@@ -16,7 +16,7 @@ type State =
   | { kind: 'idle' }
   | { kind: 'loading' }
   | { kind: 'asking-email' }
-  | { kind: 'showing'; url: string; emailSent: boolean; emailError?: string }
+  | { kind: 'showing'; url: string; email: string; emailSent: boolean; emailError?: string }
 
 export function SalesInviteButton({ clientId, clientEmail, fallbackEmail, clientName }: Props) {
   const router = useRouter()
@@ -24,6 +24,9 @@ export function SalesInviteButton({ clientId, clientEmail, fallbackEmail, client
   const [error, setError] = useState<string | null>(null)
   const [emailDraft, setEmailDraft] = useState('')
   const [copied, setCopied] = useState(false)
+  const [editingEmail, setEditingEmail] = useState(false)
+  const [resendDraft, setResendDraft] = useState('')
+  const [resending, setResending] = useState(false)
 
   async function generate(emailOverride?: string) {
     // Email берём по приоритету: явный override → email клиента → fallback (например из сделки)
@@ -41,8 +44,21 @@ export function SalesInviteButton({ clientId, clientEmail, fallbackEmail, client
       setState({ kind: 'idle' })
       return
     }
-    setState({ kind: 'showing', url: res.url!, emailSent: !!res.emailSent, emailError: res.emailError })
+    setState({ kind: 'showing', url: res.url!, email: emailToUse, emailSent: !!res.emailSent, emailError: res.emailError })
     if (emailOverride || (!clientEmail && fallbackEmail)) router.refresh()
+  }
+
+  // Поправить email и переотправить письмо (когда email указан с ошибкой).
+  async function resend(newEmail: string) {
+    const trimmed = newEmail.trim()
+    if (!trimmed) return
+    setResending(true); setError(null)
+    const res = await resendInviteForOwnClient(clientId, trimmed)
+    setResending(false)
+    if (!res.success) { setError(res.error || 'Не удалось переотправить'); return }
+    setState({ kind: 'showing', url: res.url!, email: trimmed, emailSent: !!res.emailSent, emailError: res.emailError })
+    setEditingEmail(false)
+    router.refresh()
   }
 
   async function copy() {
@@ -56,6 +72,8 @@ export function SalesInviteButton({ clientId, clientEmail, fallbackEmail, client
     setState({ kind: 'idle' })
     setEmailDraft('')
     setError(null)
+    setEditingEmail(false)
+    setResendDraft('')
   }
 
   return (
@@ -196,8 +214,58 @@ export function SalesInviteButton({ clientId, clientEmail, fallbackEmail, client
               border: `1px solid ${state.emailSent ? 'rgba(22,163,97,.25)' : 'rgba(255,193,7,.3)'}`,
               borderRadius: 8, fontSize: 12, lineHeight: 1.5, marginBottom: 16,
             }}>
-              {state.emailSent ? '✓ Email с ссылкой отправлен клиенту' : `⚠ Email не отправлен${state.emailError ? ` (${state.emailError})` : ''} — скопируй ссылку и пошли через TG/WhatsApp`}
+              {state.emailSent ? `✓ Email с ссылкой отправлен на ${state.email}` : `⚠ Email не отправлен${state.emailError ? ` (${state.emailError})` : ''} — скопируй ссылку и пошли через TG/WhatsApp`}
             </div>
+
+            {/* Поправить email и переотправить */}
+            {!editingEmail ? (
+              <button type="button"
+                onClick={() => { setEditingEmail(true); setResendDraft(state.email); setError(null) }}
+                style={{
+                  display: 'block', margin: '0 0 16px', padding: 0,
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  fontFamily: 'inherit', fontSize: 12, fontWeight: 600, color: '#B15ECC',
+                }}>
+                ✏️ Неверный email? Поправить и переотправить
+              </button>
+            ) : (
+              <div style={{
+                marginBottom: 16, padding: 12,
+                background: '#F9F8FC', border: '1px solid rgba(0,0,0,.08)', borderRadius: 10,
+              }}>
+                <div style={{ fontSize: 11, color: '#8a8796', fontWeight: 600, marginBottom: 6 }}>
+                  Правильный email клиента
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <input
+                    type="email"
+                    value={resendDraft}
+                    onChange={e => setResendDraft(e.target.value)}
+                    placeholder="client@example.com"
+                    autoFocus
+                    style={{
+                      flex: 1, padding: '9px 12px', fontSize: 13,
+                      border: '1px solid rgba(0,0,0,.12)', borderRadius: 8,
+                      fontFamily: 'inherit', outline: 'none', color: '#14121e', background: '#fff',
+                    }}
+                  />
+                  <button type="button"
+                    onClick={() => resend(resendDraft)}
+                    disabled={resending || !resendDraft.trim()}
+                    style={{
+                      padding: '9px 16px', fontSize: 12, fontWeight: 600,
+                      background: resending || !resendDraft.trim() ? '#d2c4dc' : '#B15ECC', color: '#fff',
+                      border: 'none', borderRadius: 8, whiteSpace: 'nowrap',
+                      cursor: resending || !resendDraft.trim() ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
+                    }}>
+                    {resending ? 'Шлём…' : 'Переотправить'}
+                  </button>
+                </div>
+                {error && (
+                  <div style={{ marginTop: 8, fontSize: 11, color: '#dc3545' }}>{error}</div>
+                )}
+              </div>
+            )}
 
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
               <button type="button" onClick={close}

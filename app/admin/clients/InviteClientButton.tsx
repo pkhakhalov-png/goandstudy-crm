@@ -1,13 +1,15 @@
 'use client'
 
 import { useState } from 'react'
-import { generateClientInviteAction } from './actions'
+import { useRouter } from 'next/navigation'
+import { generateClientInviteAction, resendClientInviteAction } from './actions'
 
 interface Props {
   client: { id: number; email: string | null; name: string | null }
 }
 
 export function InviteClientButton({ client }: Props) {
+  const router = useRouter()
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [url, setUrl] = useState<string | null>(null)
@@ -15,6 +17,10 @@ export function InviteClientButton({ client }: Props) {
   const [emailError, setEmailError] = useState<string | undefined>()
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [sentTo, setSentTo] = useState<string>(client.email || '')
+  const [editingEmail, setEditingEmail] = useState(false)
+  const [resendDraft, setResendDraft] = useState('')
+  const [resending, setResending] = useState(false)
 
   async function generate() {
     setLoading(true); setError(null)
@@ -27,7 +33,23 @@ export function InviteClientButton({ client }: Props) {
     setUrl(res.url!)
     setEmailSent(!!res.emailSent)
     setEmailError(res.emailError)
+    setSentTo(client.email || '')
     setOpen(true)
+  }
+
+  async function resend(newEmail: string) {
+    const trimmed = newEmail.trim()
+    if (!trimmed) return
+    setResending(true); setError(null)
+    const res = await resendClientInviteAction(client.id, trimmed)
+    setResending(false)
+    if (!res.success) { setError(res.error || 'Не удалось переотправить'); return }
+    setUrl(res.url!)
+    setEmailSent(!!res.emailSent)
+    setEmailError(res.emailError)
+    setSentTo(trimmed)
+    setEditingEmail(false)
+    router.refresh()
   }
 
   async function copy() {
@@ -95,7 +117,7 @@ export function InviteClientButton({ client }: Props) {
               Ссылка для активации кабинета
             </h2>
             <p style={{ fontSize: 13, color: '#8a8796', textAlign: 'center', margin: '0 0 20px', lineHeight: 1.5 }}>
-              Срок 30 дней. Email <b>{client.email}</b> привязан и не меняется.
+              Срок 30 дней.
             </p>
 
             <div style={{
@@ -132,9 +154,59 @@ export function InviteClientButton({ client }: Props) {
               borderRadius: 8, fontSize: 12, lineHeight: 1.5, marginBottom: 16,
             }}>
               {emailSent
-                ? `✓ Email с ссылкой отправлен на ${client.email}`
+                ? `✓ Email с ссылкой отправлен на ${sentTo}`
                 : `⚠ Email не отправлен${emailError ? ` (${emailError})` : ''} — скопируй ссылку и пошли через TG/WhatsApp`}
             </div>
+
+            {/* Поправить email и переотправить */}
+            {!editingEmail ? (
+              <button type="button"
+                onClick={() => { setEditingEmail(true); setResendDraft(sentTo); setError(null) }}
+                style={{
+                  display: 'block', margin: '0 0 16px', padding: 0,
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  fontFamily: 'inherit', fontSize: 12, fontWeight: 600, color: '#B15ECC',
+                }}>
+                ✏️ Неверный email? Поправить и переотправить
+              </button>
+            ) : (
+              <div style={{
+                marginBottom: 16, padding: 12,
+                background: '#F9F8FC', border: '1px solid rgba(0,0,0,.08)', borderRadius: 10,
+              }}>
+                <div style={{ fontSize: 11, color: '#8a8796', fontWeight: 600, marginBottom: 6 }}>
+                  Правильный email клиента
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <input
+                    type="email"
+                    value={resendDraft}
+                    onChange={e => setResendDraft(e.target.value)}
+                    placeholder="client@example.com"
+                    autoFocus
+                    style={{
+                      flex: 1, padding: '9px 12px', fontSize: 13,
+                      border: '1px solid rgba(0,0,0,.12)', borderRadius: 8,
+                      fontFamily: 'inherit', outline: 'none', color: '#14121e', background: '#fff',
+                    }}
+                  />
+                  <button type="button"
+                    onClick={() => resend(resendDraft)}
+                    disabled={resending || !resendDraft.trim()}
+                    style={{
+                      padding: '9px 16px', fontSize: 12, fontWeight: 600,
+                      background: resending || !resendDraft.trim() ? '#d2c4dc' : '#B15ECC', color: '#fff',
+                      border: 'none', borderRadius: 8, whiteSpace: 'nowrap',
+                      cursor: resending || !resendDraft.trim() ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
+                    }}>
+                    {resending ? 'Шлём…' : 'Переотправить'}
+                  </button>
+                </div>
+                {error && (
+                  <div style={{ marginTop: 8, fontSize: 11, color: '#dc3545' }}>{error}</div>
+                )}
+              </div>
+            )}
 
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
               <button

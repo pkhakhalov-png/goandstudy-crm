@@ -114,6 +114,94 @@ export async function createClientInvitation(
 }
 
 /**
+ * Поправить email клиента и переотправить invite-ссылку.
+ * Нужно, когда email указали с ошибкой: меняет email на карточке + на активном
+ * invite (или создаёт новый, если активного нет) и заново шлёт письмо.
+ */
+export async function resendClientInvitation(
+  clientId: number,
+  newEmail: string | undefined,
+  createdByUserId?: string,
+): Promise<InviteResult> {
+  const admin = await createAdminClient()
+
+  const { data: client, error: clientErr } = await admin
+    .from('clients').select('id, email, name').eq('id', clientId).maybeSingle()
+  if (clientErr || !client) return { ok: false, error: 'Клиент не найден' }
+
+  let email = client.email
+  if (newEmail) {
+    const trimmed = newEmail.trim()
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) return { ok: false, error: 'Некорректный email' }
+    const { error: updErr } = await admin.from('clients').update({ email: trimmed }).eq('id', clientId)
+    if (updErr) return { ok: false, error: updErr.message }
+    email = trimmed
+  }
+  if (!email) return { ok: false, error: 'У клиента не указан email' }
+
+  // Если кабинет уже активирован — переотправлять нечего
+  const { data: existingUser } = await admin
+    .from('users').select('id').ilike('email', email).eq('role', 'client').maybeSingle()
+  if (existingUser) {
+    return { ok: false, error: 'Кабинет уже активирован. Если клиент забыл пароль — сбросить может только админ.' }
+  }
+
+  // Берём активную неиспользованную ссылку или создаём новую
+  const now = new Date()
+  const { data: existing } = await admin
+    .from('client_invitations')
+    .select('id, token')
+    .eq('client_id', clientId)
+    .is('used_at', null)
+    .gt('expires_at', now.toISOString())
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  let inviteId: string
+  let token: string
+  if (existing) {
+    inviteId = existing.id
+    token = existing.token
+    await admin.from('client_invitations').update({ email }).eq('id', inviteId)
+  } else {
+    token = randomBytes(24).toString('hex')
+    const expiresAt = new Date(now.getTime() + INVITE_TTL_DAYS * 86400_000)
+    const { data: invite, error: insertErr } = await admin
+      .from('client_invitations')
+      .insert({
+        client_id: clientId,
+        token,
+        email,
+        expires_at: expiresAt.toISOString(),
+        created_by: createdByUserId || null,
+      })
+      .select('id, token')
+      .single()
+    if (insertErr || !invite) return { ok: false, error: insertErr?.message || 'Не удалось создать invite' }
+    inviteId = invite.id
+  }
+
+  const url = `${APP_URL}/invite/${token}`
+
+  let emailSent = false
+  let emailError: string | undefined
+  try {
+    const r = await sendInvitationEmail({ to: email, clientName: client.name || 'клиент', url })
+    emailSent = r.ok
+    if (!r.ok) emailError = r.error
+  } catch (e) {
+    emailError = e instanceof Error ? e.message : 'unknown'
+  }
+
+  await admin.from('client_invitations')
+    .update({ email_sent_at: emailSent ? new Date().toISOString() : null, email_error: emailError || null })
+    .eq('id', inviteId)
+
+  return { ok: true, url, emailSent, emailError }
+}
+
+/**
  * Отправка приглашения через Resend.
  * Если RESEND_API_KEY не настроен — возвращает {ok:false} тихо, не падает.
  */

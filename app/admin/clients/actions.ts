@@ -324,3 +324,15 @@ export async function generateClientInviteAction(clientId: number) {
   return { success: true, url: result.url, emailSent: result.emailSent, emailError: result.emailError }
 }
 
+// Поправить email и переотправить invite-ссылку.
+export async function resendClientInviteAction(clientId: number, newEmail?: string) {
+  const { supabase, error: authErr } = await assertAdmin()
+  if (authErr) return { error: authErr }
+  const { data: { user } } = await supabase.auth.getUser()
+  const { resendClientInvitation } = await import("@/lib/invitation")
+  const result = await resendClientInvitation(clientId, newEmail, user?.id)
+  if (!result.ok) return { error: result.error }
+  revalidatePath("/admin/clients")
+  return { success: true, url: result.url, emailSent: result.emailSent, emailError: result.emailError }
+}
+

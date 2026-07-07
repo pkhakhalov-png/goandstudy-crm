@@ -84,6 +84,29 @@ export async function generateInviteForOwnClient(clientId: number) {
 
 
 
+// Поправить email и переотправить invite-ссылку (если email указали с ошибкой).
+export async function resendInviteForOwnClient(clientId: number, newEmail?: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: "Не авторизован" }
+
+  const { data: profile } = await supabase.from("users").select("role").eq("id", user.id).single()
+  const isPrivileged = profile?.role === "admin" || profile?.role === "rop"
+
+  if (!isPrivileged) {
+    const admin = await createAdminClient()
+    const { data: client } = await admin.from("clients").select("salesperson_id").eq("id", clientId).maybeSingle()
+    if (!client) return { error: "Клиент не найден" }
+    if (client.salesperson_id !== user.id) return { error: "Этот клиент не у вас" }
+  }
+
+  const { resendClientInvitation } = await import("@/lib/invitation")
+  const result = await resendClientInvitation(clientId, newEmail, user.id)
+  if (!result.ok) return { error: result.error }
+  revalidatePath("/sales")
+  return { success: true, url: result.url, emailSent: result.emailSent, emailError: result.emailError }
+}
+
 // Проставить email клиенту перед генерацией invite (если его нет).
 export async function setClientEmail(clientId: number, email: string) {
   const supabase = await createClient()
