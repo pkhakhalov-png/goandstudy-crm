@@ -107,7 +107,11 @@ export default async function ProgramPage({
   }
   if (overrides.application_deadline) {
     attr.earliest_intake = { ...(attr.earliest_intake || {}), submission_deadline: overrides.application_deadline }
-    if (curatorData) curatorData.deadline_label = null  // дать override победить через fmtDate ниже
+    // deadlineText = curatorData.deadline_label || program.deadline_text || fmtDate(deadline).
+    // Обнуляем оба верхних приоритета, иначе сид-текст deadline_text («Уточняется…»)
+    // перекрывает правку куратора и она не видна на карточке.
+    program.deadline_text = null
+    if (curatorData) curatorData.deadline_label = null
   }
   if (overrides.tuition != null && overrides.tuition !== '') {
     const n = Number(overrides.tuition)
