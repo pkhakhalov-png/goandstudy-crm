@@ -147,6 +147,14 @@ export default async function ProgramPage({
       const n = Number(v); if (Number.isFinite(n)) ensureCD()[k] = n
     }
   }
+  // Заметка куратора и список требований — редактируются вручную в ProgramEditPanel.
+  // curator_note applyOverrides кладёт как строку (ок). entry_requirements хранится в
+  // override строкой (пункты через \n) — конвертируем обратно в массив для рендера <ul>.
+  if (overrides.curator_note) program.curator_note = String(overrides.curator_note)
+  if (overrides.entry_requirements != null && overrides.entry_requirements !== '') {
+    program.entry_requirements = String(overrides.entry_requirements)
+      .split('\n').map((s: string) => s.trim()).filter(Boolean)
+  }
 
   // Кто последним обновлял — для подписи «обновил X»
   let lastUpdatedByName: string | null = null
@@ -399,7 +407,7 @@ export default async function ProgramPage({
             {/* LEFT — куратор-блоки + описание + admission + pgwp */}
             <div style={{ display: 'grid', gap: 12 }}>
               {/* BD-куратор-блоки сверху слева (если есть) */}
-              {isCurator && program.curator_note && (
+              {program.curator_note && (
                 <div style={{ ...cardStyle, borderLeft: '4px solid var(--purple, #B15ECC)' }}>
                   <div style={sectionTitle}>Заметка куратора</div>
                   <div style={{ fontSize: 14, lineHeight: 1.6, color: 'var(--text)', whiteSpace: 'pre-wrap' }}>

@@ -41,8 +41,20 @@ export function ProgramEditPanel({ programId, program, curatorData }: Props) {
   const minEducationLevel = curatorData?.min_education_level || ''
   const minGpaPercent = curatorData?.min_gpa_percent != null ? String(curatorData.min_gpa_percent) : ''
   const tuitionDeposit = attr.tuition_deposit?.amount != null ? String(attr.tuition_deposit.amount) : ''
+  const curatorNote = program.curator_note || ''
+  const entryRequirements = Array.isArray(program.entry_requirements) ? program.entry_requirements.join('\n') : ''
 
   const sections: EditableSection[] = [
+    {
+      title: 'Заметка куратора',
+      fields: [
+        {
+          field: 'curator_note', label: 'Заметка куратора',
+          type: 'textarea', placeholder: 'Ключевое про программу: сроки, нюансы поступления, на что обратить внимание',
+          ...eff('curator_note', curatorNote),
+        },
+      ],
+    },
     {
       title: 'Описание',
       fields: [
@@ -76,6 +88,12 @@ export function ProgramEditPanel({ programId, program, curatorData }: Props) {
     {
       title: 'Требования к поступлению',
       fields: [
+        {
+          field: 'entry_requirements', label: 'Требования (списком)',
+          type: 'textarea', placeholder: 'Аттестат о среднем образовании\nАнглийский: IELTS 6.0\nВступительный экзамен',
+          hint: 'Каждая строка — отдельный пункт в списке на карточке',
+          ...eff('entry_requirements', entryRequirements),
+        },
         { field: 'min_education_level', label: 'Уровень образования', type: 'text', placeholder: 'High School / Bachelor', ...eff('min_education_level', minEducationLevel) },
         { field: 'min_gpa_percent', label: 'Минимальный GPA (%)', type: 'number', ...eff('min_gpa_percent', minGpaPercent) },
       ],
