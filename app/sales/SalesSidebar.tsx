@@ -9,7 +9,7 @@ interface Props {
   userName: string
   userEmail: string
   initials: string
-  activePage?: 'clients' | 'invoices' | 'schedule' | 'funnel'
+  activePage?: 'clients' | 'invoices' | 'schedule' | 'funnel' | 'calendar'
 }
 
 export function SalesSidebar({ userName, userEmail, initials, activePage = 'clients' }: Props) {
@@ -65,6 +65,17 @@ export function SalesSidebar({ userName, userEmail, initials, activePage = 'clie
               <line x1="5" y1="11" x2="8" y2="11"/>
             </svg>
             Счета
+          </Link>
+          <Link href="/sales/calendar" onClick={() => setOpen(false)} className={`ni${activePage==='calendar'?' active':''}`}
+            style={activePage==='calendar' ? { borderLeftColor: 'var(--green)', color: 'var(--green)', background: 'rgba(22,163,97,.07)' } : undefined}>
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
+              <rect x="2" y="3" width="12" height="11" rx="2"/>
+              <line x1="2" y1="6.5" x2="14" y2="6.5"/>
+              <line x1="5" y1="1.5" x2="5" y2="4"/>
+              <line x1="11" y1="1.5" x2="11" y2="4"/>
+              <circle cx="8" cy="10.2" r="1.2" fill="currentColor" stroke="none"/>
+            </svg>
+            Календарь оплат
           </Link>
           <Link href="/sales/schedule" onClick={() => setOpen(false)} className={`ni${activePage==='schedule'?' active':''}`}
             style={activePage==='schedule' ? { borderLeftColor: 'var(--green)', color: 'var(--green)', background: 'rgba(22,163,97,.07)' } : undefined}>

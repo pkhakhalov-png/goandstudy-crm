@@ -24,6 +24,7 @@ interface Payment {
 interface Props {
   payments: Payment[]
   salespersons: { id: string; name: string }[]
+  hideSalespersonFilter?: boolean
 }
 
 const MONTHS = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь']
@@ -50,7 +51,7 @@ const statusLabel: Record<string, string> = {
   pending: 'Ожидается',
 }
 
-export function CalendarClient({ payments, salespersons }: Props) {
+export function CalendarClient({ payments, salespersons, hideSalespersonFilter = false }: Props) {
   const now = new Date()
   const [month, setMonth] = useState(now.getMonth())
   const [year, setYear] = useState(now.getFullYear())
@@ -173,10 +174,12 @@ export function CalendarClient({ payments, salespersons }: Props) {
             className="btn-s" style={{ fontSize: 11, padding: '5px 12px' }}>Сегодня</button>
 
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-            <select className="si" value={filterSalesperson} onChange={e => setFilterSalesperson(e.target.value)}>
-              <option value="">Все продажники</option>
-              {salespersons.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
+            {!hideSalespersonFilter && (
+              <select className="si" value={filterSalesperson} onChange={e => setFilterSalesperson(e.target.value)}>
+                <option value="">Все продажники</option>
+                {salespersons.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            )}
             <select className="si" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
               <option value="">Все статусы</option>
               <option value="overdue">Просрочка</option>
