@@ -152,7 +152,7 @@ export function SalesPage({ clients, expenses }: Props) {
             <div className="kc">
               <div className="kl">Заработано всего</div>
               <div className="kv p" style={{fontSize:17}}>{salaryTotal.toLocaleString('ru')} ₽</div>
-              <div className="ks">10% от договоров</div>
+              <div className="ks">10% · рассрочка 4+ мес — с каждого поступления</div>
             </div>
             <div className="kc">
               <div className="kl">Выплачено</div>

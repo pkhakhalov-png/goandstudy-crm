@@ -142,20 +142,31 @@ export async function moveDeal(formData: FormData) {
             }
             await admin.from('payments').insert(paymentRows)
 
-            // Update client months and first_payment_date
+            // Update client months and first_payment_date.
+            // 4+ month installments accrue salesperson commission per received
+            // payment (via the sync_sales_commission trigger), so flag them.
+            const perPayment = months >= 4
             await admin.from('clients').update({
               months,
               first_payment_date: firstPayDate,
+              commission_per_payment: perPayment,
             }).eq('id', clientId)
 
             // Create expenses (same as RPC does)
             const { data: existingExpenses } = await admin.from('expenses').select('id').eq('client_id', clientId!).limit(1)
             if (!existingExpenses || existingExpenses.length === 0) {
-              const expenseRows = [
+              const { data: sp } = deal.salesperson_id
+                ? await admin.from('users').select('name').eq('id', deal.salesperson_id).maybeSingle()
+                : { data: null }
+              const expenseRows: Record<string, unknown>[] = [
                 { client_id: clientId, article: 'curator', plan_date: firstPayDate, plan_sum: 25000, note: 'Куратор — этап 1' },
                 { client_id: clientId, article: 'curator', plan_date: (() => { const d = new Date(firstPayDate); d.setMonth(d.getMonth() + 1); return d.toISOString().split('T')[0] })(), plan_sum: 25000, note: 'Куратор — этап 2' },
-                { client_id: clientId, article: 'salesperson', plan_date: firstPayDate, plan_sum: Math.round(totalAmount * 0.1), note: 'ЗП продажника — 10% от ' + totalAmount.toLocaleString('ru') + ' ₽' },
               ]
+              // Salesperson lump only for <= 3 month installments; per-payment
+              // commission for 4+ months is booked by the DB trigger.
+              if (!perPayment) {
+                expenseRows.push({ client_id: clientId, article: 'salesperson', who: sp?.name ?? null, plan_date: firstPayDate, plan_sum: Math.round(totalAmount * 0.1), note: 'ЗП продажника — 10% от ' + totalAmount.toLocaleString('ru') + ' ₽' })
+              }
               await admin.from('expenses').insert(expenseRows)
             }
           }
