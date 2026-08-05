@@ -21,11 +21,13 @@ export default async function AdminSalesPage() {
     { data: clients },
     { data: payments },
     { data: allBookings },
+    { data: salesPlans },
   ] = await Promise.all([
     supabase.from('users').select('id, name, email, is_active').eq('role', 'salesperson').order('name'),
     supabase.from('clients').select('id, name, country, status, salesperson_id, created_at, months'),
     supabase.from('payments_view').select('id, client_id, plan_sum, fact_sum, is_paid, status, plan_date, fact_date'),
     supabase.from('bookings').select('id, salesperson_id, status, booking_date'),
+    supabase.from('sales_plans').select('month, salesperson_id, plan_amount'),
   ])
 
   return (
@@ -41,6 +43,7 @@ export default async function AdminSalesPage() {
           clients={clients ?? []}
           payments={payments ?? []}
           bookings={allBookings ?? []}
+          salesPlans={salesPlans ?? []}
         />
       </div>
     </div>

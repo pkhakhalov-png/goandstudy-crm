@@ -7,6 +7,7 @@ import {
   addFixedExpense, updateFixedExpense, toggleFixedExpense, deleteFixedExpense
 } from './actions'
 import { CuratorInviteButton } from './CuratorInviteButton'
+import { SalesPlansEditor } from './SalesPlansEditor'
 
 type Salesperson = { id: string; name: string; email: string; is_active: boolean; telegram_username: string | null }
 type Curator = { id: string; name: string; is_active: boolean; email?: string | null; user_id?: string | null }
@@ -27,11 +28,12 @@ const thStyle = {
 const periodLabel: Record<string,string> = { monthly:'Ежемесячно', quarterly:'Ежеквартально', yearly:'Ежегодно', once:'Разово' }
 const articleLabel: Record<string,string> = { office:'Офис', salary:'ЗП', software:'ПО/Подписки', marketing:'Маркетинг', other:'Прочее' }
 
-export function SettingsClient({ salespersons, curators, fixedExpenses, bookings }: {
+export function SettingsClient({ salespersons, curators, fixedExpenses, bookings, salesPlans }: {
   salespersons: Salesperson[]
   curators: Curator[]
   fixedExpenses: FixedExpense[]
   bookings: any[]
+  salesPlans: any[]
 }) {
   const [newPassword, setNewPassword] = useState<string | null>(null)
   const [newPasswordName, setNewPasswordName] = useState<string | null>(null)
@@ -83,6 +85,8 @@ export function SettingsClient({ salespersons, curators, fixedExpenses, bookings
       )}
 
       {/* Продажники */}
+      {settingsTab === 'team' && <SalesPlansEditor salespersons={salespersons} salesPlans={salesPlans} />}
+
       {settingsTab === 'team' && <div style={cardStyle}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(0,0,0,.07)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ fontSize: 13, fontWeight: 700 }}>Продажники</div>

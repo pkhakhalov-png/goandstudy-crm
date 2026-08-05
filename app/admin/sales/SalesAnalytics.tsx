@@ -7,6 +7,7 @@ interface Props {
   clients: any[]
   payments: any[]
   bookings: any[]
+  salesPlans: any[]
 }
 
 interface MonthEntry {
@@ -16,10 +17,16 @@ interface MonthEntry {
 
 const MONTHS_FULL = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь']
 const MONTHS_SHORT = ['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек']
-const PLAN = 900000
 
-export function SalesAnalytics({ salespersons, clients, payments, bookings }: Props) {
+export function SalesAnalytics({ salespersons, clients, payments, bookings, salesPlans }: Props) {
   const now = new Date()
+
+  // План берётся из sales_plans по месяцу (не захардкожен). План отдела = сумма личных.
+  function planFor(salespersonId: string, year: number, month: number): number {
+    const ym = `${year}-${String(month+1).padStart(2,'0')}`
+    const row = salesPlans.find(p => p.month === ym && p.salesperson_id === salespersonId)
+    return Number(row?.plan_amount || 0)
+  }
   const [viewMonth, setViewMonth] = useState(now.getMonth())
   const [viewYear, setViewYear] = useState(now.getFullYear())
   const [expandedSales, setExpandedSales] = useState<Set<string>>(new Set())
@@ -53,8 +60,9 @@ export function SalesAnalytics({ salespersons, clients, payments, bookings }: Pr
       .filter(p => myClientIds.includes(p.client_id) && p.is_paid && p.fact_date >= mStart && p.fact_date <= mEnd)
       .reduce((sum: number, p: any) => sum + Number(p.fact_sum || p.plan_sum), 0)
 
-    const pct = Math.round(factPaid / PLAN * 100)
-    return { newClients: newClients.length, newContractsSum, factPaid, pct }
+    const plan = planFor(salespersonId, year, month)
+    const pct = plan > 0 ? Math.round(factPaid / plan * 100) : 0
+    return { newClients: newClients.length, newContractsSum, factPaid, pct, plan }
   }
 
   const salesStats = salespersons.map(s => {
@@ -112,7 +120,8 @@ export function SalesAnalytics({ salespersons, clients, payments, bookings }: Pr
   const teamFactPaid = salesStats.reduce((s: number, x: any) => s + x.factPaid, 0)
   const teamNewContracts = salesStats.reduce((s: number, x: any) => s + x.newContractsSum, 0)
   const teamOverdue = salesStats.reduce((s: number, x: any) => s + x.overdue, 0)
-  const teamPlan = PLAN * (salespersons.filter(s => s.is_active).length || 1)
+  // План отдела = сумма личных планов продажников за просматриваемый месяц.
+  const teamPlan = salespersons.reduce((sum: number, s: any) => sum + planFor(s.id, viewYear, viewMonth), 0)
 
   return (
     <div style={{padding:'20px 28px 40px',overflowY:'auto',flex:1}}>
@@ -186,8 +195,8 @@ export function SalesAnalytics({ salespersons, clients, payments, bookings }: Pr
                 </div>
                 <div style={{textAlign:'right'}}>
                   <div style={{fontSize:10,color:'var(--muted)',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:2}}>% плана</div>
-                  <div style={{fontSize:14,fontWeight:700,color:s.pct>=100?'var(--green)':s.pct>=60?'var(--gold)':'var(--red)'}}>{s.pct}%</div>
-                  <div style={{fontSize:10,color:'var(--muted)',marginTop:1}}>план {PLAN.toLocaleString('ru')} ₽</div>
+                  <div style={{fontSize:14,fontWeight:700,color:s.pct>=100?'var(--green)':s.pct>=60?'var(--gold)':'var(--red)'}}>{s.plan>0?`${s.pct}%`:'—'}</div>
+                  <div style={{fontSize:10,color:'var(--muted)',marginTop:1}}>{s.plan>0?`план ${s.plan.toLocaleString('ru')} ₽`:'план не задан'}</div>
                 </div>
                 <div style={{textAlign:'right'}}>
                   <div style={{fontSize:10,color:'var(--muted)',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:2}}>Просрочка</div>
@@ -205,7 +214,7 @@ export function SalesAnalytics({ salespersons, clients, payments, bookings }: Pr
             <div style={{padding:'8px 20px',borderBottom:isOpen?'1px solid var(--bor)':'none'}}>
               <div style={{display:'flex',justifyContent:'space-between',fontSize:10,color:'var(--muted)',marginBottom:3}}>
                 <span>Выполнение плана {MONTHS_FULL[viewMonth]}</span>
-                <span>{s.factPaid.toLocaleString('ru')} / {PLAN.toLocaleString('ru')} ₽</span>
+                <span>{s.factPaid.toLocaleString('ru')} / {(s.plan>0?s.plan:0).toLocaleString('ru')} ₽</span>
               </div>
               <div style={{height:4,background:'var(--bor2)',borderRadius:20,overflow:'hidden'}}>
                 <div style={{height:'100%',width:`${Math.min(s.pct,100)}%`,background:s.pct>=100?'var(--green)':s.pct>=60?'linear-gradient(90deg,var(--purple),#d47aff)':'var(--red)',borderRadius:20,transition:'width .3s'}}/>

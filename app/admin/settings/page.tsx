@@ -21,11 +21,13 @@ export default async function AdminSettingsPage() {
     { data: curators },
     { data: fixedExpenses },
     { data: allBookings },
+    { data: salesPlans },
   ] = await Promise.all([
     supabase.from('users').select('id, name, email, is_active, telegram_username, created_at').eq('role', 'salesperson').order('created_at', { ascending: true }),
     supabase.from('curators').select('id, name, email, user_id, is_active, created_at').order('created_at', { ascending: true }),
     supabase.from('fixed_expenses').select('*').order('created_at', { ascending: true }),
     supabase.from('bookings').select('id, salesperson_id, booking_date, start_time, end_time, client_name, client_phone, client_telegram, status, created_at').order('booking_date', { ascending: false }).limit(500),
+    supabase.from('sales_plans').select('month, salesperson_id, plan_amount'),
   ])
 
   return (
@@ -41,6 +43,7 @@ export default async function AdminSettingsPage() {
           curators={curators ?? []}
           fixedExpenses={fixedExpenses ?? []}
           bookings={allBookings ?? []}
+          salesPlans={salesPlans ?? []}
         />
       </div>
     </div>

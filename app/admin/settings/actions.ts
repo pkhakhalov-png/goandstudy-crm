@@ -54,6 +54,18 @@ export async function updateSalespersonTg(formData: FormData): Promise<void> {
   revalidatePath('/admin/settings')
 }
 
+export async function upsertSalesPlan(formData: FormData): Promise<void> {
+  const supabase = await createClient()
+  const month = formData.get('month') as string            // 'YYYY-MM'
+  const salespersonId = formData.get('salesperson_id') as string
+  const planAmount = Number(formData.get('plan_amount')) || 0
+  await supabase
+    .from('sales_plans')
+    .upsert({ month, salesperson_id: salespersonId, plan_amount: planAmount }, { onConflict: 'month,salesperson_id' })
+  revalidatePath('/admin/settings')
+  revalidatePath('/admin/sales')
+}
+
 export async function addCurator(formData: FormData): Promise<void> {
   const supabase = await createClient()
   const name = (formData.get('name') as string)?.trim()

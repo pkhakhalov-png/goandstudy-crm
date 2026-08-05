@@ -6,7 +6,7 @@ import { logout } from '@/app/login/actions'
 import { WelcomeOverlay } from '@/components/WelcomeOverlay'
 
 interface Props {
-  activePage: 'clients' | 'payments' | 'expenses' | 'invoices' | 'calendar' | 'funnel' | 'home' | 'sales' | 'curators' | 'settings'
+  activePage: 'clients' | 'payments' | 'expenses' | 'invoices' | 'calendar' | 'funnel' | 'home' | 'sales' | 'curators' | 'settings' | 'analytics'
   userName: string
   userEmail: string
 }
@@ -86,6 +86,12 @@ export function Sidebar({ activePage, userName, userEmail }: Props) {
             Календарь
           </Link>
           <div className="ns">Аналитика</div>
+          <Link href="/admin/analytics" onClick={()=>setOpen(false)} className={`ni${activePage==='analytics'?' active':''}`}>
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
+              <rect x="2" y="8" width="3" height="6"/><rect x="6.5" y="4" width="3" height="10"/><rect x="11" y="10" width="3" height="4"/>
+            </svg>
+            Аналитика
+          </Link>
           <Link href="/admin/sales" onClick={()=>setOpen(false)} className={`ni${activePage==='sales'?' active':''}`}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
               <polyline points="2,13 5,8 8,10 11,4 14,6"/>
