@@ -158,9 +158,14 @@ export async function moveDeal(formData: FormData) {
               const { data: sp } = deal.salesperson_id
                 ? await admin.from('users').select('name').eq('id', deal.salesperson_id).maybeSingle()
                 : { data: null }
+              // Curator name goes into expenses.who so the payout groups under the
+              // right curator on Расходы → Кураторы (which groups by who, not curator_id).
+              const { data: cur } = curatorId
+                ? await admin.from('curators').select('name').eq('id', curatorId).maybeSingle()
+                : { data: null }
               const expenseRows: Record<string, unknown>[] = [
-                { client_id: clientId, article: 'curator', plan_date: firstPayDate, plan_sum: 25000, note: 'Куратор — этап 1' },
-                { client_id: clientId, article: 'curator', plan_date: (() => { const d = new Date(firstPayDate); d.setMonth(d.getMonth() + 1); return d.toISOString().split('T')[0] })(), plan_sum: 25000, note: 'Куратор — этап 2' },
+                { client_id: clientId, article: 'curator', who: cur?.name ?? null, plan_date: firstPayDate, plan_sum: 25000, note: 'Куратор — этап 1' },
+                { client_id: clientId, article: 'curator', who: cur?.name ?? null, plan_date: (() => { const d = new Date(firstPayDate); d.setMonth(d.getMonth() + 1); return d.toISOString().split('T')[0] })(), plan_sum: 25000, note: 'Куратор — этап 2' },
               ]
               // Salesperson lump only for <= 3 month installments; per-payment
               // commission for 4+ months is booked by the DB trigger.

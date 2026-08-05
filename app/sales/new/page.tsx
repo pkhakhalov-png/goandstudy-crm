@@ -173,6 +173,13 @@ export default async function NewClientPage({ searchParams }: { searchParams: Pr
             {/* Оплата */}
             <div style={cardStyle}>
               <div style={{ fontSize: 12, fontWeight: 700, color: '#14121e', marginBottom: 16, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Оплата</div>
+              <div style={{ marginBottom: 14 }}>
+                <label style={labelStyle}>Тип услуги *</label>
+                <select name="service_type" required defaultValue="full" style={{ ...inputStyle, appearance: 'none' as const }}>
+                  <option value="full">Полное сопровождение</option>
+                  <option value="session">Экспертная сессия</option>
+                </select>
+              </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
                 <div>
                   <label style={labelStyle}>Сумма договора *</label>
@@ -188,7 +195,7 @@ export default async function NewClientPage({ searchParams }: { searchParams: Pr
                 </div>
               </div>
               <div style={{ marginTop: 14, padding: '10px 14px', background: 'rgba(22,163,97,.07)', border: '1px solid rgba(22,163,97,.15)', borderRadius: 8, fontSize: 12, color: 'var(--muted)' }}>
-                💡 Платежи разобьются автоматически на указанное кол-во месяцев. ЗП продажника — 10% от суммы договора.
+                💡 Платежи разобьются автоматически на указанное кол-во месяцев. ЗП продажника — 10% от суммы договора. Экспертная сессия — куратору 7 500 ₽ одной выплатой (вместо 2×25 000 ₽ при полном сопровождении).
               </div>
             </div>
 

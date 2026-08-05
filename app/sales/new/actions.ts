@@ -17,6 +17,7 @@ export async function createClientSales(formData: FormData): Promise<void> {
   const clientName = [firstName, lastName].filter(Boolean).join(' ') || (formData.get('name') as string)
   const totalAmount = Number(formData.get('total_amount'))
   const firstPayDate = formData.get('first_pay_date') as string
+  const serviceType = (formData.get('service_type') as string) === 'session' ? 'session' : 'full'
 
   const { error } = await supabase.rpc('create_client_with_payments', {
     p_name: clientName,
@@ -31,6 +32,7 @@ export async function createClientSales(formData: FormData): Promise<void> {
     p_curator_id: curatorId,
     p_salesperson_id: user.id,
     p_notes: (formData.get('notes') as string) || null,
+    p_service_type: serviceType,
   })
 
   if (error) {
