@@ -246,6 +246,7 @@ RETURNS json LANGUAGE sql STABLE SECURITY DEFINER AS $$
              ORDER BY EXTRACT(EPOCH FROM (roadmap_approved_at - curator_assigned_at))/86400.0) AS days
       FROM public.clients
      WHERE roadmap_approved_at IS NOT NULL AND curator_assigned_at IS NOT NULL
+       AND roadmap_approved_at >= curator_assigned_at
   )
   SELECT json_build_object(
     'kpis', json_build_object(
