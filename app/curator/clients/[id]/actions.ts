@@ -6,14 +6,14 @@ import { revalidatePath } from 'next/cache'
 async function assertCurator() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Не авторизован' as const, curatorId: null, userId: null }
+  if (!user) return { error: 'Не авторизован' as const, curatorId: null, userId: null, role: null }
   const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single()
   if (profile?.role !== 'curator' && profile?.role !== 'admin' && profile?.role !== 'rop') {
-    return { error: 'Нет доступа' as const, curatorId: null, userId: null }
+    return { error: 'Нет доступа' as const, curatorId: null, userId: null, role: null }
   }
   const admin = await createAdminClient()
   const { data: curator } = await admin.from('curators').select('id').eq('user_id', user.id).maybeSingle()
-  return { error: null, curatorId: curator?.id || null, userId: user.id }
+  return { error: null, curatorId: curator?.id || null, userId: user.id, role: profile.role }
 }
 
 async function verifyClientOwnership(admin: any, clientId: number, curatorId: string) {
@@ -111,7 +111,7 @@ export async function toggleChecklist(formData: FormData) {
 }
 
 export async function updateClientField(formData: FormData) {
-  const { error: authErr, curatorId } = await assertCurator()
+  const { error: authErr, curatorId, role } = await assertCurator()
   if (authErr) return { error: authErr }
 
   const clientId = Number(formData.get('client_id'))
@@ -119,11 +119,18 @@ export async function updateClientField(formData: FormData) {
   const value = (formData.get('value') as string)?.trim() || null
   if (!clientId || !field) return { error: 'Неверные данные' }
 
-  const allowed = ['country', 'university', 'telegram', 'phone', 'email']
+  const allowed = ['country', 'university', 'telegram', 'phone', 'email', 'expected_offer_month']
   if (!allowed.includes(field)) return { error: 'Поле недоступно' }
 
+  if (field === 'expected_offer_month' && value && !/^\d{4}-(0[1-9]|1[0-2])$/.test(value)) {
+    return { error: 'Некорректный месяц' }
+  }
+
   const admin = await createAdminClient()
-  if (!await verifyClientOwnership(admin, clientId, curatorId!)) return { error: 'Клиент не найден' }
+  // admin/rop открывают любую карточку (page.tsx), у них нет строки в curators —
+  // для них пропускаем проверку владения, как в sales/actions.ts.
+  const privileged = role === 'admin' || role === 'rop'
+  if (!privileged && !await verifyClientOwnership(admin, clientId, curatorId!)) return { error: 'Клиент не найден' }
 
   const { error } = await admin.from('clients').update({ [field]: value }).eq('id', clientId)
   if (error) return { error: error.message }

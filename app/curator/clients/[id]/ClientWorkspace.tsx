@@ -606,6 +606,25 @@ function ProjectTab({ client }: { client: any }) {
         </div>
 
         <div className="ds-card" style={{ padding: 24 }}>
+          <SectionHead eyebrow="Оффер" title="Ориентировочный срок" />
+          <div style={{ display: 'flex', flexDirection: 'column', marginTop: 20 }}>
+            <EditableField
+              clientId={client.id}
+              fieldKey="expected_offer_month"
+              label="Месяц оффера"
+              value={client.expected_offer_month ?? ''}
+              display={formatMonthRu(client.expected_offer_month)}
+              placeholder="Выбрать месяц…"
+              inputType="month"
+              isFirst
+            />
+          </div>
+          <div style={{ marginTop: 10, fontSize: 11, lineHeight: 1.5, color: 'var(--ds-muted)' }}>
+            Ориентировочный месяц зачисления / получения оффера. По нему планируется вторая выплата куратору.
+          </div>
+        </div>
+
+        <div className="ds-card" style={{ padding: 24 }}>
           <SectionHead eyebrow="Статус" title="Ключевая инфа" />
           <dl style={{ display: 'flex', flexDirection: 'column', gap: 10, margin: '18px 0 0' }}>
             <InfoRow label="Статус" value={client.status || '—'} />
@@ -620,7 +639,7 @@ function ProjectTab({ client }: { client: any }) {
 }
 
 function EditableField({
-  clientId, fieldKey, label, value, placeholder, isFirst,
+  clientId, fieldKey, label, value, placeholder, isFirst, inputType = 'text', display,
 }: {
   clientId: number
   fieldKey: string
@@ -628,6 +647,8 @@ function EditableField({
   value: string
   placeholder?: string
   isFirst: boolean
+  inputType?: string
+  display?: string
 }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(value)
@@ -671,7 +692,7 @@ function EditableField({
         <>
           <div style={{ gridColumn: '2 / 4' }}>
             <input
-              type="text"
+              type={inputType}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => {
@@ -715,7 +736,7 @@ function EditableField({
               lineHeight: 1.4,
             }}
           >
-            {value || <span style={{ color: 'var(--ds-muted)', fontWeight: 400 }}>{placeholder || 'Заполнить…'}</span>}
+            {value ? (display ?? value) : <span style={{ color: 'var(--ds-muted)', fontWeight: 400 }}>{placeholder || 'Заполнить…'}</span>}
           </button>
           <button
             type="button"
@@ -740,6 +761,14 @@ function EditableField({
       )}
     </div>
   )
+}
+
+const MONTHS_RU_FULL = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь']
+function formatMonthRu(ym?: string | null): string | undefined {
+  if (!ym) return undefined
+  const [y, m] = ym.split('-').map(Number)
+  if (!y || !m || m < 1 || m > 12) return ym
+  return `${MONTHS_RU_FULL[m - 1]} ${y}`
 }
 
 function InfoRow({ label, value }: { label: string; value: string }) {

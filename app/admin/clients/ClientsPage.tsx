@@ -2,13 +2,22 @@
 
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
-import { assignCurator, updatePaymentSum, updateClientTotal, getAvailableGroups, linkClientGroup, unlinkClientGroup, refundAndDeleteClient } from './actions'
+import { Pager, pageCountOf } from '../Pager'
+import { assignCurator, updatePaymentSum, updateClientTotal, getAvailableGroups, linkClientGroup, unlinkClientGroup, refundAndDeleteClient, updateExpectedOfferMonth } from './actions'
 import { InviteClientButton } from './InviteClientButton'
 
 interface Props {
   clients: any[]
   salespersons: any[]
   curators: any[]
+}
+
+const MONTHS_RU_FULL = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь']
+function fmtMonth(ym?: string | null): string {
+  if (!ym) return ''
+  const [y, m] = ym.split('-').map(Number)
+  if (!y || !m || m < 1 || m > 12) return ym
+  return `${MONTHS_RU_FULL[m - 1]} ${y}`
 }
 
 function getPaymentStatus(client: any) {
@@ -44,12 +53,22 @@ export function ClientsPage({ clients, salespersons, curators }: Props) {
   const [paymentDraft, setPaymentDraft] = useState<string>('')
   const [editingTotal, setEditingTotal] = useState(false)
   const [totalDraft, setTotalDraft] = useState<string>('')
+  const [editingOffer, setEditingOffer] = useState(false)
+  const [offerDraft, setOfferDraft] = useState<string>('')
   const [search, setSearch] = useState('')
   const [filterSalesperson, setFilterSalesperson] = useState('')
   const [filterCurator, setFilterCurator] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
   const [filterPayment, setFilterPayment] = useState('')
   const [drawerTab, setDrawerTab] = useState<'info' | 'payments' | 'expenses' | 'invoices'>('info')
+
+  // Смена/закрытие карточки должна сбрасывать инлайн-редакторы — иначе draft от
+  // предыдущего клиента откроется у следующего и ОК запишет чужое значение.
+  function resetInlineEdits() {
+    setEditingOffer(false); setEditingTotal(false); setEditingPaymentId(null)
+  }
+  function selectClient(c: any) { setSelected(c); resetInlineEdits() }
+  function closePanel() { setSelected(null); resetInlineEdits() }
 
   const filtered = clients.filter(c => {
     if (search && !c.name.toLowerCase().includes(search.toLowerCase()) && !c.phone?.includes(search) && !c.email?.toLowerCase().includes(search.toLowerCase())) return false
@@ -61,6 +80,14 @@ export function ClientsPage({ clients, salespersons, curators }: Props) {
     if (filterPayment === 'clean' && c.payments?.some((p: any) => p.status === 'overdue')) return false
     return true
   })
+
+  const PAGE_SIZE = 25
+  const filterSig = `${search}|${filterSalesperson}|${filterCurator}|${filterStatus}|${filterPayment}`
+  const [pageState, setPageState] = useState({ sig: filterSig, page: 1 })
+  const pageCount = pageCountOf(filtered.length, PAGE_SIZE)
+  const curPage = pageState.sig === filterSig ? Math.min(pageState.page, pageCount) : 1
+  const setListPage = (p: number) => setPageState({ sig: filterSig, page: p })
+  const pagedClients = filtered.slice((curPage - 1) * PAGE_SIZE, curPage * PAGE_SIZE)
 
   const totalClients = clients.length
   const totalPlan = clients.reduce((s,c) => s + (c.payments?.reduce((ps:number,p:any)=>ps+Number(p.plan_sum),0)??0), 0)
@@ -82,7 +109,7 @@ export function ClientsPage({ clients, salespersons, curators }: Props) {
       {/* Overlay */}
       {sel && (
         <div
-          onClick={() => setSelected(null)}
+          onClick={() => closePanel()}
           style={{
             position: 'fixed', inset: 0, background: 'rgba(0,0,0,.25)',
             zIndex: 40, backdropFilter: 'blur(1px)'
@@ -125,7 +152,7 @@ export function ClientsPage({ clients, salespersons, curators }: Props) {
                   </div>
                 )}
               </div>
-              <button onClick={() => setSelected(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: 'var(--muted)', padding: '0 4px', lineHeight: 1 }}>×</button>
+              <button onClick={() => closePanel()} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: 'var(--muted)', padding: '0 4px', lineHeight: 1 }}>×</button>
             </div>
 
             {/* Mini stats */}
@@ -248,6 +275,31 @@ export function ClientsPage({ clients, salespersons, curators }: Props) {
                   )}
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid rgba(0,0,0,.04)', fontSize: 12 }}>
+                  <span style={{ color: 'var(--muted)' }}>Оффер ~</span>
+                  {editingOffer ? (
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <input type="month" value={offerDraft} autoFocus onChange={(e) => setOfferDraft(e.target.value)}
+                        style={{ fontSize: 12, padding: '4px 6px', borderRadius: 6, border: '1px solid rgba(0,0,0,.12)', background: '#fff' }} />
+                      <button
+                        onClick={() => startTransition(async () => {
+                          const res = await updateExpectedOfferMonth(sel.id, offerDraft)
+                          if (res?.error) { alert(res.error); return }
+                          setSelected({ ...sel, expected_offer_month: offerDraft || null })
+                          setEditingOffer(false)
+                        })}
+                        style={{ padding: '4px 10px', background: 'var(--green)', color: '#fff', border: 'none', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>ОК</button>
+                      <button onClick={() => setEditingOffer(false)}
+                        style={{ padding: '4px 8px', background: 'none', border: '1px solid rgba(0,0,0,.12)', borderRadius: 6, fontSize: 11, cursor: 'pointer', color: 'var(--muted)' }}>✕</button>
+                    </span>
+                  ) : (
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontWeight: 600, color: sel.expected_offer_month ? 'var(--text)' : 'var(--muted)' }}>{fmtMonth(sel.expected_offer_month) || '—'}</span>
+                      <button onClick={() => { setOfferDraft(sel.expected_offer_month ?? ''); setEditingOffer(true) }}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 12 }} title="Изменить месяц оффера">✎</button>
+                    </span>
+                  )}
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid rgba(0,0,0,.04)', fontSize: 12 }}>
                   <span style={{ color: 'var(--muted)' }}>TG группа</span>
                   {sel.tg_group_title ? (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -324,7 +376,7 @@ export function ClientsPage({ clients, salespersons, curators }: Props) {
                 <InviteClientButton client={sel} />
 
                 {sel.status !== 'refunded' && (
-                  <RefundClientButton client={sel} onDone={() => { setSelected(null) }} />
+                  <RefundClientButton client={sel} onDone={() => { closePanel() }} />
                 )}
                 {sel.status === 'refunded' && (
                   <div style={{ marginTop: 20, padding: '12px 14px', background: 'rgba(255,59,48,.06)', border: '1px solid rgba(255,59,48,.2)', borderRadius: 10, fontSize: 12, color: 'var(--red)' }}>
@@ -521,7 +573,7 @@ export function ClientsPage({ clients, salespersons, curators }: Props) {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((c: any) => {
+              {pagedClients.map((c: any) => {
                 const pays = c.payments ?? []
                 const paidS = pays.filter((p:any)=>p.is_paid).reduce((s:number,p:any)=>s+Number(p.fact_sum ?? p.plan_sum),0)
                 const totalS = pays.reduce((s:number,p:any)=>s+Number(p.plan_sum),0)
@@ -532,7 +584,7 @@ export function ClientsPage({ clients, salespersons, curators }: Props) {
 
                 return (
                   <tr key={c.id}
-                    onClick={() => setSelected(c)}
+                    onClick={() => selectClient(c)}
                     style={{ background: isSel ? 'rgba(177,94,204,.07)' : 'transparent', cursor: 'pointer' }}>
                     <td>
                       <div className="cn">{c.name}</div>
@@ -570,6 +622,7 @@ export function ClientsPage({ clients, salespersons, curators }: Props) {
               )}
             </tbody>
           </table>
+          <Pager page={curPage} pageCount={pageCount} onPage={setListPage} total={filtered.length} unit={['клиент', 'клиента', 'клиентов']} />
         </div>
       </div>
     </>

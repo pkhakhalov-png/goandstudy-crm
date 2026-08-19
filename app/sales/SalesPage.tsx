@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { markPaymentPaidSales, unmarkPaymentPaidSales } from './actions'
+import { markPaymentPaidSales, unmarkPaymentPaidSales, setExpectedOfferMonth } from './actions'
 import { SalesInviteButton } from './SalesInviteButton'
 
 interface Props {
@@ -28,6 +28,49 @@ function getPaymentStatus(client: any) {
   })
   if (hasSoon) return { label: 'Скоро платёж', cls: 'ps' }
   return { label: 'В графике', cls: 'pa' }
+}
+
+function OfferMonthRow({ clientId, value }: { clientId: number; value: string }) {
+  const router = useRouter()
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(value)
+  const [saving, setSaving] = useState(false)
+  const label = value ? `${MONTHS_FULL[Number(value.split('-')[1]) - 1]} ${value.split('-')[0]}` : '—'
+
+  async function save() {
+    setSaving(true)
+    const res = await setExpectedOfferMonth(clientId, draft)
+    setSaving(false)
+    if (res?.error) { alert(res.error); return }
+    setEditing(false)
+    router.refresh()
+  }
+
+  if (!editing) {
+    return (
+      <div className="ir">
+        <span className="ik">Оффер ~</span>
+        <span className="iv" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {label}
+          <button type="button" onClick={() => { setDraft(value); setEditing(true) }}
+            style={{ background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer', padding: 2, fontSize: 12 }} title="Изменить месяц оффера">✎</button>
+        </span>
+      </div>
+    )
+  }
+  return (
+    <div className="ir" style={{ alignItems: 'center' }}>
+      <span className="ik">Оффер ~</span>
+      <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <input type="month" value={draft} onChange={e => setDraft(e.target.value)}
+          style={{ padding: '4px 6px', border: '1px solid var(--bor2)', borderRadius: 6, fontSize: 12, fontFamily: 'inherit', outline: 'none', background: 'var(--surf)' }} />
+        <button type="button" onClick={save} disabled={saving}
+          style={{ padding: '4px 10px', background: 'var(--green)', color: '#fff', border: 'none', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>{saving ? '…' : 'ОК'}</button>
+        <button type="button" onClick={() => setEditing(false)}
+          style={{ padding: '4px 8px', background: 'transparent', color: 'var(--muted)', border: '1px solid var(--bor2)', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontFamily: 'inherit' }}>✕</button>
+      </span>
+    </div>
+  )
 }
 
 export function SalesPage({ clients, expenses }: Props) {
@@ -324,6 +367,7 @@ export function SalesPage({ clients, expenses }: Props) {
                   <div className="ir"><span className="ik">Рассрочка</span><span className="iv">{sel.months} мес.</span></div>
                   <div className="ir"><span className="ik">Оплачено</span><span className="iv g">{selPaidSum.toLocaleString('ru')} ₽</span></div>
                   <div className="ir"><span className="ik">Остаток</span><span className="iv o">{selDebt.toLocaleString('ru')} ₽</span></div>
+                  <OfferMonthRow key={sel.id} clientId={sel.id} value={sel.expected_offer_month ?? ''} />
 
                   <div style={{margin:'14px 0 2px'}}>
                     <div style={{display:'flex',justifyContent:'space-between',fontSize:11,color:'var(--muted)',marginBottom:5,fontWeight:500}}>

@@ -2,7 +2,7 @@
 // Используется и на сервере (page.tsx), и в шелле (для подписей).
 
 export type Preset = 'month' | 'prev' | 'quarter' | 'year' | 'custom'
-export type Tab = 'money' | 'sales' | 'curators' | 'forecast'
+export type Tab = 'money' | 'sales' | 'curators' | 'forecast' | 'payouts'
 
 export interface Period { preset: Preset; from: string; to: string }
 
@@ -50,4 +50,5 @@ export const TABS: { key: Tab; label: string }[] = [
   { key: 'sales', label: 'Продажники' },
   { key: 'curators', label: 'Кураторы' },
   { key: 'forecast', label: 'Прогноз' },
+  { key: 'payouts', label: 'Выплаты кураторам' },
 ]

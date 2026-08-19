@@ -123,6 +123,25 @@ export async function updateClientTotal(clientId: number, newTotal: number) {
   return { success: true }
 }
 
+export async function updateExpectedOfferMonth(clientId: number, month: string) {
+  const { supabase, error } = await assertAdmin()
+  if (error) return { error }
+
+  const value = month?.trim() || null
+  if (value && !/^\d{4}-(0[1-9]|1[0-2])$/.test(value)) return { error: 'Некорректный месяц' }
+
+  const { error: updErr } = await supabase
+    .from('clients')
+    .update({ expected_offer_month: value })
+    .eq('id', clientId)
+  if (updErr) return { error: updErr.message }
+
+  revalidatePath('/admin/clients')
+  revalidatePath('/sales')
+  revalidatePath(`/curator/clients/${clientId}`)
+  return { success: true }
+}
+
 export async function assignCurator(clientId: number, curatorId: string) {
   const supabase = await createClient()
 

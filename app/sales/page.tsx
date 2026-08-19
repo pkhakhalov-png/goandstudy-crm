@@ -30,7 +30,7 @@ export default async function SalesCabinetPage() {
     { data: allClients },
     { data: salesPlans },
   ] = await Promise.all([
-    supabase.from('clients').select('id, name, phone, email, telegram, country, university, status, months, created_at, salesperson_id, curator_id').eq('salesperson_id', user.id).order('created_at', { ascending: false }),
+    supabase.from('clients').select('id, name, phone, email, telegram, country, university, status, months, created_at, salesperson_id, curator_id, expected_offer_month').eq('salesperson_id', user.id).order('created_at', { ascending: false }),
     supabase.from('payments_view').select('id, client_id, num, plan_date, plan_sum, fact_sum, fact_date, is_paid, status, comment'),
     supabase.from('curators').select('id, name'),
     (await createAdminClient()).from('users').select('id, name, is_active').eq('role', 'salesperson').eq('is_active', true),

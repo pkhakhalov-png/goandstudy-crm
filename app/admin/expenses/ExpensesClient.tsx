@@ -2,6 +2,9 @@
 
 import { useState, Fragment } from 'react'
 import { addExpense, markExpensePaid, markExpenseUnpaid, updateExpense, addFixedExpenseRecord, markFixedRecordPaid, markFixedRecordUnpaid, deleteFixedExpenseRecord, deleteExpense } from './actions'
+import { Pager, pageCountOf } from '../Pager'
+
+const MONTH_PAGE_SIZE = 15
 
 interface Props {
   clients: any[]
@@ -26,6 +29,7 @@ export function ExpensesClient({ clients, expenses, fixedExpenses, fixedRecords 
   const [openEditForms, setOpenEditForms] = useState<Set<string>>(new Set())
   const [openAddForms, setOpenAddForms] = useState<Set<number>>(new Set())
   const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set())
+  const [monthPage, setMonthPage] = useState<Record<string, number>>({})
   const [staffUnpaidOnly, setStaffUnpaidOnly] = useState<Set<string>>(new Set())
   const [fixedMonth, setFixedMonth] = useState(`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`)
   const [openFixedForms, setOpenFixedForms] = useState<Set<string>>(new Set())
@@ -195,6 +199,9 @@ export function ExpensesClient({ clients, expenses, fixedExpenses, fixedRecords 
                   if (unpaidOnly && visibleExp.length === 0) return null
                   const mk = `${s.name}-${key}`
                   const isMOpen = expandedMonths.has(mk)
+                  const mPageCount = pageCountOf(visibleExp.length, MONTH_PAGE_SIZE)
+                  const mPage = Math.min(monthPage[mk] || 1, mPageCount)
+                  const pagedExp = visibleExp.slice((mPage - 1) * MONTH_PAGE_SIZE, mPage * MONTH_PAGE_SIZE)
                   return (
                     <div key={key}>
                       <div onClick={()=>toggleMonth(mk)} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 20px',cursor:'pointer',borderTop:'1px solid var(--bor)',background:isMOpen?'rgba(177,94,204,.03)':'transparent'}}>
@@ -206,6 +213,7 @@ export function ExpensesClient({ clients, expenses, fixedExpenses, fixedRecords 
                         {monthPending > 0 && <span style={{fontSize:12,fontWeight:700,color:'var(--gold)'}}>{monthPending.toLocaleString('ru')} ₽ должны</span>}
                       </div>
                       {isMOpen && (
+                        <>
                         <table>
                           <thead>
                             <tr><th>Клиент</th><th>Дата план</th><th>Сумма план</th><th>Факт</th><th>Дата выплаты</th><th>Статус</th><th style={{width:80}}>✓</th></tr>
@@ -214,7 +222,7 @@ export function ExpensesClient({ clients, expenses, fixedExpenses, fixedRecords 
                             {visibleExp.length === 0 && (
                               <tr><td colSpan={7} style={{textAlign:'center',color:'var(--muted)',padding:16,fontSize:12}}>Все выплачено</td></tr>
                             )}
-                            {visibleExp.map((e:any) => {
+                            {pagedExp.map((e:any) => {
                               const client = clients.find(cl => cl.id === e.client_id)
                               const isPayOpen = openPayForms.has(e.id)
                               return (
@@ -287,6 +295,8 @@ export function ExpensesClient({ clients, expenses, fixedExpenses, fixedRecords 
                             })}
                           </tbody>
                         </table>
+                        <Pager page={mPage} pageCount={mPageCount} onPage={(p)=>setMonthPage(prev=>({...prev,[mk]:p}))} total={visibleExp.length} unit={['выплата', 'выплаты', 'выплат']} />
+                        </>
                       )}
                     </div>
                   )

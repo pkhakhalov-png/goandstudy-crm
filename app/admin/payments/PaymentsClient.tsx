@@ -2,6 +2,7 @@
 
 import { useState, Fragment } from 'react'
 import { markPaymentPaid, unmarkPaymentPaid, editPayment } from './actions'
+import { Pager, pageCountOf } from '../Pager'
 
 const MONTHS = ['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек']
 
@@ -103,6 +104,14 @@ export function PaymentsClient({ allPayments, salespersons, curators }: Props) {
     if (!aSoon && bSoon) return 1
     return 0
   })
+
+  const PAGE_SIZE = 25
+  const filterSig = `${filterSalesperson}|${filterCurator}|${filterOverdue}|${filterSoon}|${filterDone}`
+  const [pageState, setPageState] = useState({ sig: filterSig, page: 1 })
+  const pageCount = pageCountOf(clientGroups.length, PAGE_SIZE)
+  const curPage = pageState.sig === filterSig ? Math.min(pageState.page, pageCount) : 1
+  const setListPage = (p: number) => setPageState({ sig: filterSig, page: p })
+  const pagedGroups = clientGroups.slice((curPage - 1) * PAGE_SIZE, curPage * PAGE_SIZE)
 
   const totalPlan = allPayments.reduce((s:number,p:any) => s+Number(p.plan_sum),0)
   const totalPaid = allPayments.filter((p:any)=>p.is_paid).reduce((s:number,p:any)=>s+Number(p.fact_sum||p.plan_sum),0)
@@ -226,7 +235,7 @@ export function PaymentsClient({ allPayments, salespersons, curators }: Props) {
           <div style={{textAlign:'center',color:'var(--muted)',padding:48}}>Платежей нет</div>
         )}
 
-        {clientGroups.map(({client, payments: cPayments}) => {
+        {pagedGroups.map(({client, payments: cPayments}) => {
           const sortedPayments = [...cPayments].sort((a,b) => a.num - b.num)
           const paidCount = cPayments.filter((p:any)=>p.is_paid).length
           const totalCount = cPayments.length
@@ -385,6 +394,8 @@ export function PaymentsClient({ allPayments, salespersons, curators }: Props) {
             </div>
           )
         })}
+
+        <Pager page={curPage} pageCount={pageCount} onPage={setListPage} total={clientGroups.length} unit={['клиент', 'клиента', 'клиентов']} />
       </div>
     </div>
   )

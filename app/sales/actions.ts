@@ -129,3 +129,28 @@ export async function setClientEmail(clientId: number, email: string) {
   return { success: true }
 }
 
+// Ориентировочный месяц оффера/зачисления (формат 'YYYY-MM' или пусто = сбросить).
+export async function setExpectedOfferMonth(clientId: number, month: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: "Не авторизован" }
+
+  const value = month?.trim() || null
+  if (value && !/^\d{4}-(0[1-9]|1[0-2])$/.test(value)) return { error: "Некорректный месяц" }
+
+  const { data: profile } = await supabase.from("users").select("role").eq("id", user.id).single()
+  const isPrivileged = profile?.role === "admin" || profile?.role === "rop"
+
+  const admin = await createAdminClient()
+  if (!isPrivileged) {
+    const { data: client } = await admin.from("clients").select("salesperson_id").eq("id", clientId).maybeSingle()
+    if (!client) return { error: "Клиент не найден" }
+    if (client.salesperson_id !== user.id) return { error: "Этот клиент не у вас" }
+  }
+  const { error } = await admin.from("clients").update({ expected_offer_month: value }).eq("id", clientId)
+  if (error) return { error: error.message }
+  revalidatePath("/sales")
+  revalidatePath("/admin/clients")
+  return { success: true }
+}
+
