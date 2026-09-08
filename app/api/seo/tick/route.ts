@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
         continue
       }
       try {
-        const outcome = await runStep(job)   // { outcome, result }
+        const outcome = await runStep(job, seo)   // { outcome, result }
         await seo.rpc('complete_job', { p_job_id: job.id, p_outcome: outcome.outcome, p_result: outcome.result ?? {} })
       } catch (e: any) {
         await seo.rpc('complete_job', {

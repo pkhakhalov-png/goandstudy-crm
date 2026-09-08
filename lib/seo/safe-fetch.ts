@@ -7,7 +7,7 @@ import dns from 'node:dns/promises'
 const MAX_BYTES = 5 * 1024 * 1024
 const TIMEOUT_MS = 20_000
 const MAX_REDIRECTS = 3
-const ALLOWED_MIME = ['text/html', 'application/pdf', 'text/plain', 'application/xhtml+xml']
+const ALLOWED_MIME = ['text/html', 'application/pdf', 'text/plain', 'application/xhtml+xml', 'application/xml', 'text/xml']
 
 export type SafeFetchResult =
   | { ok: true; status: number; finalUrl: string; contentType: string; body: Buffer }
