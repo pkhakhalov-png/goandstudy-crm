@@ -101,7 +101,7 @@ export async function computeInventoryFindings(seo: any): Promise<Record<string,
     vecs.push({ id: p.id, type: p.page_type, v: arr.map((x) => x / n) })
   }
   const idxById = new Map(pages.map((p) => [p.id, p.indexable]))
-  const THRESH = 0.90
+  const THRESH = 0.80   // title+h1+meta эмбеддинги дискриминативны; настоящая каннибализация — по GSC
   for (let i = 0; i < vecs.length; i++) {
     for (let j = i + 1; j < vecs.length; j++) {
       if (vecs[i].type !== vecs[j].type) continue
