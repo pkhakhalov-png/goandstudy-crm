@@ -29,6 +29,114 @@ async function fetchAll(seo: any, table: string, cols: string, apply?: (q: any) 
 
 const norm = (s: string | null) => (s || '').trim().toLowerCase().replace(/\s+/g, ' ')
 
+// ── Технический аудит: порт автоматизируемой части чеклистов claude-seo ──────
+// (seo-technical: title/meta/h1/thin-content; seo-schema: наличие JSON-LD;
+//  seo-geo/AI-visibility: llms.txt; crawlability: robots.txt + sitemap-декларация).
+// Всё считается из уже собранного инвентаря (seo.pages) + один запрос robots/llms.
+type TechPage = {
+  id: number
+  normalized_url: string
+  indexable: boolean
+  page_type: string
+  title: string | null
+  h1: string | null
+  meta_desc: string | null
+  word_count: number | null
+  has_schema: boolean | null
+}
+
+// Пороговые значения (из чеклистов; в символах/словах)
+const TITLE_MIN = 20, TITLE_MAX = 65        // ~200-600px → символьное приближение
+const META_MIN = 70, META_MAX = 160
+const THIN_WORDS = 300                       // seo-content: тонкий контент
+
+const TECH_KINDS = [
+  'missing_title', 'missing_h1', 'missing_meta_desc',
+  'title_length', 'meta_desc_length', 'thin_content',
+  'missing_schema', 'llms_txt_missing', 'robots_sitemap',
+]
+
+/** Технические находки из инвентаря + один site-wide запрос. Возвращает счётчики. */
+export async function computeTechnicalFindings(seo: any, safeFetch: (u: string) => Promise<any>, origin: string): Promise<Record<string, number>> {
+  // has_schema появляется миграцией 20260908000001; если её ещё нет — читаем без неё
+  let pages: TechPage[]
+  try {
+    pages = await fetchAll(
+      seo, 'pages',
+      'id, normalized_url, indexable, page_type, title, h1, meta_desc, word_count, has_schema',
+      (q) => q.is('removed_at', null),
+    )
+  } catch (e: any) {
+    if (!/has_schema|column|PGRST/i.test(e?.message || '')) throw e
+    const base = await fetchAll(
+      seo, 'pages',
+      'id, normalized_url, indexable, page_type, title, h1, meta_desc, word_count',
+      (q) => q.is('removed_at', null),
+    )
+    pages = base.map((p: any) => ({ ...p, has_schema: null }))
+  }
+  const findings: { kind: string; confidence: string; page_ids: number[]; evidence: any }[] = []
+  const add = (kind: string, confidence: string, id: number, url: string, extra: any = {}) =>
+    findings.push({ kind, confidence, page_ids: [id], evidence: { url, ...extra } })
+
+  const isContent = (t: string) => t === 'article' || t === 'service' || t === 'landing' || t === 'commercial'
+
+  for (const p of pages) {
+    if (!p.indexable) continue
+    const title = (p.title || '').trim()
+    const meta = (p.meta_desc || '').trim()
+
+    if (!title) add('missing_title', 'high', p.id, p.normalized_url)
+    else if (title.length < TITLE_MIN) add('title_length', 'medium', p.id, p.normalized_url, { title, len: title.length, issue: 'short', want: `${TITLE_MIN}-${TITLE_MAX}` })
+    else if (title.length > TITLE_MAX) add('title_length', 'medium', p.id, p.normalized_url, { title, len: title.length, issue: 'long', want: `${TITLE_MIN}-${TITLE_MAX}` })
+
+    if (!(p.h1 || '').trim()) add('missing_h1', 'high', p.id, p.normalized_url)
+
+    if (!meta) add('missing_meta_desc', 'medium', p.id, p.normalized_url)
+    else if (meta.length < META_MIN) add('meta_desc_length', 'low', p.id, p.normalized_url, { len: meta.length, issue: 'short', want: `${META_MIN}-${META_MAX}` })
+    else if (meta.length > META_MAX) add('meta_desc_length', 'low', p.id, p.normalized_url, { len: meta.length, issue: 'long', want: `${META_MIN}-${META_MAX}` })
+
+    if (isContent(p.page_type) && (p.word_count ?? 0) > 0 && (p.word_count as number) < THIN_WORDS)
+      add('thin_content', 'medium', p.id, p.normalized_url, { words: p.word_count, want: `>= ${THIN_WORDS}` })
+
+    // has_schema === false → точно нет JSON-LD; null → страница краулилась до появления колонки, пропускаем
+    if (p.has_schema === false && isContent(p.page_type))
+      add('missing_schema', 'medium', p.id, p.normalized_url, { page_type: p.page_type, note: 'нет JSON-LD; рекомендуется ' + (p.page_type === 'article' ? 'Article/BlogPosting' : 'Service/Course') })
+  }
+
+  // ── Site-wide: robots.txt (sitemap-декларация) + llms.txt (AI/GEO-видимость) ──
+  let origHost = ''
+  try { origHost = new URL(origin).origin } catch { origHost = origin.replace(/\/+$/, '') }
+
+  const robots = await safeFetch(`${origHost}/robots.txt`).catch(() => ({ ok: false }))
+  const robotsText = robots.ok ? (robots.body?.toString('utf8') || '') : ''
+  if (!robots.ok || !/sitemap:/i.test(robotsText)) {
+    findings.push({ kind: 'robots_sitemap', confidence: 'medium', page_ids: [],
+      evidence: { url: `${origHost}/robots.txt`, exists: !!robots.ok, has_sitemap_directive: /sitemap:/i.test(robotsText),
+        note: 'robots.txt не объявляет Sitemap: — снижает эффективность обхода' } })
+  }
+
+  const llms = await safeFetch(`${origHost}/llms.txt`).catch(() => ({ ok: false }))
+  if (!llms.ok || (llms.status && llms.status >= 400)) {
+    findings.push({ kind: 'llms_txt_missing', confidence: 'low', page_ids: [],
+      evidence: { url: `${origHost}/llms.txt`, exists: false,
+        note: 'нет /llms.txt — файла-ориентира для AI-ассистентов (ChatGPT/Perplexity/Claude); повышает AI-видимость' } })
+  }
+
+  // перезаписать открытые незанятые технические находки
+  await seo.from('findings').delete().in('kind', TECH_KINDS).eq('status', 'open').is('change_set_id', null)
+  const now = new Date().toISOString()
+  const rows = findings.map((f) => ({ ...f, status: 'open', detected_at: now, last_seen_at: now }))
+  for (let i = 0; i < rows.length; i += 200) {
+    const { error } = await seo.from('findings').insert(rows.slice(i, i + 200))
+    if (error) throw new Error(`tech findings insert: ${error.message}`)
+  }
+
+  const counts: Record<string, number> = {}
+  for (const f of findings) counts[f.kind] = (counts[f.kind] || 0) + 1
+  return counts
+}
+
 /** Пересчитать инвентарные находки. Возвращает счётчики по видам. */
 export async function computeInventoryFindings(seo: any): Promise<Record<string, number>> {
   const pages: Page[] = await fetchAll(seo, 'pages', 'id, normalized_url, indexable, page_type, title, content_hash', (q) => q.is('removed_at', null))

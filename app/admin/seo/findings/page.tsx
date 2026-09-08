@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { RecomputeFindingsButton } from '../RecomputeFindingsButton'
+import { TechnicalFindingsButton } from '../TechnicalFindingsButton'
 
 const KIND_RU: Record<string, string> = {
   orphan: 'Сироты (нет входящих ссылок)',
@@ -10,6 +11,16 @@ const KIND_RU: Record<string, string> = {
   broken_link: 'Битые ссылки',
   ctr_opportunity: 'CTR-возможности',
   stale_content: 'Устаревшее',
+  // технический аудит (порт claude-seo)
+  missing_title: 'Нет title',
+  missing_h1: 'Нет H1',
+  missing_meta_desc: 'Нет meta description',
+  title_length: 'Длина title вне нормы',
+  meta_desc_length: 'Длина meta description вне нормы',
+  thin_content: 'Тонкий контент (< 300 слов)',
+  missing_schema: 'Нет schema.org (JSON-LD)',
+  llms_txt_missing: 'Нет /llms.txt (AI-видимость)',
+  robots_sitemap: 'robots.txt без Sitemap',
 }
 
 async function load() {
@@ -37,7 +48,7 @@ export default async function SeoFindings() {
             Каннибализация / striking-distance / CTR появятся с подключением Search Console.
           </p>
         </div>
-        {s.ok && <RecomputeFindingsButton />}
+        {s.ok && <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><TechnicalFindingsButton /><RecomputeFindingsButton /></div>}
       </div>
 
       {!s.ok ? (
@@ -61,6 +72,9 @@ export default async function SeoFindings() {
                      f.evidence?.missing_url?.replace('https://goandstudy.com', '') ||
                      (f.evidence?.urls ? `«${f.evidence.title || 'дубль'}»: ${f.evidence.urls.map((u: string) => u.replace('https://goandstudy.com', '')).join(', ')}` : JSON.stringify(f.evidence))}
                     {f.evidence?.linked_from_count ? ` — ссылок: ${f.evidence.linked_from_count}` : ''}
+                    {f.evidence?.len != null ? ` — ${f.evidence.len} симв. (${f.evidence.issue === 'long' ? 'длинно' : 'коротко'}, надо ${f.evidence.want})` : ''}
+                    {f.evidence?.words != null ? ` — ${f.evidence.words} слов` : ''}
+                    {f.evidence?.note ? ` — ${f.evidence.note}` : ''}
                   </div>
                 ))}
                 {items.length > 60 && <div style={{ color: 'var(--muted)' }}>…ещё {items.length - 60}</div>}

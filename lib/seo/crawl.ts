@@ -44,6 +44,7 @@ export type ParsedPage = {
   canonical: string | null
   noindex: boolean
   hasSchema: boolean
+  schemaTypes: string[]
   wordCount: number
   contentHash: string
   links: { href: string; anchor: string; block: string; position: number; rel: string | null }[]
@@ -59,7 +60,24 @@ export function parseHtml(html: string, finalUrl: string, httpStatus: number): P
   const canonical = root.querySelector('link[rel="canonical"]')?.getAttribute('href')?.trim() || null
   const robots = (root.querySelector('meta[name="robots"]')?.getAttribute('content') || '').toLowerCase()
   const noindex = robots.includes('noindex')
-  const hasSchema = !!root.querySelector('script[type="application/ld+json"]')
+
+  // JSON-LD: наличие + перечень @type (в т.ч. вложенные @graph)
+  const schemaTypes = new Set<string>()
+  const ldNodes = root.querySelectorAll('script[type="application/ld+json"]')
+  for (const s of ldNodes) {
+    try {
+      const collectTypes = (o: any) => {
+        if (!o || typeof o !== 'object') return
+        if (Array.isArray(o)) { o.forEach(collectTypes); return }
+        const t = o['@type']
+        if (typeof t === 'string') schemaTypes.add(t)
+        else if (Array.isArray(t)) t.forEach((x) => typeof x === 'string' && schemaTypes.add(x))
+        if (Array.isArray(o['@graph'])) o['@graph'].forEach(collectTypes)
+      }
+      collectTypes(JSON.parse(s.text))
+    } catch { /* битый JSON-LD — игнорируем */ }
+  }
+  const hasSchema = ldNodes.length > 0
 
   // word count: тело без script/style
   root.querySelectorAll('script, style, noscript').forEach((n) => n.remove())
@@ -84,7 +102,7 @@ export function parseHtml(html: string, finalUrl: string, httpStatus: number): P
     })
   }
 
-  return { finalUrl, httpStatus, title, h1, metaDesc, canonical, noindex, hasSchema, wordCount, contentHash, links }
+  return { finalUrl, httpStatus, title, h1, metaDesc, canonical, noindex, hasSchema, schemaTypes: [...schemaTypes], wordCount, contentHash, links }
 }
 
 function isSameSite(u: string): boolean {
@@ -120,26 +138,31 @@ export async function crawlPage(
   const canonicalNorm = p.canonical ? norm(p.canonical, cls.page_type === 'article') : null
   const indexable = res.status === 200 && !p.noindex && (!canonicalNorm || canonicalNorm === normalizedUrl)
 
-  const { data: page, error } = await seo.from('pages').upsert(
-    {
-      normalized_url: normalizedUrl,
-      url: res.finalUrl,
-      platform: cls.platform,
-      page_type: cls.page_type,
-      editable: false,               // true появится только через WP Bridge (M4)
-      http_status: res.status,
-      indexable,
-      canonical_url: canonicalNorm,
-      title: p.title,
-      h1: p.h1,
-      meta_desc: p.metaDesc,
-      word_count: p.wordCount,
-      content_hash: p.contentHash,
-      last_crawled_at: now,
-      removed_at: null,
-    },
-    { onConflict: 'normalized_url' },
-  ).select('id').single()
+  const baseRow: Record<string, any> = {
+    normalized_url: normalizedUrl,
+    url: res.finalUrl,
+    platform: cls.platform,
+    page_type: cls.page_type,
+    editable: false,               // true появится только через WP Bridge (M4)
+    http_status: res.status,
+    indexable,
+    canonical_url: canonicalNorm,
+    title: p.title,
+    h1: p.h1,
+    meta_desc: p.metaDesc,
+    word_count: p.wordCount,
+    content_hash: p.contentHash,
+    last_crawled_at: now,
+    removed_at: null,
+  }
+  // has_schema / schema_types появляются миграцией 20260908000001; если её ещё не
+  // применили — PostgREST вернёт 42703/PGRST204, тогда апсертим без этих полей.
+  const schemaRow = { ...baseRow, has_schema: p.hasSchema, schema_types: p.schemaTypes.length ? p.schemaTypes : null }
+  let ins = await seo.from('pages').upsert(schemaRow, { onConflict: 'normalized_url' }).select('id').single()
+  if (ins.error && /schema_types|has_schema|PGRST204|column/i.test(ins.error.message)) {
+    ins = await seo.from('pages').upsert(baseRow, { onConflict: 'normalized_url' }).select('id').single()
+  }
+  const { data: page, error } = ins
   if (error) return { ok: false, reason: error.message }
 
   // ссылки: пере-записываем набор для этой страницы (идемпотентно)

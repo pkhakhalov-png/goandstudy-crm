@@ -59,6 +59,19 @@ export async function startCheckLinks() {
   return { success: true }
 }
 
+// Технический аудит (title/meta/h1/thin/schema/llms/robots) — порт чеклистов claude-seo.
+export async function startTechnicalFindings() {
+  const { error: authErr } = await assertAdmin()
+  if (authErr) return { error: authErr }
+  const seo = (await createAdminClient()).schema('seo')
+  const { data: ex } = await seo.from('jobs').select('id').eq('step', 'technical_findings').in('status', ['pending', 'running']).limit(1)
+  if (ex?.length) return { error: 'Технический аудит уже идёт' }
+  const { error } = await seo.from('jobs').insert({ step: 'technical_findings', lane: 'findings', priority: 40, payload: { origin: 'https://goandstudy.com' } })
+  if (error) return { error: error.message }
+  revalidatePath('/admin/seo/findings')
+  return { success: true }
+}
+
 // Пересчитать находки из инвентаря (orphan / дубли title / content_gap / похожесть).
 export async function recomputeFindings() {
   const { error: authErr } = await assertAdmin()

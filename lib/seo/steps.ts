@@ -3,7 +3,7 @@
 import { safeFetch } from './safe-fetch'
 import { normalizeUrl } from './normalize'
 import { crawlPage } from './crawl'
-import { computeInventoryFindings } from './findings'
+import { computeInventoryFindings, computeTechnicalFindings } from './findings'
 import { embed, toPgVector } from './embeddings'
 import { gscConfigured, getAccessToken, searchAnalytics, daysAgo } from './gsc'
 
@@ -145,6 +145,13 @@ const registry: Record<string, Handler> = {
   // ── M5-частично: находки из инвентаря (без GSC) ───────────────────────────
   findings_inventory: async (_job, seo) => {
     const counts = await computeInventoryFindings(seo)
+    return { outcome: 'done', result: { findings: counts, cost: 0 } }
+  },
+
+  // ── Технический аудит (порт чеклистов claude-seo): title/meta/h1/thin/schema/llms/robots ──
+  technical_findings: async (job, seo) => {
+    const origin = job.payload.origin || 'https://goandstudy.com'
+    const counts = await computeTechnicalFindings(seo, safeFetch, origin)
     return { outcome: 'done', result: { findings: counts, cost: 0 } }
   },
 
