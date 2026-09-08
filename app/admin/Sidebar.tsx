@@ -6,7 +6,7 @@ import { logout } from '@/app/login/actions'
 import { WelcomeOverlay } from '@/components/WelcomeOverlay'
 
 interface Props {
-  activePage: 'clients' | 'payments' | 'expenses' | 'invoices' | 'calendar' | 'funnel' | 'home' | 'sales' | 'curators' | 'settings' | 'analytics'
+  activePage: 'clients' | 'payments' | 'expenses' | 'invoices' | 'calendar' | 'funnel' | 'home' | 'sales' | 'curators' | 'settings' | 'analytics' | 'seo'
   userName: string
   userEmail: string
 }
@@ -91,6 +91,12 @@ export function Sidebar({ activePage, userName, userEmail }: Props) {
               <rect x="2" y="8" width="3" height="6"/><rect x="6.5" y="4" width="3" height="10"/><rect x="11" y="10" width="3" height="4"/>
             </svg>
             Аналитика
+          </Link>
+          <Link href="/admin/seo" onClick={()=>setOpen(false)} className={`ni${activePage==='seo'?' active':''}`}>
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
+              <circle cx="7" cy="7" r="4.5"/><line x1="10.5" y1="10.5" x2="14" y2="14"/>
+            </svg>
+            SEO
           </Link>
           <Link href="/admin/sales" onClick={()=>setOpen(false)} className={`ni${activePage==='sales'?' active':''}`}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
