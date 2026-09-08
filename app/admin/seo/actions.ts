@@ -35,7 +35,31 @@ export async function startInventory() {
   return { success: true }
 }
 
-// Пересчитать находки из инвентаря (orphan / дубли title / content_gap).
+// Запустить импорт Google Search Console (нужны env GSC_*).
+export async function startGscImport() {
+  const { error: authErr } = await assertAdmin()
+  if (authErr) return { error: authErr }
+  const seo = (await createAdminClient()).schema('seo')
+  const { data: ex } = await seo.from('jobs').select('id').eq('step', 'gsc_import').in('status', ['pending', 'running']).limit(1)
+  if (ex?.length) return { error: 'Импорт GSC уже идёт' }
+  const { error } = await seo.from('jobs').insert({ step: 'gsc_import', lane: 'gsc', priority: 40, payload: {} })
+  if (error) return { error: error.message }
+  return { success: true }
+}
+
+// Проверить «ссылки в никуда» (404 → broken_link).
+export async function startCheckLinks() {
+  const { error: authErr } = await assertAdmin()
+  if (authErr) return { error: authErr }
+  const seo = (await createAdminClient()).schema('seo')
+  const { data: ex } = await seo.from('jobs').select('id').eq('step', 'check_missing_links').in('status', ['pending', 'running']).limit(1)
+  if (ex?.length) return { error: 'Проверка уже идёт' }
+  const { error } = await seo.from('jobs').insert({ step: 'check_missing_links', lane: 'crawl', priority: 45, payload: {} })
+  if (error) return { error: error.message }
+  return { success: true }
+}
+
+// Пересчитать находки из инвентаря (orphan / дубли title / content_gap / похожесть).
 export async function recomputeFindings() {
   const { error: authErr } = await assertAdmin()
   if (authErr) return { error: authErr }

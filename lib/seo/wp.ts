@@ -1,0 +1,35 @@
+// M4: клиент WordPress Bridge (mu-plugin goandstudy-seo-bridge).
+// HMAC-подпись тела (WP_BRIDGE_SECRET) + X-GS-Timestamp. Инертен без env.
+import { createHmac } from 'node:crypto'
+
+export function wpConfigured(): boolean {
+  return !!(process.env.WP_BASE_URL && process.env.WP_BRIDGE_SECRET)
+}
+
+async function call(method: string, path: string, body?: any): Promise<any> {
+  const base = process.env.WP_BASE_URL!.replace(/\/$/, '')
+  const secret = process.env.WP_BRIDGE_SECRET!
+  const ts = String(Math.floor(Date.now() / 1000))
+  const payload = body ? JSON.stringify(body) : ''
+  const sig = createHmac('sha256', secret).update(`${ts}.${payload}`).digest('hex')
+  const res = await fetch(`${base}/wp-json/goandstudy-seo/v1${path}`, {
+    method,
+    headers: { 'Content-Type': 'application/json', 'X-GS-Timestamp': ts, 'X-GS-Signature': sig },
+    body: body ? payload : undefined,
+    signal: AbortSignal.timeout(30000),
+  })
+  const text = await res.text()
+  if (!res.ok) throw new Error(`WP Bridge ${res.status}: ${text.slice(0, 300)}`)
+  try { return JSON.parse(text) } catch { return text }
+}
+
+export const wp = {
+  lookup: (key: string) => call('GET', `/lookup?key=${encodeURIComponent(key)}`),
+  createPost: (p: { key: string; title: string; content: string; excerpt?: string; slug?: string; status?: string; schema?: any; meta_description?: string; version_id?: string }) =>
+    call('POST', '/posts', p),
+  patchPost: (id: number, ops: Record<string, any>) => call('PATCH', `/posts/${id}`, ops),
+  redirect: (from_path: string, to_url: string) => call('POST', '/redirects', { from_path, to_url }),
+  rendered: (id: number) => call('GET', `/posts/${id}/rendered`),
+  export: (page = 1, per_page = 50, since?: string) =>
+    call('GET', `/export?page=${page}&per_page=${per_page}${since ? `&since=${encodeURIComponent(since)}` : ''}`),
+}

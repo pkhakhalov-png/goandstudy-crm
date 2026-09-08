@@ -89,8 +89,34 @@ export async function computeInventoryFindings(seo: any): Promise<Record<string,
       evidence: { missing_url: url, linked_from_count: m.from.size, anchors: [...m.anchors].slice(0, 5), reason: 'internal link to non-inventoried URL' } })
   }
 
+  // 5) near-duplicate по эмбеддингам — сигнал каннибализации без GSC (confidence low)
+  const emb = await fetchAll(seo, 'pages', 'id, page_type, embedding', (q) => q.not('embedding', 'is', null).is('removed_at', null))
+  const vecs: { id: number; type: string; v: number[] }[] = []
+  for (const p of emb) {
+    let arr: number[] | null = null
+    try { arr = typeof p.embedding === 'string' ? JSON.parse(p.embedding) : p.embedding } catch { arr = null }
+    if (!arr || !arr.length) continue
+    // нормируем для косинуса = dot
+    let n = 0; for (const x of arr) n += x * x; n = Math.sqrt(n) || 1
+    vecs.push({ id: p.id, type: p.page_type, v: arr.map((x) => x / n) })
+  }
+  const idxById = new Map(pages.map((p) => [p.id, p.indexable]))
+  const THRESH = 0.90
+  for (let i = 0; i < vecs.length; i++) {
+    for (let j = i + 1; j < vecs.length; j++) {
+      if (vecs[i].type !== vecs[j].type) continue
+      if (!idxById.get(vecs[i].id) || !idxById.get(vecs[j].id)) continue
+      let dot = 0; const a = vecs[i].v, b = vecs[j].v
+      for (let k = 0; k < a.length; k++) dot += a[k] * b[k]
+      if (dot >= THRESH) {
+        findings.push({ kind: 'cannibalization', confidence: 'low', page_ids: [vecs[i].id, vecs[j].id],
+          evidence: { signal: 'embedding', cosine: Math.round(dot * 1000) / 1000, note: 'похожие страницы (эмбеддинг); подтвердится пересечением запросов после GSC' } })
+      }
+    }
+  }
+
   // перезаписать открытые незанятые находки этих видов
-  const kinds = ['orphan', 'duplicate_title', 'content_gap']
+  const kinds = ['orphan', 'duplicate_title', 'content_gap', 'cannibalization']
   await seo.from('findings').delete().in('kind', kinds).eq('status', 'open').is('change_set_id', null)
   const now = new Date().toISOString()
   const rows = findings.map((f) => ({ ...f, status: 'open', detected_at: now, last_seen_at: now }))

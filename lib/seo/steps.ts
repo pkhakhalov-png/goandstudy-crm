@@ -5,6 +5,7 @@ import { normalizeUrl } from './normalize'
 import { crawlPage } from './crawl'
 import { computeInventoryFindings } from './findings'
 import { embed, toPgVector } from './embeddings'
+import { gscConfigured, getAccessToken, searchAnalytics, daysAgo } from './gsc'
 
 export type Job = {
   id: number
@@ -92,10 +93,94 @@ const registry: Record<string, Handler> = {
     return { outcome: 'done', result: { embedded: done, more, cost: 0 } }
   },
 
+  // ── M2: импорт GSC (клики/показы/позиции) ─────────────────────────────────
+  gsc_import: async (job, seo) => {
+    if (!gscConfigured()) {
+      return { outcome: 'awaiting_human', result: { need: 'GSC_CLIENT_ID/SECRET/REFRESH_TOKEN/SITE_URL в env' } }
+    }
+    const endDate = job.payload.endDate || daysAgo(3)   // задержка GSC 2-3 дня
+    const startDate = job.payload.startDate || daysAgo(120)
+    const token = await getAccessToken()
+
+    const upsertPage = async (rows: any[]) => {
+      for (let i = 0; i < rows.length; i += 500) {
+        await seo.from('gsc_page_daily').upsert(rows.slice(i, i + 500), { onConflict: 'normalized_url,date' })
+      }
+    }
+    const upsertDaily = async (rows: any[]) => {
+      for (let i = 0; i < rows.length; i += 500) {
+        await seo.from('gsc_daily').upsert(rows.slice(i, i + 500), { onConflict: 'normalized_url,query,date' })
+      }
+    }
+
+    // 1) честные итоги по странице: dimensions date+page
+    let pageRows = 0
+    for (let start = 0; start < 250_000; start += 25_000) {
+      const rows = await searchAnalytics(token, { startDate, endDate, dimensions: ['date', 'page'], startRow: start })
+      if (!rows.length) break
+      await upsertPage(rows.map((r) => ({
+        normalized_url: normalizeUrl(r.keys[1], false), date: r.keys[0],
+        clicks: r.clicks, impressions: r.impressions, position: r.position, ctr: r.ctr,
+      })))
+      pageRows += rows.length
+      if (rows.length < 25_000) break
+    }
+
+    // 2) запросный срез: dimensions date+page+query (неполный, см. 4.3)
+    let queryRows = 0
+    for (let start = 0; start < 500_000; start += 25_000) {
+      const rows = await searchAnalytics(token, { startDate, endDate, dimensions: ['date', 'page', 'query'], startRow: start })
+      if (!rows.length) break
+      await upsertDaily(rows.map((r) => ({
+        normalized_url: normalizeUrl(r.keys[1], false), query: r.keys[2], date: r.keys[0],
+        clicks: r.clicks, impressions: r.impressions, position: r.position, ctr: r.ctr,
+      })))
+      queryRows += rows.length
+      if (rows.length < 25_000) break
+    }
+
+    return { outcome: 'done', result: { startDate, endDate, pageRows, queryRows, cost: 0 } }
+  },
+
   // ── M5-частично: находки из инвентаря (без GSC) ───────────────────────────
   findings_inventory: async (_job, seo) => {
     const counts = await computeInventoryFindings(seo)
     return { outcome: 'done', result: { findings: counts, cost: 0 } }
+  },
+
+  // ── Проверка «ссылок в никуда»: 404 → broken_link, 200 → пробел sitemap ───
+  check_missing_links: async (_job, seo) => {
+    const pageUrls = new Set<string>()
+    for (let from = 0; ; from += 1000) {
+      const { data } = await seo.from('pages').select('normalized_url').range(from, from + 999)
+      for (const p of data ?? []) pageUrls.add(p.normalized_url)
+      if (!data || data.length < 1000) break
+    }
+    const targets = new Set<string>()
+    for (let from = 0; ; from += 1000) {
+      const { data } = await seo.from('link_edges').select('to_url').eq('link_type', 'internal').is('to_page_id', null).range(from, from + 999)
+      for (const e of data ?? []) if (!pageUrls.has(e.to_url)) targets.add(e.to_url)
+      if (!data || data.length < 1000) break
+    }
+    const list = [...targets].slice(0, 120)
+    const broken: { url: string; status: number }[] = []
+    let checked = 0
+    for (const url of list) {
+      if (!/^https?:\/\//.test(url)) continue
+      const r = await safeFetch(url)
+      checked++
+      if (!r.ok && (r.status === 404 || r.status === 410)) broken.push({ url, status: r.status })
+    }
+    // перезаписать broken_link находки
+    await seo.from('findings').delete().eq('kind', 'broken_link').eq('status', 'open').is('change_set_id', null)
+    if (broken.length) {
+      const now = new Date().toISOString()
+      await seo.from('findings').insert(broken.map((b) => ({
+        kind: 'broken_link', confidence: 'high', page_ids: [],
+        evidence: { url: b.url, status: b.status }, status: 'open', detected_at: now, last_seen_at: now,
+      })))
+    }
+    return { outcome: 'done', result: { checked, broken: broken.length, cost: 0 } }
   },
 
   // ── M1: обойти одну страницу ──────────────────────────────────────────────
