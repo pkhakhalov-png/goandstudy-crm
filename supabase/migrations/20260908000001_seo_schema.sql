@@ -421,8 +421,8 @@ create table seo.lead_identities (
   lead_at          timestamptz not null,
   first_touch_page bigint references seo.pages(id),
   last_touch_page  bigint references seo.pages(id),
-  deal_id          bigint,          -- public.deals.id, проставляется ночной сшивкой
-  client_id        bigint,
+  deal_id          uuid,            -- public.deals.id (UUID), проставляется ночной сшивкой
+  client_id        bigint,          -- public.clients.id (integer)
   matched_by       text,            -- custom_fields.anon_id | tranid | phone_time
   matched_at       timestamptz
 );
