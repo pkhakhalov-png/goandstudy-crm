@@ -41,7 +41,9 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/api/wazzup') ||
     pathname.startsWith('/api/telegram') ||
     pathname.startsWith('/api/tbank') ||
-    pathname.startsWith('/api/debug')
+    pathname.startsWith('/api/debug') ||
+    pathname.startsWith('/api/seo') ||     // воркер SEO: своя авторизация по x-seo-tick-secret
+    pathname.startsWith('/api/track')      // трекер/лид-webhook (M3): своя проверка
 
   // Не авторизован — редирект на /login
   if (!user && !isPublic) {
