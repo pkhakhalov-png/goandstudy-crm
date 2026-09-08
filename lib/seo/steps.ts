@@ -3,6 +3,7 @@
 import { safeFetch } from './safe-fetch'
 import { normalizeUrl } from './normalize'
 import { crawlPage } from './crawl'
+import { computeInventoryFindings } from './findings'
 
 export type Job = {
   id: number
@@ -65,6 +66,12 @@ const registry: Record<string, Handler> = {
       if (error) return { outcome: 'retry', result: { error: `enqueue: ${error.message}` } }
     }
     return { outcome: 'done', result: { urls: norm.length, cost: 0 } }
+  },
+
+  // ── M5-частично: находки из инвентаря (без GSC) ───────────────────────────
+  findings_inventory: async (_job, seo) => {
+    const counts = await computeInventoryFindings(seo)
+    return { outcome: 'done', result: { findings: counts, cost: 0 } }
   },
 
   // ── M1: обойти одну страницу ──────────────────────────────────────────────

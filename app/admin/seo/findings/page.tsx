@@ -1,14 +1,74 @@
-// Находки (M5): каннибализация, striking distance, orphan, broken link, stale,
-// ctr opportunity, content gap, duplicate title. Считаются ночным джобом по разделу 8.
-export default function SeoFindingsStub() {
+import { createAdminClient } from '@/lib/supabase/server'
+import { RecomputeFindingsButton } from '../RecomputeFindingsButton'
+
+const KIND_RU: Record<string, string> = {
+  orphan: 'Сироты (нет входящих ссылок)',
+  duplicate_title: 'Дубли title / контента',
+  content_gap: 'Ссылки на несуществующие страницы',
+  cannibalization: 'Каннибализация',
+  striking_distance: 'На подходе к топ-10',
+  broken_link: 'Битые ссылки',
+  ctr_opportunity: 'CTR-возможности',
+  stale_content: 'Устаревшее',
+}
+
+async function load() {
+  try {
+    const seo = (await createAdminClient()).schema('seo')
+    const { data, error } = await seo.from('findings').select('id, kind, confidence, page_ids, evidence, status')
+      .eq('status', 'open').order('kind').limit(2000)
+    if (error) return { ok: false as const, error: error.message }
+    return { ok: true as const, findings: (data ?? []) as any[] }
+  } catch (e: any) { return { ok: false as const, error: e?.message ?? 'seo недоступна' } }
+}
+
+export default async function SeoFindings() {
+  const s = await load()
+  const groups: Record<string, any[]> = {}
+  if (s.ok) for (const f of s.findings) (groups[f.kind] ??= []).push(f)
+
   return (
-    <div style={{ maxWidth: 900 }}>
-      <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 6px' }}>Находки</h2>
-      <p style={{ color: 'var(--muted)', fontSize: 13 }}>
-        Восемь типов находок по формальным правилам (раздел 8 PRD): каннибализация,
-        striking distance, orphan, битые ссылки, устаревание, CTR-возможности, пробелы,
-        дубли title. Появятся на этапе <b>M5</b> после инвентаря и импорта GSC.
-      </p>
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 14, flexWrap: 'wrap' }}>
+        <div>
+          <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 4px' }}>Находки</h2>
+          <p style={{ color: 'var(--muted)', fontSize: 13, margin: 0 }}>
+            Из инвентаря (без GSC): сироты, дубли title/контента, ссылки на несуществующие страницы.
+            Каннибализация / striking-distance / CTR появятся с подключением Search Console.
+          </p>
+        </div>
+        {s.ok && <RecomputeFindingsButton />}
+      </div>
+
+      {!s.ok ? (
+        <div style={{ padding: 14, border: '1px solid var(--bor2)', borderRadius: 10, fontSize: 13 }}>seo недоступна: {s.error}</div>
+      ) : s.findings.length === 0 ? (
+        <div style={{ padding: 20, border: '1px dashed var(--bor2)', borderRadius: 10, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
+          Находок нет. Сначала собери инвентарь (вкладка «Страницы»), затем нажми «Пересчитать находки».
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {Object.entries(groups).map(([kind, items]) => (
+            <div key={kind} style={{ border: '1px solid var(--bor)', borderRadius: 10, overflow: 'hidden' }}>
+              <div style={{ padding: '10px 14px', background: 'var(--surf2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <b style={{ fontSize: 13 }}>{KIND_RU[kind] || kind}</b>
+                <span style={{ fontSize: 12, color: 'var(--muted)' }}>{items.length}</span>
+              </div>
+              <div style={{ padding: '8px 14px', fontSize: 12, display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 320, overflowY: 'auto' }}>
+                {items.slice(0, 60).map((f) => (
+                  <div key={f.id} style={{ color: 'var(--muted)', wordBreak: 'break-all' }}>
+                    {f.evidence?.url?.replace('https://goandstudy.com', '') ||
+                     f.evidence?.missing_url?.replace('https://goandstudy.com', '') ||
+                     (f.evidence?.urls ? `«${f.evidence.title || 'дубль'}»: ${f.evidence.urls.map((u: string) => u.replace('https://goandstudy.com', '')).join(', ')}` : JSON.stringify(f.evidence))}
+                    {f.evidence?.linked_from_count ? ` — ссылок: ${f.evidence.linked_from_count}` : ''}
+                  </div>
+                ))}
+                {items.length > 60 && <div style={{ color: 'var(--muted)' }}>…ещё {items.length - 60}</div>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

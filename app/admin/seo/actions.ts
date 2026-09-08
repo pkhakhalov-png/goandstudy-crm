@@ -34,3 +34,17 @@ export async function startInventory() {
   revalidatePath('/admin/seo/pages')
   return { success: true }
 }
+
+// Пересчитать находки из инвентаря (orphan / дубли title / content_gap).
+export async function recomputeFindings() {
+  const { error: authErr } = await assertAdmin()
+  if (authErr) return { error: authErr }
+  const admin = await createAdminClient()
+  const seo = admin.schema('seo')
+  const { data: ex } = await seo.from('jobs').select('id').eq('step', 'findings_inventory').in('status', ['pending', 'running']).limit(1)
+  if (ex?.length) return { error: 'Пересчёт уже идёт' }
+  const { error } = await seo.from('jobs').insert({ step: 'findings_inventory', lane: 'findings', priority: 40, payload: {} })
+  if (error) return { error: error.message }
+  revalidatePath('/admin/seo/findings')
+  return { success: true }
+}
