@@ -4,6 +4,7 @@ import { safeFetch } from './safe-fetch'
 import { normalizeUrl } from './normalize'
 import { crawlPage } from './crawl'
 import { computeInventoryFindings } from './findings'
+import { embed, toPgVector } from './embeddings'
 
 export type Job = {
   id: number
@@ -66,6 +67,29 @@ const registry: Record<string, Handler> = {
       if (error) return { outcome: 'retry', result: { error: `enqueue: ${error.message}` } }
     }
     return { outcome: 'done', result: { urls: norm.length, cost: 0 } }
+  },
+
+  // ── Эмбеддинги: заполнить pages.embedding (title+h1+meta) через Voyage ────
+  embed_pages: async (_job, seo) => {
+    const { data: pages } = await seo.from('pages').select('id, title, h1, meta_desc')
+      .is('embedding', null).is('removed_at', null).limit(300)
+    if (!pages?.length) return { outcome: 'done', result: { embedded: 0, cost: 0 } }
+    const model = process.env.EMBEDDING_MODEL || 'voyage-3'
+    let done = 0
+    for (let i = 0; i < pages.length; i += 50) {
+      const batch = pages.slice(i, i + 50)
+      const texts = batch.map((p: any) =>
+        [p.title, p.h1, p.meta_desc].filter(Boolean).join(' — ').slice(0, 2000) || p.title || '(no text)')
+      const vecs = await embed(texts)
+      for (let j = 0; j < batch.length; j++) {
+        await seo.from('pages').update({ embedding: toPgVector(vecs[j]), embedding_model: model }).eq('id', batch[j].id)
+        done++
+      }
+    }
+    // если ещё остались — поставить продолжение
+    const more = pages.length === 300
+    if (more) await seo.from('jobs').insert({ step: 'embed_pages', lane: 'production', priority: 60, payload: {} })
+    return { outcome: 'done', result: { embedded: done, more, cost: 0 } }
   },
 
   // ── M5-частично: находки из инвентаря (без GSC) ───────────────────────────
