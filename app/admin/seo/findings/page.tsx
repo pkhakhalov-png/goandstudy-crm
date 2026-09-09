@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { RecomputeFindingsButton } from '../RecomputeFindingsButton'
 import { TechnicalFindingsButton } from '../TechnicalFindingsButton'
+import { GscFindingsButton } from '../GscFindingsButton'
 
 const KIND_RU: Record<string, string> = {
   orphan: 'Сироты (нет входящих ссылок)',
@@ -44,11 +45,11 @@ export default async function SeoFindings() {
         <div>
           <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 4px' }}>Находки</h2>
           <p style={{ color: 'var(--muted)', fontSize: 13, margin: 0 }}>
-            Из инвентаря (без GSC): сироты, дубли title/контента, ссылки на несуществующие страницы.
-            Каннибализация / striking-distance / CTR появятся с подключением Search Console.
+            Инвентарь: сироты, дубли, битые ссылки, технический аудит. Search Console: striking-distance
+            (позиции 11–20), CTR-возможности, реальная каннибализация. Каждая находка привязана к кластеру.
           </p>
         </div>
-        {s.ok && <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><TechnicalFindingsButton /><RecomputeFindingsButton /></div>}
+        {s.ok && <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><GscFindingsButton /><TechnicalFindingsButton /><RecomputeFindingsButton /></div>}
       </div>
 
       {!s.ok ? (
@@ -71,6 +72,9 @@ export default async function SeoFindings() {
                     {f.evidence?.url?.replace('https://goandstudy.com', '') ||
                      f.evidence?.missing_url?.replace('https://goandstudy.com', '') ||
                      (f.evidence?.urls ? `«${f.evidence.title || 'дубль'}»: ${f.evidence.urls.map((u: string) => u.replace('https://goandstudy.com', '')).join(', ')}` : JSON.stringify(f.evidence))}
+                    {f.evidence?.query ? ` — «${f.evidence.query}»` : ''}
+                    {f.evidence?.position != null ? ` поз.${f.evidence.position}` : ''}
+                    {f.evidence?.impressions != null ? ` · ${f.evidence.impressions} показов${f.evidence.clicks != null && typeof f.evidence.clicks === 'number' ? `, ${f.evidence.clicks} кликов` : ''}` : ''}
                     {f.evidence?.linked_from_count ? ` — ссылок: ${f.evidence.linked_from_count}` : ''}
                     {f.evidence?.len != null ? ` — ${f.evidence.len} симв. (${f.evidence.issue === 'long' ? 'длинно' : 'коротко'}, надо ${f.evidence.want})` : ''}
                     {f.evidence?.words != null ? ` — ${f.evidence.words} слов` : ''}

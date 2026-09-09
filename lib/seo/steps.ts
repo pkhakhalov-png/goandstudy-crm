@@ -3,7 +3,7 @@
 import { safeFetch } from './safe-fetch'
 import { normalizeUrl } from './normalize'
 import { crawlPage } from './crawl'
-import { computeInventoryFindings, computeTechnicalFindings } from './findings'
+import { computeInventoryFindings, computeTechnicalFindings, computeGscFindings } from './findings'
 import { computeClusters } from './cluster'
 import { reclusterTopics } from './topics'
 import { embed, toPgVector } from './embeddings'
@@ -147,6 +147,13 @@ const registry: Record<string, Handler> = {
   // ── M5-частично: находки из инвентаря (без GSC) ───────────────────────────
   findings_inventory: async (_job, seo) => {
     const counts = await computeInventoryFindings(seo)
+    return { outcome: 'done', result: { findings: counts, cost: 0 } }
+  },
+
+  // ── M5/M2: находки из Google Search Console (striking-distance/CTR/каннибализация) ──
+  findings_gsc: async (_job, seo) => {
+    if (!gscConfigured()) return { outcome: 'awaiting_human', result: { need: 'GSC_* в env + запуск gsc_import' } }
+    const counts = await computeGscFindings(seo)
     return { outcome: 'done', result: { findings: counts, cost: 0 } }
   },
 

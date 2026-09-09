@@ -242,13 +242,112 @@ export async function computeInventoryFindings(seo: any): Promise<Record<string,
   }
 
   // перезаписать открытые незанятые находки этих видов
-  const kinds = ['orphan', 'duplicate_title', 'content_gap', 'cannibalization']
-  await seo.from('findings').delete().in('kind', kinds).eq('status', 'open').is('change_set_id', null)
+  await seo.from('findings').delete().in('kind', ['orphan', 'duplicate_title', 'content_gap']).eq('status', 'open').is('change_set_id', null)
+  // каннибализацию трогаем только «эмбеддинговую» — GSC-версию (signal=gsc) не сносим
+  await seo.from('findings').delete().eq('kind', 'cannibalization').filter('evidence->>signal', 'eq', 'embedding').eq('status', 'open').is('change_set_id', null)
   const now = new Date().toISOString()
   const rows = findings.map((f) => ({ ...f, status: 'open', detected_at: now, last_seen_at: now }))
   for (let i = 0; i < rows.length; i += 200) {
     const { error } = await seo.from('findings').insert(rows.slice(i, i + 200))
     if (error) throw new Error(`findings insert: ${error.message}`)
+  }
+
+  const counts: Record<string, number> = {}
+  for (const f of findings) counts[f.kind] = (counts[f.kind] || 0) + 1
+  return counts
+}
+
+// ── GSC-находки: striking-distance, CTR-возможности, реальная каннибализация ──
+// Считаются из seo.gsc_daily (запрос×страница×день) за импортированное окно.
+// Требуют импорта GSC (gsc_import). Каждая находка несёт cluster участвующих страниц.
+
+// приближённая «эталонная» CTR по позиции (для оценки недобора кликов)
+function expectedCtr(pos: number): number {
+  const table = [0.28, 0.28, 0.15, 0.10, 0.07, 0.05, 0.04, 0.03, 0.025, 0.02, 0.018]
+  const p = Math.max(1, Math.min(10, Math.round(pos)))
+  return table[p]
+}
+
+const GSC_KINDS = ['striking_distance', 'ctr_opportunity']
+
+export async function computeGscFindings(seo: any): Promise<Record<string, number>> {
+  // карта url → { id, cluster }
+  const pages = await fetchAll(seo, 'pages', 'id, normalized_url, cluster', (q) => q.is('removed_at', null))
+  const pageByUrl = new Map<string, { id: number; cluster: string | null }>(pages.map((p: any) => [p.normalized_url, { id: p.id, cluster: p.cluster }]))
+
+  // агрегируем gsc_daily по (url, query): клики, показы, взвешенная позиция
+  type Agg = { clicks: number; impr: number; posw: number }
+  const agg = new Map<string, Agg>()   // ключ url<SEP>query
+  const SEP = ' '
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await seo.from('gsc_daily').select('normalized_url, query, clicks, impressions, position').range(from, from + 999)
+    if (error) throw new Error(`gsc_daily: ${error.message}`)
+    for (const r of data ?? []) {
+      const k = `${r.normalized_url}${SEP}${r.query}`
+      const a = agg.get(k) ?? { clicks: 0, impr: 0, posw: 0 }
+      a.clicks += r.clicks || 0; a.impr += r.impressions || 0; a.posw += (r.position || 0) * (r.impressions || 0)
+      agg.set(k, a)
+    }
+    if (!data || data.length < 1000) break
+  }
+
+  const findings: { kind: string; confidence: string; page_ids: number[]; evidence: any }[] = []
+  const byQuery = new Map<string, { url: string; clicks: number; impr: number; pos: number }[]>()
+
+  const strikingBuf: any[] = [], ctrBuf: any[] = []
+  for (const [k, a] of agg) {
+    if (a.impr < 20) continue
+    const [url, query] = k.split(SEP)
+    const pos = a.posw / (a.impr || 1)
+    const pg = pageByUrl.get(url)
+    ;(byQuery.get(query) ?? byQuery.set(query, []).get(query)!).push({ url, clicks: a.clicks, impr: a.impr, pos })
+
+    // striking-distance: позиция 10.5–20.5, ≥30 показов
+    if (pos >= 10.5 && pos <= 20.5 && a.impr >= 30) {
+      strikingBuf.push({ kind: 'striking_distance', confidence: pos <= 15 ? 'high' : 'medium', page_ids: pg ? [pg.id] : [],
+        evidence: { url, query, position: Math.round(pos * 10) / 10, impressions: a.impr, clicks: a.clicks, cluster: pg?.cluster ?? null } })
+    }
+    // CTR-возможность: топ-10, ≥100 показов, CTR заметно ниже эталона
+    if (pos <= 10 && a.impr >= 100) {
+      const ctr = a.clicks / a.impr
+      const exp = expectedCtr(pos)
+      if (ctr < exp * 0.5) {
+        ctrBuf.push({ kind: 'ctr_opportunity', confidence: 'medium', page_ids: pg ? [pg.id] : [],
+          evidence: { url, query, position: Math.round(pos * 10) / 10, impressions: a.impr, ctr: Math.round(ctr * 1000) / 1000, expected: exp, cluster: pg?.cluster ?? null } })
+      }
+    }
+  }
+  strikingBuf.sort((a, b) => b.evidence.impressions - a.evidence.impressions)
+  ctrBuf.sort((a, b) => b.evidence.impressions - a.evidence.impressions)
+  findings.push(...strikingBuf.slice(0, 200), ...ctrBuf.slice(0, 150))
+
+  // каннибализация: один запрос → ≥2 страницы с показами (обе ранжируются)
+  const cannib: any[] = []
+  for (const [query, arr] of byQuery) {
+    const strong = arr.filter((x) => x.impr >= 50).sort((a, b) => b.impr - a.impr)
+    if (strong.length < 2) continue
+    const totalClicks = strong.reduce((s, x) => s + x.clicks, 0)
+    if (totalClicks < 3) continue
+    const [a, b] = strong
+    const pa = pageByUrl.get(a.url), pb = pageByUrl.get(b.url)
+    const bothClick = a.clicks > 0 && b.clicks > 0
+    cannib.push({ kind: 'cannibalization', confidence: bothClick ? 'high' : 'medium', page_ids: [pa?.id, pb?.id].filter(Boolean) as number[],
+      evidence: { signal: 'gsc', query, urls: strong.slice(0, 3).map((x) => x.url),
+        impressions: strong.slice(0, 3).map((x) => x.impr), clicks: strong.slice(0, 3).map((x) => x.clicks),
+        positions: strong.slice(0, 3).map((x) => Math.round(x.pos * 10) / 10),
+        cluster: pa?.cluster ?? pb?.cluster ?? null, note: 'несколько страниц ранжируются по одному запросу' } })
+  }
+  cannib.sort((a, b) => b.evidence.impressions[0] - a.evidence.impressions[0])
+  findings.push(...cannib.slice(0, 150))
+
+  // перезапись: striking/ctr целиком; каннибализацию — только GSC-версию (signal=gsc)
+  await seo.from('findings').delete().in('kind', GSC_KINDS).eq('status', 'open').is('change_set_id', null)
+  await seo.from('findings').delete().eq('kind', 'cannibalization').filter('evidence->>signal', 'eq', 'gsc').eq('status', 'open').is('change_set_id', null)
+  const now = new Date().toISOString()
+  const rows = findings.map((f) => ({ ...f, status: 'open', detected_at: now, last_seen_at: now }))
+  for (let i = 0; i < rows.length; i += 200) {
+    const { error } = await seo.from('findings').insert(rows.slice(i, i + 200))
+    if (error) throw new Error(`gsc findings insert: ${error.message}`)
   }
 
   const counts: Record<string, number> = {}

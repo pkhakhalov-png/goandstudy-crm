@@ -59,6 +59,19 @@ export async function startCheckLinks() {
   return { success: true }
 }
 
+// GSC-находки: striking-distance / CTR-возможности / реальная каннибализация.
+export async function startGscFindings() {
+  const { error: authErr } = await assertAdmin()
+  if (authErr) return { error: authErr }
+  const seo = (await createAdminClient()).schema('seo')
+  const { data: ex } = await seo.from('jobs').select('id').eq('step', 'findings_gsc').in('status', ['pending', 'running']).limit(1)
+  if (ex?.length) return { error: 'Пересчёт GSC-находок уже идёт' }
+  const { error } = await seo.from('jobs').insert({ step: 'findings_gsc', lane: 'gsc', priority: 40, payload: {} })
+  if (error) return { error: error.message }
+  revalidatePath('/admin/seo/findings')
+  return { success: true }
+}
+
 // Тематическая кластеризация страниц по эмбеддингам (spherical k-means).
 export async function startClusterPages(k?: number) {
   const { error: authErr } = await assertAdmin()
