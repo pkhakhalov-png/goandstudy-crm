@@ -4,6 +4,7 @@ import { safeFetch } from './safe-fetch'
 import { normalizeUrl } from './normalize'
 import { crawlPage } from './crawl'
 import { computeInventoryFindings, computeTechnicalFindings } from './findings'
+import { computeClusters } from './cluster'
 import { embed, toPgVector } from './embeddings'
 import { gscConfigured, getAccessToken, searchAnalytics, daysAgo } from './gsc'
 
@@ -146,6 +147,13 @@ const registry: Record<string, Handler> = {
   findings_inventory: async (_job, seo) => {
     const counts = await computeInventoryFindings(seo)
     return { outcome: 'done', result: { findings: counts, cost: 0 } }
+  },
+
+  // ── Тематическая кластеризация страниц по эмбеддингам (spherical k-means) ──
+  cluster_pages: async (job, seo) => {
+    const k = Number(job.payload.k) || 0   // 0 → авто-подбор
+    const res = await computeClusters(seo, { k })
+    return { outcome: 'done', result: { ...res, cost: 0 } }
   },
 
   // ── Технический аудит (порт чеклистов claude-seo): title/meta/h1/thin/schema/llms/robots ──

@@ -59,6 +59,19 @@ export async function startCheckLinks() {
   return { success: true }
 }
 
+// Тематическая кластеризация страниц по эмбеддингам (spherical k-means).
+export async function startClusterPages(k?: number) {
+  const { error: authErr } = await assertAdmin()
+  if (authErr) return { error: authErr }
+  const seo = (await createAdminClient()).schema('seo')
+  const { data: ex } = await seo.from('jobs').select('id').eq('step', 'cluster_pages').in('status', ['pending', 'running']).limit(1)
+  if (ex?.length) return { error: 'Кластеризация уже идёт' }
+  const { error } = await seo.from('jobs').insert({ step: 'cluster_pages', lane: 'findings', priority: 40, payload: { k: k && k >= 2 ? k : 0 } })
+  if (error) return { error: error.message }
+  revalidatePath('/admin/seo/clusters')
+  return { success: true }
+}
+
 // Технический аудит (title/meta/h1/thin/schema/llms/robots) — порт чеклистов claude-seo.
 export async function startTechnicalFindings() {
   const { error: authErr } = await assertAdmin()
