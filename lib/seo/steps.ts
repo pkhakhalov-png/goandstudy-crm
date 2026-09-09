@@ -5,6 +5,7 @@ import { normalizeUrl } from './normalize'
 import { crawlPage } from './crawl'
 import { computeInventoryFindings, computeTechnicalFindings } from './findings'
 import { computeClusters } from './cluster'
+import { reclusterTopics } from './topics'
 import { embed, toPgVector } from './embeddings'
 import { gscConfigured, getAccessToken, searchAnalytics, daysAgo } from './gsc'
 
@@ -153,7 +154,8 @@ const registry: Record<string, Handler> = {
   cluster_pages: async (job, seo) => {
     const k = Number(job.payload.k) || 0   // 0 → авто-подбор
     const res = await computeClusters(seo, { k })
-    return { outcome: 'done', result: { ...res, cost: 0 } }
+    const topics = await reclusterTopics(seo)   // темы статей относим к новым кластерам
+    return { outcome: 'done', result: { ...res, topics_reclustered: topics.updated, cost: 0 } }
   },
 
   // ── Технический аудит (порт чеклистов claude-seo): title/meta/h1/thin/schema/llms/robots ──

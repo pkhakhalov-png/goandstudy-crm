@@ -9,6 +9,7 @@ type Page = {
   page_type: string
   title: string | null
   content_hash: string | null
+  cluster: string | null
 }
 
 async function fetchAll(seo: any, table: string, cols: string, apply?: (q: any) => any): Promise<any[]> {
@@ -43,6 +44,7 @@ type TechPage = {
   meta_desc: string | null
   word_count: number | null
   has_schema: boolean | null
+  cluster: string | null
 }
 
 // Пороговые значения (из чеклистов; в символах/словах)
@@ -63,21 +65,22 @@ export async function computeTechnicalFindings(seo: any, safeFetch: (u: string) 
   try {
     pages = await fetchAll(
       seo, 'pages',
-      'id, normalized_url, indexable, page_type, title, h1, meta_desc, word_count, has_schema',
+      'id, normalized_url, indexable, page_type, title, h1, meta_desc, word_count, has_schema, cluster',
       (q) => q.is('removed_at', null),
     )
   } catch (e: any) {
     if (!/has_schema|column|PGRST/i.test(e?.message || '')) throw e
     const base = await fetchAll(
       seo, 'pages',
-      'id, normalized_url, indexable, page_type, title, h1, meta_desc, word_count',
+      'id, normalized_url, indexable, page_type, title, h1, meta_desc, word_count, cluster',
       (q) => q.is('removed_at', null),
     )
     pages = base.map((p: any) => ({ ...p, has_schema: null }))
   }
   const findings: { kind: string; confidence: string; page_ids: number[]; evidence: any }[] = []
+  const clusterById = new Map(pages.map((p) => [p.id, p.cluster]))
   const add = (kind: string, confidence: string, id: number, url: string, extra: any = {}) =>
-    findings.push({ kind, confidence, page_ids: [id], evidence: { url, ...extra } })
+    findings.push({ kind, confidence, page_ids: [id], evidence: { url, cluster: clusterById.get(id) ?? null, ...extra } })
 
   const isContent = (t: string) => t === 'article' || t === 'service' || t === 'landing' || t === 'commercial'
 
@@ -139,7 +142,9 @@ export async function computeTechnicalFindings(seo: any, safeFetch: (u: string) 
 
 /** Пересчитать инвентарные находки. Возвращает счётчики по видам. */
 export async function computeInventoryFindings(seo: any): Promise<Record<string, number>> {
-  const pages: Page[] = await fetchAll(seo, 'pages', 'id, normalized_url, indexable, page_type, title, content_hash', (q) => q.is('removed_at', null))
+  const pages: Page[] = await fetchAll(seo, 'pages', 'id, normalized_url, indexable, page_type, title, content_hash, cluster', (q) => q.is('removed_at', null))
+  const clusterOf = new Map(pages.map((p) => [p.id, p.cluster]))
+  const urlCluster = new Map(pages.map((p) => [p.normalized_url, p.cluster]))
   const contentEdges = await fetchAll(seo, 'link_edges', 'to_url', (q) => q.eq('link_type', 'internal').eq('block', 'content'))
   const allInternal = await fetchAll(seo, 'link_edges', 'from_page_id, to_url, anchor', (q) => q.eq('link_type', 'internal').is('to_page_id', null))
 
@@ -192,9 +197,16 @@ export async function computeInventoryFindings(seo: any): Promise<Record<string,
     if (e.anchor) m.anchors.add(e.anchor)
     missing.set(e.to_url, m)
   }
+  const majorityCluster = (ids: number[] | Set<number>): string | null => {
+    const cnt = new Map<string, number>()
+    for (const id of ids) { const c = clusterOf.get(id); if (c) cnt.set(c, (cnt.get(c) || 0) + 1) }
+    let best: string | null = null, n = 0
+    for (const [c, k] of cnt) if (k > n) { n = k; best = c }
+    return best
+  }
   for (const [url, m] of missing) {
     findings.push({ kind: 'content_gap', confidence: 'low', page_ids: [],
-      evidence: { missing_url: url, linked_from_count: m.from.size, anchors: [...m.anchors].slice(0, 5), reason: 'internal link to non-inventoried URL' } })
+      evidence: { missing_url: url, linked_from_count: m.from.size, anchors: [...m.anchors].slice(0, 5), reason: 'internal link to non-inventoried URL', cluster: majorityCluster(m.from) } })
   }
 
   // 5) near-duplicate по эмбеддингам — сигнал каннибализации без GSC (confidence low)
@@ -221,6 +233,12 @@ export async function computeInventoryFindings(seo: any): Promise<Record<string,
           evidence: { signal: 'embedding', cosine: Math.round(dot * 1000) / 1000, note: 'похожие страницы (эмбеддинг); подтвердится пересечением запросов после GSC' } })
       }
     }
+  }
+
+  // проставить кластер по участвующим страницам (для группировки конфликтов по теме)
+  for (const f of findings) {
+    if (f.evidence.cluster !== undefined) continue
+    f.evidence.cluster = f.page_ids.length ? majorityCluster(f.page_ids) : null
   }
 
   // перезаписать открытые незанятые находки этих видов

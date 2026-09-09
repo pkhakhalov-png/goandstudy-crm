@@ -16,6 +16,7 @@ export default async function SeoLayout({ children }: { children: React.ReactNod
     { href: '/admin/seo', label: 'Обзор' },
     { href: '/admin/seo/pages', label: 'Страницы' },
     { href: '/admin/seo/clusters', label: 'Кластеры' },
+    { href: '/admin/seo/topics', label: 'Статьи' },
     { href: '/admin/seo/findings', label: 'Находки' },
     { href: '/admin/seo/experts', label: 'Эксперт' },
   ]

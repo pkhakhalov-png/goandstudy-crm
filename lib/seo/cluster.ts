@@ -132,6 +132,23 @@ function nameClusters(rows: Row[], assign: number[], k: number): string[] {
   return names
 }
 
+export type Centroid = { name: string; size: number; centroid: number[] }
+
+/** Загрузить сохранённые центроиды кластеров (из settings). */
+export async function loadCentroids(seo: any): Promise<Centroid[]> {
+  const { data } = await seo.from('settings').select('value').eq('key', 'cluster_centroids').maybeSingle()
+  return (data?.value as Centroid[]) || []
+}
+
+/** Отнести вектор к ближайшему кластеру (косинус). Возвращает имя и score, либо null. */
+export function assignCluster(vec: number[], centroids: Centroid[]): { name: string; score: number } | null {
+  if (!centroids.length) return null
+  const v = normalize(vec)
+  let best = -Infinity, name = ''
+  for (const c of centroids) { const s = dot(v, normalize(c.centroid)); if (s > best) { best = s; name = c.name } }
+  return { name, score: Math.round(best * 1000) / 1000 }
+}
+
 export type ClusterResult = { k: number; cohesion: number; distribution: { name: string; count: number }[] }
 
 /** Кластеризовать страницы и записать seo.pages.cluster. k=0 → авто-подбор по связности. */
@@ -160,6 +177,14 @@ export async function computeClusters(seo: any, opts: { k?: number; seed?: numbe
   }
   const { assign, centers } = best!
   const names = nameClusters(rows, assign, k)
+
+  // размеры кластеров
+  const sizes = new Array(k).fill(0)
+  for (const a of assign) sizes[a]++
+
+  // сохранить центроиды в settings — чтобы новые топики/статьи мгновенно относились к теме
+  const centroidPayload = names.map((name, c) => ({ name, size: sizes[c], centroid: centers[c] }))
+  await seo.from('settings').upsert({ key: 'cluster_centroids', value: centroidPayload as any }, { onConflict: 'key' })
 
   // запись pages.cluster батчами по id
   const now = new Date().toISOString()

@@ -75,6 +75,7 @@ export default async function SeoFindings() {
                     {f.evidence?.len != null ? ` — ${f.evidence.len} симв. (${f.evidence.issue === 'long' ? 'длинно' : 'коротко'}, надо ${f.evidence.want})` : ''}
                     {f.evidence?.words != null ? ` — ${f.evidence.words} слов` : ''}
                     {f.evidence?.note ? ` — ${f.evidence.note}` : ''}
+                    {f.evidence?.cluster ? <span style={{ marginLeft: 6, padding: '1px 7px', borderRadius: 999, border: '1px solid var(--bor2)', fontSize: 10, color: 'var(--text)', whiteSpace: 'nowrap' }}>◆ {f.evidence.cluster}</span> : ''}
                   </div>
                 ))}
                 {items.length > 60 && <div style={{ color: 'var(--muted)' }}>…ещё {items.length - 60}</div>}
