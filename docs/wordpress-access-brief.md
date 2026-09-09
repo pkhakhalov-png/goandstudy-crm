@@ -38,7 +38,7 @@ wp-content/mu-plugins/goandstudy-seo-bridge.php
 ### 2. Секрет в wp-config.php
 В `wp-config.php` (до строки `/* That's all, stop editing! */`) добавить:
 ```php
-define('GS_SEO_BRIDGE_SECRET', '4a25d92d2db32fd3fb8346221c48e8f7f52f17a293b55148b6f87ab9f78ae01a');
+define('GS_SEO_BRIDGE_SECRET', '<секрет: сгенерировать openssl rand -hex 32, в репозиторий не коммитить>');
 ```
 Этот же секрет я впишу в env CRM как `WP_BRIDGE_SECRET` — по нему проверяется HMAC-подпись каждого запроса (окно 5 минут). Можешь сгенерировать свой (`openssl rand -hex 32`) — тогда пришли какой, но **не в открытый чат**, а впишем в env напрямую (как делали с GSC).
 
