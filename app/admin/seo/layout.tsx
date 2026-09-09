@@ -14,6 +14,7 @@ export default async function SeoLayout({ children }: { children: React.ReactNod
 
   const tabs = [
     { href: '/admin/seo', label: 'Обзор' },
+    { href: '/admin/seo/opportunities', label: 'Возможности' },
     { href: '/admin/seo/pages', label: 'Страницы' },
     { href: '/admin/seo/clusters', label: 'Кластеры' },
     { href: '/admin/seo/topics', label: 'Статьи' },
