@@ -261,84 +261,154 @@ export async function computeInventoryFindings(seo: any): Promise<Record<string,
 // Считаются из seo.gsc_daily (запрос×страница×день) за импортированное окно.
 // Требуют импорта GSC (gsc_import). Каждая находка несёт cluster участвующих страниц.
 
-// приближённая «эталонная» CTR по позиции (для оценки недобора кликов)
-function expectedCtr(pos: number): number {
-  const table = [0.28, 0.28, 0.15, 0.10, 0.07, 0.05, 0.04, 0.03, 0.025, 0.02, 0.018]
-  const p = Math.max(1, Math.min(10, Math.round(pos)))
-  return table[p]
+function posBucket(p: number): string {
+  if (p < 1.5) return '1'; if (p < 2.5) return '2'; if (p < 3.5) return '3'
+  if (p <= 5) return '4-5'; if (p <= 10) return '6-10'; if (p <= 20) return '11-20'; return '21+'
 }
+function median(xs: number[]): number { if (!xs.length) return 0; const s = [...xs].sort((a, b) => a - b); const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2 }
+function percentile(xs: number[], p: number): number { if (!xs.length) return 0; const s = [...xs].sort((a, b) => a - b); return s[Math.min(s.length - 1, Math.floor(p * (s.length - 1)))] }
+function stdev(xs: number[]): number { if (xs.length < 2) return 0; const m = xs.reduce((a, b) => a + b, 0) / xs.length; return Math.sqrt(xs.reduce((s, x) => s + (x - m) ** 2, 0) / xs.length) }
 
 const GSC_KINDS = ['striking_distance', 'ctr_opportunity']
+const CTR_FALLBACK: Record<string, number> = { '1': 0.26, '2': 0.15, '3': 0.10, '4-5': 0.07, '6-10': 0.035, '11-20': 0.012, '21+': 0.005 }
 
 export async function computeGscFindings(seo: any): Promise<Record<string, number>> {
-  // карта url → { id, cluster }
   const pages = await fetchAll(seo, 'pages', 'id, normalized_url, cluster', (q) => q.is('removed_at', null))
   const pageByUrl = new Map<string, { id: number; cluster: string | null }>(pages.map((p: any) => [p.normalized_url, { id: p.id, cluster: p.cluster }]))
 
-  // агрегируем gsc_daily по (url, query): клики, показы, взвешенная позиция
-  type Agg = { clicks: number; impr: number; posw: number }
-  const agg = new Map<string, Agg>()   // ключ url<SEP>query
+  // брендовые термины из settings (исключаем из CTR/позиций)
+  const { data: bt } = await seo.from('settings').select('value').eq('key', 'brand_terms').maybeSingle()
+  const brandTerms: string[] = (Array.isArray(bt?.value) ? bt!.value : ['goandstudy', 'go&study', 'гоэндстади', 'гоуэндстади', 'гоу энд стади', 'го энд стади']).map((s: string) => String(s).toLowerCase())
+  const isBrand = (q: string) => { const s = q.toLowerCase(); return brandTerms.some((t) => s.includes(t)) }
+
+  // агрегируем per (url, query): клики/показы/поз + позиции по дням (для std и каннибализации)
+  type PQ = { clicks: number; impr: number; posw: number; byDay: Map<string, number> }
+  const perPQ = new Map<string, PQ>()
   const SEP = ' '
+  let dMin = '9999', dMax = '0'
   for (let from = 0; ; from += 1000) {
-    const { data, error } = await seo.from('gsc_daily').select('normalized_url, query, clicks, impressions, position').range(from, from + 999)
+    const { data, error } = await seo.from('gsc_daily').select('normalized_url, query, clicks, impressions, position, date').range(from, from + 999)
     if (error) throw new Error(`gsc_daily: ${error.message}`)
     for (const r of data ?? []) {
       const k = `${r.normalized_url}${SEP}${r.query}`
-      const a = agg.get(k) ?? { clicks: 0, impr: 0, posw: 0 }
+      const a = perPQ.get(k) ?? { clicks: 0, impr: 0, posw: 0, byDay: new Map() }
       a.clicks += r.clicks || 0; a.impr += r.impressions || 0; a.posw += (r.position || 0) * (r.impressions || 0)
-      agg.set(k, a)
+      if (r.date) { a.byDay.set(r.date, r.position || 0); if (r.date < dMin) dMin = r.date; if (r.date > dMax) dMax = r.date }
+      perPQ.set(k, a)
     }
     if (!data || data.length < 1000) break
   }
+  const windowDays = Math.max(1, (Date.parse(dMax) - Date.parse(dMin)) / 86400000 + 1)
+  const to28 = 28 / windowDays
+
+  // 1) собственная CTR-модель по бакету позиции (небрендовые, impr>=10).
+  //    Эталон = пул сайта (сумма кликов / сумма показов) — устойчив к нулевому хвосту;
+  //    p75 — 75-й перцентиль CTR среди пар с кликами (потолок «хорошего сниппета»).
+  const bucketCtrs: Record<string, number[]> = {}
+  const bucketClicks: Record<string, number> = {}, bucketImpr: Record<string, number> = {}
+  for (const [k, a] of perPQ) {
+    if (a.impr < 10) continue
+    const query = k.slice(k.indexOf(SEP) + 1)
+    if (isBrand(query)) continue
+    const b = posBucket(a.posw / a.impr)
+    bucketClicks[b] = (bucketClicks[b] || 0) + a.clicks
+    bucketImpr[b] = (bucketImpr[b] || 0) + a.impr
+    if (a.clicks > 0) (bucketCtrs[b] ??= []).push(a.clicks / a.impr)
+  }
+  const ctrModel: Record<string, { median: number; p75: number; n: number; basis: string }> = {}
+  for (const b of ['1', '2', '3', '4-5', '6-10', '11-20', '21+']) {
+    const impr = bucketImpr[b] || 0
+    const pooled = impr > 0 ? bucketClicks[b] / impr : 0
+    const p75 = percentile(bucketCtrs[b] || [], 0.75)
+    ctrModel[b] = impr >= 1000
+      ? { median: pooled, p75: Math.max(p75, pooled * 1.5), n: impr, basis: 'site_pooled' }
+      : { median: CTR_FALLBACK[b], p75: CTR_FALLBACK[b] * 1.6, n: impr, basis: 'fallback' }
+  }
+
+  // 2) агрегируем per (url) -> его запросы (5.3)
+  type QRow = { query: string; clicks: number; impr: number; pos: number; posStd: number; brand: boolean }
+  const perUrl = new Map<string, QRow[]>()
+  const queryUrls = new Map<string, string[]>()
+  for (const [k, a] of perPQ) {
+    if (a.impr < 20) continue
+    const url = k.slice(0, k.indexOf(SEP)), query = k.slice(k.indexOf(SEP) + 1)
+    const pos = a.posw / a.impr
+    ;(perUrl.get(url) ?? perUrl.set(url, []).get(url)!).push({ query, clicks: a.clicks, impr: a.impr, pos, posStd: stdev([...a.byDay.values()]), brand: isBrand(query) })
+    ;(queryUrls.get(query) ?? queryUrls.set(query, []).get(query)!).push(url)
+  }
 
   const findings: { kind: string; confidence: string; page_ids: number[]; evidence: any }[] = []
-  const byQuery = new Map<string, { url: string; clicks: number; impr: number; pos: number }[]>()
 
-  const strikingBuf: any[] = [], ctrBuf: any[] = []
-  for (const [k, a] of agg) {
-    if (a.impr < 20) continue
-    const [url, query] = k.split(SEP)
-    const pos = a.posw / (a.impr || 1)
+  // 3) striking-distance - по URL: запросы на позиции 10.5-20.5, >=30 показов
+  const strikingBuf: any[] = []
+  for (const [url, rows] of perUrl) {
+    const sd = rows.filter((r) => !r.brand && r.pos >= 10.5 && r.pos <= 20.5 && r.impr >= 30).sort((a, b) => b.impr - a.impr)
+    if (!sd.length) continue
     const pg = pageByUrl.get(url)
-    ;(byQuery.get(query) ?? byQuery.set(query, []).get(query)!).push({ url, clicks: a.clicks, impr: a.impr, pos })
-
-    // striking-distance: позиция 10.5–20.5, ≥30 показов
-    if (pos >= 10.5 && pos <= 20.5 && a.impr >= 30) {
-      strikingBuf.push({ kind: 'striking_distance', confidence: pos <= 15 ? 'high' : 'medium', page_ids: pg ? [pg.id] : [],
-        evidence: { url, query, position: Math.round(pos * 10) / 10, impressions: a.impr, clicks: a.clicks, cluster: pg?.cluster ?? null } })
-    }
-    // CTR-возможность: топ-10, ≥100 показов, CTR заметно ниже эталона
-    if (pos <= 10 && a.impr >= 100) {
-      const ctr = a.clicks / a.impr
-      const exp = expectedCtr(pos)
-      if (ctr < exp * 0.5) {
-        ctrBuf.push({ kind: 'ctr_opportunity', confidence: 'medium', page_ids: pg ? [pg.id] : [],
-          evidence: { url, query, position: Math.round(pos * 10) / 10, impressions: a.impr, ctr: Math.round(ctr * 1000) / 1000, expected: exp, cluster: pg?.cluster ?? null } })
-      }
-    }
+    const totalImpr = sd.reduce((s, r) => s + r.impr, 0)
+    const best = sd[0]
+    strikingBuf.push({ kind: 'striking_distance', confidence: best.pos <= 15 ? 'high' : 'medium', page_ids: pg ? [pg.id] : [],
+      evidence: { url, cluster: pg?.cluster ?? null, query: best.query, position: Math.round(best.pos * 10) / 10,
+        impressions: totalImpr, queries_count: sd.length, top_queries: sd.slice(0, 5).map((r) => ({ q: r.query, pos: Math.round(r.pos * 10) / 10, impr: r.impr })) } })
   }
   strikingBuf.sort((a, b) => b.evidence.impressions - a.evidence.impressions)
-  ctrBuf.sort((a, b) => b.evidence.impressions - a.evidence.impressions)
-  findings.push(...strikingBuf.slice(0, 200), ...ctrBuf.slice(0, 150))
 
-  // каннибализация: один запрос → ≥2 страницы с показами (обе ранжируются)
-  const cannib: any[] = []
-  for (const [query, arr] of byQuery) {
-    const strong = arr.filter((x) => x.impr >= 50).sort((a, b) => b.impr - a.impr)
-    if (strong.length < 2) continue
-    const totalClicks = strong.reduce((s, x) => s + x.clicks, 0)
-    if (totalClicks < 3) continue
-    const [a, b] = strong
-    const pa = pageByUrl.get(a.url), pb = pageByUrl.get(b.url)
-    const bothClick = a.clicks > 0 && b.clicks > 0
-    cannib.push({ kind: 'cannibalization', confidence: bothClick ? 'high' : 'medium', page_ids: [pa?.id, pb?.id].filter(Boolean) as number[],
-      evidence: { signal: 'gsc', query, urls: strong.slice(0, 3).map((x) => x.url),
-        impressions: strong.slice(0, 3).map((x) => x.impr), clicks: strong.slice(0, 3).map((x) => x.clicks),
-        positions: strong.slice(0, 3).map((x) => Math.round(x.pos * 10) / 10),
-        cluster: pa?.cluster ?? pb?.cluster ?? null, note: 'несколько страниц ранжируются по одному запросу' } })
+  // 4) CTR-возможность - по URL: топ-10, >=100 показов, CTR ниже медианы на >=40%, позиция стабильна (5.2)
+  const ctrBuf: any[] = []
+  for (const [url, rows] of perUrl) {
+    const cand = rows.filter((r) => !r.brand && r.pos <= 10 && r.impr >= 100 && r.posStd <= 1.5)
+      .filter((r) => { const exp = ctrModel[posBucket(r.pos)].median; return exp > 0 && r.clicks / r.impr < exp * 0.6 })
+    if (!cand.length) continue
+    const pg = pageByUrl.get(url)
+    let base = 0, cons = 0, opt = 0, impr = 0
+    for (const r of cand) {
+      const m = ctrModel[posBucket(r.pos)]; const actual = r.clicks / r.impr
+      const gap = Math.max(0, m.median - actual)
+      base += r.impr * gap; cons += r.impr * gap * 0.5; opt += r.impr * Math.max(gap, m.p75 - actual); impr += r.impr
+    }
+    const top = cand.sort((a, b) => b.impr - a.impr)[0]
+    ctrBuf.push({ kind: 'ctr_opportunity', confidence: 'medium', page_ids: pg ? [pg.id] : [],
+      evidence: { url, cluster: pg?.cluster ?? null, query: top.query, position: Math.round(top.pos * 10) / 10,
+        impressions: impr, queries_count: cand.length,
+        ctr: Math.round((top.clicks / top.impr) * 1000) / 1000, expected: Math.round(ctrModel[posBucket(top.pos)].median * 1000) / 1000,
+        forecast: { conservative: Math.round(cons * to28), base: Math.round(base * to28), optimistic: Math.round(opt * to28), basis: 'доп. клики/28 дн при сохранении показов и позиций' } } })
   }
-  cannib.sort((a, b) => b.evidence.impressions[0] - a.evidence.impressions[0])
-  findings.push(...cannib.slice(0, 150))
+  ctrBuf.sort((a, b) => b.evidence.forecast.base - a.evidence.forecast.base)
+  findings.push(...strikingBuf.slice(0, 120), ...ctrBuf.slice(0, 120))
+
+  // 5) каннибализация (5.5): один интент - >=2 URL; чередование лидера + нестабильность позиции
+  const cannib: any[] = []
+  for (const [query, urlsRaw] of queryUrls) {
+    if (isBrand(query)) continue
+    const urls = [...new Set(urlsRaw)].filter((u) => (perPQ.get(`${u}${SEP}${query}`)?.impr || 0) >= 50)
+    if (urls.length < 2) continue
+    const leadDays: Record<string, number> = {}; let activeDays = 0
+    const allDays = new Set<string>()
+    for (const u of urls) for (const d of perPQ.get(`${u}${SEP}${query}`)!.byDay.keys()) allDays.add(d)
+    for (const d of allDays) {
+      let bestU = '', bestP = Infinity
+      for (const u of urls) { const p = perPQ.get(`${u}${SEP}${query}`)!.byDay.get(d); if (p != null && p < bestP) { bestP = p; bestU = u } }
+      if (bestU) { leadDays[bestU] = (leadDays[bestU] || 0) + 1; activeDays++ }
+    }
+    if (activeDays < 5) continue
+    const shares = Object.values(leadDays).map((n) => n / activeDays).sort((a, b) => b - a)
+    const alternation = shares.length >= 2 && shares[0] >= 0.4 && shares[1] >= 0.4
+    const stats = urls.map((u) => { const a = perPQ.get(`${u}${SEP}${query}`)!; return { url: u, impr: a.impr, clicks: a.clicks, pos: a.posw / a.impr, std: stdev([...a.byDay.values()]) } }).sort((a, b) => b.impr - a.impr)
+    const unstable = stats.slice(0, 2).every((s) => s.std > 1.5) || alternation
+    const totalClicks = stats.reduce((s, x) => s + x.clicks, 0)
+    if (totalClicks < 3) continue
+    const confidence = alternation && unstable ? 'high' : 'medium'
+    const pa = pageByUrl.get(stats[0].url), pb = pageByUrl.get(stats[1].url)
+    cannib.push({ kind: 'cannibalization', confidence, page_ids: [pa?.id, pb?.id].filter(Boolean) as number[],
+      evidence: { signal: 'gsc', query, urls: stats.slice(0, 3).map((s) => s.url),
+        impressions: stats.slice(0, 3).map((s) => s.impr), clicks: stats.slice(0, 3).map((s) => s.clicks),
+        positions: stats.slice(0, 3).map((s) => Math.round(s.pos * 10) / 10),
+        alternation, lead_shares: shares.slice(0, 3).map((x) => Math.round(x * 100) / 100), active_days: activeDays,
+        cluster: pa?.cluster ?? pb?.cluster ?? null,
+        note: alternation ? 'URL чередуются в выдаче по запросу — вероятная каннибализация' : 'несколько URL по запросу; чередования нет — проверить интент (5.5)' } })
+  }
+  cannib.sort((a, b) => (b.evidence.impressions[0] || 0) - (a.evidence.impressions[0] || 0))
+  findings.push(...cannib.slice(0, 120))
 
   // перезапись: striking/ctr целиком; каннибализацию — только GSC-версию (signal=gsc)
   await seo.from('findings').delete().in('kind', GSC_KINDS).eq('status', 'open').is('change_set_id', null)
@@ -349,6 +419,9 @@ export async function computeGscFindings(seo: any): Promise<Record<string, numbe
     const { error } = await seo.from('findings').insert(rows.slice(i, i + 200))
     if (error) throw new Error(`gsc findings insert: ${error.message}`)
   }
+
+  // сохранить CTR-модель в settings (для UI и переиспользования)
+  await seo.from('settings').upsert({ key: 'ctr_model', value: { model: ctrModel, window_days: Math.round(windowDays), computed_from: `${dMin}..${dMax}` } as any }, { onConflict: 'key' })
 
   const counts: Record<string, number> = {}
   for (const f of findings) counts[f.kind] = (counts[f.kind] || 0) + 1
