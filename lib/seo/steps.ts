@@ -5,7 +5,7 @@ import { normalizeUrl } from './normalize'
 import { crawlPage } from './crawl'
 import { computeInventoryFindings, computeTechnicalFindings, computeGscFindings } from './findings'
 import { computeClusters } from './cluster'
-import { reclusterTopics } from './topics'
+import { reclusterTopics, topicsFromContentGaps } from './topics'
 import { persistOpportunities } from './opportunities'
 import { generateSchemaProposals } from './schema-gen'
 import { embed, toPgVector } from './embeddings'
@@ -165,6 +165,12 @@ const registry: Record<string, Handler> = {
     const res = await computeClusters(seo, { k })
     const topics = await reclusterTopics(seo)   // темы статей относим к новым кластерам
     return { outcome: 'done', result: { ...res, topics_reclustered: topics.updated, cost: 0 } }
+  },
+
+  // ── Кандидаты статей из content_gap (§7.1): ссылки в никуда → темы с кластером ──
+  topics_from_gaps: async (_job, seo) => {
+    const res = await topicsFromContentGaps(seo)
+    return { outcome: 'done', result: { ...res, cost: 0 } }
   },
 
   // ── Генерация schema.org для страниц без разметки (§5.6, только проверяемые поля) ──

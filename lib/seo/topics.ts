@@ -31,12 +31,12 @@ export type CreateTopicResult = {
  * - помечает status='rejected_duplicate', если есть страница с cosine ≥ 0.80 (уже покрыто);
  * - предлагает внутренние ссылки из того же кластера.
  */
-export async function createTopicWithCluster(seo: any, input: CreateTopicInput): Promise<CreateTopicResult> {
+export async function createTopicWithCluster(seo: any, input: CreateTopicInput, precomputedVec?: number[]): Promise<CreateTopicResult> {
   const title = (input.title || '').trim()
   if (!title) return { topic_id: null, cluster: null, cluster_score: null, status: 'error', duplicates: [], link_targets: [], error: 'нет заголовка' }
 
   const text = [title, input.primary_keyword].filter(Boolean).join(' — ').slice(0, 2000)
-  const vec = (await embed([text]))[0]
+  const vec = precomputedVec ?? (await embed([text]))[0]
 
   // кластер по сохранённым центроидам
   const centroids = await loadCentroids(seo)
@@ -86,6 +86,63 @@ export async function createTopicWithCluster(seo: any, input: CreateTopicInput):
     duplicates,
     link_targets,
   }
+}
+
+function titleCaseSlug(u: string): string {
+  try { const seg = new URL(u).pathname.split('/').filter(Boolean).pop() || ''; const s = decodeURIComponent(seg).replace(/[-_]+/g, ' ').trim(); return s ? s.charAt(0).toUpperCase() + s.slice(1) : '' } catch { return '' }
+}
+
+// служебные/навигационные анкоры — не тема статьи
+const GENERIC_ANCHOR = new Set(['подробнее', 'подробно', 'читать', 'читать далее', 'далее', 'здесь', 'тут', 'перейти', 'узнать', 'узнать больше', 'смотреть', 'ещё', 'еще', 'разбор', 'пошаговый разбор', 'ссылка', 'подробный разбор', 'по ссылке', 'на сайте', 'подробнее по ссылке', 'подробнее об аспирантуре', 'подробнее о магистратуре', 'подробнее о бакалавриате'])
+// CTA/транзакционные анкоры — не темы статей
+const CTA = /оплатит|записат|купит|заказат|заявк|консультац|связат|забронир|начать|отправит|подписат|₽|руб|\$/i
+function cleanAnchor(a: string): string {
+  return a.replace(/[→←↔»«•·|]+/g, ' ').replace(/\s+/g, ' ').replace(/^(подробнее|подробно|читать|далее)\s+(об?|о|про)\s+/i, '').replace(/[\s—-]+$/, '').trim()
+}
+function isGoodTopic(title: string): boolean {
+  const t = cleanAnchor(title).toLowerCase()
+  return t.length >= 8 && !GENERIC_ANCHOR.has(t) && /[а-я]{4}/i.test(t) && !CTA.test(t)   // требуем кириллицу, без CTA/транслита
+}
+
+/**
+ * Создать кандидаты статей из находок content_gap (внутренние ссылки на несуществующие URL) — PRD §7.1.
+ * Заголовок берётся из анкора (что искал пользователь) или из слага URL. Идемпотентно по ключу.
+ * Каждая тема относится к кластеру, дубли отсекаются (createTopicWithCluster).
+ */
+export async function topicsFromContentGaps(seo: any): Promise<{ created: number; skipped: number; duplicates: number }> {
+  const { data: gaps } = await seo.from('findings').select('evidence').eq('kind', 'content_gap').eq('status', 'open').limit(500)
+  const { data: existing } = await seo.from('topics').select('primary_keyword, title')
+  const seen = new Set<string>()
+  for (const t of existing ?? []) { if (t.primary_keyword) seen.add(String(t.primary_keyword).toLowerCase()); if (t.title) seen.add(String(t.title).toLowerCase()) }
+
+  // отбираем уникальные кандидаты
+  const cands: { title: string; anchor: string }[] = []
+  let skipped = 0
+  for (const g of gaps ?? []) {
+    const e = g.evidence || {}
+    const rawAnchor = (e.anchors && e.anchors[0]) ? String(e.anchors[0]).trim() : ''
+    const anchor = cleanAnchor(rawAnchor)
+    const title = isGoodTopic(anchor) ? anchor : titleCaseSlug(e.missing_url || '')
+    if (!isGoodTopic(title)) { skipped++; continue }
+    const key = title.toLowerCase()
+    if (seen.has(key)) { skipped++; continue }
+    seen.add(key)
+    cands.push({ title, anchor: isGoodTopic(anchor) ? anchor : '' })
+  }
+
+  // батч-эмбеддинг всех заголовков (обход rate-limit: один запрос на пачку)
+  let created = 0, duplicates = 0
+  for (let i = 0; i < cands.length; i += 100) {
+    const batch = cands.slice(i, i + 100)
+    const vecs = await embed(batch.map((c) => [c.title, c.anchor].filter(Boolean).join(' — ').slice(0, 2000)))
+    for (let j = 0; j < batch.length; j++) {
+      const res = await createTopicWithCluster(seo, { title: batch[j].title, primary_keyword: batch[j].anchor || undefined }, vecs[j])
+      if (res.status === 'rejected_duplicate') duplicates++
+      else if (res.topic_id) created++
+      else skipped++
+    }
+  }
+  return { created, skipped, duplicates }
 }
 
 /** Пере-назначить кластеры всем темам по сохранённым центроидам (после пересчёта кластеров). */
