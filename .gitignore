@@ -43,3 +43,6 @@ next-env.d.ts
 # local temp (screenshots, notes, scratch files)
 /temp
 /supabase/.temp
+
+# Артефакты генерации статей (HTML и картинки) — в репозитории не нужны
+out/

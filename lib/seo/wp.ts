@@ -23,13 +23,24 @@ async function call(method: string, path: string, body?: any): Promise<any> {
   try { return JSON.parse(text) } catch { return text }
 }
 
+export type WpResolved = {
+  found: boolean; post_id?: number; type?: string; status?: string; title?: string; link?: string
+  has_schema?: boolean; has_meta_description?: boolean; seo_key?: string
+}
+
 export const wp = {
   lookup: (key: string) => call('GET', `/lookup?key=${encodeURIComponent(key)}`),
-  createPost: (p: { key: string; title: string; content: string; excerpt?: string; slug?: string; status?: string; schema?: any; meta_description?: string; version_id?: string }) =>
+  // публичный URL → ID поста/страницы: нужно для правок существующих страниц,
+  // у которых нет нашей меты _gs_seo_key
+  resolve: (url: string): Promise<WpResolved> => call('GET', `/resolve?url=${encodeURIComponent(url)}`),
+  createPost: (p: { key: string; title: string; content: string; excerpt?: string; slug?: string; status?: string; schema?: any; meta_description?: string; version_id?: string; post_type?: 'post' | 'page'; featured_media?: number }) =>
     call('POST', '/posts', p),
+  /** Загрузка картинки в медиатеку: файл идёт base64 в теле, подпись HMAC покрывает и его. */
+  media: (p: { filename: string; data: string; alt: string }): Promise<{ media_id: number; url: string; mime: string }> =>
+    call('POST', '/media', p),
   patchPost: (id: number, ops: Record<string, any>) => call('PATCH', `/posts/${id}`, ops),
   redirect: (from_path: string, to_url: string) => call('POST', '/redirects', { from_path, to_url }),
   rendered: (id: number) => call('GET', `/posts/${id}/rendered`),
-  export: (page = 1, per_page = 50, since?: string) =>
-    call('GET', `/export?page=${page}&per_page=${per_page}${since ? `&since=${encodeURIComponent(since)}` : ''}`),
+  export: (page = 1, per_page = 50, since?: string, postType?: 'post' | 'page' | 'any') =>
+    call('GET', `/export?page=${page}&per_page=${per_page}${since ? `&since=${encodeURIComponent(since)}` : ''}${postType ? `&post_type=${postType}` : ''}`),
 }

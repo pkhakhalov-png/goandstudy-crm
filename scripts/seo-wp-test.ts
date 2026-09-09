@@ -15,7 +15,7 @@ async function main() {
   console.log('2) создать черновик (draft, не публикация)…')
   const created = await wp.createPost({
     key, status: 'draft',
-    title: '[TEST] Go&Study SEO Bridge — можно удалить',
+    title: '[TEST] goandstudy SEO Bridge — можно удалить',
     content: '<p>Тестовый черновик моста. Создан автоматически для проверки связи. Удалите в админке.</p>',
     meta_description: 'Тестовый черновик — удалить.',
   })

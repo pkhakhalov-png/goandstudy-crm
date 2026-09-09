@@ -37,6 +37,8 @@ const norm = (s: string | null) => (s || '').trim().toLowerCase().replace(/\s+/g
 type TechPage = {
   id: number
   normalized_url: string
+  /** Конечный URL после редиректов. Отличается от normalized_url — значит был редирект. */
+  url: string | null
   indexable: boolean
   page_type: string
   title: string | null
@@ -68,14 +70,14 @@ export async function computeTechnicalFindings(seo: any, safeFetch: (u: string) 
   try {
     pages = await fetchAll(
       seo, 'pages',
-      'id, normalized_url, indexable, page_type, title, h1, meta_desc, word_count, has_schema, cluster, http_status, canonical_url',
+      'id, normalized_url, url, indexable, page_type, title, h1, meta_desc, word_count, has_schema, cluster, http_status, canonical_url',
       (q) => q.is('removed_at', null),
     )
   } catch (e: any) {
     if (!/has_schema|column|PGRST/i.test(e?.message || '')) throw e
     const base = await fetchAll(
       seo, 'pages',
-      'id, normalized_url, indexable, page_type, title, h1, meta_desc, word_count, cluster, http_status, canonical_url',
+      'id, normalized_url, url, indexable, page_type, title, h1, meta_desc, word_count, cluster, http_status, canonical_url',
       (q) => q.is('removed_at', null),
     )
     pages = base.map((p: any) => ({ ...p, has_schema: null }))
@@ -96,14 +98,22 @@ export async function computeTechnicalFindings(seo: any, safeFetch: (u: string) 
     findings.push({ kind, confidence, page_ids: [id], evidence: { url, cluster: clusterById.get(id) ?? null, ...extra } })
 
   const isContent = (t: string) => t === 'article' || t === 'service' || t === 'landing' || t === 'commercial'
+  const strip = (u: string) => String(u).replace(/\/$/, '')
 
   // ── Критические техпроблемы (§5.8: canonical/robots/noindex/HTTP — высший приоритет) ──
   for (const p of pages) {
     const impr = imprByUrl.get(p.normalized_url) || 0
     if (p.http_status && p.http_status >= 400) {
       add('technical_critical', 'high', p.id, p.normalized_url, { issue: 'http_error', status: p.http_status, impressions: impr, note: `страница отдаёт HTTP ${p.http_status}` })
+    } else if (p.url && strip(p.url) !== strip(p.normalized_url)) {
+      // Краулер ходит по редиректам и кладёт в url конечный адрес, а canonical читает
+      // уже со страницы назначения. Раньше это выдавалось за «чужой canonical», хотя на
+      // деле URL просто 301-редиректит. Это разные проблемы с разными решениями.
+      add('redirected_with_traffic', impr > 100 ? 'high' : 'low', p.id, p.normalized_url,
+        { issue: 'redirect', target: p.url, impressions: impr,
+          note: 'URL редиректит на другую страницу, но продолжает получать показы — запрос уходит на общую страницу' })
     } else if (p.canonical_url && p.canonical_url !== p.normalized_url) {
-      add('technical_critical', impr > 0 ? 'high' : 'medium', p.id, p.normalized_url, { issue: 'canonical_mismatch', canonical: p.canonical_url, impressions: impr, note: 'canonical указывает на другой URL — страница отдаёт вес другой' })
+      add('technical_critical', impr > 0 ? 'high' : 'medium', p.id, p.normalized_url, { issue: 'canonical_mismatch', canonical: p.canonical_url, impressions: impr, note: 'страница отдаёт 200, но canonical указывает на другой URL' })
     } else if (!p.indexable && impr > 50) {
       add('technical_critical', 'high', p.id, p.normalized_url, { issue: 'noindex_with_traffic', impressions: impr, note: 'страница получает показы в поиске, но помечена неиндексируемой — проверить robots/noindex/canonical' })
     }

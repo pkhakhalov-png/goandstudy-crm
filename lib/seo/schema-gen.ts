@@ -5,7 +5,7 @@
 
 type P = { id: number; normalized_url: string; url: string | null; title: string | null; h1: string | null; meta_desc: string | null; page_type: string; has_schema: boolean | null }
 
-const ORG = { '@type': 'Organization', name: 'Go&Study', url: 'https://goandstudy.com' }
+const ORG = { '@type': 'Organization', name: 'goandstudy', url: 'https://goandstudy.com' }
 
 function titleCase(seg: string): string {
   const s = decodeURIComponent(seg).replace(/[-_]+/g, ' ').trim()
