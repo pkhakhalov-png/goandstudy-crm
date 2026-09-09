@@ -6,6 +6,7 @@ import { crawlPage } from './crawl'
 import { computeInventoryFindings, computeTechnicalFindings, computeGscFindings } from './findings'
 import { computeClusters } from './cluster'
 import { reclusterTopics } from './topics'
+import { persistOpportunities } from './opportunities'
 import { embed, toPgVector } from './embeddings'
 import { gscConfigured, getAccessToken, searchAnalytics, daysAgo } from './gsc'
 
@@ -163,6 +164,12 @@ const registry: Record<string, Handler> = {
     const res = await computeClusters(seo, { k })
     const topics = await reclusterTopics(seo)   // темы статей относим к новым кластерам
     return { outcome: 'done', result: { ...res, topics_reclustered: topics.updated, cost: 0 } }
+  },
+
+  // ── Пересчёт возможностей (PRD §7): находки → приоритизированная очередь ──
+  compute_opportunities: async (_job, seo) => {
+    const res = await persistOpportunities(seo)
+    return { outcome: 'done', result: { ...res, cost: 0 } }
   },
 
   // ── Технический аудит (порт чеклистов claude-seo): title/meta/h1/thin/schema/llms/robots ──

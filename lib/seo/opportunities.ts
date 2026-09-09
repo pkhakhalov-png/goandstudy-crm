@@ -9,6 +9,7 @@ export type Opportunity = {
   key: string
   scope: 'url' | 'query' | 'site'
   url: string | null
+  page_ids: number[]
   cluster: string | null
   decision: string          // UPDATE | EXPAND | MERGE | REPOSITION | SCHEMA | FIX | LINK_ONLY | CREATE
   decision_reason: string
@@ -72,7 +73,7 @@ export function computeOpportunities(findings: Finding[]): Opportunity[] {
     const e = f.evidence || {}
     const { decision, risk } = decisionFor('cannibalization')
     opps.push({
-      key: `cannib:${e.query}`, scope: 'query', url: null, cluster: e.cluster ?? null,
+      key: `cannib:${e.query}`, scope: 'query', url: null, page_ids: f.page_ids || [], cluster: e.cluster ?? null,
       decision: f.confidence === 'high' ? 'MERGE/REPOSITION' : 'REVIEW', risk,
       decision_reason: e.alternation ? `«${e.query}»: URL чередуются в выдаче (${JSON.stringify(e.lead_shares)}) — вероятная каннибализация` : `«${e.query}»: несколько URL ранжируются, проверить интент (§5.5)`,
       priority: scoreOf(f), forecast: null, kinds: ['cannibalization'],
@@ -104,8 +105,9 @@ export function computeOpportunities(findings: Finding[]): Opportunity[] {
       missing_schema: 'нет schema.org — добавить разметку по типу',
       orphan: 'нет входящих ссылок — добавить перелинковку',
     }
+    const pageIds = [...new Set(fs.flatMap((f) => f.page_ids || []))]
     opps.push({
-      key: `url:${url}`, scope: 'url', url, cluster,
+      key: `url:${url}`, scope: 'url', url, page_ids: pageIds, cluster,
       decision, decision_reason: reasons[dominant.kind] || `основное: ${dominant.kind}`, risk,
       priority, forecast: ctr?.evidence?.forecast ?? null, kinds,
       evidence: { url: short(url), findings: kinds, impressions: Math.max(0, ...fs.map((f) => f.evidence?.impressions || 0)) },
@@ -116,11 +118,39 @@ export function computeOpportunities(findings: Finding[]): Opportunity[] {
   for (const f of siteWide) {
     const { decision, risk } = decisionFor(f.kind)
     opps.push({
-      key: `site:${f.kind}:${f.id}`, scope: 'site', url: null, cluster: f.evidence?.cluster ?? null,
+      key: `site:${f.kind}:${f.id}`, scope: 'site', url: null, page_ids: f.page_ids || [], cluster: f.evidence?.cluster ?? null,
       decision, decision_reason: f.evidence?.note || f.kind, risk,
       priority: scoreOf(f), forecast: null, kinds: [f.kind], evidence: f.evidence,
     })
   }
 
   return opps.sort((a, b) => b.priority - a.priority)
+}
+
+/**
+ * Пересчитать и записать возможности в seo.opportunities.
+ * Идемпотентно: удаляет только необработанные (status='new'), сохраняет решённые человеком
+ * (approved/queued/dismissed/…). Возвращает счётчики.
+ */
+export async function persistOpportunities(seo: any): Promise<{ inserted: number; kept: number }> {
+  const { data: findings, error } = await seo.from('findings').select('id, kind, confidence, page_ids, evidence, status').eq('status', 'open').limit(5000)
+  if (error) throw new Error(`findings: ${error.message}`)
+  const opps = computeOpportunities((findings ?? []) as any[])
+
+  const { count: kept } = await seo.from('opportunities').select('*', { count: 'exact', head: true }).neq('status', 'new')
+  await seo.from('opportunities').delete().eq('status', 'new')
+
+  const now = new Date().toISOString()
+  const rows = opps.map((o) => ({
+    kind: o.kinds[0], page_ids: o.page_ids.length ? o.page_ids : null,
+    query_group: o.scope === 'query' ? [o.evidence?.query].filter(Boolean) : o.kinds,
+    decision: o.decision, decision_reason: o.decision_reason, risk: o.risk,
+    priority: Math.round(o.priority), forecast: o.forecast, evidence: { ...o.evidence, scope: o.scope, url: o.url, cluster: o.cluster },
+    status: 'new', created_at: now, updated_at: now,
+  }))
+  for (let i = 0; i < rows.length; i += 200) {
+    const { error: e } = await seo.from('opportunities').insert(rows.slice(i, i + 200))
+    if (e) throw new Error(`opportunities insert: ${e.message}`)
+  }
+  return { inserted: rows.length, kept: kept || 0 }
 }
