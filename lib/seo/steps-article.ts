@@ -281,3 +281,49 @@ registerStep('article_linkplan', async (job: Job, seo: any): Promise<StepOutcome
   const ready = donors.filter((d) => d.status === 'proposed').length
   return { outcome: 'done', result: { donors: donors.length, ready, orphan_risk: ready < 2, cost: 0 } }
 })
+
+/* ── Кандидаты в статьи: считаем один раз, а не на каждой отрисовке экрана ── */
+
+/**
+ * Запросы с показами, где сайт ниже десятого места, складываются в seo.topics.
+ * Раньше экран «Статьи» считал это сам и вытягивал 152 тысячи строк GSC на каждый
+ * рендер. Теперь считает шаг очереди, а экран читает готовые темы.
+ */
+registerStep('topics_from_gsc', async (_job: Job, seo: any): Promise<StepOutcome> => {
+  const agg = new Map<string, { imp: number; clicks: number; pos: number; n: number; url: string }>()
+  for (const r of await fetchAll(seo, 'gsc_daily', 'normalized_url,query,clicks,impressions,position')) {
+    const q = String(r.query).toLowerCase().trim()
+    if (!q) continue
+    const a = agg.get(q) ?? { imp: 0, clicks: 0, pos: 0, n: 0, url: String(r.normalized_url) }
+    a.imp += r.impressions ?? 0; a.clicks += r.clicks ?? 0; a.pos += Number(r.position ?? 0); a.n++
+    agg.set(q, a)
+  }
+
+  const existing = new Set<string>()
+  for (const t of await fetchAll(seo, 'topics', 'title,primary_keyword')) {
+    existing.add(String(t.primary_keyword ?? t.title).toLowerCase().trim())
+  }
+
+  const candidates = [...agg.entries()]
+    .map(([query, a]) => ({ query, impressions: a.imp, clicks: a.clicks, position: a.pos / a.n, url: a.url }))
+    // Ниже десятого места и с заметным спросом: значит подходящей страницы нет
+    .filter((c) => c.position > 10 && c.impressions >= 150 && !existing.has(c.query))
+    .sort((a, b) => b.impressions - a.impressions)
+    .slice(0, 60)
+
+  if (!candidates.length) return { outcome: 'done', result: { inserted: 0, cost: 0 } }
+
+  const rows = candidates.map((c) => ({
+    title: c.query,
+    primary_keyword: c.query,
+    origin: 'gsc_gap',
+    status: 'new',
+    search_volume: c.impressions,
+    // Приоритет: показы, приглушённые глубиной позиции — чем дальше, тем нужнее страница
+    priority: Math.round(c.impressions * Math.min(1, c.position / 30)),
+  }))
+  const { error } = await seo.from('topics').insert(rows)
+  if (error) return { outcome: 'failed', result: { error: `topics: ${error.message}` } }
+
+  return { outcome: 'done', result: { inserted: rows.length, top: candidates[0]?.query, cost: 0 } }
+})

@@ -3,19 +3,6 @@ import Link from 'next/link'
 import { LaunchArticle } from './LaunchArticle'
 import { JobQueue } from './JobQueue'
 
-async function fetchAll(seo: any, table: string, cols: string, apply?: (q: any) => any): Promise<any[]> {
-  const out: any[] = []
-  for (let from = 0; ; from += 1000) {
-    let q = seo.from(table).select(cols).range(from, from + 999)
-    if (apply) q = apply(q)
-    const { data } = await q
-    out.push(...(data ?? []))
-    if (!data || data.length < 1000) break
-  }
-  return out
-}
-
-// Список сгенерированных статей. Экран ревью уровня A0: человек читает и решает.
 async function load() {
   try {
     const admin = await createAdminClient()
@@ -30,7 +17,11 @@ async function load() {
       : { data: [] as any[] }
     const byId = new Map((versions ?? []).map((v: any) => [v.id, v]))
 
-    const { data: counts } = await seo.from('article_versions').select('article_id')
+    // Считаем версии по id статей на экране, а не вытягиваем таблицу целиком
+    const articleIds = (articles ?? []).map((a: any) => a.id)
+    const { data: counts } = articleIds.length
+      ? await seo.from('article_versions').select('article_id').in('article_id', articleIds)
+      : { data: [] as any[] }
     const versionCount = new Map<number, number>()
     for (const c of counts ?? []) versionCount.set(c.article_id, (versionCount.get(c.article_id) || 0) + 1)
 
@@ -56,20 +47,19 @@ async function load() {
       .select('id, step, status, article_id, topic_id, attempts, last_error, result, created_at')
       .like('step', 'article_%').order('id', { ascending: false }).limit(40)
 
-    // Подсказки тем: запросы с показами, где сайт ниже десятого места
-    const seen = new Set((articles ?? []).map((a: any) => String(a.primary_keyword ?? '').toLowerCase()))
-    const agg = new Map<string, { imp: number; pos: number; n: number }>()
-    for (const r of await fetchAll(seo, 'gsc_daily', 'query,impressions,position')) {
-      const q = String(r.query).toLowerCase()
-      const a = agg.get(q) ?? { imp: 0, pos: 0, n: 0 }
-      a.imp += r.impressions ?? 0; a.pos += Number(r.position ?? 0); a.n++
-      agg.set(q, a)
-    }
-    const suggestions = [...agg.entries()]
-      .map(([query, a]) => ({ query, impressions: a.imp, position: a.pos / a.n }))
-      .filter((s) => s.position > 10 && s.impressions >= 150 && !seen.has(s.query))
-      .sort((a, b) => b.impressions - a.impressions)
-      .slice(0, 8)
+    // Подсказки тем берём из seo.topics — их считает шаг topics_from_gsc.
+    // Раньше здесь на каждой отрисовке вытягивалось 152 тысячи строк GSC (153 запроса
+    // к базе), из-за чего экран открывался несколько секунд.
+    const { data: topics } = await seo.from('topics')
+      .select('id, title, primary_keyword, search_volume, priority, status')
+      .eq('status', 'new').eq('origin', 'gsc_gap')
+      .order('priority', { ascending: false, nullsFirst: false }).limit(10)
+
+    const suggestions = (topics ?? []).map((t: any) => ({
+      topicId: t.id,
+      query: t.primary_keyword ?? t.title,
+      impressions: t.search_volume ?? 0,
+    }))
 
     return { ok: true as const, rows, jobs: jobs ?? [], suggestions }
   } catch (e: any) {

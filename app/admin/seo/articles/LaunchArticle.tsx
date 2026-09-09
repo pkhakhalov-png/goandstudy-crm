@@ -3,14 +3,14 @@
 import { useState, useTransition } from 'react'
 import { enqueueArticle } from './actions'
 
-export function LaunchArticle({ suggestions }: { suggestions: { query: string; impressions: number; position: number }[] }) {
+export function LaunchArticle({ suggestions }: { suggestions: { topicId: number; query: string; impressions: number }[] }) {
   const [query, setQuery] = useState('')
   const [pending, start] = useTransition()
   const [msg, setMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
 
-  const launch = (q: string) => start(async () => {
+  const launch = (q: string, topicId?: number) => start(async () => {
     setMsg(null)
-    const res = await enqueueArticle({ query: q })
+    const res = await enqueueArticle(topicId ? { topicId } : { query: q })
     if (res.error) setMsg({ kind: 'err', text: res.error })
     else { setMsg({ kind: 'ok', text: 'Задача в очереди. Воркер подхватит её и напишет статью.' }); setQuery('') }
   })
@@ -37,9 +37,9 @@ export function LaunchArticle({ suggestions }: { suggestions: { query: string; i
           </div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {suggestions.map((s) => (
-              <button key={s.query} className="btn-s" disabled={pending}
-                title={`${s.impressions.toLocaleString('ru')} показов, позиция ${s.position.toFixed(1)}`}
-                onClick={() => launch(s.query)}
+              <button key={s.topicId} className="btn-s" disabled={pending}
+                title={`${s.impressions.toLocaleString('ru')} показов в поиске`}
+                onClick={() => launch(s.query, s.topicId)}
                 style={{ fontSize: 12 }}>
                 {s.query} <span style={{ color: 'var(--muted)' }}>· {s.impressions.toLocaleString('ru')}</span>
               </button>
