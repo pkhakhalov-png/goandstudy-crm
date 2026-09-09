@@ -45,6 +45,8 @@ type TechPage = {
   word_count: number | null
   has_schema: boolean | null
   cluster: string | null
+  http_status: number | null
+  canonical_url: string | null
 }
 
 // Пороговые значения (из чеклистов; в символах/словах)
@@ -53,6 +55,7 @@ const META_MIN = 70, META_MAX = 160
 const THIN_WORDS = 300                       // seo-content: тонкий контент
 
 const TECH_KINDS = [
+  'technical_critical',
   'missing_title', 'missing_h1', 'missing_meta_desc',
   'title_length', 'meta_desc_length', 'thin_content',
   'missing_schema', 'llms_txt_missing', 'robots_sitemap',
@@ -65,24 +68,46 @@ export async function computeTechnicalFindings(seo: any, safeFetch: (u: string) 
   try {
     pages = await fetchAll(
       seo, 'pages',
-      'id, normalized_url, indexable, page_type, title, h1, meta_desc, word_count, has_schema, cluster',
+      'id, normalized_url, indexable, page_type, title, h1, meta_desc, word_count, has_schema, cluster, http_status, canonical_url',
       (q) => q.is('removed_at', null),
     )
   } catch (e: any) {
     if (!/has_schema|column|PGRST/i.test(e?.message || '')) throw e
     const base = await fetchAll(
       seo, 'pages',
-      'id, normalized_url, indexable, page_type, title, h1, meta_desc, word_count, cluster',
+      'id, normalized_url, indexable, page_type, title, h1, meta_desc, word_count, cluster, http_status, canonical_url',
       (q) => q.is('removed_at', null),
     )
     pages = base.map((p: any) => ({ ...p, has_schema: null }))
   }
+
+  // показы по URL из GSC (для приоритета schema и критических техпроблем «есть трафик, но…»)
+  const imprByUrl = new Map<string, number>()
+  try {
+    for (let from = 0; ; from += 1000) {
+      const { data } = await seo.from('gsc_page_daily').select('normalized_url, impressions').range(from, from + 999)
+      for (const r of data ?? []) imprByUrl.set(r.normalized_url, (imprByUrl.get(r.normalized_url) || 0) + (r.impressions || 0))
+      if (!data || data.length < 1000) break
+    }
+  } catch { /* GSC ещё не импортирован — приоритет без показов */ }
   const findings: { kind: string; confidence: string; page_ids: number[]; evidence: any }[] = []
   const clusterById = new Map(pages.map((p) => [p.id, p.cluster]))
   const add = (kind: string, confidence: string, id: number, url: string, extra: any = {}) =>
     findings.push({ kind, confidence, page_ids: [id], evidence: { url, cluster: clusterById.get(id) ?? null, ...extra } })
 
   const isContent = (t: string) => t === 'article' || t === 'service' || t === 'landing' || t === 'commercial'
+
+  // ── Критические техпроблемы (§5.8: canonical/robots/noindex/HTTP — высший приоритет) ──
+  for (const p of pages) {
+    const impr = imprByUrl.get(p.normalized_url) || 0
+    if (p.http_status && p.http_status >= 400) {
+      add('technical_critical', 'high', p.id, p.normalized_url, { issue: 'http_error', status: p.http_status, impressions: impr, note: `страница отдаёт HTTP ${p.http_status}` })
+    } else if (p.canonical_url && p.canonical_url !== p.normalized_url) {
+      add('technical_critical', impr > 0 ? 'high' : 'medium', p.id, p.normalized_url, { issue: 'canonical_mismatch', canonical: p.canonical_url, impressions: impr, note: 'canonical указывает на другой URL — страница отдаёт вес другой' })
+    } else if (!p.indexable && impr > 50) {
+      add('technical_critical', 'high', p.id, p.normalized_url, { issue: 'noindex_with_traffic', impressions: impr, note: 'страница получает показы в поиске, но помечена неиндексируемой — проверить robots/noindex/canonical' })
+    }
+  }
 
   for (const p of pages) {
     if (!p.indexable) continue
@@ -102,9 +127,13 @@ export async function computeTechnicalFindings(seo: any, safeFetch: (u: string) 
     if (isContent(p.page_type) && (p.word_count ?? 0) > 0 && (p.word_count as number) < THIN_WORDS)
       add('thin_content', 'medium', p.id, p.normalized_url, { words: p.word_count, want: `>= ${THIN_WORDS}` })
 
-    // has_schema === false → точно нет JSON-LD; null → страница краулилась до появления колонки, пропускаем
-    if (p.has_schema === false && isContent(p.page_type))
-      add('missing_schema', 'medium', p.id, p.normalized_url, { page_type: p.page_type, note: 'нет JSON-LD; рекомендуется ' + (p.page_type === 'article' ? 'Article/BlogPosting' : 'Service/Course') })
+    // has_schema === false → точно нет JSON-LD; приоритет по показам (§5.6), не «82 работы»
+    if (p.has_schema === false && isContent(p.page_type)) {
+      const impr = imprByUrl.get(p.normalized_url) || 0
+      const rec = p.page_type === 'article' ? 'Article/BlogPosting' : 'Service/EducationalOrganization'
+      add('missing_schema', impr >= 500 ? 'medium' : 'low', p.id, p.normalized_url,
+        { page_type: p.page_type, impressions: impr, priority: impr, note: `нет JSON-LD; тип ${rec} (приоритет по показам: ${impr})` })
+    }
   }
 
   // ── Site-wide: robots.txt (sitemap-декларация) + llms.txt (AI/GEO-видимость) ──

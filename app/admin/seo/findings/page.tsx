@@ -13,6 +13,7 @@ const KIND_RU: Record<string, string> = {
   ctr_opportunity: 'CTR-возможности',
   stale_content: 'Устаревшее',
   // технический аудит (порт claude-seo)
+  technical_critical: 'Критично: canonical / noindex / HTTP',
   missing_title: 'Нет title',
   missing_h1: 'Нет H1',
   missing_meta_desc: 'Нет meta description',
@@ -72,9 +73,12 @@ export default async function SeoFindings() {
                     {f.evidence?.url?.replace('https://goandstudy.com', '') ||
                      f.evidence?.missing_url?.replace('https://goandstudy.com', '') ||
                      (f.evidence?.urls ? `«${f.evidence.title || 'дубль'}»: ${f.evidence.urls.map((u: string) => u.replace('https://goandstudy.com', '')).join(', ')}` : JSON.stringify(f.evidence))}
-                    {f.evidence?.query ? ` — «${f.evidence.query}»` : ''}
+                    {f.evidence?.query ? ` — «${f.evidence.query}»${f.evidence?.queries_count > 1 ? ` +${f.evidence.queries_count - 1} запр.` : ''}` : ''}
                     {f.evidence?.position != null ? ` поз.${f.evidence.position}` : ''}
                     {f.evidence?.impressions != null ? ` · ${f.evidence.impressions} показов${f.evidence.clicks != null && typeof f.evidence.clicks === 'number' ? `, ${f.evidence.clicks} кликов` : ''}` : ''}
+                    {f.evidence?.forecast ? ` → +${f.evidence.forecast.conservative}/${f.evidence.forecast.base}/${f.evidence.forecast.optimistic} кликов/28д` : ''}
+                    {f.evidence?.issue ? ` — ${f.evidence.issue}${f.evidence.status ? ` (${f.evidence.status})` : ''}` : ''}
+                    {f.evidence?.alternation ? ` — чередование ${JSON.stringify(f.evidence.lead_shares)}` : ''}
                     {f.evidence?.linked_from_count ? ` — ссылок: ${f.evidence.linked_from_count}` : ''}
                     {f.evidence?.len != null ? ` — ${f.evidence.len} симв. (${f.evidence.issue === 'long' ? 'длинно' : 'коротко'}, надо ${f.evidence.want})` : ''}
                     {f.evidence?.words != null ? ` — ${f.evidence.words} слов` : ''}
