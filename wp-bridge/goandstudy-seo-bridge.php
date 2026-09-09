@@ -4,7 +4,7 @@
  * Description: Мост между CRM SEO-модулем и WordPress: lookup по мете, идемпотентная
  *              публикация/правки, редиректы, rendered-HTML, экспорт. Аутентификация —
  *              HMAC (WP_BRIDGE_SECRET) + окно времени. Ставится как mu-plugin.
- * Version: 0.1
+ * Version: 0.2
  *
  * УСТАНОВКА: положить файл в wp-content/mu-plugins/goandstudy-seo-bridge.php
  * В wp-config.php добавить: define('GS_SEO_BRIDGE_SECRET', '<тот же WP_BRIDGE_SECRET, что в CRM env>');
@@ -44,13 +44,17 @@ function gs_seo_check_auth(WP_REST_Request $req) {
 }
 
 /* ── Лог операций ─────────────────────────────────────────────────────────── */
-function gs_seo_log($post_id, $key, $action) {
+/* Таблица создаётся один раз (по версии в опции), а не при каждой записи. */
+add_action('init', function () {
+    if (get_option('gs_seo_log_v') === '1') return;
     global $wpdb;
     $t = $wpdb->prefix . 'gs_seo_log';
-    $wpdb->query($wpdb->prepare(
-        "CREATE TABLE IF NOT EXISTS $t (id BIGINT AUTO_INCREMENT PRIMARY KEY, post_id BIGINT, ikey VARCHAR(191), action VARCHAR(64), created_at DATETIME)"
-    ));
-    $wpdb->insert($t, ['post_id' => $post_id, 'ikey' => $key, 'action' => $action, 'created_at' => current_time('mysql')]);
+    $wpdb->query("CREATE TABLE IF NOT EXISTS $t (id BIGINT AUTO_INCREMENT PRIMARY KEY, post_id BIGINT, ikey VARCHAR(191), action VARCHAR(64), created_at DATETIME)");
+    update_option('gs_seo_log_v', '1');
+});
+function gs_seo_log($post_id, $key, $action) {
+    global $wpdb;
+    $wpdb->insert($wpdb->prefix . 'gs_seo_log', ['post_id' => $post_id, 'ikey' => $key, 'action' => $action, 'created_at' => current_time('mysql')]);
 }
 
 /* ── Идемпотентность: найти пост по ключу ─────────────────────────────────── */
@@ -119,12 +123,20 @@ add_action('rest_api_init', function () {
             return ['post_id' => $id, 'ok' => true, 'modified' => get_post_modified_time('c', true, $id)];
         }]);
 
-    // POST redirects — 301
+    // POST redirects — 301 (to_url ограничен своим доменом: защита от угона трафика)
     register_rest_route(GS_SEO_NS, '/redirects', ['methods' => 'POST', 'permission_callback' => $auth,
         'callback' => function (WP_REST_Request $r) {
             $b = $r->get_json_params();
+            $from = isset($b['from_path']) ? (string) $b['from_path'] : '';
+            $to   = isset($b['to_url']) ? (string) $b['to_url'] : '';
+            if ($from === '' || $to === '') return new WP_Error('gs_redirect', 'from_path/to_url обязательны', ['status' => 400]);
+            // разрешаем только относительный путь или абсолютный URL на goandstudy.com
+            $host = parse_url($to, PHP_URL_HOST);
+            if ($host !== null && $host !== '' && strcasecmp($host, 'goandstudy.com') !== 0 && !preg_match('/\.goandstudy\.com$/i', $host)) {
+                return new WP_Error('gs_redirect', 'to_url разрешён только в пределах goandstudy.com', ['status' => 400]);
+            }
             $map = get_option('gs_seo_redirects', []);
-            $map[$b['from_path']] = $b['to_url'];
+            $map[$from] = $to;
             update_option('gs_seo_redirects', $map);
             return ['ok' => true, 'count' => count($map)];
         }]);
