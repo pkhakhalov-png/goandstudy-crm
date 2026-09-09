@@ -7,6 +7,7 @@ import { computeInventoryFindings, computeTechnicalFindings, computeGscFindings 
 import { computeClusters } from './cluster'
 import { reclusterTopics } from './topics'
 import { persistOpportunities } from './opportunities'
+import { generateSchemaProposals } from './schema-gen'
 import { embed, toPgVector } from './embeddings'
 import { gscConfigured, getAccessToken, searchAnalytics, daysAgo } from './gsc'
 
@@ -164,6 +165,12 @@ const registry: Record<string, Handler> = {
     const res = await computeClusters(seo, { k })
     const topics = await reclusterTopics(seo)   // темы статей относим к новым кластерам
     return { outcome: 'done', result: { ...res, topics_reclustered: topics.updated, cost: 0 } }
+  },
+
+  // ── Генерация schema.org для страниц без разметки (§5.6, только проверяемые поля) ──
+  generate_schema: async (_job, seo) => {
+    const res = await generateSchemaProposals(seo)
+    return { outcome: 'done', result: { ...res, cost: 0 } }
   },
 
   // ── Пересчёт возможностей (PRD §7): находки → приоритизированная очередь ──
