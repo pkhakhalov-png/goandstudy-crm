@@ -7,6 +7,7 @@ import { COMPANY_FACTS } from './facts'
 import { embed } from './embeddings'
 import { checkStandard, languageChecks, type Check } from './standard'
 import { checkBlogStandard, BLOG_CATEGORIES } from './blog-style'
+import { claimsBlock, findUnbackedNumbers, type Claim } from './claims'
 export { summarize } from './standard'
 export type { Check, Level } from './standard'
 
@@ -20,6 +21,10 @@ export type GenContext = {
   topicTitle: string
   primaryKeyword: string
   cluster: string | null
+  /** Проверенные факты под тему. Пусто — значит цифр в статье быть не должно. */
+  claims?: Claim[]
+  /** Тексты соседних страниц: чтобы статья не противоречила сайту. */
+  neighbourTexts?: { url: string; title: string | null; text: string }[]
   /** Страницы сайта рядом по смыслу — для перелинковки и чтобы не написать дубль. */
   related: PageRef[]
   /** Реальные запросы из Search Console по этой теме. */
@@ -135,6 +140,12 @@ const WRITING_RULES = `
   «стоит отметить, что», «важно понимать, что», «более того», «что касается»,
   «в заключение», «подводя итог», «играет ключевую роль», «открывает двери».
 
+ЦИФРЫ
+Суммы, сроки, возрастные рамки, проходные баллы берутся ТОЛЬКО из блока проверенных
+фактов. Если факта нет — не выдумывай и не обходи молчанием: объясни, от чего зависит
+требование, и скажи, где читателю проверить актуальное значение. Факт, помеченный
+одним источником, подаётся с оговоркой: «обычно», «как правило», «по практике».
+
 ЧЕГО НЕ ОБЕЩАЕМ
 Поступление, визу, стипендию, сроки рассмотрения — это не в нашей власти.
 `.trim()
@@ -144,8 +155,16 @@ function contextBlock(ctx: GenContext): string {
   const queries = ctx.queries
     .map((q) => `- «${q.query}» — ${q.impressions} показов, ${q.clicks} кликов, средняя позиция ${q.position.toFixed(1)}`)
     .join('\n')
+  const facts = claimsBlock(ctx.claims ?? [])
+  const neighbours = (ctx.neighbourTexts ?? []).length
+    ? `\n\nЧТО УЖЕ НАПИСАНО НА САЙТЕ ПО СОСЕДНИМ ТЕМАМ\nНе противоречь этим страницам: расхождение внутри сайта по одной теме читается\nкак недостоверность. Термины и названия программ бери отсюда.\n\n` +
+      ctx.neighbourTexts!.map((n) => `— ${n.url} «${n.title ?? ''}»\n${n.text.slice(0, 1800)}`).join('\n\n')
+    : ''
+
   return `
 ${COMPANY_FACTS}
+
+${facts}${neighbours}
 
 ТЕМА
 ${ctx.topicTitle}
@@ -390,6 +409,17 @@ export async function qaDeterministic(
   checks.push(...languageChecks(text))
 
   const issues: QaIssue[] = []
+
+  // Числа, за которыми не стоит ни один факт из реестра. Ложное срабатывание тут
+  // дешевле пропущенной выдуманной суммы, поэтому это предупреждение человеку.
+  const unbacked = findUnbackedNumbers(text, ctx.claims ?? [])
+  checks.push({
+    id: 'факты: числа подтверждены реестром', level: 'W', ok: unbacked.length === 0,
+    detail: unbacked.length ? `без подтверждения: ${unbacked.slice(0, 5).map((u) => u.value).join(', ')}` : 'все числа из реестра',
+  })
+  for (const u of unbacked.slice(0, 8)) {
+    issues.push({ severity: 'major', kind: 'facts', quote: u.context, why: `число «${u.value}» не подтверждено реестром фактов` })
+  }
 
   // PRD §13: без ответа «чем отличается» статью не публикуем — защита от scaled content
   const uvOk = brief.unique_value.trim().length > 40

@@ -9,6 +9,7 @@ import { registerStep, type Job, type StepOutcome } from './steps'
 import { generateBrief, generateDraft, reviseDraft, qaWithModel, qaDeterministic, GEN_MODEL, PROMPT_VERSION, type GenContext, type Brief, type QaReport } from './generate'
 import { summarize } from './standard'
 import { loadSiteTargets, normalizeBody } from './blog-style'
+import { loadClaims, subjectKeysFor } from './claims'
 import { publishToTheme, verifyPublished, listPublishedSlugs } from './theme-publish'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -81,12 +82,35 @@ async function buildContext(seo: any, topic: any): Promise<GenContext> {
   const related: any[] = []
   for (const p of [...exact, ...near]) if (!related.some((e) => e.id === p.id)) related.push(p)
 
+  // Факты под тему: без них цифр в статье быть не должно
+  const claims = await loadClaims(seo, subjectKeysFor(`${topic.title} ${topic.primary_keyword ?? ''}`))
+
+  // Тексты трёх ближайших страниц: чтобы не противоречить тому, что уже на сайте.
+  // Именно из-за отсутствия этого статья написала «институты Конфуция», хотя
+  // на соседней странице куратор уже поправил название программы.
+  const neighbourTexts: { url: string; title: string | null; text: string }[] = []
+  for (const p of related.slice(0, 3)) {
+    const text = await fetchPageText(p.url)
+    if (text) neighbourTexts.push({ url: p.url, title: p.title, text })
+  }
+
   return {
     topicTitle: topic.title,
     primaryKeyword: topic.primary_keyword || topic.title,
     cluster: topic.cluster ?? null,
+    claims, neighbourTexts,
     related, queries,
   }
+}
+
+async function fetchPageText(url: string): Promise<string | null> {
+  const res = await fetch(url, { headers: { 'User-Agent': 'goandstudy-seo' }, signal: AbortSignal.timeout(20000) }).catch(() => null)
+  if (!res || !res.ok) return null
+  const html = await res.text()
+  return html
+    .replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>|<nav[\s\S]*?<\/nav>|<footer[\s\S]*?<\/footer>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+    .slice(0, 6000)
 }
 
 async function siteStrings(seo: any) {
