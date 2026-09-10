@@ -3,7 +3,7 @@
 import { config } from 'dotenv'; import path from 'path'
 config({ path: path.resolve(process.cwd(), '.env.local') })
 import { createClient } from '@supabase/supabase-js'
-import { inspectUrl, saveIndexStatus } from '../lib/seo/index-status'
+import { inspectPage, saveIndexStatus } from '../lib/seo/index-status'
 
 async function main() {
   const seo = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
@@ -22,7 +22,7 @@ async function main() {
     if (!slug) { console.log(`#${a.id} — нет адреса, пропуск`); continue }
     const url = `https://goandstudy.com/blog/${slug}/`
 
-    const res = await inspectUrl(url)
+    const res = await inspectPage(url)
     console.log(`#${a.id} ${slug}\n   ${res.note}${res.lastCrawl ? `, обход ${String(res.lastCrawl).slice(0, 10)}` : ''}`)
 
     const { data: page } = await seo.from('pages').select('id').eq('normalized_url', url.replace(/\/$/, '')).maybeSingle()

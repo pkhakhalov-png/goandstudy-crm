@@ -544,7 +544,7 @@ registerStep('article_fix', async (job: Job, seo: any): Promise<StepOutcome> => 
  * до неё нам далеко, но перепроверяем только те, чей срок подошёл.
  */
 registerStep('article_index_check', async (job: Job, seo: any): Promise<StepOutcome> => {
-  const { inspectUrl, saveIndexStatus } = await import('./index-status')
+  const { inspectPage, saveIndexStatus } = await import('./index-status')
 
   const { data: articles } = await seo.from('articles')
     .select('id, current_version_id, indexed_at').eq('status', 'published').order('id')
@@ -565,7 +565,7 @@ registerStep('article_index_check', async (job: Job, seo: any): Promise<StepOutc
     if (Date.now() - last < wait) continue
 
     const url = `https://goandstudy.com/blog/${slug}/`
-    const res = await inspectUrl(url)
+    const res = await inspectPage(url)
     if (!res.checked) break // нет доступа или кончилась квота — остальные тем более не пройдут
     checked++
 

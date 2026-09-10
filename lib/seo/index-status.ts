@@ -21,7 +21,27 @@ export type IndexVerdict = {
 
 const SITE = process.env.GSC_SITE_URL || 'sc-domain:goandstudy.com'
 
-/** Спросить Google про конкретный адрес. */
+/**
+ * Спросить Google про страницу, не гадая с формой адреса.
+ *
+ * Форма имеет значение: сайт отвечает 301 с адреса без слэша на адрес со слэшем,
+ * но в индексе Google держит вариант БЕЗ слэша — и на вариант со слэшем честно
+ * отвечает «URL неизвестен». Поэтому спрашиваем сначала форму без слэша (её же
+ * использует Search Console в отчётах), а если Google её не знает — пробуем вторую.
+ */
+export async function inspectPage(url: string): Promise<IndexVerdict & { url: string }> {
+  const bare = url.replace(/\/+$/, '')
+  const slashed = `${bare}/`
+
+  const first = await inspectUrl(bare)
+  if (!first.checked || first.verdict === 'PASS') return { ...first, url: bare }
+
+  const second = await inspectUrl(slashed)
+  if (second.checked && second.verdict === 'PASS') return { ...second, url: slashed }
+  return { ...first, url: bare }
+}
+
+/** Спросить Google про конкретный адрес ровно в той форме, что передали. */
 export async function inspectUrl(url: string): Promise<IndexVerdict> {
   if (!gscConfigured()) {
     return { checked: false, verdict: '—', coverageState: '—', lastCrawl: null, robotsState: null, canonical: null,
@@ -113,7 +133,7 @@ export async function checkSiteIndexation(
 
   let checked = 0
   for (const p of due) {
-    const v = await inspectUrl(p.normalized_url.endsWith('/') ? p.normalized_url : `${p.normalized_url}/`)
+    const v = await inspectPage(p.normalized_url)
     if (!v.checked) return { checked, stopped: v.note } // квота или доступ — дальше нет смысла
     await saveIndexStatus(seo, p.id, v)
     opts.onEach?.(p.normalized_url, v)

@@ -393,8 +393,8 @@ export async function checkIndex(articleId: number) {
   const slug = meta.publish?.slug ?? meta.slug
   const url = `https://goandstudy.com/blog/${slug}/`
 
-  const { inspectUrl, saveIndexStatus } = await import('@/lib/seo/index-status')
-  const v = await inspectUrl(url)
+  const { inspectPage, saveIndexStatus } = await import('@/lib/seo/index-status')
+  const v = await inspectPage(url)
 
   // Привязываем к странице инвентаря, если она уже обойдена краулером
   const { data: page } = await seo.from('pages').select('id').eq('normalized_url', url.replace(/\/$/, '')).maybeSingle()

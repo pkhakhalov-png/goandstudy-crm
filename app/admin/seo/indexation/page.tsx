@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { CheckSiteButton } from './CheckSiteButton'
+import { trafficByPage } from '@/lib/seo/gsc-agg'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,6 +14,7 @@ type Row = {
   checkedAt: string | null
   impressions: number
   clicks: number
+  lastImpression: string | null
 }
 
 /** Человеческое имя состояния. Google отдаёт их на языке запроса, но не всегда. */
@@ -36,25 +38,19 @@ export default async function IndexationPage() {
   const { data: statuses } = await seo.from('index_status').select('*')
   const byPage = new Map<number, any>((statuses ?? []).map((s: any) => [s.page_id, s]))
 
-  // Показы за 28 дней — чтобы сортировать не по алфавиту, а по важности
+  // Показы за 28 дней — чтобы сортировать не по алфавиту, а по важности.
+  // Читаем страницами: обычный select обрезал бы данные на тысяче строк.
   const since = new Date(Date.now() - 28 * 864e5).toISOString().slice(0, 10)
-  const { data: gsc } = await seo.from('gsc_page_daily')
-    .select('normalized_url, clicks, impressions').gte('date', since)
-  const traffic = new Map<string, { clicks: number; impressions: number }>()
-  for (const g of gsc ?? []) {
-    const t = traffic.get(g.normalized_url) ?? { clicks: 0, impressions: 0 }
-    t.clicks += g.clicks; t.impressions += g.impressions
-    traffic.set(g.normalized_url, t)
-  }
+  const traffic = await trafficByPage(seo, { since })
 
   const rows: Row[] = (pages ?? []).map((p: any) => {
     const st = byPage.get(p.id)
-    const t = traffic.get(p.normalized_url) ?? { clicks: 0, impressions: 0 }
+    const t = traffic.get(p.normalized_url) ?? { clicks: 0, impressions: 0, lastImpression: null }
     return {
       page_id: p.id, url: p.normalized_url,
       verdict: st?.verdict ?? null, coverage: st?.coverage_state ?? null,
       lastCrawl: st?.last_crawl ?? null, checkedAt: st?.checked_at ?? null,
-      impressions: t.impressions, clicks: t.clicks,
+      impressions: t.impressions, clicks: t.clicks, lastImpression: t.lastImpression,
     }
   })
 
@@ -95,16 +91,16 @@ export default async function IndexationPage() {
 
       {painful.length > 0 && (
         <Table
-          title="Не в индексе, но их ищут"
-          hint="Здесь теряется трафик: люди видят страницу в выдаче по показам, а Google её не держит. Разбирать в первую очередь."
+          title="Выпали из индекса"
+          hint="Эти страницы приносили показы, а сейчас Google их не держит. Колонка «Показы до» говорит, когда трафик оборвался — если у многих совпадает дата, причина общая."
           rows={painful} showTraffic
         />
       )}
 
       {quiet.length > 0 && (
         <Table
-          title="Не в индексе, показов нет"
-          hint="Либо страница новая и Google до неё не дошёл, либо она ему не интересна. Для свежих статей это нормально в первые недели."
+          title="Не в индексе, показов не было"
+          hint="Google до них не дошёл или счёл неинтересными. Для только что вышедших статей это нормально в первые недели."
           rows={quiet}
         />
       )}
@@ -148,6 +144,7 @@ function Table({ title, hint, rows, showTraffic, collapsed }: {
           <th style={th}>Ответ Google</th>
           {showTraffic && <th style={{ ...th, textAlign: 'right' }}>Показы</th>}
           {showTraffic && <th style={{ ...th, textAlign: 'right' }}>Клики</th>}
+          {showTraffic && <th style={th}>Показы до</th>}
           <th style={th}>Обход</th>
         </tr>
       </thead>
@@ -166,6 +163,11 @@ function Table({ title, hint, rows, showTraffic, collapsed }: {
               <td style={{ ...td, color: 'var(--muted)' }}>{r.coverage ?? '—'}</td>
               {showTraffic && <td style={{ ...td, textAlign: 'right' }}>{r.impressions.toLocaleString('ru')}</td>}
               {showTraffic && <td style={{ ...td, textAlign: 'right' }}>{r.clicks}</td>}
+              {showTraffic && (
+                <td style={{ ...td, color: 'var(--muted)', whiteSpace: 'nowrap' }}>
+                  {r.lastImpression ? new Date(r.lastImpression).toLocaleDateString('ru') : '—'}
+                </td>
+              )}
               <td style={{ ...td, color: 'var(--muted)', whiteSpace: 'nowrap' }}>
                 {r.lastCrawl ? new Date(r.lastCrawl).toLocaleDateString('ru') : '—'}
               </td>
