@@ -7,7 +7,7 @@
  *              Плюс техническая SEO-база: canonical на всех страницах, JSON-LD и
  *              meta description из меты. Аутентификация — HMAC (WP_BRIDGE_SECRET)
  *              + окно времени. Ставится как mu-plugin.
- * Version: 0.6
+ * Version: 0.8
  *
  * УСТАНОВКА: положить файл в wp-content/mu-plugins/goandstudy-seo-bridge.php
  * В wp-config.php добавить: define('GS_SEO_BRIDGE_SECRET', '<тот же WP_BRIDGE_SECRET, что в CRM env>');
@@ -69,6 +69,16 @@ add_action('init', function () {
 function gs_seo_log($post_id, $key, $action) {
     global $wpdb;
     $wpdb->insert($wpdb->prefix . 'gs_seo_log', ['post_id' => $post_id, 'ikey' => $key, 'action' => $action, 'created_at' => current_time('mysql')]);
+}
+
+/* ── Сохранение JSON в мету ───────────────────────────────────────────────── */
+/* WordPress прогоняет значение через stripslashes при записи меты, и обратные слэши
+   из JSON-экранирования пропадают: "\u042f" превращается в "u042f", а кавычки внутри
+   строк ломают разметку. Поэтому кодируем без экранирования юникода и слэшей,
+   а результат отдаём через wp_slash — иначе WordPress съест то, что осталось. */
+function gs_seo_store_json($post_id, $key, $value) {
+    $json = wp_json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    return update_post_meta($post_id, $key, wp_slash($json));
 }
 
 /* ── Время правки ─────────────────────────────────────────────────────────── */
@@ -151,8 +161,10 @@ add_action('rest_api_init', function () {
                 'meta_input' => array_filter([
                     GS_SEO_KEY_META => $key,
                     GS_SEO_VER_META => $b['version_id'] ?? null,
-                    GS_SEO_SCHEMA_META => isset($b['schema']) ? wp_json_encode($b['schema']) : null,
-                    GS_SEO_METADESC_META => $b['meta_description'] ?? null,
+                    GS_SEO_SCHEMA_META => isset($b['schema'])
+                        ? wp_slash(wp_json_encode($b['schema'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES))
+                        : null,
+                    GS_SEO_METADESC_META => isset($b['meta_description']) ? wp_slash((string) $b['meta_description']) : null,
                 ]),
             ], true);
             if (is_wp_error($id)) return $id;
@@ -187,11 +199,11 @@ add_action('rest_api_init', function () {
             if (isset($b['slug']) && $b['slug'] !== '') $up['post_name'] = sanitize_title((string) $b['slug']);
             if (count($up) > 1) wp_update_post($up);
             if (isset($b['set_meta']) && is_array($b['set_meta'])) {
-                foreach ($b['set_meta'] as $mk => $mv) update_post_meta($id, sanitize_key($mk), $mv);
+                foreach ($b['set_meta'] as $mk => $mv) update_post_meta($id, sanitize_key($mk), wp_slash(is_scalar($mv) ? (string) $mv : wp_json_encode($mv, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)));
             }
             if (!empty($b['featured_media'])) set_post_thumbnail($id, intval($b['featured_media']));
-            if (isset($b['schema'])) update_post_meta($id, GS_SEO_SCHEMA_META, wp_json_encode($b['schema']));
-            if (isset($b['meta_description'])) update_post_meta($id, GS_SEO_METADESC_META, $b['meta_description']);
+            if (isset($b['schema'])) gs_seo_store_json($id, GS_SEO_SCHEMA_META, $b['schema']);
+            if (isset($b['meta_description'])) update_post_meta($id, GS_SEO_METADESC_META, wp_slash((string) $b['meta_description']));
             gs_seo_log($id, $b['idempotency_key'] ?? '', 'patch');
             return ['post_id' => $id, 'ok' => true, 'modified' => gs_seo_modified($id)];
         }]);
@@ -251,6 +263,19 @@ add_action('rest_api_init', function () {
             $map[$from] = $to;
             update_option('gs_seo_redirects', $map);
             return ['ok' => true, 'count' => count($map)];
+        }]);
+
+    // GET posts/{id} — исходный контент одной записи. Нужно для точечных правок
+    // (вставка ссылки): через /export за ним не сходить, там только свежая сотня.
+    register_rest_route(GS_SEO_NS, '/posts/(?P<id>\d+)', ['methods' => 'GET', 'permission_callback' => $auth,
+        'callback' => function (WP_REST_Request $r) {
+            $id = intval($r['id']);
+            $p = get_post($id);
+            if (!$p) return new WP_Error('gs_404', 'нет поста', ['status' => 404]);
+            return ['post_id' => $id, 'type' => $p->post_type, 'status' => $p->post_status,
+                    'title' => $p->post_title, 'content' => $p->post_content,
+                    'slug' => $p->post_name, 'link' => get_permalink($id),
+                    'modified' => gs_seo_modified($id)];
         }]);
 
     // GET posts/{id}/rendered — HTML как видит бот (для post_publish_verify)

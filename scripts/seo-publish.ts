@@ -99,7 +99,7 @@ async function main() {
   const { count: incoming } = await seo.from('link_suggestions')
     .select('id', { count: 'exact', head: true })
     .eq('to_topic_id', (await seo.from('articles').select('topic_id').eq('id', articleId).single()).data?.topic_id)
-    .eq('status', 'proposed')
+    .in('status', ['proposed', 'waiting_target'])
   if ((incoming ?? 0) < 2) warnings.push(`§8.9: входящих ссылок запланировано ${incoming ?? 0} из 2 — статья выйдет сиротой`)
   for (const w of warnings) console.log(`⚠ ${w}`)
 

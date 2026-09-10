@@ -47,7 +47,8 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
   const postId: number | null = meta.publish?.post_id ?? null
   const warnings: string[] = []
   if (!meta.images?.cover?.url) warnings.push('§9.1: нет обложки')
-  if (links.filter((l: any) => l.status === 'proposed').length < 2) warnings.push('§8.9: меньше двух входящих ссылок — статья выйдет сиротой')
+  const plannedLinks = links.filter((l: any) => l.status === 'proposed' || l.status === 'waiting_target').length
+  if (plannedLinks < 2) warnings.push('§8.9: меньше двух входящих ссылок — статья выйдет сиротой')
 
   const box = { border: '1px solid var(--bor)', borderRadius: 10, padding: 14, background: 'var(--surf)', marginBottom: 14 }
 

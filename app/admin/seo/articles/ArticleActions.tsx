@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { approveArticle, rejectArticle, sendDraftToWp, publishArticle } from './actions'
+import { approveArticle, rejectArticle, sendDraftToWp, publishArticle, insertIncomingLinks } from './actions'
 
 export function ArticleActions({ articleId, status, postId, blockers, warnings }: {
   articleId: number
@@ -12,6 +12,7 @@ export function ArticleActions({ articleId, status, postId, blockers, warnings }
 }) {
   const [pending, start] = useTransition()
   const [msg, setMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
+  const [linkReport, setLinkReport] = useState<{ url: string; ok: boolean; note: string }[] | null>(null)
 
   const run = (fn: () => Promise<any>) => start(async () => {
     setMsg(null)
@@ -47,6 +48,28 @@ export function ArticleActions({ articleId, status, postId, blockers, warnings }
           }}>
           Опубликовать
         </button>
+        <button className="btn-s" disabled={pending}
+          onClick={() => start(async () => {
+            setMsg(null); setLinkReport(null)
+            const res: any = await insertIncomingLinks(articleId, true)
+            if (res?.error) setMsg({ kind: 'err', text: res.error })
+            else setLinkReport(res.report)
+          })}>
+          Показать, куда встанут ссылки
+        </button>
+        <button className="btn-s" disabled={pending || status !== 'published'}
+          title={status !== 'published' ? 'Сначала публикация: ссылка на черновик ведёт в никуда' : ''}
+          onClick={() => {
+            if (!confirm('Ссылки будут вставлены в тексты существующих страниц. Продолжить?')) return
+            start(async () => {
+              setMsg(null)
+              const res: any = await insertIncomingLinks(articleId, false)
+              if (res?.error) setMsg({ kind: 'err', text: res.error })
+              else { setLinkReport(res.report); setMsg({ kind: 'ok', text: `Вставлено ссылок: ${res.report.filter((r: any) => r.ok).length}` }) }
+            })
+          }}>
+          Вставить ссылки
+        </button>
         <button className="btn-s" disabled={pending || status === 'rejected'}
           onClick={() => {
             const reason = prompt('Почему отклоняем? Причина попадёт в историю.')
@@ -63,6 +86,18 @@ export function ArticleActions({ articleId, status, postId, blockers, warnings }
           <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
             {warnings.map((w, i) => <li key={i}>{w}</li>)}
           </ul>
+        </div>
+      )}
+
+      {linkReport && (
+        <div style={{ marginTop: 10, fontSize: 11, lineHeight: 1.5 }}>
+          {linkReport.map((r, i) => (
+            <div key={i} style={{ marginBottom: 6 }}>
+              <span style={{ color: r.ok ? 'var(--green)' : 'var(--muted)' }}>{r.ok ? '✓' : '~'}</span>{' '}
+              {r.url.replace('https://goandstudy.com', '')}
+              <div style={{ color: 'var(--muted)' }}>{r.note}</div>
+            </div>
+          ))}
         </div>
       )}
 

@@ -4,6 +4,7 @@
 //   npx tsx scripts/seo-apply-schema.ts                    # сухой прогон, ничего не меняет
 //   npx tsx scripts/seo-apply-schema.ts --apply            # записать на сайт
 //   npx tsx scripts/seo-apply-schema.ts --apply --limit 10 # только самые важные
+//   npx tsx scripts/seo-apply-schema.ts --url <URL> --apply # одна конкретная страница
 //
 // Порядок — по показам из GSC (сначала страницы, которые реально видят люди).
 // Мост печатает JSON-LD из меты _gs_schema, поэтому запись меты = разметка на странице.
@@ -16,6 +17,7 @@ const seo = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPA
 
 const APPLY = process.argv.includes('--apply')
 const LIMIT = (() => { const i = process.argv.indexOf('--limit'); return i > -1 ? parseInt(process.argv[i + 1], 10) || 0 : 0 })()
+const ONLY_URL = (() => { const i = process.argv.indexOf('--url'); return i > -1 ? process.argv[i + 1] : null })()
 
 async function main() {
   if (!wpConfigured()) { console.error('✗ Нет WP_BASE_URL / WP_BRIDGE_SECRET в .env.local'); process.exit(1) }
@@ -44,6 +46,11 @@ async function main() {
     .map((p) => ({ ...p, page: byId.get(p.page_id), imp: impressions.get(p.page_id) ?? 0 }))
     .filter((p) => p.page)
     .sort((a, b) => b.imp - a.imp)
+  if (ONLY_URL) {
+    const want = ONLY_URL.replace(/\/$/, '')
+    queue = queue.filter((p) => String(p.page!.url ?? p.page!.normalized_url).replace(/\/$/, '') === want)
+    if (!queue.length) { console.error(`✗ для ${ONLY_URL} предложения schema нет`); process.exit(1) }
+  }
   if (LIMIT > 0) queue = queue.slice(0, LIMIT)
 
   console.log(`Предложений: ${props.length}, к обработке: ${queue.length}${APPLY ? '' : '  (СУХОЙ ПРОГОН — --apply чтобы записать)'}\n`)

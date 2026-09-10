@@ -41,6 +41,9 @@ export const wp = {
   patchPost: (id: number, ops: Record<string, any>) => call('PATCH', `/posts/${id}`, ops),
   redirect: (from_path: string, to_url: string) => call('POST', '/redirects', { from_path, to_url }),
   rendered: (id: number) => call('GET', `/posts/${id}/rendered`),
+  /** Исходный контент записи: для точечных правок вроде вставки ссылки. */
+  post: (id: number): Promise<{ post_id: number; type: string; status: string; title: string; content: string; slug: string; link: string; modified: string | null }> =>
+    call('GET', `/posts/${id}`),
   export: (page = 1, per_page = 50, since?: string, postType?: 'post' | 'page' | 'any') =>
     call('GET', `/export?page=${page}&per_page=${per_page}${since ? `&since=${encodeURIComponent(since)}` : ''}${postType ? `&post_type=${postType}` : ''}`),
 }

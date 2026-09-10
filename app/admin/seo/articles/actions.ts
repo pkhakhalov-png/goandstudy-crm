@@ -190,3 +190,51 @@ export async function cancelJob(jobId: number) {
   revalidatePath('/admin/seo/articles')
   return { ok: true }
 }
+
+/** Вставить запланированные входящие ссылки в страницы-доноры (§8.9). */
+export async function insertIncomingLinks(articleId: number, dryRun = true) {
+  const { error: authErr } = await assertAdmin()
+  if (authErr) return { error: authErr }
+  const admin = await createAdminClient()
+  const seo = admin.schema('seo')
+
+  const { planInsertion, applyInsertion } = await import('@/lib/seo/linkinsert')
+
+  const { data: article } = await seo.from('articles')
+    .select('id, topic_id, status, current_version_id').eq('id', articleId).single()
+  if (!article) return { error: 'статья не найдена' }
+  if (article.status !== 'published' && !dryRun) {
+    return { error: 'статья не опубликована — ссылка вела бы на несуществующую страницу' }
+  }
+
+  const { data: version } = await seo.from('article_versions').select('meta').eq('id', article.current_version_id).single()
+  const meta: any = version?.meta ?? {}
+  const slug = meta.publish?.slug ?? meta.slug
+  const targetUrl = meta.publish?.post_type === 'page'
+    ? `https://goandstudy.com/${slug}/`
+    : `https://goandstudy.com/blog/${slug}/`
+
+  const { data: links } = await seo.from('link_suggestions')
+    .select('id, from_page_id, anchor').eq('to_topic_id', article.topic_id)
+    .in('status', ['proposed', 'waiting_target'])
+  if (!links?.length) return { error: 'план ссылок пуст' }
+
+  const { data: pages } = await seo.from('pages').select('id, url').in('id', links.map((l: any) => l.from_page_id))
+  const byId = new Map((pages ?? []).map((p: any) => [p.id, p.url]))
+
+  const report: { url: string; ok: boolean; note: string }[] = []
+  for (const l of links) {
+    const donorUrl = byId.get(l.from_page_id)
+    if (!donorUrl) { report.push({ url: `page ${l.from_page_id}`, ok: false, note: 'страница не найдена' }); continue }
+    const res: any = await planInsertion(donorUrl, l.anchor, targetUrl)
+    if (!res.ok) { report.push({ url: donorUrl, ok: false, note: res.reason }); continue }
+    if (!dryRun) {
+      await applyInsertion(seo, res.plan, res.newHtml, articleId)
+      await seo.from('link_suggestions').update({ status: 'applied' }).eq('id', l.id)
+    }
+    report.push({ url: donorUrl, ok: true, note: `анкор «${l.anchor}»: …${res.plan.before.slice(-50)}[${l.anchor}]${res.plan.after.slice(0, 50)}…` })
+  }
+
+  revalidatePath(`/admin/seo/articles/${articleId}`)
+  return { ok: true, dryRun, report }
+}

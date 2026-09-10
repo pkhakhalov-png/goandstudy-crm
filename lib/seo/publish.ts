@@ -206,6 +206,14 @@ export async function promoteToPublish(seo: any, articleId: number, postId: numb
 
   await wp.patchPost(postId, { status: 'publish', idempotency_key: `promote:${articleId}` })
   await seo.from('articles').update({ status: 'published', published_at: new Date().toISOString() }).eq('id', articleId)
+  // Пока статья была черновиком, план входящих ссылок лежал как waiting_target:
+  // ставить ссылку на несуществующую страницу нельзя. Теперь цель есть.
+  const { data: art } = await seo.from('articles').select('topic_id').eq('id', articleId).single()
+  if (art?.topic_id) {
+    await seo.from('link_suggestions').update({ status: 'proposed' })
+      .eq('to_topic_id', art.topic_id).eq('status', 'waiting_target')
+  }
+
   await seo.from('change_sets').insert({
     article_id: articleId, kind: 'new_article', reason: 'перевод черновика в публикацию',
     idempotency_key: `promote:${articleId}`, status: 'applied', proposed_by: 'human',
