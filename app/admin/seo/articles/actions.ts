@@ -137,9 +137,20 @@ export async function publishArticle(articleId: number, postId: number) {
     const { payload } = await buildPayload(seo, articleId)
     const rate = await checkPublishRate(seo)
     if (!rate.ok) return { error: rate.reason }
-    const res = await promoteToPublish(seo, articleId, postId, payload)
+
+    // Публикуем без ожидания: проверку страницы глазами бота делает очередь через
+    // минуту. Ждать её в веб-запросе нельзя — Vercel оборвёт, и откат не сработает.
+    const res = await promoteToPublish(seo, articleId, postId)
+    if (!res.ok) return { error: res.reason }
+
+    await seo.from('jobs').insert({
+      step: 'article_verify', lane: 'production', priority: 20,
+      article_id: articleId, payload: { post_id: postId },
+      next_run_at: new Date(Date.now() + 70_000).toISOString(),
+    })
+
     revalidatePath(`/admin/seo/articles/${articleId}`)
-    return res.ok ? { ok: true } : { error: res.reason }
+    return { ok: true, note: 'опубликовано; через минуту система проверит страницу и вернёт в черновики, если что-то сломалось' }
   } catch (e: any) {
     return { error: e?.message ?? 'ошибка публикации' }
   }

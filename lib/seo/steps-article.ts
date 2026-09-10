@@ -13,6 +13,7 @@ import { proposeDiagrams, renderDiagram, insertFigures } from './diagrams'
 import { planIncomingLinks, saveLinkPlan } from './linkplan'
 import { embed } from './embeddings'
 import { wp, wpConfigured } from './wp'
+import { postPublishVerify, type PublishInput } from './publish'
 
 const MAX_REVISIONS = 2   // §12.2
 
@@ -326,4 +327,49 @@ registerStep('topics_from_gsc', async (_job: Job, seo: any): Promise<StepOutcome
   if (error) return { outcome: 'failed', result: { error: `topics: ${error.message}` } }
 
   return { outcome: 'done', result: { inserted: rows.length, top: candidates[0]?.query, cost: 0 } }
+})
+
+
+/* ── Шаг 6: проверка опубликованной страницы глазами бота (§12) ───────────── */
+
+/**
+ * Ставится с задержкой после публикации. Раньше это ждали прямо в кнопке CRM,
+ * но 60 секунд ожидания внутри веб-запроса — верный способ получить обрыв:
+ * страница опубликована, а проверка и откат не отработали.
+ */
+registerStep('article_verify', async (job: Job, seo: any): Promise<StepOutcome> => {
+  const articleId = job.article_id!
+  const postId = job.payload.post_id as number
+  if (!wpConfigured()) return { outcome: 'failed', result: { error: 'нет доступа к мосту' } }
+
+  const { data: article } = await seo.from('articles').select('current_version_id, status').eq('id', articleId).single()
+  const { data: version } = await seo.from('article_versions').select('title, body, meta').eq('id', article.current_version_id).single()
+  const meta: any = version.meta ?? {}
+  const brief: any = meta.brief ?? {}
+  const slug: string = meta.publish?.slug ?? meta.slug
+
+  const payload: PublishInput = {
+    articleId, versionId: article.current_version_id,
+    title: version.title ?? '', h1: brief.h1 ?? version.title ?? '',
+    description: meta.description ?? '', slug,
+    html: version.body ?? '', primaryKeyword: '',
+    imageUrl: meta.images?.cover?.url ?? null, author: null, breadcrumbs: [],
+  }
+
+  const verify = await postPublishVerify(postId, payload)
+  if (!verify.ok) {
+    // Битую страницу в индексе не оставляем: возвращаем в черновик и зовём человека
+    await wp.patchPost(postId, { status: 'draft', idempotency_key: `rollback:${articleId}` })
+    await seo.from('articles').update({ status: 'ready_for_review', published_at: null }).eq('id', articleId)
+    await seo.from('change_sets').insert({
+      article_id: articleId, kind: 'new_article',
+      reason: `откат: проверка после публикации нашла критичное — ${verify.critical.join('; ')}`,
+      idempotency_key: `rollback:${articleId}:${job.id}`, status: 'rolled_back', proposed_by: 'system',
+    })
+    return { outcome: 'done', result: { rolled_back: true, critical: verify.critical, cost: 0 } }
+  }
+
+  await seo.from('change_sets').update({ verified_at: new Date().toISOString() })
+    .eq('article_id', articleId).eq('kind', 'new_article').eq('status', 'applied').is('verified_at', null)
+  return { outcome: 'done', result: { ok: true, warnings: verify.warnings, cost: 0 } }
 })

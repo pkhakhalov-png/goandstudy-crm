@@ -17,7 +17,7 @@ export function ArticleActions({ articleId, status, postId, blockers, warnings }
   const run = (fn: () => Promise<any>) => start(async () => {
     setMsg(null)
     const res = await fn()
-    setMsg(res?.error ? { kind: 'err', text: res.error } : { kind: 'ok', text: 'Готово' })
+    setMsg(res?.error ? { kind: 'err', text: res.error } : { kind: 'ok', text: res?.note ?? 'Готово' })
   })
 
   const canPublish = status === 'approved' && postId && warnings.length === 0
