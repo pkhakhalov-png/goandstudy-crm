@@ -249,3 +249,71 @@ export async function insertIncomingLinks(articleId: number, dryRun = true) {
   revalidatePath(`/admin/seo/articles/${articleId}`)
   return { ok: true, dryRun, report }
 }
+
+/* ── Публикация в блог по устройству темы ─────────────────────────────────── */
+
+/**
+ * Статья блога — это файлы в теме, а тема принадлежит root и для PHP закрыта
+ * (и это правильно: взломанный WordPress не должен переписывать свои же файлы).
+ * Поэтому кнопка ставит задачу, а исполняет её воркер, у которого есть SSH.
+ */
+export async function publishToBlog(articleId: number, dryRun = true) {
+  const { error: authErr } = await assertAdmin()
+  if (authErr) return { error: authErr }
+  const admin = await createAdminClient()
+  const seo = admin.schema('seo')
+
+  const { data: article } = await seo.from('articles')
+    .select('id, status, topic_id, current_version_id').eq('id', articleId).single()
+  if (!article) return { error: 'статья не найдена' }
+  if (article.status !== 'approved' && !dryRun) return { error: 'сначала «Утвердить» — публикуем только прочитанное' }
+
+  const { data: version } = await seo.from('article_versions')
+    .select('id, title, meta').eq('id', article.current_version_id).single()
+  const meta: any = version?.meta ?? {}
+  if (!meta.cover?.base64) return { error: 'нет обложки карточки — без неё на /blog/ будет серый прямоугольник' }
+
+  const { data: existing } = await seo.from('jobs').select('id')
+    .eq('step', 'article_publish_blog').eq('article_id', articleId)
+    .in('status', ['pending', 'running', 'waiting']).limit(1)
+  if (existing?.length) return { error: 'публикация уже в очереди' }
+
+  const { error } = await seo.from('jobs').insert({
+    step: 'article_publish_blog', lane: 'production', priority: 10,
+    article_id: articleId, topic_id: article.topic_id,
+    payload: { dry_run: dryRun },
+  })
+  if (error) return { error: error.message }
+
+  revalidatePath(`/admin/seo/articles/${articleId}`)
+  return {
+    ok: true,
+    note: dryRun
+      ? 'План публикации поставлен в очередь — воркер покажет, какие файлы куда уедут.'
+      : 'Публикация поставлена в очередь. Воркер выложит файлы в тему, бампнет сид-флаг и проверит страницу.',
+  }
+}
+
+
+/** Ещё один круг починки по замечаниям — по кнопке, после двух автоматических (§12.2). */
+export async function requestFix(articleId: number) {
+  const { error: authErr } = await assertAdmin()
+  if (authErr) return { error: authErr }
+  const admin = await createAdminClient()
+  const seo = admin.schema('seo')
+
+  const { data: existing } = await seo.from('jobs').select('id')
+    .eq('step', 'article_fix').eq('article_id', articleId)
+    .in('status', ['pending', 'running', 'waiting']).limit(1)
+  if (existing?.length) return { error: 'починка уже в очереди' }
+
+  const { data: article } = await seo.from('articles').select('topic_id').eq('id', articleId).single()
+  const { error } = await seo.from('jobs').insert({
+    step: 'article_fix', lane: 'production', priority: 30,
+    article_id: articleId, topic_id: article?.topic_id ?? null, payload: {},
+  })
+  if (error) return { error: error.message }
+
+  revalidatePath(`/admin/seo/articles/${articleId}`)
+  return { ok: true, note: 'Починка в очереди: модель перепишет отмеченные места и отчёт обновится. Статус вернётся в «на вычитку».' }
+}

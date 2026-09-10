@@ -1,12 +1,11 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { approveArticle, rejectArticle, sendDraftToWp, publishArticle, insertIncomingLinks } from './actions'
+import { approveArticle, rejectArticle, publishToBlog, requestFix, insertIncomingLinks } from './actions'
 
-export function ArticleActions({ articleId, status, postId, blockers, warnings }: {
+export function ArticleActions({ articleId, status, blockers, warnings }: {
   articleId: number
   status: string
-  postId: number | null
   blockers: number
   warnings: string[]
 }) {
@@ -30,7 +29,7 @@ export function ArticleActions({ articleId, status, postId, blockers, warnings }
     }
   })
 
-  const canPublish = status === 'approved' && postId && warnings.length === 0
+  const canPublish = status === 'approved' && warnings.length === 0
 
   return (
     <div style={{ border: '1px solid var(--bor)', borderRadius: 10, padding: 14, background: 'var(--surf)' }}>
@@ -47,17 +46,27 @@ export function ArticleActions({ articleId, status, postId, blockers, warnings }
           onClick={() => run(() => approveArticle(articleId))}>
           Утвердить
         </button>
-        <button className="btn-s" disabled={pending || blockers > 0}
-          onClick={() => run(() => sendDraftToWp(articleId))}>
-          {postId ? 'Обновить черновик в WP' : 'Отправить черновиком в WP'}
+
+        <button className="btn-s" disabled={pending || status === 'published'}
+          title="Модель перепишет отмеченные места и отчёт обновится"
+          onClick={() => run(() => requestFix(articleId))}>
+          Исправить замечания
         </button>
+
+        <button className="btn-s" disabled={pending}
+          onClick={() => run(() => publishToBlog(articleId, true))}>
+          План публикации
+        </button>
+
         <button className="btn-s" disabled={pending || !canPublish}
+          title={!canPublish ? 'Сначала «Утвердить» и закрыть то, что мешает выпуску' : ''}
           onClick={() => {
-            if (!confirm('Статья станет видимой в интернете. Продолжить?')) return
-            run(() => publishArticle(articleId, postId!))
+            if (!confirm('Статья появится на сайте в блоге и станет видимой в интернете. Продолжить?')) return
+            run(() => publishToBlog(articleId, false))
           }}>
-          Опубликовать
+          Опубликовать в блог
         </button>
+
         <button className="btn-s" disabled={pending}
           onClick={() => start(async () => {
             setMsg(null); setLinkReport(null)
@@ -71,19 +80,16 @@ export function ArticleActions({ articleId, status, postId, blockers, warnings }
           })}>
           Показать, куда встанут ссылки
         </button>
+
         <button className="btn-s" disabled={pending || status !== 'published'}
-          title={status !== 'published' ? 'Сначала публикация: ссылка на черновик ведёт в никуда' : ''}
+          title={status !== 'published' ? 'Сначала публикация: ссылка на неопубликованную статью ведёт в никуда' : ''}
           onClick={() => {
             if (!confirm('Ссылки будут вставлены в тексты существующих страниц. Продолжить?')) return
-            start(async () => {
-              setMsg(null)
-              const res: any = await insertIncomingLinks(articleId, false)
-              if (res?.error) setMsg({ kind: 'err', text: res.error })
-              else { setLinkReport(res.report); setMsg({ kind: 'ok', text: `Вставлено ссылок: ${res.report.filter((r: any) => r.ok).length}` }) }
-            })
+            run(() => insertIncomingLinks(articleId, false))
           }}>
           Вставить ссылки
         </button>
+
         <button className="btn-s" disabled={pending || status === 'rejected'}
           onClick={() => {
             const reason = prompt('Почему отклоняем? Причина попадёт в историю.')
@@ -122,9 +128,9 @@ export function ArticleActions({ articleId, status, postId, blockers, warnings }
       )}
 
       <div style={{ marginTop: 10, fontSize: 11, color: 'var(--muted)', lineHeight: 1.5 }}>
-        Порядок по §12.1.1: сначала всегда черновик, публикация — отдельным действием.
-        После выпуска система через минуту смотрит на страницу глазами бота и вернёт её
-        в черновики, если что-то сломалось.
+        Статья блога — это файлы в теме сайта, а не запись WordPress. Публикация кладёт
+        тело, обложку и строку в реестр, бампает сид-флаг и сразу проверяет страницу:
+        отдаётся ли, есть ли описание и разметка, появилась ли карточка на /blog/.
       </div>
     </div>
   )

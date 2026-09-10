@@ -46,7 +46,16 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
 
   const postId: number | null = meta.publish?.post_id ?? null
   const warnings: string[] = []
-  if (!meta.images?.cover?.url) warnings.push('§9.1: нет обложки')
+  // Обложка карточки блога лежит в meta.cover (480×320 JPEG). Старое место
+  // meta.images.cover осталось от прежнего формата с обложкой 1200×630.
+  const hasCover = Boolean(meta.cover?.base64 || meta.images?.cover?.url)
+  if (!hasCover) warnings.push('§9.1: нет обложки карточки')
+
+  // Выдуманный факт дороже любой стилистики: §14 требует, чтобы в статье не было
+  // вымышленных вузов, программ, цен и сроков. Такие замечания держим как блокирующие,
+  // хотя это и суждение модели — цена ошибки здесь выше цены лишней проверки человеком.
+  const factIssues = issues.filter((i: any) => (i.kind === 'facts' || i.kind === 'promise') && i.severity !== 'minor')
+  if (factIssues.length) warnings.push(`§14: непроверенных фактов и обещаний — ${factIssues.length}, нужно снять или подтвердить`)
   const plannedLinks = links.filter((l: any) => l.status === 'proposed' || l.status === 'waiting_target').length
   if (plannedLinks < 2) warnings.push('§8.9: меньше двух входящих ссылок — статья выйдет сиротой')
 
@@ -74,15 +83,16 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
             </div>
           </div>
 
-          {/* Картинки */}
-          {meta.images?.cover && (
+          {/* Обложка карточки */}
+          {meta.cover?.base64 && (
             <div style={box}>
-              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Иллюстрации</div>
-              <img src={meta.images.cover.url} alt={meta.images.cover.alt} style={{ width: '100%', maxWidth: 420, borderRadius: 8, border: '1px solid var(--bor)' }} />
-              <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
-                {(meta.images.figures ?? []).map((f: any, i: number) => (
-                  <img key={i} src={f.url} alt={f.alt} style={{ width: 130, borderRadius: 6, border: '1px solid var(--bor)' }} />
-                ))}
+              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>
+                Обложка карточки · {meta.cover.width}×{meta.cover.height}, {Math.round(meta.cover.bytes / 1024)} КБ
+              </div>
+              <img src={`data:image/jpeg;base64,${meta.cover.base64}`} alt="Обложка карточки статьи"
+                style={{ width: 240, borderRadius: 8, border: '1px solid var(--bor)' }} />
+              <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6 }}>
+                Заглушка: по стандарту на обложке не бывает текста и логотипов. Настоящие фотографии — отдельная задача.
               </div>
             </div>
           )}
@@ -110,7 +120,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
         </div>
 
         <div>
-          <ArticleActions articleId={article.id} status={article.status} postId={postId} blockers={failedB.length} warnings={warnings} />
+          <ArticleActions articleId={article.id} status={article.status} blockers={failedB.length} warnings={warnings} />
 
           {/* Проверки */}
           <div style={{ ...box, marginTop: 14 }}>

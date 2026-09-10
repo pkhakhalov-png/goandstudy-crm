@@ -33,7 +33,8 @@ async function load() {
       const issues: any[] = report.issues ?? []
       return {
         ...a,
-        title: v?.title ?? '(без заголовка)',
+        // Пока черновик пишется, версии ещё нет — показываем запрос, а не «(без заголовка)»
+        title: v?.title ?? (a.primary_keyword ? `пишется: ${a.primary_keyword}` : 'пишется…'),
         versions: versionCount.get(a.id) ?? 0,
         verdict: report.verdict ?? '—',
         failedB,

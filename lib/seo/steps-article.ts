@@ -9,8 +9,11 @@ import { registerStep, type Job, type StepOutcome } from './steps'
 import { generateBrief, generateDraft, reviseDraft, qaWithModel, qaDeterministic, GEN_MODEL, PROMPT_VERSION, type GenContext, type Brief, type QaReport } from './generate'
 import { summarize } from './standard'
 import { loadSiteTargets } from './blog-style'
-import { renderCover, coverFilename } from './cover'
-import { proposeDiagrams, renderDiagram, insertFigures } from './diagrams'
+import { publishToTheme, verifyPublished, listPublishedSlugs } from './theme-publish'
+import fs from 'node:fs'
+import os from 'node:os'
+import nodePath from 'node:path'
+import { renderBlogCover } from './cover'
 import { planIncomingLinks, saveLinkPlan } from './linkplan'
 import { embed } from './embeddings'
 import { wp, wpConfigured } from './wp'
@@ -188,14 +191,14 @@ registerStep('article_qa', async (job: Job, seo: any): Promise<StepOutcome> => {
   const needFix = failedB.length > 0 || blockingIssues.length > 0
   if (!needFix) {
     await seo.from('articles').update({ status: 'ready_for_review' }).eq('id', articleId)
-    await next(seo, 'article_illustrate', articleId, job.topic_id!, { brief, ctx })
+    await next(seo, 'article_cover', articleId, job.topic_id!, { brief, ctx })
     return { outcome: 'done', result: { verdict: 'ready_for_review', checks_failed: 0, issues: report.issues.length, cost: 0 } }
   }
 
   if (attempt >= MAX_REVISIONS) {
     // §12.2: две попытки — и дальше решает человек, а не машина по кругу
     await seo.from('articles').update({ status: 'ready_for_review' }).eq('id', articleId)
-    await next(seo, 'article_illustrate', articleId, job.topic_id!, { brief, ctx })
+    await next(seo, 'article_cover', articleId, job.topic_id!, { brief, ctx })
     return { outcome: 'done', result: { verdict: 'needs_human', checks_failed: failedB.length, issues: report.issues.length, cost: 0 } }
   }
 
@@ -212,48 +215,30 @@ registerStep('article_qa', async (job: Job, seo: any): Promise<StepOutcome> => {
   return { outcome: 'done', result: { verdict: 'revised', attempt: attempt + 1, checks_failed: failedB.length, cost: 0 } }
 })
 
-/* ── Шаг 4: обложка и схемы ───────────────────────────────────────────────── */
+/* ── Шаг 4: обложка карточки ──────────────────────────────────────────────── */
 
-registerStep('article_illustrate', async (job: Job, seo: any): Promise<StepOutcome> => {
-  const { brief } = job.payload as { brief: Brief }
+/**
+ * Схем внутри текста у блога не бывает: wp:image в теме не стилизован, картинка
+ * отрендерится голым HTML. Поэтому шаг делает только обложку карточки — 480×320
+ * JPEG без текста и логотипов, как требует стандарт.
+ *
+ * Файл кладём в мету версии base64: воркер может крутиться на Vercel, где нет
+ * постоянного диска, а при публикации обложка всё равно уезжает на сервер темы.
+ */
+registerStep('article_cover', async (job: Job, seo: any): Promise<StepOutcome> => {
   const articleId = job.article_id!
-  if (!wpConfigured()) return { outcome: 'failed', result: { error: 'нет WP_BASE_URL / WP_BRIDGE_SECRET' } }
-
   const { data: article } = await seo.from('articles').select('current_version_id').eq('id', articleId).single()
-  const { data: version } = await seo.from('article_versions').select('id,version_no,title,body,meta,qa_report').eq('id', article.current_version_id).single()
+  const { data: version } = await seo.from('article_versions').select('id, meta').eq('id', article.current_version_id).single()
   const meta: any = version.meta ?? {}
   const slug: string = meta.slug ?? `article-${articleId}`
-  const html = String(version.body)
 
-  const cover = await renderCover({ title: brief.h1, kicker: brief.secondary_keywords?.[0] ?? null })
-  const coverUp = await wp.media({ filename: coverFilename(slug), data: cover.buffer.toString('base64'), alt: cover.alt })
+  const cover = await renderBlogCover(slug)
+  await seo.from('article_versions').update({
+    meta: { ...meta, cover: { format: 'jpeg', width: cover.width, height: cover.height, bytes: cover.bytes, base64: cover.buffer.toString('base64') } },
+  }).eq('id', version.id)
 
-  const plans = await proposeDiagrams(html, String(version.title))
-  const figures = []
-  for (const [i, p] of plans.entries()) {
-    const d = await renderDiagram(p.spec)
-    const up = await wp.media({ filename: `${slug}-${i + 1}-${p.spec.type}.webp`, data: d.buffer.toString('base64'), alt: d.alt })
-    figures.push({ plan: p, url: up.url, width: d.width, height: d.height, alt: d.alt, mediaId: up.media_id })
-  }
-  const illustrated = insertFigures(html, figures)
-
-  const { data: nv, error } = await seo.from('article_versions').insert({
-    article_id: articleId, version_no: (version.version_no ?? 1) + 1, origin: 'qa_fixed',
-    title: version.title, body: illustrated,
-    meta: {
-      ...meta,
-      images: {
-        cover: { url: coverUp.url, media_id: coverUp.media_id, alt: cover.alt },
-        figures: figures.map((f) => ({ url: f.url, media_id: f.mediaId, alt: f.alt, type: f.plan.spec.type })),
-      },
-    },
-    prompt_version: PROMPT_VERSION, model: GEN_MODEL, qa_report: version.qa_report, qa_version: 'v1',
-  }).select('id').single()
-  if (error) return { outcome: 'failed', result: { error: `article_versions: ${error.message}` } }
-  await seo.from('articles').update({ current_version_id: nv.id }).eq('id', articleId)
-
-  await next(seo, 'article_linkplan', articleId, job.topic_id!, { brief })
-  return { outcome: 'done', result: { cover: coverUp.url, figures: figures.length, cost: 0 } }
+  await next(seo, 'article_linkplan', articleId, job.topic_id!, { brief: job.payload.brief })
+  return { outcome: 'done', result: { cover: `${cover.width}×${cover.height}`, kb: Math.round(cover.bytes / 102.4) / 10, cost: 0 } }
 })
 
 /* ── Шаг 5: план входящих ссылок ──────────────────────────────────────────── */
@@ -374,4 +359,142 @@ registerStep('article_verify', async (job: Job, seo: any): Promise<StepOutcome> 
   await seo.from('change_sets').update({ verified_at: new Date().toISOString() })
     .eq('article_id', articleId).eq('kind', 'new_article').eq('status', 'applied').is('verified_at', null)
   return { outcome: 'done', result: { ok: true, warnings: verify.warnings, cost: 0 } }
+})
+
+
+/* ── Шаг 6: публикация в блог по устройству темы ──────────────────────────── */
+
+/**
+ * Требует SSH к серверу: тема принадлежит root и для PHP закрыта. Воркер без
+ * ключа честно падает с понятной причиной, а не делает вид, что опубликовал.
+ */
+registerStep('article_publish_blog', async (job: Job, seo: any): Promise<StepOutcome> => {
+  const articleId = job.article_id!
+  const dryRun = job.payload?.dry_run !== false
+
+  const { data: article } = await seo.from('articles').select('current_version_id, status').eq('id', articleId).single()
+  const { data: version } = await seo.from('article_versions').select('id, title, body, meta').eq('id', article.current_version_id).single()
+  const meta: any = version.meta ?? {}
+  const brief: any = meta.brief ?? {}
+  const slug: string = meta.slug
+
+  if (!meta.cover?.base64) return { outcome: 'failed', result: { error: 'нет обложки карточки' } }
+
+  const today = new Date().toISOString().slice(0, 10)
+  const entry = {
+    slug,
+    title: String(version.title ?? ''),
+    excerpt: String(meta.description ?? ''),
+    cat: String(brief.category ?? ''),
+    published: today,
+    updated: today,
+  }
+
+  const tmp = fs.mkdtempSync(nodePath.join(os.tmpdir(), 'gs-blog-'))
+  const bodyPath = nodePath.join(tmp, `${slug}.html`)
+  const coverPath = nodePath.join(tmp, `${slug}.jpg`)
+  fs.writeFileSync(bodyPath, String(version.body ?? '').trimEnd() + '\n')
+  fs.writeFileSync(coverPath, Buffer.from(meta.cover.base64, 'base64'))
+
+  try {
+    const report = await publishToTheme(entry, { bodyPath, coverPath }, { dryRun })
+    if (dryRun) return { outcome: 'done', result: { dry_run: true, ...report, cost: 0 } }
+
+    await seo.from('articles').update({ status: 'published', published_at: new Date().toISOString() }).eq('id', articleId)
+    await seo.from('article_versions').update({ meta: { ...meta, publish: { path: `/blog/${slug}/`, seed: report.seedTo, at: new Date().toISOString() } } }).eq('id', version.id)
+    await seo.from('change_sets').insert({
+      article_id: articleId, kind: 'new_article',
+      reason: `публикация в блог: тело, обложка, реестр, сид-флаг ${report.seedFrom} → ${report.seedTo}`,
+      idempotency_key: `blogpublish:${version.id}`, status: 'applied', proposed_by: 'human',
+      applied_at: new Date().toISOString(),
+    })
+
+    // Ссылки на статью теперь ведут на существующую страницу
+    if (job.topic_id) {
+      await seo.from('link_suggestions').update({ status: 'proposed' })
+        .eq('to_topic_id', job.topic_id).eq('status', 'waiting_target')
+    }
+
+    const verify = await verifyPublished(slug)
+    return { outcome: 'done', result: { url: report.url, verify_ok: verify.ok, checks: verify.results, cost: 0 } }
+  } catch (e: any) {
+    return { outcome: 'failed', result: { error: e?.message ?? String(e) } }
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true })
+  }
+})
+
+
+/* ── Ручная починка по замечаниям ─────────────────────────────────────────── */
+
+/**
+ * Отдельный шаг под кнопку «Исправить замечания». Автоматических попыток по §12.2
+ * всего две, дальше решает человек — но если он посмотрел и хочет ещё круг,
+ * не надо перегенерировать статью с нуля.
+ */
+registerStep('article_fix', async (job: Job, seo: any): Promise<StepOutcome> => {
+  const articleId = job.article_id!
+
+  const { data: article } = await seo.from('articles').select('current_version_id, topic_id').eq('id', articleId).single()
+  const { data: version } = await seo.from('article_versions')
+    .select('id, version_no, title, body, meta, qa_report').eq('id', article.current_version_id).single()
+  const meta: any = version.meta ?? {}
+  const brief: Brief = meta.brief
+  if (!brief) return { outcome: 'failed', result: { error: 'у версии нет брифа' } }
+
+  const { data: topic } = await seo.from('topics').select('id,title,primary_keyword,cluster').eq('id', article.topic_id).single()
+  const ctx = await buildContext(seo, topic)
+
+  const html = String(version.body)
+  const det = await qaDeterministic(ctx, brief, html, {
+    pageEmbeddings: await pageEmbeddings(seo),
+    ...(await loadSiteTargets(seo)),
+    category: brief.category,
+  })
+  const modelIssues = await qaWithModel(ctx, brief, html)
+  const { failedB } = summarize(det.checks)
+
+  // Чинить нечего — не плодим версию впустую
+  const worth = [...modelIssues.filter((i) => i.severity !== 'minor'), ...det.issues]
+  if (!failedB.length && worth.length === 0) {
+    return { outcome: 'done', result: { nothing_to_fix: true, cost: 0 } }
+  }
+
+  const fixed = await reviseDraft(ctx, brief, html, failedB.map((c) => ({ id: c.id, detail: c.detail })), modelIssues)
+
+  const { data: nv, error } = await seo.from('article_versions').insert({
+    article_id: articleId, version_no: (version.version_no ?? 1) + 1, origin: 'qa_fixed',
+    title: version.title, body: fixed, meta,
+    prompt_version: PROMPT_VERSION, model: GEN_MODEL,
+  }).select('id').single()
+  if (error) return { outcome: 'failed', result: { error: `article_versions: ${error.message}` } }
+
+  // Перепроверяем уже исправленный текст, чтобы отчёт относился к нему, а не к прошлому
+  const det2 = await qaDeterministic(ctx, brief, fixed, {
+    pageEmbeddings: await pageEmbeddings(seo),
+    ...(await loadSiteTargets(seo)),
+    category: brief.category,
+  })
+  const modelIssues2 = await qaWithModel(ctx, brief, fixed)
+  const sum2 = summarize(det2.checks)
+  await seo.from('article_versions').update({
+    qa_report: {
+      checks: det2.checks,
+      issues: [...det2.issues.filter((i) => i.kind !== 'structure'), ...modelIssues2],
+      verdict: sum2.verdict,
+    },
+    qa_version: 'v1',
+  }).eq('id', nv.id)
+
+  await seo.from('articles').update({ current_version_id: nv.id, status: 'ready_for_review' }).eq('id', articleId)
+
+  return {
+    outcome: 'done',
+    result: {
+      version_id: nv.id,
+      было: { блокеры: failedB.length, замечания: modelIssues.length },
+      стало: { блокеры: sum2.failedB.length, замечания: modelIssues2.length },
+      cost: 0,
+    },
+  }
 })
