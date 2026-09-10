@@ -533,3 +533,54 @@ registerStep('article_fix', async (job: Job, seo: any): Promise<StepOutcome> => 
     },
   }
 })
+
+
+/* ── Шаг 8: проверка индексации ───────────────────────────────────────────── */
+
+/**
+ * Спрашивает Search Console про опубликованные статьи и запоминает ответ.
+ * Ставится раз в сутки, поэтому момент попадания в индекс ловится сам —
+ * нажимать кнопку каждый день не нужно. Квота метода 2000 адресов в сутки,
+ * до неё нам далеко, но перепроверяем только те, чей срок подошёл.
+ */
+registerStep('article_index_check', async (job: Job, seo: any): Promise<StepOutcome> => {
+  const { inspectUrl, saveIndexStatus } = await import('./index-status')
+
+  const { data: articles } = await seo.from('articles')
+    .select('id, current_version_id, indexed_at').eq('status', 'published').order('id')
+  if (!articles?.length) return { outcome: 'done', result: { checked: 0, cost: 0 } }
+
+  let checked = 0
+  const indexed: number[] = []
+
+  for (const a of articles as any[]) {
+    const { data: version } = await seo.from('article_versions').select('id, meta').eq('id', a.current_version_id).single()
+    const meta: any = version?.meta ?? {}
+    const slug = meta.publish?.slug ?? meta.slug
+    if (!slug) continue
+
+    // Уже в индексе и проверено недавно — не тратим квоту
+    const last = meta.index_check?.at ? Date.parse(meta.index_check.at) : 0
+    const wait = meta.index_check?.verdict === 'PASS' ? 14 * 864e5 : 2 * 864e5
+    if (Date.now() - last < wait) continue
+
+    const url = `https://goandstudy.com/blog/${slug}/`
+    const res = await inspectUrl(url)
+    if (!res.checked) break // нет доступа или кончилась квота — остальные тем более не пройдут
+    checked++
+
+    const { data: page } = await seo.from('pages').select('id').eq('normalized_url', url.replace(/\/$/, '')).maybeSingle()
+    if (page?.id) await saveIndexStatus(seo, page.id, res)
+
+    await seo.from('article_versions').update({
+      meta: { ...meta, index_check: { at: new Date().toISOString(), verdict: res.verdict, coverage: res.coverageState, note: res.note, last_crawl: res.lastCrawl } },
+    }).eq('id', version!.id)
+
+    if (res.verdict === 'PASS' && !a.indexed_at) {
+      await seo.from('articles').update({ indexed_at: new Date().toISOString() }).eq('id', a.id)
+      indexed.push(a.id)
+    }
+  }
+
+  return { outcome: 'done', result: { checked, newly_indexed: indexed, cost: 0 } }
+})

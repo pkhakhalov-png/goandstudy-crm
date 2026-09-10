@@ -46,6 +46,7 @@ export async function POST(req: NextRequest) {
         { step: 'findings_gsc', lane: 'gsc', priority: 50, payload: {} },
         { step: 'compute_opportunities', lane: 'findings', priority: 40, payload: {} },
         { step: 'generate_schema', lane: 'findings', priority: 30, payload: {} },
+        { step: 'article_index_check', lane: 'findings', priority: 20, payload: {} },
       ]
       const { data: ex } = await seo.from('jobs').select('step').in('step', steps.map((s) => s.step)).in('status', ['pending', 'running', 'waiting'])
       const have = new Set((ex ?? []).map((e: any) => e.step))
