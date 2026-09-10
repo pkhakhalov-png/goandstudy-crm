@@ -106,16 +106,36 @@ const registry: Record<string, Handler> = {
     const startDate = job.payload.startDate || daysAgo(120)
     const token = await getAccessToken()
 
-    const upsertPage = async (rows: any[]) => {
-      for (let i = 0; i < rows.length; i += 500) {
-        await seo.from('gsc_page_daily').upsert(rows.slice(i, i + 500), { onConflict: 'normalized_url,date' })
+    // Google отдаёт один и тот же адрес в двух формах — со слэшем и без. После
+    // нормализации они схлопываются в один ключ, и вся пачка отлетает: Postgres не
+    // даёт обновить одну строку дважды в одном запросе. Поэтому складываем заранее.
+    const merge = (rows: any[], keyOf: (r: any) => string) => {
+      const acc = new Map<string, any>()
+      for (const r of rows) {
+        const k = keyOf(r)
+        const cur = acc.get(k)
+        if (!cur) { acc.set(k, { ...r }); continue }
+        // позиция средневзвешенная по показам — простое среднее исказило бы её
+        const imp = cur.impressions + r.impressions
+        cur.position = imp > 0 ? (cur.position * cur.impressions + r.position * r.impressions) / imp : cur.position
+        cur.clicks += r.clicks
+        cur.impressions = imp
+        cur.ctr = imp > 0 ? cur.clicks / imp : 0
+      }
+      return [...acc.values()]
+    }
+
+    const write = async (table: string, rows: any[], conflict: string, keyOf: (r: any) => string) => {
+      const merged = merge(rows, keyOf)
+      for (let i = 0; i < merged.length; i += 500) {
+        const { error } = await seo.from(table).upsert(merged.slice(i, i + 500), { onConflict: conflict })
+        // Молча терять данные нельзя: именно так дыра в статистике и осталась незамеченной
+        if (error) throw new Error(`запись ${table}: ${error.message}`)
       }
     }
-    const upsertDaily = async (rows: any[]) => {
-      for (let i = 0; i < rows.length; i += 500) {
-        await seo.from('gsc_daily').upsert(rows.slice(i, i + 500), { onConflict: 'normalized_url,query,date' })
-      }
-    }
+
+    const upsertPage = (rows: any[]) => write('gsc_page_daily', rows, 'normalized_url,date', (r) => `${r.normalized_url}|${r.date}`)
+    const upsertDaily = (rows: any[]) => write('gsc_daily', rows, 'normalized_url,query,date', (r) => `${r.normalized_url}|${r.query}|${r.date}`)
 
     // 1) честные итоги по странице: dimensions date+page
     let pageRows = 0
