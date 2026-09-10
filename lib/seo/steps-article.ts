@@ -584,3 +584,19 @@ registerStep('article_index_check', async (job: Job, seo: any): Promise<StepOutc
 
   return { outcome: 'done', result: { checked, newly_indexed: indexed, cost: 0 } }
 })
+
+
+/**
+ * Обход сайта: проверяем индексацию страниц, чей срок подошёл. Порция за раз,
+ * остаток доберётся следующим тиком — так шаг укладывается в бюджет воркера.
+ */
+registerStep('index_check_site', async (_job: Job, seo: any): Promise<StepOutcome> => {
+  const { checkSiteIndexation } = await import('./index-status')
+  const res = await checkSiteIndexation(seo, { limit: 60 })
+
+  // Осталось непроверенное — ставим продолжение, а не бросаем на середине
+  if (res.checked >= 60) {
+    await seo.from('jobs').insert({ step: 'index_check_site', lane: 'findings', priority: 95, payload: {} })
+  }
+  return { outcome: 'done', result: { checked: res.checked, stopped: res.stopped ?? null, cost: 0 } }
+})

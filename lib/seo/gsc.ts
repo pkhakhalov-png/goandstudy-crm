@@ -5,7 +5,13 @@ export function gscConfigured(): boolean {
   return !!(process.env.GSC_CLIENT_ID && process.env.GSC_CLIENT_SECRET && process.env.GSC_REFRESH_TOKEN && process.env.GSC_SITE_URL)
 }
 
+// Токен живёт час. Просить новый на каждый запрос нельзя: Google ограничивает
+// частоту обмена refresh-токена и на обходе сайта отвечает отказом на середине.
+let cachedToken: { value: string; until: number } | null = null
+
 export async function getAccessToken(): Promise<string> {
+  if (cachedToken && Date.now() < cachedToken.until) return cachedToken.value
+
   const body = new URLSearchParams({
     client_id: process.env.GSC_CLIENT_ID!,
     client_secret: process.env.GSC_CLIENT_SECRET!,
@@ -17,7 +23,11 @@ export async function getAccessToken(): Promise<string> {
     signal: AbortSignal.timeout(15000),
   })
   if (!res.ok) throw new Error(`GSC token ${res.status}: ${(await res.text()).slice(0, 200)}`)
-  return (await res.json()).access_token as string
+
+  const json = await res.json()
+  const ttl = Number(json.expires_in ?? 3600)
+  cachedToken = { value: json.access_token, until: Date.now() + (ttl - 120) * 1000 }
+  return cachedToken.value
 }
 
 export type GscRow = { keys: string[]; clicks: number; impressions: number; ctr: number; position: number }

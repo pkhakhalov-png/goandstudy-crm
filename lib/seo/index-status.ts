@@ -86,3 +86,38 @@ export async function saveIndexStatus(seo: any, pageId: number, v: IndexVerdict)
     next_check_at: new Date(Date.now() + nextDays * 864e5).toISOString(),
   }, { onConflict: 'page_id' })
 }
+
+/**
+ * Обход сайта: спрашиваем Search Console про страницы, чей срок проверки подошёл.
+ * Ограничение по числу за раз — чтобы уложиться в бюджет тика и не съесть квоту
+ * (2000 адресов в сутки на ресурс, 600 в минуту).
+ */
+export async function checkSiteIndexation(
+  seo: any,
+  opts: { limit?: number; onEach?: (url: string, v: IndexVerdict) => void } = {},
+): Promise<{ checked: number; stopped?: string }> {
+  const limit = opts.limit ?? 60
+  const nowIso = new Date().toISOString()
+
+  const { data: pages } = await seo.from('pages')
+    .select('id, normalized_url, index_status:index_status(next_check_at)')
+    .is('removed_at', null).eq('indexable', true).eq('http_status', 200)
+    .order('id')
+
+  // Сначала те, кого не проверяли ни разу, затем просроченные
+  const due = (pages ?? [])
+    .map((p: any) => ({ ...p, next: p.index_status?.[0]?.next_check_at ?? p.index_status?.next_check_at ?? null }))
+    .filter((p: any) => !p.next || p.next <= nowIso)
+    .sort((a: any, b: any) => (a.next ? 1 : 0) - (b.next ? 1 : 0))
+    .slice(0, limit)
+
+  let checked = 0
+  for (const p of due) {
+    const v = await inspectUrl(p.normalized_url.endsWith('/') ? p.normalized_url : `${p.normalized_url}/`)
+    if (!v.checked) return { checked, stopped: v.note } // квота или доступ — дальше нет смысла
+    await saveIndexStatus(seo, p.id, v)
+    opts.onEach?.(p.normalized_url, v)
+    checked++
+  }
+  return { checked }
+}
