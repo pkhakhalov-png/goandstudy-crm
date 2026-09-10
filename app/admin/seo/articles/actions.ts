@@ -346,3 +346,64 @@ export async function requestFix(articleId: number) {
   revalidatePath(`/admin/seo/articles/${articleId}`)
   return { ok: true, note: 'Починка в очереди: модель перепишет отмеченные места и отчёт обновится. Статус вернётся в «на вычитку».' }
 }
+
+/* ── Индексация ───────────────────────────────────────────────────────────── */
+
+/** Отправить страницу в IndexNow: Яндекс, Bing, Seznam, Naver одним запросом. */
+export async function submitForIndexing(articleId: number) {
+  const { error: authErr } = await assertAdmin()
+  if (authErr) return { error: authErr }
+  const admin = await createAdminClient()
+  const seo = admin.schema('seo')
+
+  const { data: article } = await seo.from('articles').select('status, current_version_id').eq('id', articleId).single()
+  if (!article) return { error: 'статья не найдена' }
+  if (article.status !== 'published') return { error: 'статья не опубликована — отправлять нечего' }
+
+  const { data: version } = await seo.from('article_versions').select('id, meta').eq('id', article.current_version_id).single()
+  const meta: any = version?.meta ?? {}
+  const slug = meta.publish?.slug ?? meta.slug
+  const url = `https://goandstudy.com/blog/${slug}/`
+
+  const { submitToIndexNow } = await import('@/lib/seo/indexnow')
+  const res = await submitToIndexNow([url])
+
+  await seo.from('article_versions')
+    .update({ meta: { ...meta, indexnow: { at: new Date().toISOString(), status: res.status, note: res.note } } })
+    .eq('id', version?.id)
+
+  revalidatePath(`/admin/seo/articles/${articleId}`)
+  return res.ok
+    ? { ok: true, note: `Отправлено в Яндекс, Bing, Seznam и Naver: ${res.note}. Google так уведомить нельзя — он придёт по sitemap.` }
+    : { error: `IndexNow не принял: ${res.note}` }
+}
+
+/** Спросить Google, в индексе ли страница. Настоящий ответ Search Console. */
+export async function checkIndex(articleId: number) {
+  const { error: authErr } = await assertAdmin()
+  if (authErr) return { error: authErr }
+  const admin = await createAdminClient()
+  const seo = admin.schema('seo')
+
+  const { data: article } = await seo.from('articles').select('status, current_version_id').eq('id', articleId).single()
+  if (!article) return { error: 'статья не найдена' }
+
+  const { data: version } = await seo.from('article_versions').select('id, meta').eq('id', article.current_version_id).single()
+  const meta: any = version?.meta ?? {}
+  const slug = meta.publish?.slug ?? meta.slug
+  const url = `https://goandstudy.com/blog/${slug}/`
+
+  const { inspectUrl, saveIndexStatus } = await import('@/lib/seo/index-status')
+  const v = await inspectUrl(url)
+
+  // Привязываем к странице инвентаря, если она уже обойдена краулером
+  const { data: page } = await seo.from('pages').select('id').eq('normalized_url', url.replace(/\/$/, '')).maybeSingle()
+  if (page?.id) await saveIndexStatus(seo, page.id, v)
+
+  await seo.from('article_versions')
+    .update({ meta: { ...meta, index_check: { at: new Date().toISOString(), verdict: v.verdict, coverage: v.coverageState, note: v.note, last_crawl: v.lastCrawl } } })
+    .eq('id', version?.id)
+
+  revalidatePath(`/admin/seo/articles/${articleId}`)
+  return { ok: true, note: `Google: ${v.note}${v.lastCrawl ? `, последний обход ${String(v.lastCrawl).slice(0, 10)}` : ''}` }
+}

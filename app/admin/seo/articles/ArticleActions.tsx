@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { approveArticle, rejectArticle, publishToBlog, requestFix, insertIncomingLinks } from './actions'
+import { approveArticle, rejectArticle, publishToBlog, requestFix, insertIncomingLinks, submitForIndexing, checkIndex } from './actions'
 
 export function ArticleActions({ articleId, status, blockers, warnings }: {
   articleId: number
@@ -88,6 +88,18 @@ export function ArticleActions({ articleId, status, blockers, warnings }: {
             run(() => insertIncomingLinks(articleId, false))
           }}>
           Вставить ссылки
+        </button>
+
+        <button className="btn-s" disabled={pending || status !== 'published'}
+          title={status !== 'published' ? 'Сначала публикация' : 'Яндекс, Bing, Seznam, Naver — одним запросом'}
+          onClick={() => run(() => submitForIndexing(articleId))}>
+          Отправить на индексацию
+        </button>
+
+        <button className="btn-s" disabled={pending || status !== 'published'}
+          title={status !== 'published' ? 'Сначала публикация' : 'Настоящий ответ Search Console'}
+          onClick={() => run(() => checkIndex(articleId))}>
+          Проверить индекс
         </button>
 
         <button className="btn-s" disabled={pending || status === 'rejected'}

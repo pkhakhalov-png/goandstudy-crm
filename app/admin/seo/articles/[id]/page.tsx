@@ -122,6 +122,35 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
         <div>
           <ArticleActions articleId={article.id} status={article.status} blockers={failedB.length} warnings={warnings} />
 
+          {/* Индексация */}
+          {(meta.indexnow || meta.index_check) && (
+            <div style={{ ...box, marginTop: 14 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Индексация</div>
+              {meta.index_check && (
+                <div style={{ fontSize: 12, marginBottom: 6 }}>
+                  <b style={{ color: meta.index_check.verdict === 'PASS' ? 'var(--green)' : 'var(--muted)' }}>
+                    Google: {meta.index_check.note}
+                  </b>
+                  <div style={{ color: 'var(--muted)' }}>
+                    {meta.index_check.coverage}
+                    {meta.index_check.last_crawl ? ` · обход ${String(meta.index_check.last_crawl).slice(0, 10)}` : ''}
+                    {` · проверено ${new Date(meta.index_check.at).toLocaleString('ru')}`}
+                  </div>
+                </div>
+              )}
+              {meta.indexnow && (
+                <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+                  Яндекс, Bing, Seznam, Naver: {meta.indexnow.note} · {new Date(meta.indexnow.at).toLocaleString('ru')}
+                </div>
+              )}
+              <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 8, lineHeight: 1.5 }}>
+                Google нельзя попросить проиндексировать страницу: их приём заявок закрыт в 2023,
+                а отдельный интерфейс для этого предназначен вакансиям и трансляциям. Он придёт
+                по sitemap сам, а кнопка «Проверить индекс» показывает настоящий ответ Search Console.
+              </div>
+            </div>
+          )}
+
           {/* Проверки */}
           <div style={{ ...box, marginTop: 14 }}>
             <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>
