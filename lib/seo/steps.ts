@@ -244,6 +244,16 @@ export function registerStep(step: string, handler: Handler) {
   registry[step] = handler
 }
 
+/** Знает ли этот воркер такой шаг. Нужно, чтобы не убивать чужие задачи. */
+export function hasStep(step: string): boolean {
+  return Boolean(registry[step])
+}
+
+/** Список шагов этого воркера — для диагностики. */
+export function registeredSteps(): string[] {
+  return Object.keys(registry).sort()
+}
+
 export async function runStep(job: Job, seo: any): Promise<StepOutcome> {
   const handler = registry[job.step]
   if (!handler) return { outcome: 'failed', result: { error: `no handler for step "${job.step}"` } }

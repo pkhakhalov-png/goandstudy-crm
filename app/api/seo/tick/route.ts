@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
-import { runStep } from '@/lib/seo/steps'
+import { runStep, hasStep, registeredSteps } from '@/lib/seo/steps'
 import '@/lib/seo/steps-article'   // регистрация шагов производства статьи
 
 // Воркер SEO-очереди (PRD 10.3). Вызывается pg_cron через pg_net раз в минуту.
@@ -70,6 +70,14 @@ export async function POST(req: NextRequest) {
         released++
         continue
       }
+      // Шаг может быть неизвестен этому воркеру: публикация в тему требует SSH,
+      // и её делает воркер с ключом, а не Vercel. Возвращаем задачу в очередь,
+      // а не убиваем — иначе один воркер ломает работу другого.
+      if (!hasStep(job.step)) {
+        await seo.rpc('complete_job', { p_job_id: job.id, p_outcome: 'released', p_result: { skipped: 'нет обработчика у этого воркера' } })
+        released++
+        continue
+      }
       try {
         const outcome = await runStep(job, seo)   // { outcome, result }
         await seo.rpc('complete_job', { p_job_id: job.id, p_outcome: outcome.outcome, p_result: outcome.result ?? {} })
@@ -83,5 +91,5 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ ok: true, worker: workerId, processed, released, ms: Date.now() - started })
+  return NextResponse.json({ ok: true, worker: workerId, processed, released, steps: registeredSteps(), ms: Date.now() - started })
 }

@@ -8,7 +8,7 @@
 import { config } from 'dotenv'; import path from 'path'; import os from 'os'
 import { createClient } from '@supabase/supabase-js'
 config({ path: path.resolve(process.cwd(), '.env.local') })
-import { runStep } from '../lib/seo/steps'
+import { runStep, hasStep } from '../lib/seo/steps'
 import '../lib/seo/steps-article'   // регистрация шагов производства статьи
 
 const seo = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } }).schema('seo')
@@ -42,6 +42,11 @@ async function main() {
     for (const job of jobs) {
       const started = Date.now()
       console.log(`→ ${job.step} #${job.id}${job.article_id ? ` (статья ${job.article_id})` : ''}`)
+      if (!hasStep(job.step)) {
+        await complete(job.id, 'released', { skipped: 'нет обработчика у этого воркера' })
+        console.log(`  ↩ ${job.step} не мой шаг — вернул в очередь`)
+        continue
+      }
       try {
         const res = await runStep(job as any, seo as any)
         await complete(job.id, res.outcome, res.result)
