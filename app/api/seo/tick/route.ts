@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { runStep } from '@/lib/seo/steps'
+import '@/lib/seo/steps-article'   // регистрация шагов производства статьи
 
 // Воркер SEO-очереди (PRD 10.3). Вызывается pg_cron через pg_net раз в минуту.
 // Тики МОГУТ пересекаться — конкуренция регулируется в БД (claim_jobs, SKIP LOCKED).
@@ -9,6 +10,13 @@ export const maxDuration = 300
 
 const TIME_BUDGET_MS = 240_000   // ≤240 c, остаток возвращаем в pending
 const BATCH = 5
+
+// Шаги производства статьи долгие: замерено на живом прогоне — бриф 122 c,
+// черновик 189 c, проверки с починкой 209 c. Начинать такой шаг под конец бюджета
+// нельзя: Vercel убьёт функцию на 300 c посреди генерации, задача повиснет
+// в running и вернётся в очередь только через десять минут.
+const LONG_STEP_MS = 230_000
+const isLongStep = (step: string) => step.startsWith('article_')
 
 export async function POST(req: NextRequest) {
   const secret = process.env.SEO_TICK_SECRET
@@ -53,8 +61,11 @@ export async function POST(req: NextRequest) {
     if (!jobs || jobs.length === 0) break
 
     for (const job of jobs as any[]) {
-      // Кончилось время — вернуть остаток в pending, не выполнять
-      if (Date.now() - started >= TIME_BUDGET_MS) {
+      // Кончилось время — вернуть остаток в pending, не выполнять.
+      // Для долгих шагов нужен не остаток времени, а полный запас: иначе шаг
+      // начнётся и будет убит на середине.
+      const need = isLongStep(job.step) ? LONG_STEP_MS : 0
+      if (Date.now() - started >= TIME_BUDGET_MS - need) {
         await seo.rpc('complete_job', { p_job_id: job.id, p_outcome: 'released', p_result: {} })
         released++
         continue
