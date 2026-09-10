@@ -51,7 +51,7 @@ export default async function IndexationPage({ searchParams }: { searchParams: P
 
   const rows: Row[] = (pages ?? []).map((p: any) => {
     const st = byPage.get(p.id)
-    const t = traffic.get(p.normalized_url) ?? { clicks: 0, impressions: 0, lastImpression: null }
+    const t = traffic.get(p.normalized_url) ?? { clicks: 0, impressions: 0, lastImpression: null, position: 0 }
     return {
       page_id: p.id, url: p.normalized_url,
       verdict: st?.verdict ?? null, coverage: st?.coverage_state ?? null,
