@@ -103,3 +103,47 @@ export async function renderCover(input: CoverInput): Promise<Cover> {
 export function coverFilename(slug: string): string {
   return `${slug.replace(/[^a-z0-9-]/g, '').slice(0, 60) || 'cover'}-cover.webp`
 }
+
+
+/* ── Обложка карточки блога ───────────────────────────────────────────────── */
+//
+// Формат задан темой: 480×320 JPEG 40–70 КБ, aspect-ratio 1.3, без текста и
+// логотипов — верхний левый угол перекрывает бейдж категории.
+// Пока это заглушка: фирменный фон без смысла. Настоящие фотографии — отдельный
+// вопрос, до его решения карточка хотя бы не будет серым прямоугольником.
+
+export const BLOG_COVER_W = 480
+export const BLOG_COVER_H = 320
+
+export function buildBlogCoverSvg(seed: string): string {
+  // Оттенок слегка гуляет от слага, чтобы карточки в ленте не выглядели копиями
+  let h = 0
+  for (const ch of seed) h = (h * 31 + ch.charCodeAt(0)) % 360
+  const angle = h
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${BLOG_COVER_W}" height="${BLOG_COVER_H}" viewBox="0 0 ${BLOG_COVER_W} ${BLOG_COVER_H}">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="${BRAND.purple}"/>
+      <stop offset="100%" stop-color="#6B4E9E"/>
+    </linearGradient>
+  </defs>
+  <rect width="${BLOG_COVER_W}" height="${BLOG_COVER_H}" fill="url(#g)"/>
+  <g opacity="0.16" transform="rotate(${angle % 40 - 20} 240 160)">
+    <circle cx="120" cy="90" r="130" fill="#FFFFFF"/>
+    <circle cx="380" cy="250" r="150" fill="#FFFFFF"/>
+  </g>
+  <rect y="${BLOG_COVER_H - 6}" width="${BLOG_COVER_W}" height="6" fill="${BRAND.purple}"/>
+</svg>`
+}
+
+export async function renderBlogCover(slug: string): Promise<{ buffer: Buffer; width: number; height: number; bytes: number }> {
+  const svg = buildBlogCoverSvg(slug)
+  let quality = 82
+  let buffer = await sharp(Buffer.from(svg)).jpeg({ quality, mozjpeg: true }).toBuffer()
+  // Тема ждёт 40–70 КБ: слишком лёгкий файл выглядит рваным, слишком тяжёлый тормозит ленту
+  while (buffer.length > 70 * 1024 && quality > 45) {
+    quality -= 8
+    buffer = await sharp(Buffer.from(svg)).jpeg({ quality, mozjpeg: true }).toBuffer()
+  }
+  return { buffer, width: BLOG_COVER_W, height: BLOG_COVER_H, bytes: buffer.length }
+}

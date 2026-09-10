@@ -134,37 +134,7 @@ export function checkStandard(input: CheckInput): Check[] {
   const alsoLinks = alsoRead ? sectionEl(alsoRead).querySelectorAll('a').length : 0
   add('4.3.4 «Читайте также» 3–5 ссылок', 'B', alsoLinks >= 3 && alsoLinks <= 5, alsoRead ? `${alsoLinks} ссылок` : 'блока нет')
 
-  /* §6 Язык */
-  // §6.1 явно выводит из-под правила тире в роли сказуемого («Bocconi — частный университет»).
-  // Разобрать это морфологически нельзя, но у сказуемого есть свойство: оно одно на предложение.
-  // Машинный почерк — это несколько тире в одном предложении (вставные конструкции).
-  // Поэтому считаем только «лишние» тире сверх одного на предложение.
-  const sentencesForDash = text.split(/(?<=[.!?])\s+/)
-  const emTotal = (text.match(/—/g) ?? []).length
-  const emExtra = sentencesForDash.reduce((n, snt) => n + Math.max(0, (snt.match(/—/g) ?? []).length - 1), 0)
-  const emLimit = Math.max(1, Math.round(chars / 1500))
-  add('6.1 длинных тире ≤1 на 1500 знаков', 'B', emExtra <= emLimit,
-    `${emExtra} вставных при лимите ${emLimit} (всего тире ${emTotal}, по одному на предложение не считаем — §6.1)`)
-
-  const hits = FORBIDDEN_PHRASES.filter((re) => re.test(text)).map((re) => String(re).slice(1, -2))
-  add('6.2 нет запрещённых оборотов', 'B', hits.length === 0, hits.length ? hits.join('; ') : 'чисто')
-
-  const markerHits = MARKER_WORDS.reduce((n, w) => n + countAll(text.toLowerCase(), w), 0)
-  const markerLimit = Math.max(1, Math.round(chars / 1000))
-  add('6.3 плотность слов-маркеров', 'B', markerHits <= markerLimit, `${markerHits} при лимите ${markerLimit}`)
-
-  const sentences = text.split(/(?<=[.!?])\s+/).filter((s) => s.trim().length > 1)
-  const lens = sentences.map((s) => s.split(/\s+/).length)
-  const avg = lens.length ? lens.reduce((a, b) => a + b, 0) / lens.length : 0
-  const longShare = lens.length ? lens.filter((l) => l > 35).length / lens.length : 0
-  add('6.4.1 средняя длина предложения 12–20', 'W', avg >= 12 && avg <= 20, `${avg.toFixed(1)} слов, длиннее 35 слов: ${(longShare * 100).toFixed(0)}%`)
-  add('6.4.4 «вы» со строчной', 'B', !/(^|[^А-Яа-яЁё])Вы([^А-Яа-яЁё]|$)/.test(text.replace(/^[^.]*\. /, '')), 'обращение на «Вы» с заглавной')
-
-  const listChars = root.querySelectorAll('ul li, ol li').reduce((n, li) => n + li.textContent.length, 0)
-  add('4.2.4 не более 40% текста в списках', 'W', chars === 0 || listChars / chars <= 0.4, `${((listChars / (chars || 1)) * 100).toFixed(0)}% в списках`)
-
-  const longParas = root.querySelectorAll('p').filter((p) => p.textContent.length > 600).length
-  add('4.2.1 абзац ≤600 знаков', 'W', longParas === 0, longParas ? `${longParas} длинных абзацев` : 'все абзацы в норме')
+  out.push(...languageChecks(text, chars))
 
   /* §7 Slug */
   add('7.1 slug только latin/цифры/дефис', 'B', /^[a-z0-9-]+$/.test(slug), slug)
@@ -190,6 +160,44 @@ export function checkStandard(input: CheckInput): Check[] {
   add('8.8 внешние ссылки в новом окне', 'W',
     external.every((a) => (a.getAttribute('rel') ?? '').includes('noopener') && a.getAttribute('target') === '_blank'),
     `${external.length} внешних ссылок`)
+
+  return out
+}
+
+
+/**
+ * Язык (§6 приложения F). Вынесено отдельно: эти правила не зависят от разметки
+ * и применяются в том числе к статьям блога, у которых свой стандарт структуры.
+ */
+export function languageChecks(text: string, chars = text.length): Check[] {
+  const out: Check[] = []
+  const add = (id: string, level: Level, ok: boolean, detail: string) => out.push({ id, level, ok, detail })
+
+  // §6.1 выводит из-под правила тире в роли сказуемого («Bocconi — частный университет»).
+  // Морфологии тут нет, но у сказуемого есть свойство: оно одно на предложение,
+  // а машинный почерк — несколько тире в одном предложении. Считаем только лишние.
+  const sentences = text.split(/(?<=[.!?])\s+/)
+  const emTotal = (text.match(/—/g) ?? []).length
+  const emExtra = sentences.reduce((n, s) => n + Math.max(0, (s.match(/—/g) ?? []).length - 1), 0)
+  const emLimit = Math.max(1, Math.round(chars / 1500))
+  add('6.1 длинных тире ≤1 на 1500 знаков', 'B', emExtra <= emLimit,
+    `${emExtra} вставных при лимите ${emLimit} (всего ${emTotal}, по одному на предложение не считаем)`)
+
+  const hits = FORBIDDEN_PHRASES.filter((re) => re.test(text)).map((re) => String(re).slice(1, -2))
+  add('6.2 нет запрещённых оборотов', 'B', hits.length === 0, hits.length ? hits.join('; ') : 'чисто')
+
+  const markerHits = MARKER_WORDS.reduce((n, w) => n + countAll(text.toLowerCase(), w), 0)
+  const markerLimit = Math.max(1, Math.round(chars / 1000))
+  add('6.3 плотность слов-маркеров', 'B', markerHits <= markerLimit, `${markerHits} при лимите ${markerLimit}`)
+
+  const lens = sentences.filter((s) => s.trim()).map((s) => s.split(/\s+/).length)
+  const avg = lens.length ? lens.reduce((a, b) => a + b, 0) / lens.length : 0
+  const longShare = lens.length ? lens.filter((l) => l > 35).length / lens.length : 0
+  add('6.4.1 средняя длина предложения 12–20', 'W', avg >= 12 && avg <= 20,
+    `${avg.toFixed(1)} слов, длиннее 35 слов: ${(longShare * 100).toFixed(0)}%`)
+
+  add('6.4.4 «вы» со строчной', 'B', !/(^|[^А-Яа-яЁё])Вы([^А-Яа-яЁё]|$)/.test(text.replace(/^[^.]*\. /, '')),
+    'обращение на «Вы» с заглавной')
 
   return out
 }

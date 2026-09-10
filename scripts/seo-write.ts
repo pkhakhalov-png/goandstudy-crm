@@ -20,6 +20,7 @@ import {
   type GenContext, type PageRef, type QueryRef, type QaReport,
 } from '../lib/seo/generate'
 import { embed } from '../lib/seo/embeddings'
+import { loadSiteTargets } from '../lib/seo/blog-style'
 import { reviseDraft } from '../lib/seo/generate'
 import { planIncomingLinks, saveLinkPlan } from '../lib/seo/linkplan'
 import { finalPreflight, checkPublishRate, publishDraft, postPublishVerify } from '../lib/seo/publish'
@@ -88,6 +89,7 @@ async function main() {
   // origin = generated | qa_fixed, а редактору нужно видеть, что именно поменялось.
   const pageEmbeddings = await loadEmbeddings()
   const site = await loadSiteStrings()
+  const targets = await loadSiteTargets(seo)
 
   const { data: article, error: aerr } = await seo.from('articles')
     .insert({ topic_id: topic.id, primary_keyword: brief.primary_keyword, status: 'in_production' })
@@ -101,7 +103,7 @@ async function main() {
 
   for (;;) {
     console.log(`\n[3/3] QA${attempt ? ` — после починки #${attempt}` : ''}…`)
-    const det = await qaDeterministic(ctx, brief, current, { pageEmbeddings, ...site })
+    const det = await qaDeterministic(ctx, brief, current, { pageEmbeddings, ...targets, category: (brief as any).category })
     const modelIssues = await qaWithModel(ctx, brief, current)
     const { failedB, failedW, passed, verdict } = summarizeChecks(det.checks)
     report = {

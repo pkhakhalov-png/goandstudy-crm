@@ -8,6 +8,7 @@
 import { registerStep, type Job, type StepOutcome } from './steps'
 import { generateBrief, generateDraft, reviseDraft, qaWithModel, qaDeterministic, GEN_MODEL, PROMPT_VERSION, type GenContext, type Brief, type QaReport } from './generate'
 import { summarize } from './standard'
+import { loadSiteTargets } from './blog-style'
 import { renderCover, coverFilename } from './cover'
 import { proposeDiagrams, renderDiagram, insertFigures } from './diagrams'
 import { planIncomingLinks, saveLinkPlan } from './linkplan'
@@ -171,7 +172,8 @@ registerStep('article_qa', async (job: Job, seo: any): Promise<StepOutcome> => {
 
   const det = await qaDeterministic(ctx, brief, html, {
     pageEmbeddings: await pageEmbeddings(seo),
-    ...(await siteStrings(seo)),
+    ...(await loadSiteTargets(seo)),
+    category: (brief as any).category,
   })
   const modelIssues = await qaWithModel(ctx, brief, html)
   const { failedB, verdict } = summarize(det.checks)
