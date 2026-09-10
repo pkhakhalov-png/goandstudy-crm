@@ -151,6 +151,58 @@ try {
 $job = $res['job'] ?? null;
 if (!$job) exit(0);
 
+// Вставка ссылки в файл статьи блога. Через мост это делать нельзя: тема
+// пересидит страницу из файла и затрёт правку.
+if (($job['kind'] ?? '') === 'link_insert') {
+    $slug = (string) $job['slug'];
+    $file = THEME . "/inc/blog-articles/$slug.html";
+    try {
+        if (!preg_match('/^[a-z0-9-]+$/', $slug)) throw new RuntimeException("недопустимый слаг: $slug");
+        if (!file_exists($file)) throw new RuntimeException("нет файла статьи $slug");
+        $html = file_get_contents($file);
+        $anchor = (string) $job['anchor'];
+        $target = (string) $job['target'];
+
+        if (str_contains($html, $target)) throw new RuntimeException('ссылка на эту страницу уже есть');
+
+        // Ищем фразу вне тегов и вне существующих ссылок: разбираем по кускам
+        $parts = preg_split('/(<[^>]+>)/u', $html, -1, PREG_SPLIT_DELIM_CAPTURE);
+        $inLink = false; $done = false;
+        foreach ($parts as $i => $chunk) {
+            if ($chunk === '' || $chunk[0] === '<') {
+                $low = strtolower($chunk);
+                if (str_starts_with($low, '<a')) $inLink = true;
+                if (str_starts_with($low, '</a')) $inLink = false;
+                continue;
+            }
+            if ($inLink || $done) continue;
+            $pos = mb_stripos($chunk, $anchor);
+            if ($pos === false) continue;
+            $exact = mb_substr($chunk, $pos, mb_strlen($anchor));
+            $parts[$i] = mb_substr($chunk, 0, $pos) . '<a href="' . $target . '">' . $exact . '</a>' . mb_substr($chunk, $pos + mb_strlen($anchor));
+            $done = true;
+        }
+        if (!$done) throw new RuntimeException("фраза «$anchor» не найдена вне ссылок");
+
+        copy($file, $file . '.bak.' . time());
+        file_put_contents($file, implode('', $parts));
+
+        $seedFrom = seed_flag();
+        $seedTo = 'goandstudy_seed_v' . ((int) str_replace('goandstudy_seed_v', '', $seedFrom) + 1);
+        shell_exec("sed -i 's/$seedFrom/$seedTo/g' " . THEME . '/functions.php');
+        shell_exec('curl -s -o /dev/null https://goandstudy.com/ || true');
+
+        say("ссылка вставлена в $slug: «$anchor» → $target");
+        api('/api/seo/publish/result', $conf, ['job_id' => $job['id'], 'article_id' => $job['article_id'], 'kind' => 'link_insert',
+            'ok' => true, 'slug' => $slug, 'seed_from' => $seedFrom, 'seed_to' => $seedTo,
+            'steps' => ["ссылка «$anchor» → $target в $file"], 'suggestion_id' => $job['suggestion_id'] ?? null]);
+    } catch (Throwable $e) {
+        say('ошибка вставки: ' . $e->getMessage());
+        api('/api/seo/publish/result', $conf, ['job_id' => $job['id'], 'article_id' => $job['article_id'], 'kind' => 'link_insert', 'ok' => false, 'error' => $e->getMessage()]);
+    }
+    exit(0);
+}
+
 say("взял задание {$job['id']}: {$job['slug']}" . (!empty($job['dry_run']) ? ' (план)' : ''));
 try {
     $result = publish($job);

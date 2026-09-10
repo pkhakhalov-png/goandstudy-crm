@@ -19,6 +19,26 @@ export async function GET(req: NextRequest) {
   const sb = await createAdminClient()
   const seo = sb.schema('seo')
 
+  // Агент умеет два дела: публиковать статью и вставлять ссылку в файл темы.
+  // Второе нужно потому, что статьи блога живут файлами: правка через мост
+  // была бы затёрта при следующем пересиде.
+  const { data: linkJobs } = await seo.from('jobs')
+    .select('id, article_id, payload')
+    .eq('step', 'link_insert_theme').eq('status', 'pending')
+    .order('id').limit(1)
+
+  if (linkJobs?.[0]) {
+    const lj = linkJobs[0]
+    await seo.from('jobs').update({ status: 'running', locked_at: new Date().toISOString(), locked_by: 'publish-agent' }).eq('id', lj.id)
+    return NextResponse.json({
+      job: {
+        id: lj.id, article_id: lj.article_id, kind: 'link_insert',
+        slug: lj.payload?.slug, anchor: lj.payload?.anchor, target: lj.payload?.target,
+        dry_run: lj.payload?.dry_run === true,
+      },
+    })
+  }
+
   const { data: jobs } = await seo.from('jobs')
     .select('id, article_id, payload')
     .eq('step', 'article_publish_blog').eq('status', 'pending')

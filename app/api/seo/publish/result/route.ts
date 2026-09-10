@@ -27,6 +27,12 @@ export async function POST(req: NextRequest) {
 
   await seo.from('jobs').update({ status: 'done', result: { dry_run, steps, seed_from, seed_to } }).eq('id', job_id)
 
+  // Вставка ссылки в файл темы: отмечаем предложение применённым и выходим
+  if (body.kind === 'link_insert') {
+    if (body.suggestion_id) await seo.from('link_suggestions').update({ status: 'applied' }).eq('id', body.suggestion_id)
+    return NextResponse.json({ ok: true })
+  }
+
   if (dry_run) return NextResponse.json({ ok: true })
 
   const { data: article } = await seo.from('articles').select('current_version_id, topic_id').eq('id', article_id).single()

@@ -165,7 +165,9 @@ function findPhrase(text: string, phrase: string): string | null {
       // Слова короче пяти букв (предлоги, «в», «на») ищем целиком, остальные — по основе
       if (w.length < 5) return esc
       const stem = esc.slice(0, Math.max(4, esc.length - 2))
-      return `${stem}[а-яё]{0,3}`
+      // Окончание берём целиком и упираемся в границу слова: иначе анкор
+      // обрывается на середине — «обучение в китайск» вместо «китайском».
+      return `${stem}[а-яё]*(?![а-яё])`
     })
     .join('\\s+')
   const re = new RegExp(pattern, 'i')

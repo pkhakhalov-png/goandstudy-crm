@@ -202,7 +202,13 @@ export async function cancelJob(jobId: number) {
   return { ok: true }
 }
 
-/** Вставить запланированные входящие ссылки в страницы-доноры (§8.9). */
+/**
+ * Вставить запланированные входящие ссылки (§8.9).
+ *
+ * Доноры бывают двух видов, и это не мелочь: страницы WordPress правятся через мост,
+ * а статьи блога живут файлами в теме — правку через мост там затрёт при следующем
+ * пересиде. Для них задача уходит агенту на сервере.
+ */
 export async function insertIncomingLinks(articleId: number, dryRun = true) {
   const { error: authErr } = await assertAdmin()
   if (authErr) return { error: authErr }
@@ -221,9 +227,7 @@ export async function insertIncomingLinks(articleId: number, dryRun = true) {
   const { data: version } = await seo.from('article_versions').select('meta').eq('id', article.current_version_id).single()
   const meta: any = version?.meta ?? {}
   const slug = meta.publish?.slug ?? meta.slug
-  const targetUrl = meta.publish?.post_type === 'page'
-    ? `https://goandstudy.com/${slug}/`
-    : `https://goandstudy.com/blog/${slug}/`
+  const targetUrl = `https://goandstudy.com/blog/${slug}/`
 
   const { data: links } = await seo.from('link_suggestions')
     .select('id, from_page_id, anchor').eq('to_topic_id', article.topic_id)
@@ -235,8 +239,31 @@ export async function insertIncomingLinks(articleId: number, dryRun = true) {
 
   const report: { url: string; ok: boolean; note: string }[] = []
   for (const l of links) {
-    const donorUrl = byId.get(l.from_page_id)
+    const donorUrl = String(byId.get(l.from_page_id) ?? '')
     if (!donorUrl) { report.push({ url: `page ${l.from_page_id}`, ok: false, note: 'страница не найдена' }); continue }
+
+    // Статья блога: правит агент на сервере, иначе тема затрёт
+    if (donorUrl.includes('/blog/')) {
+      const donorSlug = donorUrl.replace(/\/$/, '').split('/').pop()!
+      if (dryRun) {
+        report.push({ url: donorUrl, ok: true, note: `файл темы: ссылка «${l.anchor}» встанет через агента на сервере` })
+        continue
+      }
+      const { data: exists } = await seo.from('jobs').select('id')
+        .eq('step', 'link_insert_theme').eq('article_id', articleId)
+        .in('status', ['pending', 'running']).contains('payload', { slug: donorSlug }).limit(1)
+      if (exists?.length) { report.push({ url: donorUrl, ok: true, note: 'уже в очереди у агента' }); continue }
+
+      await seo.from('jobs').insert({
+        step: 'link_insert_theme', lane: 'production', priority: 15,
+        article_id: articleId, topic_id: article.topic_id,
+        payload: { slug: donorSlug, anchor: l.anchor, target: targetUrl, suggestion_id: l.id },
+      })
+      report.push({ url: donorUrl, ok: true, note: `поставлено агенту: «${l.anchor}»` })
+      continue
+    }
+
+    // Обычная страница WordPress: правим через мост
     const res: any = await planInsertion(donorUrl, l.anchor, targetUrl)
     if (!res.ok) { report.push({ url: donorUrl, ok: false, note: res.reason }); continue }
     if (!dryRun) {
