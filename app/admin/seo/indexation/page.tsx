@@ -24,6 +24,7 @@ function label(verdict: string | null, coverage: string | null): { text: string;
   if (!verdict) return { text: 'не проверяли', color: 'var(--muted)' }
   if (verdict === 'PASS') return { text: 'в индексе', color: 'var(--green)' }
   if (verdict === 'FAIL') return { text: 'ошибка на странице', color: 'var(--red)' }
+  if (coverage && /переадресац|redirect/i.test(coverage)) return { text: 'переадресация', color: 'var(--muted)' }
   if (coverage && /неизвестен|not found|URL is unknown/i.test(coverage)) return { text: 'Google не видел адрес', color: 'var(--red)' }
   if (coverage && /Обнаружен|Discovered|Просканирован|Crawled/i.test(coverage)) return { text: 'знает, но не взял', color: 'var(--purple)' }
   return { text: 'не в индексе', color: 'var(--purple)' }
@@ -60,8 +61,13 @@ export default async function IndexationPage({ searchParams }: { searchParams: P
     }
   })
 
+  const isRedirect = (r: Row) => !!r.coverage && /переадресац|redirect/i.test(r.coverage)
+
   const inIndex = rows.filter((r) => r.verdict === 'PASS')
-  const outIndex = rows.filter((r) => r.verdict && r.verdict !== 'PASS')
+  // Переадресация — не беда, а решение: страница намеренно ведёт на другую.
+  // В общей куче «не в индексе» она выглядела бы потерей, которой нет.
+  const redirects = rows.filter((r) => r.verdict && r.verdict !== 'PASS' && isRedirect(r))
+  const outIndex = rows.filter((r) => r.verdict && r.verdict !== 'PASS' && !isRedirect(r))
   const unchecked = rows.filter((r) => !r.verdict)
   const share = inIndex.length + outIndex.length > 0
     ? Math.round((inIndex.length / (inIndex.length + outIndex.length)) * 100) : 0
@@ -110,6 +116,7 @@ export default async function IndexationPage({ searchParams }: { searchParams: P
         <Card label="В индексе" value={inIndex.length} color="var(--green)" sub={`${share}% из проверенных`} />
         <Card label="Не в индексе" value={outIndex.length} color={outIndex.length ? 'var(--red)' : undefined}
           sub={painful.length ? `${painful.length} из них ищут` : 'без показов'} />
+        <Card label="Переадресация" value={redirects.length} sub={redirects.length ? 'так и задумано' : '—'} />
         <Card label="Не проверяли" value={unchecked.length} sub={unchecked.length ? 'дойдёт очередь' : 'все проверены'} />
         <Card label="Всего страниц" value={rows.length} sub="индексируемых" />
       </div>
@@ -195,6 +202,14 @@ export default async function IndexationPage({ searchParams }: { searchParams: P
           title="Не в индексе, показов не было"
           hint="Google до них не дошёл или счёл неинтересными. Для только что вышедших статей это нормально в первые недели."
           rows={quiet}
+        />
+      )}
+
+      {redirects.length > 0 && (
+        <Table
+          title="Ведут на другие страницы"
+          hint="Эти адреса переадресуют на другие страницы — в индексе им и не место. Показы засчитываются старому адресу, пока Google не переучится."
+          rows={redirects} showTraffic collapsed
         />
       )}
 
