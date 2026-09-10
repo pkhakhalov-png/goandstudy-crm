@@ -146,13 +146,37 @@ export async function pickTopic(
   const free = topics.filter((t: any) => !taken.has(t.id))
   if (!free.length) return { topic: null, skipped }
 
-  const { loadQueryRows, verdictFor } = await import('./cannibal')
+  const { loadQueryRows, verdictFor, sameFamily } = await import('./cannibal')
   const rows = await loadQueryRows(seo)
+
+  // Свои же статьи и темы: проверка по показам их не видит, пока они не начали
+  // ранжироваться. Без этого конвейер за неделю написал бы четыре статьи об
+  // одном и том же — просто разными словами.
+  const { data: mine } = await seo.from('articles').select('primary_keyword')
+  const { data: busy } = await seo.from('topics').select('title, primary_keyword')
+    .in('status', ['in_production', 'produced'])
+  const ourQueries = [
+    ...(mine ?? []).map((r: any) => r.primary_keyword),
+    ...(busy ?? []).map((r: any) => r.primary_keyword ?? r.title),
+  ].filter(Boolean) as string[]
 
   for (const t of free) {
     const query = t.primary_keyword ?? t.title
+
+    const twin = ourQueries.find((q) => sameFamily(q, query))
+    if (twin) {
+      skipped.push({
+        query, verdict: 'update',
+        reason: `то же самое другими словами — у нас уже есть «${twin}»`,
+        updateTarget: null,
+      })
+      continue
+    }
+
     const v = verdictFor(rows, query)
     if (v.verdict === 'safe') {
+      // Тема занимает свою семью: следующие формулировки того же уже не пройдут
+      ourQueries.push(query)
       return { topic: { id: t.id, query, impressions: t.search_volume ?? 0, cannibalReason: v.reason }, skipped }
     }
     skipped.push({ query, verdict: v.verdict, reason: v.reason, updateTarget: v.updateTarget })

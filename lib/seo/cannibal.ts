@@ -36,6 +36,25 @@ export function stemsOf(query: string): string[] {
   return query.toLowerCase().split(/[^\p{L}\d]+/u).filter((w) => w.length >= 4).map((w) => w.slice(0, 5))
 }
 
+/**
+ * Две формулировки одного и того же? Сравниваем по основам слов в обе стороны:
+ * «грант на обучение в китае» и «получение гранта на обучение в китае» — одна
+ * семья, а «обучение в китае» и «обучение в италии» — разные.
+ *
+ * Нужно потому, что проверка по показам видит только то, что уже ранжируется.
+ * Вчерашняя статья и соседняя тема в очереди для неё невидимы — а между собой
+ * они дерутся точно так же.
+ */
+export function sameFamily(a: string, b: string): boolean {
+  const sa = new Set(stemsOf(a))
+  const sb = new Set(stemsOf(b))
+  if (!sa.size || !sb.size) return false
+  let common = 0
+  for (const st of sa) if (sb.has(st)) common++
+  // В обе стороны: иначе длинная тема «съедала» бы короткую
+  return common / sa.size >= 0.6 && common / sb.size >= 0.6
+}
+
 /** Читает таблицу целиком: обычный select обрезал бы выдачу на тысяче строк. */
 async function readAll(seo: any, table: string, cols: string, since?: string): Promise<any[]> {
   const out: any[] = []

@@ -158,8 +158,21 @@ registerStep('article_brief', async (job: Job, seo: any): Promise<StepOutcome> =
   // темы: тему можно задать руками, а деньги тратятся начиная со следующего шага.
   // Пропуск возможен явным флагом — на случай, когда решение принято осознанно.
   if (!job.payload?.force) {
-    const { checkCannibalization } = await import('./cannibal')
-    const v = await checkCannibalization(seo, topic.primary_keyword ?? topic.title)
+    const { checkCannibalization, sameFamily } = await import('./cannibal')
+    const query = topic.primary_keyword ?? topic.title
+
+    // Своя же статья про то же самое, только другими словами
+    const { data: mine } = await seo.from('articles').select('id, primary_keyword').neq('status', 'rejected')
+    const twin = (mine ?? []).find((r: any) => r.primary_keyword && sameFamily(r.primary_keyword, query))
+    if (twin) {
+      await seo.from('topics').update({ status: 'rejected_duplicate' }).eq('id', topic.id)
+      return {
+        outcome: 'done',
+        result: { skipped: true, verdict: 'duplicate', reason: `то же самое другими словами — статья #${twin.id} «${twin.primary_keyword}»`, cost: 0 },
+      }
+    }
+
+    const v = await checkCannibalization(seo, query)
     if (v.verdict !== 'safe') {
       await seo.from('topics').update({ status: 'rejected_duplicate' }).eq('id', topic.id)
       return {
