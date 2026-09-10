@@ -8,7 +8,7 @@
 import { registerStep, type Job, type StepOutcome } from './steps'
 import { generateBrief, generateDraft, reviseDraft, qaWithModel, qaDeterministic, GEN_MODEL, PROMPT_VERSION, type GenContext, type Brief, type QaReport } from './generate'
 import { summarize } from './standard'
-import { loadSiteTargets } from './blog-style'
+import { loadSiteTargets, normalizeBody } from './blog-style'
 import { publishToTheme, verifyPublished, listPublishedSlugs } from './theme-publish'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -148,7 +148,7 @@ registerStep('article_brief', async (job: Job, seo: any): Promise<StepOutcome> =
 registerStep('article_draft', async (job: Job, seo: any): Promise<StepOutcome> => {
   const { brief, ctx } = job.payload as { brief: Brief; ctx: GenContext }
   const articleId = job.article_id!
-  const html = await generateDraft(ctx, brief)
+  const html = normalizeBody(await generateDraft(ctx, brief))
 
   const { data: v, error } = await seo.from('article_versions').insert({
     article_id: articleId, version_no: 1, origin: 'generated',
@@ -460,7 +460,7 @@ registerStep('article_fix', async (job: Job, seo: any): Promise<StepOutcome> => 
     return { outcome: 'done', result: { nothing_to_fix: true, cost: 0 } }
   }
 
-  const fixed = await reviseDraft(ctx, brief, html, failedB.map((c) => ({ id: c.id, detail: c.detail })), modelIssues)
+  const fixed = normalizeBody(await reviseDraft(ctx, brief, html, failedB.map((c) => ({ id: c.id, detail: c.detail })), modelIssues))
 
   const { data: nv, error } = await seo.from('article_versions').insert({
     article_id: articleId, version_no: (version.version_no ?? 1) + 1, origin: 'qa_fixed',

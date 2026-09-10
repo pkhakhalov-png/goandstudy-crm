@@ -20,6 +20,33 @@ export const CTA_HTML =
 /** §2: белый список блоков. Всё остальное в теме не стилизовано. */
 export const ALLOWED_BLOCKS = ['paragraph', 'heading', 'list', 'table', 'quote'] as const
 
+/**
+ * Привести тело к стандарту в том, что не должно зависеть от модели.
+ *
+ * Финальный CTA обязан быть дословным (§3). Полагаться на то, что модель повторит
+ * его символ в символ, нельзя: на живом прогоне она выбросила слово «бесплатную»,
+ * потому что предыдущая проверка ошибочно сочла бесплатность противоречием прайсу.
+ * Требование, которое проверяется побуквенно, дешевле проставить кодом.
+ */
+export function normalizeBody(body: string): string {
+  // Режем по границам блоков и работаем с целыми блоками. Регулярное выражение
+  // «от начала абзаца до ссылки» уже показало, чем это кончается: на живых статьях
+  // оно съело весь текст между первым абзацем и призывом в конце.
+  const blocks = splitBlocks(body)
+  while (blocks.length && blocks[blocks.length - 1].includes('crm.goandstudy.com/book')) blocks.pop()
+  blocks.push(`<!-- wp:paragraph -->\n${CTA_HTML}\n<!-- /wp:paragraph -->`)
+  return blocks.join('\n\n')
+}
+
+/** Разбор тела на блоки Гутенберга: от «<!-- wp:x -->» до парного «<!-- /wp:x -->». */
+export function splitBlocks(body: string): string[] {
+  const out: string[] = []
+  const re = /<!--\s*wp:([a-z]+)[^]*?<!--\s*\/wp:\1\s*-->/g
+  let m: RegExpExecArray | null
+  while ((m = re.exec(body)) !== null) out.push(m[0].trim())
+  return out
+}
+
 export type BlogCheckInput = {
   body: string          // разметка Гутенберга
   title: string
@@ -79,9 +106,12 @@ export function checkBlogStandard(input: BlogCheckInput): Check[] {
   }
 
   const lastBlock = body.trimEnd().split(/<!--\s*\/wp:[a-z]+\s*-->/).filter((s) => s.trim()).pop() ?? ''
-  add('3 последний блок — дословный CTA', 'B',
-    lastBlock.includes('crm.goandstudy.com/book') && lastBlock.includes('Запишитесь на бесплатную консультацию'),
-    lastBlock.includes('crm.goandstudy.com/book') ? 'на месте' : 'CTA отсутствует или не последний')
+  const hasLink = lastBlock.includes('crm.goandstudy.com/book')
+  const exact = lastBlock.includes('Запишитесь на бесплатную консультацию')
+  add('3 последний блок — дословный CTA', 'B', hasLink && exact,
+    !hasLink ? 'CTA отсутствует или стоит не последним'
+      : !exact ? 'текст призыва изменён: нужен дословный «Запишитесь на бесплатную консультацию»'
+      : 'на месте')
 
   /* §5 Таблицы, §6 цитаты */
   const tables = (body.match(/<!--\s*wp:table/g) ?? []).length
