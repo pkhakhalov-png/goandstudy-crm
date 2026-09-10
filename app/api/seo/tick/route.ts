@@ -16,7 +16,9 @@ const BATCH = 5
 // нельзя: Vercel убьёт функцию на 300 c посреди генерации, задача повиснет
 // в running и вернётся в очередь только через десять минут.
 const LONG_STEP_MS = 230_000
-const isLongStep = (step: string) => step.startsWith('article_')
+// Долгие — те, что зовут модель. Проверка индексации это пара запросов к
+// Search Console, ей полный запас времени не нужен.
+const isLongStep = (step: string) => step.startsWith('article_') && step !== 'article_index_check'
 
 export async function POST(req: NextRequest) {
   const secret = process.env.SEO_TICK_SECRET
