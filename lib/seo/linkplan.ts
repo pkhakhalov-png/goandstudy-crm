@@ -66,7 +66,7 @@ export async function planIncomingLinks(input: LinkPlanInput): Promise<Donor[]> 
       const live = await input.fetchText(p.url).catch(() => null)
       if (live) text = live
     }
-    const anchor = pickAnchor(input.anchorCandidates, text)
+    const anchor = pickAnchor(input.anchorCandidates, text, topicStems(input))
     const point = anchor ? findInsertionPoint(text, anchor) : null
     donors.push({
       pageId: p.id, url: p.url, title: p.title, similarity: Number(sim.toFixed(3)),
@@ -81,15 +81,96 @@ export async function planIncomingLinks(input: LinkPlanInput): Promise<Donor[]> 
   return donors
 }
 
-/** Анкор описывает целевую страницу (§8.3) и уже встречается в тексте донора. */
-function pickAnchor(candidates: string[], donorText: string): string | null {
+/**
+ * Анкор описывает целевую страницу (§8.3) и уже встречается в тексте донора.
+ *
+ * Дословный поиск не работал: в кандидаты подставляется заголовок статьи целиком
+ * («Поступление на магистратуру в Австрии: программы, языки, деньги»), а такой фразы
+ * на страницах сайта нет и быть не может. Поэтому кандидат разбирается на осмысленные
+ * куски, и они ищутся с учётом русских окончаний.
+ */
+function pickAnchor(candidates: string[], donorText: string, mustContain: string[]): string | null {
   const low = donorText.toLowerCase()
-  const sorted = [...candidates].sort((a, b) => b.length - a.length)   // длиннее — точнее
-  for (const c of sorted) {
-    if (c.length < 12) continue                                        // «здесь»-подобные не берём
-    if (low.includes(c.toLowerCase())) return c
+  for (const phrase of anchorVariants(candidates)) {
+    const found = findPhrase(low, phrase)
+    if (found && isUsableAnchor(found, mustContain)) return found
   }
   return null
+}
+
+// Служебные слова: анкор, начинающийся или кончающийся на них, — обрубок вроде
+// «обучения за» или «магистратура в». По §8.3 такой анкор не описывает цель.
+const STOPWORDS = new Set(['в', 'во', 'на', 'за', 'для', 'с', 'со', 'по', 'из', 'от', 'до', 'к', 'о', 'об',
+  'при', 'над', 'под', 'и', 'а', 'но', 'или', 'что', 'как', 'это', 'все', 'ещё', 'еще'])
+
+/** Анкор годится, если он осмыслен сам по себе и говорит о теме целевой страницы. */
+function isUsableAnchor(anchor: string, mustContain: string[]): boolean {
+  const words = anchor.toLowerCase().split(/\s+/).filter(Boolean)
+  if (words.length === 0) return false
+  // Одно слово годится, если оно само называет предмет: «магистратуре», «стипендии».
+  // §8.3 запрещает «здесь» и «подробнее», а не тематическое существительное.
+  if (words.length === 1 && (words[0].length < 8 || STOPWORDS.has(words[0]))) return false
+  if (STOPWORDS.has(words[0]) || STOPWORDS.has(words[words.length - 1])) return false
+  // Хотя бы одно слово должно быть о теме цели, иначе ссылка стоит непонятно почему
+  const low = anchor.toLowerCase()
+  return mustContain.length === 0 || mustContain.some((stem) => low.includes(stem))
+}
+
+/** Основы значимых слов темы: анкор обязан содержать хотя бы одну из них. */
+function topicStems(input: LinkPlanInput): string[] {
+  return `${input.targetTitle} ${input.targetH1}`
+    .toLowerCase()
+    .split(/[^\p{L}\d]+/u)
+    .filter((w) => w.length >= 6 && !STOPWORDS.has(w))
+    .map((w) => w.slice(0, 6))
+    .filter((w, i, a) => a.indexOf(w) === i)
+    .slice(0, 6)
+}
+
+/** Из заголовков и ключей делаем список фраз: от точных к более общим. */
+function anchorVariants(candidates: string[]): string[] {
+  const out: string[] = []
+  const push = (v: string) => {
+    const t = v.trim().replace(/^[«"']|[»"'.,:;]$/g, '').trim()
+    if (t && !out.includes(t)) out.push(t)
+  }
+  for (const c of candidates) {
+    if (!c) continue
+    push(c)
+    // Заголовок вида «Тема: подробности» — берём часть до двоеточия
+    const beforeColon = c.split(/[:—–]/)[0]
+    if (beforeColon !== c) push(beforeColon)
+    // И скользящее окно по словам: 4, затем 3, затем 2 слова подряд
+    const words = c.split(/\s+/).filter(Boolean)
+    // Двусловные окна нужны: «англоязычные программы», «университеты Австрии».
+    // От обрубков вроде «обучения за» защищают не они, а проверки в isUsableAnchor.
+    for (const size of [5, 4, 3, 2, 1]) {
+      for (let i = 0; i + size <= words.length; i++) push(words.slice(i, i + size).join(' '))
+    }
+  }
+  // Длинные фразы точнее описывают цель — пробуем их первыми
+  return out.sort((a, b) => b.length - a.length)
+}
+
+/**
+ * Поиск фразы с учётом русской морфологии: «магистратуру в Австрии» должно найтись
+ * по «магистратура в Австрии». Точной морфологии тут не нужно — достаточно сравнивать
+ * слова по основам, отбрасывая хвост в пару букв.
+ */
+function findPhrase(text: string, phrase: string): string | null {
+  const words = phrase.toLowerCase().split(/\s+/).filter(Boolean)
+  const pattern = words
+    .map((w) => {
+      const esc = w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      // Слова короче пяти букв (предлоги, «в», «на») ищем целиком, остальные — по основе
+      if (w.length < 5) return esc
+      const stem = esc.slice(0, Math.max(4, esc.length - 2))
+      return `${stem}[а-яё]{0,3}`
+    })
+    .join('\\s+')
+  const re = new RegExp(pattern, 'i')
+  const m = text.match(re)
+  return m ? m[0] : null
 }
 
 /** Предложение, в котором стоит фраза, — его и покажем человеку в карточке правки. */
