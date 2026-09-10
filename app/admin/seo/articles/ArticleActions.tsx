@@ -14,10 +14,20 @@ export function ArticleActions({ articleId, status, postId, blockers, warnings }
   const [msg, setMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
   const [linkReport, setLinkReport] = useState<{ url: string; ok: boolean; note: string }[] | null>(null)
 
+  // Ошибку действия обязательно показываем: молчащая кнопка — худшее, что может быть.
+  // Отдельный случай — устаревшая вкладка после деплоя: Next привязывает действия
+  // к версии сборки, и со старой страницы нажатие не доходит до сервера вовсе.
   const run = (fn: () => Promise<any>) => start(async () => {
     setMsg(null)
-    const res = await fn()
-    setMsg(res?.error ? { kind: 'err', text: res.error } : { kind: 'ok', text: res?.note ?? 'Готово' })
+    try {
+      const res = await fn()
+      setMsg(res?.error ? { kind: 'err', text: res.error } : { kind: 'ok', text: res?.note ?? 'Готово' })
+    } catch (e: any) {
+      setMsg({
+        kind: 'err',
+        text: `Не отправилось: ${e?.message ?? 'ошибка'}. Если страница открыта давно — обнови её (⌘⇧R) и повтори.`,
+      })
+    }
   })
 
   const canPublish = status === 'approved' && postId && warnings.length === 0
@@ -51,9 +61,13 @@ export function ArticleActions({ articleId, status, postId, blockers, warnings }
         <button className="btn-s" disabled={pending}
           onClick={() => start(async () => {
             setMsg(null); setLinkReport(null)
-            const res: any = await insertIncomingLinks(articleId, true)
-            if (res?.error) setMsg({ kind: 'err', text: res.error })
-            else setLinkReport(res.report)
+            try {
+              const res: any = await insertIncomingLinks(articleId, true)
+              if (res?.error) setMsg({ kind: 'err', text: res.error })
+              else setLinkReport(res.report)
+            } catch (e: any) {
+              setMsg({ kind: 'err', text: `Не отправилось: ${e?.message ?? 'ошибка'}. Обнови страницу (⌘⇧R) и повтори.` })
+            }
           })}>
           Показать, куда встанут ссылки
         </button>
