@@ -427,8 +427,14 @@ export async function startNextNow() {
   const seo = (await createAdminClient()).schema('seo')
   const { pickTopic } = await import('@/lib/seo/flow')
 
-  const topic = await pickTopic(seo)
-  if (!topic) return { error: 'свободных тем нет' }
+  const { topic, skipped } = await pickTopic(seo, { withSkipped: true })
+  if (!topic) {
+    return {
+      error: skipped.length
+        ? `свободных тем нет: ${skipped.length} отброшено из-за каннибализации (${skipped[0].query} — ${skipped[0].reason})`
+        : 'свободных тем нет',
+    }
+  }
 
   const { error } = await seo.from('jobs').insert({
     step: 'article_brief', lane: 'production', priority: 50,

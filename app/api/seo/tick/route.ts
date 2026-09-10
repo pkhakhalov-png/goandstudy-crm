@@ -50,7 +50,6 @@ export async function POST(req: NextRequest) {
         { step: 'compute_opportunities', lane: 'findings', priority: 40, payload: {} },
         { step: 'generate_schema', lane: 'findings', priority: 30, payload: {} },
         { step: 'article_index_check', lane: 'findings', priority: 20, payload: {} },
-        { step: 'article_autostart', lane: 'production', priority: 15, payload: {} },
       ]
       const { data: ex } = await seo.from('jobs').select('step').in('step', steps.map((s) => s.step)).in('status', ['pending', 'running', 'waiting'])
       const have = new Set((ex ?? []).map((e: any) => e.step))
@@ -59,6 +58,22 @@ export async function POST(req: NextRequest) {
       await seo.from('settings').upsert({ key: 'last_auto_refresh', value: { at: new Date().toISOString() } }, { onConflict: 'key' })
     }
   } catch { /* авто-обновление не критично для обработки очереди */ }
+
+  // Поток статей проверяем чаще суточного цикла: при ритме «статья в день»
+  // проверка раз в двадцать часов пропускала бы дни. Сам шаг дешёвый и молча
+  // ничего не делает, если пауза ещё не вышла.
+  try {
+    const { data: mk } = await seo.from('settings').select('value').eq('key', 'last_autostart_check').maybeSingle()
+    const lastAt = (mk?.value as any)?.at ? Date.parse((mk!.value as any).at) : 0
+    if (Date.now() - lastAt > 3600 * 1000) {
+      const { data: ex } = await seo.from('jobs').select('id')
+        .eq('step', 'article_autostart').in('status', ['pending', 'running', 'waiting']).limit(1)
+      if (!ex?.length) {
+        await seo.from('jobs').insert({ step: 'article_autostart', lane: 'production', priority: 15, payload: {} })
+      }
+      await seo.from('settings').upsert({ key: 'last_autostart_check', value: { at: new Date().toISOString() } }, { onConflict: 'key' })
+    }
+  } catch { /* поток не критичен для обработки очереди */ }
 
   while (Date.now() - started < TIME_BUDGET_MS) {
     const { data: jobs, error } = await seo.rpc('claim_jobs', { p_worker: workerId, p_limit: BATCH })

@@ -28,21 +28,52 @@ export async function saveFlow(seo: any, next: FlowSettings): Promise<void> {
   await seo.from('settings').upsert({ key: 'article_flow', value: next }, { onConflict: 'key' })
 }
 
+export type PickedTopic = {
+  id: number
+  query: string
+  impressions: number
+  /** Почему тема безопасна — показывается человеку рядом с темой. */
+  cannibalReason: string
+}
+
 export type FlowState = {
   settings: FlowSettings
   startedThisWeek: number
   inReview: number
+  /** Когда конвейер возьмётся за следующую статью. */
+  nextRunAt: string | null
   /** Почему сейчас ничего не запускается; пусто — значит запустится. */
   blocker: string | null
-  nextTopic: { id: number; query: string; impressions: number } | null
+  nextTopic: PickedTopic | null
+  /** Темы, отброшенные из-за каннибализации — чтобы решение было видно. */
+  skipped: { query: string; verdict: string; reason: string; updateTarget: string | null }[]
 }
 
-/** Понедельник текущей недели — по нему считаем недельную норму. */
+/** Понедельник текущей недели — по нему считаем, сколько уже сделано. */
 function weekStart(): string {
   const d = new Date()
   d.setUTCHours(0, 0, 0, 0)
   d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7))
   return d.toISOString()
+}
+
+/**
+ * Промежуток между статьями. Ритм, а не недельная квота: при семи статьях в
+ * неделю — раз в сутки. Квота выбиралась ручными запусками и глушила конвейер
+ * до конца недели, ритм же просто выдерживает паузу.
+ */
+export function intervalMs(perWeek: number): number {
+  return Math.round((7 * 864e5) / Math.max(1, perWeek))
+}
+
+async function lastAutoRun(seo: any): Promise<number> {
+  const { data } = await seo.from('settings').select('value').eq('key', 'last_auto_article').maybeSingle()
+  const at = (data?.value as any)?.at
+  return at ? Date.parse(at) : 0
+}
+
+export async function markAutoRun(seo: any): Promise<void> {
+  await seo.from('settings').upsert({ key: 'last_auto_article', value: { at: new Date().toISOString() } }, { onConflict: 'key' })
 }
 
 export async function flowState(seo: any): Promise<FlowState> {
@@ -56,28 +87,51 @@ export async function flowState(seo: any): Promise<FlowState> {
     .select('*', { count: 'exact', head: true })
     .in('status', ['ready_for_review', 'in_review'])
 
-  const nextTopic = await pickTopic(seo)
+  const picked = await pickTopic(seo, { withSkipped: true })
+  const nextTopic = picked.topic
+
+  const last = await lastAutoRun(seo)
+  const readyAt = last + intervalMs(settings.perWeek)
+  const nextRunAt = settings.enabled ? new Date(Math.max(readyAt, Date.now())).toISOString() : null
 
   let blocker: string | null = null
   if (!settings.enabled) blocker = 'поток выключен'
   else if ((inReview ?? 0) >= settings.maxInReview) blocker = `на вычитке ${inReview} — больше не берём, пока не разберёте`
-  else if ((startedThisWeek ?? 0) >= settings.perWeek) blocker = `недельная норма выбрана: ${startedThisWeek} из ${settings.perWeek}`
-  else if (!nextTopic) blocker = 'нет свободных тем — нужен новый разбор запросов'
+  else if (Date.now() < readyAt) {
+    const hours = Math.max(1, Math.round((readyAt - Date.now()) / 36e5))
+    blocker = `следующая статья через ${hours} ${hours === 1 ? 'час' : hours < 5 ? 'часа' : 'часов'} — держим ритм`
+  } else if (!nextTopic) {
+    blocker = picked.skipped.length
+      ? `свободных тем нет: ${picked.skipped.length} отброшено из-за каннибализации`
+      : 'нет свободных тем — нужен новый разбор запросов'
+  }
 
-  return { settings, startedThisWeek: startedThisWeek ?? 0, inReview: inReview ?? 0, blocker, nextTopic }
+  return {
+    settings, startedThisWeek: startedThisWeek ?? 0, inReview: inReview ?? 0,
+    nextRunAt, blocker, nextTopic, skipped: picked.skipped,
+  }
 }
 
 /**
- * Следующая тема: самая ценная из непочатых. Темы, по которым статья уже
- * писалась или пишется, отбрасываем — иначе конвейер начнёт бодать сам себя.
+ * Следующая тема: самая ценная из непочатых и безопасных.
+ *
+ * Отбрасываем два вида тем. Первый — те, по которым статья уже писалась или
+ * пишется. Второй, и он важнее: те, чьи запросы уже держит своя страница.
+ * Написать по такой теме новую статью — значит отобрать запросы у собственной
+ * страницы, а не привести новых людей. Проверка идёт по семьям запросов, а не
+ * по похожести текстов: две разные статьи прекрасно дерутся за один запрос.
  */
-export async function pickTopic(seo: any): Promise<{ id: number; query: string; impressions: number } | null> {
+export async function pickTopic(
+  seo: any,
+  opts: { withSkipped?: boolean } = {},
+): Promise<{ topic: PickedTopic | null; skipped: FlowState['skipped'] }> {
   const { data: topics } = await seo.from('topics')
     .select('id, title, primary_keyword, search_volume, priority')
     .eq('status', 'new').eq('origin', 'gsc_gap')
     .order('priority', { ascending: false, nullsFirst: false })
     .limit(40)
-  if (!topics?.length) return null
+  const skipped: FlowState['skipped'] = []
+  if (!topics?.length) return { topic: null, skipped }
 
   const ids = topics.map((t: any) => t.id)
   const { data: used } = await seo.from('articles').select('topic_id').in('topic_id', ids)
@@ -89,7 +143,20 @@ export async function pickTopic(seo: any): Promise<{ id: number; query: string; 
     ...(queued ?? []).map((r: any) => r.topic_id),
   ].filter(Boolean))
 
-  const free = topics.find((t: any) => !taken.has(t.id))
-  if (!free) return null
-  return { id: free.id, query: free.primary_keyword ?? free.title, impressions: free.search_volume ?? 0 }
+  const free = topics.filter((t: any) => !taken.has(t.id))
+  if (!free.length) return { topic: null, skipped }
+
+  const { loadQueryRows, verdictFor } = await import('./cannibal')
+  const rows = await loadQueryRows(seo)
+
+  for (const t of free) {
+    const query = t.primary_keyword ?? t.title
+    const v = verdictFor(rows, query)
+    if (v.verdict === 'safe') {
+      return { topic: { id: t.id, query, impressions: t.search_volume ?? 0, cannibalReason: v.reason }, skipped }
+    }
+    skipped.push({ query, verdict: v.verdict, reason: v.reason, updateTarget: v.updateTarget })
+    if (!opts.withSkipped && skipped.length > 20) break
+  }
+  return { topic: null, skipped }
 }

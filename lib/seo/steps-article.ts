@@ -154,6 +154,26 @@ registerStep('article_brief', async (job: Job, seo: any): Promise<StepOutcome> =
   }
   if (!topic) return { outcome: 'failed', result: { error: 'нет темы: нужен topic_id или query' } }
 
+  // Стоп-кран перед записью. Проверка стоит именно здесь, а не только при выборе
+  // темы: тему можно задать руками, а деньги тратятся начиная со следующего шага.
+  // Пропуск возможен явным флагом — на случай, когда решение принято осознанно.
+  if (!job.payload?.force) {
+    const { checkCannibalization } = await import('./cannibal')
+    const v = await checkCannibalization(seo, topic.primary_keyword ?? topic.title)
+    if (v.verdict !== 'safe') {
+      await seo.from('topics').update({ status: 'rejected_duplicate' }).eq('id', topic.id)
+      return {
+        outcome: 'done',
+        result: {
+          skipped: true, verdict: v.verdict, reason: v.reason,
+          update_instead: v.updateTarget,
+          owners: v.owners.slice(0, 3).map((o: any) => `${Math.round(o.share * 100)}% ${o.url}`),
+          cost: 0,
+        },
+      }
+    }
+  }
+
   const ctx = await buildContext(seo, topic)
   const brief: Brief = await generateBrief(ctx)
 
@@ -608,7 +628,7 @@ registerStep('index_check_site', async (_job: Job, seo: any): Promise<StepOutcom
  * вычитку переполнена.
  */
 registerStep('article_autostart', async (_job: Job, seo: any): Promise<StepOutcome> => {
-  const { flowState } = await import('./flow')
+  const { flowState, markAutoRun } = await import('./flow')
   const st = await flowState(seo)
 
   if (st.blocker || !st.nextTopic) {
@@ -621,9 +641,16 @@ registerStep('article_autostart', async (_job: Job, seo: any): Promise<StepOutco
     payload: { topic_id: st.nextTopic.id, auto: true },
     dedup_key: `article:topic:${st.nextTopic.id}:auto`,
   })
+  await markAutoRun(seo)
 
   return {
     outcome: 'done',
-    result: { started: true, topic: st.nextTopic.query, week: `${st.startedThisWeek + 1}/${st.settings.perWeek}`, cost: 0 },
+    result: {
+      started: true, topic: st.nextTopic.query,
+      week: `${st.startedThisWeek + 1}/${st.settings.perWeek}`,
+      safe_because: st.nextTopic.cannibalReason,
+      skipped: st.skipped.length,
+      cost: 0,
+    },
   }
 })

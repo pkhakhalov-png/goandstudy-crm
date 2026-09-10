@@ -36,9 +36,9 @@ export function FlowPanel({ state }: { state: FlowState }) {
       </div>
 
       <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', marginTop: 12, alignItems: 'flex-end' }}>
-        <Field label="Статей в неделю" hint={`запущено на этой неделе: ${state.startedThisWeek}`}>
+        <Field label="Статей в неделю" hint={s.perWeek >= 7 ? `это ${(s.perWeek / 7).toFixed(s.perWeek % 7 ? 1 : 0)} в день` : `раз в ${Math.round(7 / s.perWeek)} дн.`}>
           <select value={s.perWeek} disabled={pending} onChange={(e) => save({ ...s, perWeek: Number(e.target.value) })} style={select}>
-            {[1, 2, 3, 5, 7, 10].map((n) => <option key={n} value={n}>{n}</option>)}
+            {[1, 2, 3, 5, 7, 14].map((n) => <option key={n} value={n}>{n}</option>)}
           </select>
         </Field>
 
@@ -55,6 +55,11 @@ export function FlowPanel({ state }: { state: FlowState }) {
               ? <>{state.nextTopic.query} <span style={{ color: 'var(--muted)' }}>· {state.nextTopic.impressions.toLocaleString('ru')} показов</span></>
               : <span style={{ color: 'var(--muted)' }}>свободных тем нет</span>}
           </div>
+          {state.nextTopic && (
+            <div style={{ fontSize: 11, color: 'var(--green)', marginTop: 3 }}>
+              проверено: {state.nextTopic.cannibalReason}
+            </div>
+          )}
         </div>
 
         <button className="btn-s" disabled={pending || !state.nextTopic}
@@ -69,10 +74,42 @@ export function FlowPanel({ state }: { state: FlowState }) {
       <div style={{ marginTop: 10, fontSize: 12, color: state.blocker ? 'var(--muted)' : 'var(--green)' }}>
         {state.blocker
           ? <>Сейчас ничего не запускается: {state.blocker}.</>
-          : <>Следующая статья уйдёт в работу в ближайший ночной проход.</>}
+          : <>Следующая статья уйдёт в работу в ближайший проход воркера.</>}
       </div>
 
       {note && <div style={{ marginTop: 6, fontSize: 12, color: 'var(--red)' }}>{note}</div>}
+
+      {state.skipped.length > 0 && (
+        <details style={{ marginTop: 10 }}>
+          <summary style={{ fontSize: 12, color: 'var(--purple)', cursor: 'pointer' }}>
+            Отброшено из-за каннибализации: {state.skipped.length}
+          </summary>
+          <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.5 }}>
+              По этим запросам сайт уже показывается. Новая статья не привела бы новых людей,
+              а отобрала бы запросы у собственной страницы. Проверка идёт по запросам, а не по
+              похожести текстов: две совершенно разные статьи прекрасно дерутся за один запрос.
+            </div>
+            {state.skipped.map((sk, i) => (
+              <div key={i} style={{ fontSize: 12, borderLeft: '2px solid var(--bor2)', paddingLeft: 8 }}>
+                <div style={{ fontWeight: 600 }}>
+                  {sk.query}
+                  <span style={{ color: sk.verdict === 'risky' ? 'var(--red)' : 'var(--purple)', fontWeight: 400, marginLeft: 6 }}>
+                    {sk.verdict === 'risky' ? 'уже дерутся' : 'обновлять существующую'}
+                  </span>
+                </div>
+                <div style={{ color: 'var(--muted)', fontSize: 11 }}>{sk.reason}</div>
+                {sk.updateTarget && (
+                  <a href={`${sk.updateTarget}/`} target="_blank" rel="noopener noreferrer"
+                    style={{ fontSize: 11, color: 'var(--purple)', textDecoration: 'none' }}>
+                    {sk.updateTarget.replace('https://goandstudy.com', '')} →
+                  </a>
+                )}
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
     </div>
   )
 }
