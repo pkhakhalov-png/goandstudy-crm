@@ -48,6 +48,10 @@ export async function GET(req: NextRequest) {
       id: job.id,
       article_id: job.article_id,
       dry_run: job.payload?.dry_run !== false,
+      // Обновление вышедшей статьи: тот же адрес, тело перезаписывается.
+      // Без этого режима переписать опубликованное нельзя, а с ним нельзя
+      // нечаянно — решение принимает человек кнопкой, а не конвейер.
+      update: job.payload?.update === true,
       slug: meta.slug,
       body: normalizeBody(String(version?.body ?? '')).trimEnd() + '\n',
       cover_base64: meta.cover.base64,

@@ -7,6 +7,20 @@ import { mskTodayStr } from '@/lib/time'
 const MONTHS = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь']
 const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
 
+// Невидимый сбор UTM-меток + страницы источника из URL (клиент ничего не видит).
+const UTM_KEYS = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term']
+function collectUtm(): string {
+  if (typeof window === 'undefined') return '{}'
+  try {
+    const sp = new URLSearchParams(window.location.search)
+    const out: Record<string, string> = {}
+    for (const k of UTM_KEYS) { const v = sp.get(k); if (v) out[k] = v }
+    out.landing_url = window.location.href
+    if (document.referrer) out.referrer = document.referrer
+    return JSON.stringify(out)
+  } catch { return '{}' }
+}
+
 interface AvailableSlot { date: string; start_time: string; end_time: string; count: number }
 interface Props { availableSlots: AvailableSlot[]; managerId?: string; managerName?: string }
 
@@ -102,6 +116,7 @@ export function BookingClient({ availableSlots, managerId, managerName }: Props)
       fd.append('client_phone', answers.client_phone || '')
       fd.append('client_telegram', answers.client_telegram || '')
       fd.append('quiz_data', JSON.stringify({ ...answers, [id]: value }))
+      fd.append('utm_data', collectUtm())
       createLowBudgetDeal(fd)
       setTgRedirect(true)
       return
@@ -154,6 +169,7 @@ export function BookingClient({ availableSlots, managerId, managerName }: Props)
       finalAnswers.stage = finalAnswers.stage.map((v: string) => v === 'Свой вариант' ? `Свой вариант: ${customVariant}` : v)
     }
     fd.append('quiz_data', JSON.stringify(finalAnswers))
+    fd.append('utm_data', collectUtm())
     if (managerId) fd.append('manager_id', managerId)
     const res = await createBooking(fd)
     setLoading(false)

@@ -69,32 +69,62 @@ function publish(array $job): array {
 
     $bodyFile  = THEME . "/inc/blog-articles/$slug.html";
     $coverFile = THEME . "/assets/img/blog/$slug.jpg";
-    if (file_exists($bodyFile)) throw new RuntimeException("слаг $slug уже занят — по стандарту не дописываем «-2», а уточняем тему");
+    $isUpdate  = !empty($job['update']);
+
+    // Обновление вышедшей статьи — отдельный режим. Без него нельзя переписать
+    // опубликованное, а с ним легко нечаянно затереть чужую правку, поэтому
+    // решение принимает человек, а не конвейер.
+    if (file_exists($bodyFile) && !$isUpdate) {
+        throw new RuntimeException("слаг $slug уже занят — по стандарту не дописываем «-2», а уточняем тему");
+    }
+    if (!file_exists($bodyFile) && $isUpdate) {
+        throw new RuntimeException("нечего обновлять: файла $bodyFile нет");
+    }
 
     $seedFrom = seed_flag();
     $seedTo = 'goandstudy_seed_v' . ((int) str_replace('goandstudy_seed_v', '', $seedFrom) + 1);
 
     if (!empty($job['dry_run'])) {
         return ['dry_run' => true, 'seed_from' => $seedFrom, 'seed_to' => $seedTo, 'slug' => $slug,
-                'steps' => ["тело → $bodyFile", "обложка → $coverFile", 'строка в начало реестра', "сид-флаг $seedFrom → $seedTo", 'прогрев главной']];
+                'steps' => [
+                    ($isUpdate ? 'перезапись тела → ' : 'тело → ') . $bodyFile,
+                    ($isUpdate ? 'перезапись обложки → ' : 'обложка → ') . $coverFile,
+                    $isUpdate ? 'обновление строки реестра, дата правки на сегодня' : 'строка в начало реестра',
+                    "сид-флаг $seedFrom → $seedTo",
+                    'прогрев главной',
+                ]];
     }
 
     $steps = [];
+    if ($isUpdate) copy($bodyFile, $bodyFile . '.bak.' . time());
     file_put_contents($bodyFile, $job['body']);
-    $steps[] = "тело → $bodyFile";
+    $steps[] = ($isUpdate ? 'перезаписано тело → ' : 'тело → ') . $bodyFile;
     file_put_contents($coverFile, base64_decode($job['cover_base64']));
-    $steps[] = "обложка → $coverFile";
+    $steps[] = ($isUpdate ? 'перезаписана обложка → ' : 'обложка → ') . $coverFile;
 
     // Реестр правим с резервной копией и проверкой синтаксиса: сломанный PHP положит весь сайт
     $registry = THEME . '/inc/blog-data.php';
     $backup = $registry . '.bak.' . time();
     copy($registry, $backup);
     $src = file_get_contents($registry);
-    $marker = strpos($src, 'return array(');
-    if ($marker === false) throw new RuntimeException('в реестре не найдено начало массива');
-    $insertAt = strpos($src, "\n", $marker) + 1;
-    file_put_contents($registry, substr($src, 0, $insertAt) . registry_line($job['registry']) . "\n" . substr($src, $insertAt));
-    $steps[] = 'строка в начало реестра';
+    if ($isUpdate) {
+        // Меняем существующую строку на месте: порядок карточек в ленте не трогаем,
+        // дату первой публикации сохраняем, двигаем только дату правки (§8).
+        $pattern = "/^.*'slug'\s*=>\s*'" . preg_quote($slug, '/') . "'.*$/m";
+        if (!preg_match($pattern, $src, $found)) throw new RuntimeException("строки со слагом $slug в реестре нет");
+        $published = preg_match("/'published'\s*=>\s*'([0-9-]+)'/", $found[0], $pm) ? $pm[1] : $job['registry']['published'];
+        $entry = $job['registry'];
+        $entry['published'] = $published;
+        $src = preg_replace($pattern, str_replace('$', '\\$', registry_line($entry)), $src, 1);
+        file_put_contents($registry, $src);
+        $steps[] = "строка реестра обновлена, дата первой публикации сохранена ($published)";
+    } else {
+        $marker = strpos($src, 'return array(');
+        if ($marker === false) throw new RuntimeException('в реестре не найдено начало массива');
+        $insertAt = strpos($src, "\n", $marker) + 1;
+        file_put_contents($registry, substr($src, 0, $insertAt) . registry_line($job['registry']) . "\n" . substr($src, $insertAt));
+        $steps[] = 'строка в начало реестра';
+    }
 
     $lint = (string) shell_exec("php -l $registry 2>&1");
     if (!str_contains($lint, 'No syntax errors')) {

@@ -5,6 +5,18 @@ import { normalizePhone } from '@/lib/phone'
 import { timeToMinutes, MIN_GAP_MINUTES } from '@/lib/time'
 import { notifyNewBooking } from '@/lib/telegram'
 
+// UTM-метки + страница источника (скрытно собраны на /book). Парсим и приводим к сводке.
+function parseUtm(formData: FormData): Record<string, string> {
+  try { return JSON.parse((formData.get('utm_data') as string) || '{}') || {} } catch { return {} }
+}
+function utmSummary(u: Record<string, string>): string | null {
+  const parts = [u.utm_source, u.utm_medium, u.utm_campaign].filter(Boolean)
+  return parts.length ? parts.join(' / ') : null
+}
+function utmPage(u: Record<string, string>): string | null {
+  return u.landing_url || u.referrer || null
+}
+
 export async function createBooking(formData: FormData) {
   const supabase = await createAdminClient()
 
@@ -17,6 +29,7 @@ export async function createBooking(formData: FormData) {
   const quizDataRaw = formData.get('quiz_data') as string || '{}'
   let quizData: Record<string, any> = {}
   try { quizData = JSON.parse(quizDataRaw) } catch {}
+  const utm = parseUtm(formData)
 
   const fixedManagerId = (formData.get('manager_id') as string)?.trim() || null
 
@@ -204,6 +217,7 @@ export async function createBooking(formData: FormData) {
             quiz_stage: quizData.stage,
             quiz_result: quizData.result,
             quiz_consultation_format: quizData.consultation_format,
+            ...utm,
           },
         })
       }
@@ -232,6 +246,8 @@ export async function createBooking(formData: FormData) {
       clientPhone,
       clientTelegram,
       quizSummary,
+      source: utmSummary(utm),
+      page: utmPage(utm),
     })
     console.log('[BOOK] TG notify done')
   } catch (e) {
@@ -251,6 +267,7 @@ export async function createLowBudgetDeal(formData: FormData) {
   const quizDataRaw = formData.get('quiz_data') as string || '{}'
   let quizData: Record<string, any> = {}
   try { quizData = JSON.parse(quizDataRaw) } catch {}
+  const utm = parseUtm(formData)
 
   if (!clientName || !clientPhone) return { error: 'Нет данных' }
 
@@ -312,6 +329,7 @@ export async function createLowBudgetDeal(formData: FormData) {
       quiz_consultation_format: quizData.consultation_format,
       redirect_channel: channel,
       low_budget: true,
+      ...utm,
     },
   })
 

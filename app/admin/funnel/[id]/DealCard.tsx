@@ -606,6 +606,33 @@ export function DealCard({ deal, stages, activities, salespersons, clientData, b
             </div>
           </div>
 
+          {/* Источник заявки (UTM + страница) */}
+          {deal.custom_fields && (deal.custom_fields.utm_source || deal.custom_fields.utm_campaign || deal.custom_fields.landing_url || deal.custom_fields.referrer) && (
+            <div style={{ padding: '16px 20px', borderTop: '1px solid var(--bor2)' }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>Источник заявки</div>
+              <div style={{ display: 'grid', gap: 6, fontSize: 12 }}>
+                {[
+                  ['Source', deal.custom_fields.utm_source],
+                  ['Medium', deal.custom_fields.utm_medium],
+                  ['Campaign', deal.custom_fields.utm_campaign],
+                  ['Content', deal.custom_fields.utm_content],
+                  ['Term', deal.custom_fields.utm_term],
+                ].filter(([, v]) => v).map(([k, v]) => (
+                  <div key={k as string} style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+                    <span style={{ color: 'var(--muted)' }}>{k}</span>
+                    <span style={{ fontWeight: 600, textAlign: 'right', wordBreak: 'break-word' }}>{v as string}</span>
+                  </div>
+                ))}
+                {(deal.custom_fields.landing_url || deal.custom_fields.referrer) && (
+                  <div style={{ marginTop: 4, paddingTop: 6, borderTop: '1px dashed var(--bor2)', color: 'var(--muted)', wordBreak: 'break-all' }}>
+                    {deal.custom_fields.landing_url && <div>🔗 Страница: {deal.custom_fields.landing_url}</div>}
+                    {deal.custom_fields.referrer && <div>↩︎ Переход с: {deal.custom_fields.referrer}</div>}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Quiz data */}
           {deal.custom_fields && Object.keys(deal.custom_fields).some(k => k.startsWith('quiz_')) && (
             <div style={{ padding: '16px 20px', borderTop: '1px solid var(--bor2)' }}>

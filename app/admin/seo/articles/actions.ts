@@ -257,7 +257,7 @@ export async function insertIncomingLinks(articleId: number, dryRun = true) {
  * (и это правильно: взломанный WordPress не должен переписывать свои же файлы).
  * Поэтому кнопка ставит задачу, а исполняет её воркер, у которого есть SSH.
  */
-export async function publishToBlog(articleId: number, dryRun = true) {
+export async function publishToBlog(articleId: number, dryRun = true, update = false) {
   const { error: authErr } = await assertAdmin()
   if (authErr) return { error: authErr }
   const admin = await createAdminClient()
@@ -281,7 +281,7 @@ export async function publishToBlog(articleId: number, dryRun = true) {
   const { error } = await seo.from('jobs').insert({
     step: 'article_publish_blog', lane: 'production', priority: 10,
     article_id: articleId, topic_id: article.topic_id,
-    payload: { dry_run: dryRun },
+    payload: { dry_run: dryRun, update },
   })
   if (error) return { error: error.message }
 
@@ -289,8 +289,10 @@ export async function publishToBlog(articleId: number, dryRun = true) {
   return {
     ok: true,
     note: dryRun
-      ? 'План публикации поставлен в очередь — воркер покажет, какие файлы куда уедут.'
-      : 'Публикация поставлена в очередь. Воркер выложит файлы в тему, бампнет сид-флаг и проверит страницу.',
+      ? 'План поставлен в очередь — агент покажет, какие файлы куда уедут.'
+      : update
+        ? 'Обновление поставлено в очередь: тот же адрес, тело перезапишется, дата первой публикации сохранится.'
+        : 'Публикация поставлена в очередь. Агент выложит файлы в тему, бампнет сид-флаг и проверит страницу.',
   }
 }
 
