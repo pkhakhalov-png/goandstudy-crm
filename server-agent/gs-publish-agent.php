@@ -182,7 +182,7 @@ if (($job['kind'] ?? '') === 'link_insert') {
             $parts[$i] = mb_substr($chunk, 0, $pos) . '<a href="' . $target . '">' . $exact . '</a>' . mb_substr($chunk, $pos + mb_strlen($anchor));
             $done = true;
         }
-        if (!$done) throw new RuntimeException("фраза «$anchor» не найдена вне ссылок");
+        if (!$done) throw new RuntimeException("фраза «{$anchor}» не найдена вне ссылок");
 
         copy($file, $file . '.bak.' . time());
         file_put_contents($file, implode('', $parts));
@@ -192,10 +192,10 @@ if (($job['kind'] ?? '') === 'link_insert') {
         shell_exec("sed -i 's/$seedFrom/$seedTo/g' " . THEME . '/functions.php');
         shell_exec('curl -s -o /dev/null https://goandstudy.com/ || true');
 
-        say("ссылка вставлена в $slug: «$anchor» → $target");
+        say("ссылка вставлена в {$slug}: «{$anchor}» → {$target}");
         api('/api/seo/publish/result', $conf, ['job_id' => $job['id'], 'article_id' => $job['article_id'], 'kind' => 'link_insert',
             'ok' => true, 'slug' => $slug, 'seed_from' => $seedFrom, 'seed_to' => $seedTo,
-            'steps' => ["ссылка «$anchor» → $target в $file"], 'suggestion_id' => $job['suggestion_id'] ?? null]);
+            'steps' => ["ссылка «{$anchor}» → {$target} в {$file}"], 'suggestion_id' => $job['suggestion_id'] ?? null]);
     } catch (Throwable $e) {
         say('ошибка вставки: ' . $e->getMessage());
         api('/api/seo/publish/result', $conf, ['job_id' => $job['id'], 'article_id' => $job['article_id'], 'kind' => 'link_insert', 'ok' => false, 'error' => $e->getMessage()]);

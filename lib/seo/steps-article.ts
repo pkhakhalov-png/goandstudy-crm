@@ -280,11 +280,22 @@ registerStep('article_linkplan', async (job: Job, seo: any): Promise<StepOutcome
     targetTitle: brief.title, targetH1: brief.h1, targetSlug: brief.slug,
     anchorCandidates: [brief.h1, brief.primary_keyword, ...(brief.secondary_keywords ?? [])],
     pages, alreadyLinking: new Set(), min: 2,
+    // Ищем фразу там же, где потом будем править. Раньше план смотрел на
+    // отрендеренную страницу вместе с меню и подвалом, а вставка — на исходный
+    // текст записи: план находил фразу, вставка её не видела.
     fetchText: async (url) => {
+      if (!url.includes('/blog/') && wpConfigured()) {
+        const resolved = await wp.resolve(url).catch(() => null)
+        if (resolved?.found && resolved.post_id) {
+          const post = await wp.post(resolved.post_id).catch(() => null)
+          if (post) return String(post.content).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+        }
+      }
       const res = await fetch(url, { headers: { 'User-Agent': 'goandstudy-seo-linkplan' }, signal: AbortSignal.timeout(20000) }).catch(() => null)
       if (!res || !res.ok) return null
       const html = await res.text()
-      return html.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+      return html.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>|<nav[\s\S]*?<\/nav>|<footer[\s\S]*?<\/footer>/gi, ' ')
+        .replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
     },
   })
   await saveLinkPlan(seo, donors, { topicId: job.topic_id!, pageId: null })

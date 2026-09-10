@@ -136,6 +136,8 @@ export async function notifyNewBooking(params: {
   clientPhone: string
   clientTelegram: string | null
   quizSummary?: string | null
+  source?: string | null  // UTM-сводка: source / medium / campaign
+  page?: string | null     // страница-источник (landing/referrer)
 }): Promise<void> {
   const token = process.env.TELEGRAM_BOOKINGS_BOT_TOKEN
   const chatId = process.env.TELEGRAM_BOOKINGS_CHAT_ID
@@ -160,13 +162,15 @@ export async function notifyNewBooking(params: {
     : ''
 
   const quiz = params.quizSummary ? `\n\n${escHtml(params.quizSummary)}` : ''
+  const src = params.source ? `\n📍 Источник: ${escHtml(params.source)}` : ''
+  const pg = params.page ? `\n🔗 Страница: ${escHtml(params.page)}` : ''
 
   const text = `🆕 <b>Новая запись на консультацию</b>
 ${tag}
 
 🗓 ${escHtml(dateLabel)} · ${escHtml(params.startTime)}–${escHtml(params.endTime)} (МСК)
 👤 ${escHtml(params.clientName)}
-📞 ${escHtml(params.clientPhone)}${tg}${quiz}`
+📞 ${escHtml(params.clientPhone)}${tg}${src}${pg}${quiz}`
 
   try {
     const res = await fetch(`${TG_API}/bot${token}/sendMessage`, {

@@ -139,6 +139,13 @@ async function main() {
     reason: reclaimNote || undefined,
   })
   if (!res.ok) { console.log(`✗ ${res.reason}`); process.exit(1) }
+  // Запоминаем номер поста: без него экран статьи в CRM не знает, что публиковать
+  const { data: vrow } = await seo.from('article_versions').select('meta').eq('id', version.id).single()
+  const vm: any = vrow?.meta ?? {}
+  await seo.from('article_versions')
+    .update({ meta: { ...vm, publish: { ...(vm.publish ?? {}), post_id: res.postId, post_type: POST_TYPE, slug, reclaim: RECLAIM || undefined } } })
+    .eq('id', version.id)
+
   console.log(`\n✓ черновик создан: post_id=${res.postId}`)
   for (const p of res.schemaProblems ?? []) console.log(`⚠ разметка: ${p}`)
   console.log('\nСтатья лежит черновиком. В индекс не попадёт, публичного адреса пока нет.')

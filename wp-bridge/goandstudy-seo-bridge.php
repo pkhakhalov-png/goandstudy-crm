@@ -7,7 +7,7 @@
  *              Плюс техническая SEO-база: canonical на всех страницах, JSON-LD и
  *              meta description из меты. Аутентификация — HMAC (WP_BRIDGE_SECRET)
  *              + окно времени. Ставится как mu-plugin.
- * Version: 0.8
+ * Version: 0.9
  *
  * УСТАНОВКА: положить файл в wp-content/mu-plugins/goandstudy-seo-bridge.php
  * В wp-config.php добавить: define('GS_SEO_BRIDGE_SECRET', '<тот же WP_BRIDGE_SECRET, что в CRM env>');
@@ -399,20 +399,51 @@ add_action('wp_head', function () {
     $desc = get_post_meta($id, GS_SEO_METADESC_META, true);
     if ($desc) echo '<meta name="description" content="' . esc_attr($desc) . "\" />\n";
 
-    // Open Graph (§2.10). Тема их не печатает; ставим только то, что реально знаем.
+    // Open Graph (§2.10). Тема их не печатает вовсе.
+    //
+    // Описание и картинку берём по цепочке запасных вариантов: у статей блога нет
+    // ни нашей меты, ни изображения записи — они создаются пересидом из файлов темы,
+    // поэтому раньше при репосте ссылка разворачивалась голым текстом.
     $og_url = get_permalink($id);
+    $slug   = get_post_field('post_name', $id);
+
+    $og_desc = get_post_meta($id, GS_SEO_OG_PREFIX . 'description', true);
+    if (!$og_desc) $og_desc = $desc;                                   // наша мета description
+    // У темы есть собственный источник описаний: реестр статей и карта страниц.
+    // Он точнее обрезанного текста, который начинается с хлебных крошек.
+    if (!$og_desc && $slug && function_exists('goandstudy_seo_description_for_slug')) {
+        $og_desc = goandstudy_seo_description_for_slug($slug);
+    }
+    if (!$og_desc) $og_desc = get_the_excerpt($id);                    // выдержка записи
+    if (!$og_desc) {                                                   // первые строки текста
+        $txt = trim(preg_replace('/\s+/u', ' ', wp_strip_all_tags(strip_shortcodes(get_post_field('post_content', $id)))));
+        $og_desc = mb_substr($txt, 0, 155);
+    }
+
+    $og_image = get_post_meta($id, GS_SEO_OG_PREFIX . 'image', true);
+    if (!$og_image && has_post_thumbnail($id)) $og_image = get_the_post_thumbnail_url($id, 'full');
+    if (!$og_image && $slug) {
+        // Обложка статьи блога лежит в теме под тем же слагом
+        $cover = get_template_directory() . "/assets/img/blog/{$slug}.jpg";
+        if (file_exists($cover)) $og_image = get_template_directory_uri() . "/assets/img/blog/{$slug}.jpg";
+    }
+
     $og = [
         'og:type'        => 'article',
         'og:title'       => get_post_meta($id, GS_SEO_OG_PREFIX . 'title', true) ?: get_the_title($id),
-        'og:description' => get_post_meta($id, GS_SEO_OG_PREFIX . 'description', true) ?: $desc,
+        'og:description' => $og_desc,
         'og:url'         => get_post_meta($id, GS_SEO_OG_PREFIX . 'url', true) ?: $og_url,
+        'og:site_name'   => 'goandstudy',
+        'og:locale'      => 'ru_RU',
     ];
-    $og_image = get_post_meta($id, GS_SEO_OG_PREFIX . 'image', true);
-    if (!$og_image && has_post_thumbnail($id)) $og_image = get_the_post_thumbnail_url($id, 'full');
     if ($og_image) $og['og:image'] = $og_image;
+
     foreach ($og as $prop => $val) {
         if ($val) echo '<meta property="' . esc_attr($prop) . '" content="' . esc_attr($val) . "\" />\n";
     }
+    // Без карточки Twitter/X показывает ту же ссылку одной строкой
+    echo '<meta name="twitter:card" content="' . ($og_image ? 'summary_large_image' : 'summary') . "\" />\n";
+    if ($og_image) echo '<meta name="twitter:image" content="' . esc_attr($og_image) . "\" />\n";
 
     $schema = get_post_meta($id, GS_SEO_SCHEMA_META, true);
     if ($schema) {
