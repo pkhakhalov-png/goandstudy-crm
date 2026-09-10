@@ -15,6 +15,8 @@ type Row = {
   impressions: number
   clicks: number
   lastImpression: string | null
+  firstSeen: string | null
+  firstIndexed: string | null
 }
 
 /** Человеческое имя состояния. Google отдаёт их на языке запроса, но не всегда. */
@@ -27,15 +29,18 @@ function label(verdict: string | null, coverage: string | null): { text: string;
   return { text: 'не в индексе', color: 'var(--purple)' }
 }
 
-export default async function IndexationPage() {
+export default async function IndexationPage({ searchParams }: { searchParams: Promise<{ dni?: string }> }) {
+  const days = Math.min(365, Math.max(7, Number((await searchParams).dni ?? 30)))
   const sb = await createAdminClient()
   const seo = sb.schema('seo')
 
   const { data: pages } = await seo.from('pages')
-    .select('id, normalized_url, page_type')
+    .select('id, normalized_url, page_type, first_seen_at')
     .is('removed_at', null).eq('indexable', true).eq('http_status', 200)
 
   const { data: statuses } = await seo.from('index_status').select('*')
+  const { data: articles } = await seo.from('articles')
+    .select('id, published_at, indexed_at, primary_keyword, current_version_id').eq('status', 'published')
   const byPage = new Map<number, any>((statuses ?? []).map((s: any) => [s.page_id, s]))
 
   // Показы за 28 дней — чтобы сортировать не по алфавиту, а по важности.
@@ -51,6 +56,7 @@ export default async function IndexationPage() {
       verdict: st?.verdict ?? null, coverage: st?.coverage_state ?? null,
       lastCrawl: st?.last_crawl ?? null, checkedAt: st?.checked_at ?? null,
       impressions: t.impressions, clicks: t.clicks, lastImpression: t.lastImpression,
+      firstSeen: p.first_seen_at ?? null, firstIndexed: st?.first_indexed_at ?? null,
     }
   })
 
@@ -65,6 +71,25 @@ export default async function IndexationPage() {
   const quiet = outIndex.filter((r) => r.impressions === 0).sort((a, b) => a.url.localeCompare(b.url))
 
   const lastCheck = (statuses ?? []).map((s: any) => s.checked_at).filter(Boolean).sort().pop()
+
+  // Что появилось за выбранный период и попало ли в индекс.
+  // Для наших статей дата выхода известна точно, для остальных — когда мы её
+  // впервые увидели на обходе; это близко, но не одно и то же.
+  const cutoff = new Date(Date.now() - days * 864e5).toISOString()
+  const publishedAt = new Map<string, string>()
+  for (const a of articles ?? []) if (a.published_at) publishedAt.set(String(a.id), a.published_at)
+
+  const fresh = rows
+    .filter((r) => r.firstSeen && r.firstSeen >= cutoff)
+    .sort((a, b) => (b.firstSeen ?? '').localeCompare(a.firstSeen ?? ''))
+
+  const freshIn = fresh.filter((r) => r.verdict === 'PASS')
+  const waits = freshIn
+    .map((r) => (r.firstSeen && r.firstIndexed
+      ? Math.round((Date.parse(r.firstIndexed) - Date.parse(r.firstSeen)) / 864e5) : null))
+    .filter((n): n is number => n !== null && n >= 0)
+    .sort((a, b) => a - b)
+  const medianWait = waits.length ? waits[Math.floor(waits.length / 2)] : null
 
   return (
     <div>
@@ -87,6 +112,74 @@ export default async function IndexationPage() {
           sub={painful.length ? `${painful.length} из них ищут` : 'без показов'} />
         <Card label="Не проверяли" value={unchecked.length} sub={unchecked.length ? 'дойдёт очередь' : 'все проверены'} />
         <Card label="Всего страниц" value={rows.length} sub="индексируемых" />
+      </div>
+
+      <div style={{ border: '1px solid var(--bor)', borderRadius: 12, overflow: 'hidden', marginBottom: 16 }}>
+        <div style={{ padding: '10px 14px', background: 'var(--surf2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700 }}>Новые страницы за {days} дней · {fresh.length}</div>
+            <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3 }}>
+              {fresh.length === 0
+                ? 'За период ничего нового не появилось.'
+                : <>В индексе {freshIn.length} из {fresh.length}
+                    {medianWait !== null && <> · обычно попадают за {medianWait} {plural(medianWait)}</>}.
+                    Для свежих статей ожидание в одну-две недели — норма.</>}
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {[30, 90, 180].map((d) => (
+              <Link key={d} href={`/admin/seo/indexation?dni=${d}`}
+                style={{ fontSize: 12, padding: '3px 9px', borderRadius: 6, textDecoration: 'none',
+                  border: '1px solid var(--bor2)',
+                  color: d === days ? 'var(--purple)' : 'var(--muted)',
+                  fontWeight: d === days ? 700 : 400 }}>
+                {d} дн
+              </Link>
+            ))}
+          </div>
+        </div>
+        {fresh.length > 0 && (
+          <div style={{ padding: '0 6px 6px' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+              <thead>
+                <tr style={{ color: 'var(--muted)', textAlign: 'left' }}>
+                  <th style={th}>Адрес</th>
+                  <th style={th}>Появилась</th>
+                  <th style={th}>Состояние</th>
+                  <th style={th}>В индексе с</th>
+                  <th style={{ ...th, textAlign: 'right' }}>Ждёт, дней</th>
+                </tr>
+              </thead>
+              <tbody>
+                {fresh.map((r) => {
+                  const l = label(r.verdict, r.coverage)
+                  const waiting = r.firstSeen
+                    ? Math.round((Date.parse(r.firstIndexed ?? new Date().toISOString()) - Date.parse(r.firstSeen)) / 864e5)
+                    : null
+                  return (
+                    <tr key={r.page_id} style={{ borderTop: '1px solid var(--bor)' }}>
+                      <td style={td}>
+                        <a href={r.url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text)', textDecoration: 'none' }}>
+                          {r.url.replace('https://goandstudy.com', '') || '/'}
+                        </a>
+                      </td>
+                      <td style={{ ...td, color: 'var(--muted)', whiteSpace: 'nowrap' }}>
+                        {r.firstSeen ? new Date(r.firstSeen).toLocaleDateString('ru') : '—'}
+                      </td>
+                      <td style={{ ...td, color: l.color, fontWeight: 600, whiteSpace: 'nowrap' }}>{l.text}</td>
+                      <td style={{ ...td, color: 'var(--muted)', whiteSpace: 'nowrap' }}>
+                        {r.firstIndexed ? new Date(r.firstIndexed).toLocaleDateString('ru') : '—'}
+                      </td>
+                      <td style={{ ...td, textAlign: 'right', color: r.verdict === 'PASS' ? 'var(--muted)' : 'var(--purple)' }}>
+                        {waiting === null ? '—' : waiting}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {painful.length > 0 && (
@@ -192,6 +285,13 @@ function Table({ title, hint, rows, showTraffic, collapsed }: {
       ) : <div style={{ padding: '0 6px 6px' }}>{body}</div>}
     </div>
   )
+}
+
+function plural(n: number): string {
+  const d = n % 10, dd = n % 100
+  if (d === 1 && dd !== 11) return 'день'
+  if (d >= 2 && d <= 4 && (dd < 12 || dd > 14)) return 'дня'
+  return 'дней'
 }
 
 const th: React.CSSProperties = { padding: '8px 8px', fontWeight: 500, fontSize: 11 }

@@ -97,14 +97,30 @@ export async function saveIndexStatus(seo: any, pageId: number, v: IndexVerdict)
   if (!v.checked) return
   // Пока страница не в индексе, проверяем чаще: смысл в том, чтобы поймать момент
   const nextDays = v.verdict === 'PASS' ? 14 : 2
-  await seo.from('index_status').upsert({
+
+  const row: Record<string, unknown> = {
     page_id: pageId,
     coverage_state: v.coverageState,
     verdict: v.verdict,
     last_crawl: v.lastCrawl,
     checked_at: new Date().toISOString(),
     next_check_at: new Date(Date.now() + nextDays * 864e5).toISOString(),
-  }, { onConflict: 'page_id' })
+  }
+
+  // Дату попадания в индекс ставим один раз — она отвечает на вопрос
+  // «сколько дней страница шла до индекса», и перезаписывать её нельзя
+  if (v.verdict === 'PASS') {
+    const { data: prev } = await seo.from('index_status')
+      .select('first_indexed_at').eq('page_id', pageId).maybeSingle()
+    if (!prev?.first_indexed_at) row.first_indexed_at = v.lastCrawl ?? new Date().toISOString()
+  }
+
+  const { error } = await seo.from('index_status').upsert(row, { onConflict: 'page_id' })
+  // Колонка появляется миграцией; пока её нет, пишем без неё, а не теряем проверку
+  if (error && /first_indexed_at/.test(error.message)) {
+    delete row.first_indexed_at
+    await seo.from('index_status').upsert(row, { onConflict: 'page_id' })
+  }
 }
 
 /**
