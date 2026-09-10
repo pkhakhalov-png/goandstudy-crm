@@ -18,7 +18,8 @@ const BATCH = 5
 const LONG_STEP_MS = 230_000
 // Долгие — те, что зовут модель. Проверка индексации это пара запросов к
 // Search Console, ей полный запас времени не нужен.
-const isLongStep = (step: string) => step.startsWith('article_') && step !== 'article_index_check'
+const QUICK_ARTICLE_STEPS = new Set(['article_index_check', 'article_autostart'])
+const isLongStep = (step: string) => step.startsWith('article_') && !QUICK_ARTICLE_STEPS.has(step)
 
 export async function POST(req: NextRequest) {
   const secret = process.env.SEO_TICK_SECRET
@@ -49,6 +50,7 @@ export async function POST(req: NextRequest) {
         { step: 'compute_opportunities', lane: 'findings', priority: 40, payload: {} },
         { step: 'generate_schema', lane: 'findings', priority: 30, payload: {} },
         { step: 'article_index_check', lane: 'findings', priority: 20, payload: {} },
+        { step: 'article_autostart', lane: 'production', priority: 15, payload: {} },
       ]
       const { data: ex } = await seo.from('jobs').select('step').in('step', steps.map((s) => s.step)).in('status', ['pending', 'running', 'waiting'])
       const have = new Set((ex ?? []).map((e: any) => e.step))

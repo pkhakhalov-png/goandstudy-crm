@@ -407,3 +407,36 @@ export async function checkIndex(articleId: number) {
   revalidatePath(`/admin/seo/articles/${articleId}`)
   return { ok: true, note: `Google: ${v.note}${v.lastCrawl ? `, последний обход ${String(v.lastCrawl).slice(0, 10)}` : ''}` }
 }
+
+/* ── Поток статей ─────────────────────────────────────────────────────────── */
+
+export async function saveFlowSettings(next: { enabled: boolean; perWeek: number; maxInReview: number }) {
+  const { error: authErr } = await assertAdmin()
+  if (authErr) return { error: authErr }
+  const seo = (await createAdminClient()).schema('seo')
+  const { saveFlow } = await import('@/lib/seo/flow')
+  await saveFlow(seo, next)
+  revalidatePath('/admin/seo/articles')
+  return { ok: true }
+}
+
+/** Не ждать ночного прохода — взять следующую тему прямо сейчас. */
+export async function startNextNow() {
+  const { error: authErr } = await assertAdmin()
+  if (authErr) return { error: authErr }
+  const seo = (await createAdminClient()).schema('seo')
+  const { pickTopic } = await import('@/lib/seo/flow')
+
+  const topic = await pickTopic(seo)
+  if (!topic) return { error: 'свободных тем нет' }
+
+  const { error } = await seo.from('jobs').insert({
+    step: 'article_brief', lane: 'production', priority: 50,
+    topic_id: topic.id, payload: { topic_id: topic.id },
+    dedup_key: `article:topic:${topic.id}:${Date.now()}`,
+  })
+  if (error) return { error: error.message }
+
+  revalidatePath('/admin/seo/articles')
+  return { ok: true, note: `«${topic.query}» в очереди` }
+}

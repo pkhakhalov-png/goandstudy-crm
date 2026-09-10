@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { LaunchArticle } from './LaunchArticle'
+import { FlowPanel } from './FlowPanel'
 import { JobQueue } from './JobQueue'
 
 async function load() {
@@ -62,7 +63,10 @@ async function load() {
       impressions: t.search_volume ?? 0,
     }))
 
-    return { ok: true as const, rows, jobs: jobs ?? [], suggestions }
+    const { flowState } = await import('@/lib/seo/flow')
+    const flow = await flowState(seo)
+
+    return { ok: true as const, rows, jobs: jobs ?? [], suggestions, flow }
   } catch (e: any) {
     return { ok: false as const, error: e?.message ?? 'seo недоступна' }
   }
@@ -91,6 +95,7 @@ export default async function SeoArticles() {
         </div>
       ) : (
         <>
+          <FlowPanel state={s.flow} />
           <LaunchArticle suggestions={s.suggestions} />
           <JobQueue jobs={s.jobs} />
           {s.rows.length === 0 ? (

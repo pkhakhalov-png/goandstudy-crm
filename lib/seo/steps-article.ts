@@ -600,3 +600,30 @@ registerStep('index_check_site', async (_job: Job, seo: any): Promise<StepOutcom
   }
   return { outcome: 'done', result: { checked: res.checked, stopped: res.stopped ?? null, cost: 0 } }
 })
+
+
+/**
+ * Автозапуск статьи по расписанию. Ставится в суточный цикл; сам решает,
+ * пора ли, и молча ничего не делает, если норма выбрана или очередь на
+ * вычитку переполнена.
+ */
+registerStep('article_autostart', async (_job: Job, seo: any): Promise<StepOutcome> => {
+  const { flowState } = await import('./flow')
+  const st = await flowState(seo)
+
+  if (st.blocker || !st.nextTopic) {
+    return { outcome: 'done', result: { started: false, why: st.blocker ?? 'нет темы', cost: 0 } }
+  }
+
+  await seo.from('jobs').insert({
+    step: 'article_brief', lane: 'production', priority: 40,
+    topic_id: st.nextTopic.id,
+    payload: { topic_id: st.nextTopic.id, auto: true },
+    dedup_key: `article:topic:${st.nextTopic.id}:auto`,
+  })
+
+  return {
+    outcome: 'done',
+    result: { started: true, topic: st.nextTopic.query, week: `${st.startedThisWeek + 1}/${st.settings.perWeek}`, cost: 0 },
+  }
+})
