@@ -141,6 +141,20 @@ export async function createBooking(formData: FormData) {
     client_telegram: clientTelegram,
   }).select('id').single()
 
+  // Откуда человек пришёл — знаем только здесь и только сейчас. Пишем касание
+  // сразу, но так, чтобы сбой статистики не мешал записи клиента.
+  if (insertedBooking?.id) {
+    try {
+      const { recordBookingTouch } = await import('@/lib/seo/attribution')
+      const { createAdminClient } = await import('@/lib/supabase/server')
+      const seo = (await createAdminClient()).schema('seo')
+      const touch = await recordBookingTouch(seo, { bookingId: insertedBooking.id, utm, anonId: utm.anon_id ?? null })
+      console.log('[BOOK] касание записано:', touch.ok ? (touch.page ?? 'страница не наша') : touch.why)
+    } catch (e: any) {
+      console.log('[BOOK] касание не записалось:', e?.message)
+    }
+  }
+
   if (bookErr) {
     console.error('[BOOK] insert FAILED:', { code: bookErr.code, msg: bookErr.message, salesperson: assignedUser.id, date, time: st })
     if (bookErr.code === '23505') {

@@ -28,7 +28,7 @@ const LONG_STEP_MS = 230_000
 const SERVER_ONLY_STEPS = new Set(['article_publish_blog', 'link_insert_theme'])
 const canRunHere = (step: string) => !(process.env.VERCEL && SERVER_ONLY_STEPS.has(step))
 
-const QUICK_ARTICLE_STEPS = new Set(['article_index_check', 'article_autostart'])
+const QUICK_ARTICLE_STEPS = new Set(['article_index_check', 'article_autostart', 'attribution_stitch'])
 const isLongStep = (step: string) => step.startsWith('article_') && !QUICK_ARTICLE_STEPS.has(step)
 
 export async function POST(req: NextRequest) {
@@ -60,6 +60,7 @@ export async function POST(req: NextRequest) {
         { step: 'compute_opportunities', lane: 'findings', priority: 40, payload: {} },
         { step: 'generate_schema', lane: 'findings', priority: 30, payload: {} },
         { step: 'article_index_check', lane: 'findings', priority: 20, payload: {} },
+        { step: 'attribution_stitch', lane: 'findings', priority: 18, payload: {} },
       ]
       const { data: ex } = await seo.from('jobs').select('step').in('step', steps.map((s) => s.step)).in('status', ['pending', 'running', 'waiting'])
       const have = new Set((ex ?? []).map((e: any) => e.step))

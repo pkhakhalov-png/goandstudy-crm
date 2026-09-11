@@ -743,3 +743,16 @@ registerStep('article_autostart', async (_job: Job, seo: any): Promise<StepOutco
     },
   }
 })
+
+
+/**
+ * Сшивка обращений с продажами. Отдельным шагом, потому что сделка появляется
+ * позже записи на консультацию, а иногда и вручную.
+ */
+registerStep('attribution_stitch', async (_job: Job, seo: any): Promise<StepOutcome> => {
+  const { stitchDeals } = await import('./attribution')
+  const { createAdminClient } = await import('@/lib/supabase/server')
+  const sb = await createAdminClient()
+  const res = await stitchDeals(seo, sb)
+  return { outcome: 'done', result: { ...res, cost: 0 } }
+})

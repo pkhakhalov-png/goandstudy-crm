@@ -47,6 +47,17 @@ export default async function EffectPage() {
   const quiet = blog.filter((b) => b.t.impressions > 0 && b.t.clicks === 0)
 
   /* ── Наши статьи ───────────────────────────────────────────────────────── */
+  // Обращения: считаем только то, что видим целиком — заявку через нашу форму.
+  const { data: touches } = await seo.from('lead_identities')
+    .select('first_touch_page, deal_id, lead_at').not('first_touch_page', 'is', null)
+  const contactsByPage = new Map<number, { leads: number; deals: number }>()
+  for (const t of touches ?? []) {
+    const c = contactsByPage.get(t.first_touch_page) ?? { leads: 0, deals: 0 }
+    c.leads++
+    if (t.deal_id) c.deals++
+    contactsByPage.set(t.first_touch_page, c)
+  }
+
   const { data: articles } = await seo.from('articles')
     .select('id, primary_keyword, published_at, current_version_id').eq('status', 'published').order('published_at')
 
@@ -90,11 +101,12 @@ export default async function EffectPage() {
           Console отстают на 2–3 дня.
         </p>
         <div style={{ marginTop: 10, padding: '8px 12px', border: '1px solid var(--bor2)', borderRadius: 8, fontSize: 12, color: 'var(--muted)', maxWidth: 760, lineHeight: 1.55 }}>
-          <b style={{ color: 'var(--text)' }}>Здесь только поисковые показатели.</b> Обращений и сделок
-          на этом экране нет и не будет, пока не связаны посадочная страница и заявка: переходы
-          на сайте не размечены, `seo.v_page_deals` пуст. Клик по кнопке мессенджера — это клик,
-          а не заявка, и называть его заявкой мы не будем. Что для этого нужно — в
-          `docs/seo/backlog.md`.
+          <b style={{ color: 'var(--text)' }}>Чего эти цифры не покрывают.</b> Обращением считается
+          только заявка через нашу форму записи: её путь виден целиком. Переход в мессенджер —
+          это клик, а не заявка, и заявкой мы его не зовём. Звонки, письма и обращения из
+          телеграм-группы к странице не привязываются вовсе. Счёт ведётся с 11.09.2026 —
+          у более ранних заявок источник не размечен, и восстановить его нельзя.
+          {contactsByPage.size === 0 && ' Пока ни одного размеченного обращения нет — это отсутствие данных, а не ноль.'}
         </div>
       </div>
 
@@ -104,6 +116,9 @@ export default async function EffectPage() {
         <Card label="Медиана кликов" value={median} sub="за 28 дней, на статью" />
         <Card label="Без единого клика" value={quiet.length} color={quiet.length ? 'var(--purple)' : undefined} sub="показы есть" />
         <Card label="Без показов" value={dead.length} color={dead.length ? 'var(--red)' : undefined} sub="их не находят" />
+        <Card label="Обращений со статей"
+          value={[...contactsByPage.values()].reduce((a, c) => a + c.leads, 0)}
+          sub={contactsByPage.size ? `${[...contactsByPage.values()].reduce((a, c) => a + c.deals, 0)} дошли до сделки` : 'разметка с 11.09'} />
       </div>
 
       {/* Наши статьи */}
