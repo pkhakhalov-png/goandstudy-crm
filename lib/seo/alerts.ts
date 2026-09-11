@@ -27,7 +27,10 @@ async function sendRaw(token: string, chatId: string, text: string): Promise<voi
  * перестали читать и то и другое.
  */
 function alertChat(): string | null {
-  return process.env.SEO_ALERT_CHAT_ID || process.env.TELEGRAM_BOOKINGS_CHAT_ID || null
+  // Только свой чат. Запасного варианта нет намеренно: свалить сообщения
+  // конвейера в чат заявок — значит мешать работе продавцов ради удобства
+  // настройки. Нет отдельного чата — значит уведомлений нет.
+  return process.env.SEO_ALERT_CHAT_ID || null
 }
 
 /**
@@ -36,11 +39,7 @@ function alertChat(): string | null {
  * «chat not found», и сообщение просто не приходит.
  */
 function alertToken(): string | null {
-  if (process.env.SEO_ALERT_CHAT_ID) return process.env.TELEGRAM_BOT_TOKEN ?? null
-  if (process.env.TELEGRAM_BOOKINGS_CHAT_ID) {
-    return process.env.TELEGRAM_BOOKINGS_BOT_TOKEN ?? process.env.TELEGRAM_BOT_TOKEN ?? null
-  }
-  return null
+  return process.env.SEO_ALERT_CHAT_ID ? (process.env.TELEGRAM_BOT_TOKEN ?? null) : null
 }
 
 const QUIET_HOURS = 6
@@ -147,7 +146,18 @@ export async function collectNews(seo: any): Promise<Alert[]> {
 
 /** Отправить то, о чём ещё не говорили. Возвращает, сколько ушло. */
 export async function notifyAlerts(seo: any): Promise<{ sent: number; suppressed: number }> {
-  const [problems, news] = await Promise.all([collectAlerts(seo), collectNews(seo)])
+  // Настройка важнее удобства: о готовой статье сообщать не нужно, если человек
+  // и так заходит в CRM. Оставляем по умолчанию только поломки — их пропустить
+  // дороже, чем прочитать лишнее.
+  const { data: cfg } = await seo.from('settings').select('value').eq('key', 'alerts').maybeSingle()
+  const want = { problems: true, news: false, ...((cfg?.value as any) ?? {}) }
+
+  if (!alertChat()) return { sent: 0, suppressed: 0 }
+
+  const [problems, news] = await Promise.all([
+    want.problems ? collectAlerts(seo) : Promise.resolve([]),
+    want.news ? collectNews(seo) : Promise.resolve([]),
+  ])
   const alerts = [...problems, ...news]
   if (!alerts.length) return { sent: 0, suppressed: 0 }
 
