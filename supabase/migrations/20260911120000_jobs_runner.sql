@@ -9,6 +9,8 @@
 -- 'vercel' — только воркер CRM (нужны ключи моделей и внешних API)
 -- 'agent'  — только агент на сервере WordPress (нужен доступ к файлам темы)
 
+begin;
+
 alter table seo.jobs
   add column if not exists runner text not null default 'any';
 
@@ -30,8 +32,18 @@ update seo.jobs
 create index if not exists jobs_runner_status_idx on seo.jobs (runner, status, next_run_at);
 
 -- ── Выдача задач с учётом исполнителя ───────────────────────────────────────
--- Параметр со значением по умолчанию: старый код, вызывающий функцию с двумя
--- аргументами, продолжает работать и получает задачи без ограничения.
+--
+-- Важно: новая функция с третьим аргументом НЕ заменяет старую с двумя, а
+-- становится второй перегрузкой. Третий аргумент со значением по умолчанию
+-- делает вызов с двумя аргументами подходящим обеим — и Postgres откажется
+-- выбирать: «function is not unique». Поэтому старую снимаем явно.
+--
+-- Порядок безопасен: выложенный код сначала пробует вызов с тремя аргументами,
+-- и после этой миграции он сработает. Окно, в котором ни та ни другая не
+-- отвечает, — доли секунды внутри транзакции; воркер в этом случае просто
+-- пропустит один проход и придёт через минуту.
+drop function if exists seo.claim_jobs(text, int);
+
 create or replace function seo.claim_jobs(p_worker text, p_limit int default 5, p_runner text default null)
 returns setof seo.jobs
 language plpgsql
@@ -81,3 +93,5 @@ begin
    )
    returning j.*;
 end $$;
+
+commit;
