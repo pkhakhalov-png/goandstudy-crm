@@ -138,6 +138,36 @@ async function main() {
     return v.results.length + ' проверок пройдено'
   })
 
+  /* ── Достоверность ───────────────────────────────────────────────────── */
+
+  await test('существенное утверждение без подтверждения блокирует выпуск', async () => {
+    const { factGate } = await import('../lib/seo/fact-gate')
+    const { data: claim } = await seo.from('claims')
+      .select('subject_key, statement, value_num, confidence').neq('confidence', 'confirmed').limit(1).single()
+    if (!claim) return 'все утверждения подтверждены — проверка пропущена'
+    const text = `Текст со значением ${claim.value_num ?? claim.statement}`
+    const g = await factGate(seo, text, [claim.subject_key])
+    assert(g.blocking.length + g.warnings.length > 0, 'неподтверждённое утверждение не замечено')
+    return `${g.blocking.length} блокирующих, ${g.warnings.length} предупреждений`
+  })
+
+  await test('страна разводит похожие темы', async () => {
+    const { sameFamily } = await import('../lib/seo/cannibal')
+    assert(!sameFamily('поступление в вузы великобритании', 'поступление в вузы китая'), 'склеили разные страны')
+    assert(sameFamily('магистратура в корее', 'магистратура в южной корее'), 'разделили одну страну')
+    return 'страны различаются'
+  })
+
+  /* ── Обращения ───────────────────────────────────────────────────────── */
+
+  await test('заявка привязывается к посадочной, чужие адреса отбрасываются', async () => {
+    const { landingPathOf } = await import('../lib/seo/attribution')
+    assert(landingPathOf({ landing_url: 'https://goandstudy.com/blog/x/' }) === '/blog/x', 'своя страница не распознана')
+    assert(landingPathOf({ referrer: 'https://yandex.ru/search/' }) === null, 'чужой сайт принят за посадочную')
+    assert(landingPathOf({ landing_url: 'https://crm.goandstudy.com/book' }) === null, 'форма записи принята за посадочную')
+    return 'три случая разобраны верно'
+  })
+
   console.log(`\n${passed} пройдено, ${failed} провалено`)
   process.exit(failed ? 1 : 0)
 }
