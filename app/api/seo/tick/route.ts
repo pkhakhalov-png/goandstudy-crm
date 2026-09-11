@@ -18,6 +18,15 @@ const BATCH = 5
 const LONG_STEP_MS = 230_000
 // Долгие — те, что зовут модель. Проверка индексации это пара запросов к
 // Search Console, ей полный запас времени не нужен.
+/**
+ * Публикация в тему идёт по SSH к серверу, и ключа на Vercel нет — так и задумано.
+ * Обработчик у нас формально есть, поэтому проверки «умею ли я» мало: без этого
+ * условия задачу первым забирал Vercel и ронял её на отсутствии ssh, хотя рядом
+ * стоял агент, который умеет.
+ */
+const SERVER_ONLY_STEPS = new Set(['article_publish_blog', 'link_insert_theme'])
+const canRunHere = (step: string) => !(process.env.VERCEL && SERVER_ONLY_STEPS.has(step))
+
 const QUICK_ARTICLE_STEPS = new Set(['article_index_check', 'article_autostart'])
 const isLongStep = (step: string) => step.startsWith('article_') && !QUICK_ARTICLE_STEPS.has(step)
 
@@ -93,8 +102,8 @@ export async function POST(req: NextRequest) {
       // Шаг может быть неизвестен этому воркеру: публикация в тему требует SSH,
       // и её делает воркер с ключом, а не Vercel. Возвращаем задачу в очередь,
       // а не убиваем — иначе один воркер ломает работу другого.
-      if (!hasStep(job.step)) {
-        await seo.rpc('complete_job', { p_job_id: job.id, p_outcome: 'released', p_result: { skipped: 'нет обработчика у этого воркера' } })
+      if (!hasStep(job.step) || !canRunHere(job.step)) {
+        await seo.rpc('complete_job', { p_job_id: job.id, p_outcome: 'released', p_result: { skipped: 'этот воркер такую работу не делает' } })
         released++
         continue
       }

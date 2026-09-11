@@ -291,16 +291,19 @@ registerStep('article_cover', async (job: Job, seo: any): Promise<StepOutcome> =
 
   const { imagesConfigured } = await import('./images')
 
-  // Без ключа картинок не будет, но статья не должна из-за этого встать:
-  // ставим заглушку, как раньше, и идём дальше.
-  if (!imagesConfigured()) {
+  // Заглушка — запасной путь. Кончился баланс у поставщика, отвалилась сеть,
+  // модель вернула мусор — статья всё равно выходит, просто с прежней обложкой.
+  // Останавливать конвейер из-за картинки нельзя.
+  const fallback = async (why: string): Promise<StepOutcome> => {
     const cover = await renderBlogCover(slug)
     await seo.from('article_versions').update({
       meta: { ...meta, cover: { format: 'jpeg', width: cover.width, height: cover.height, bytes: cover.bytes, base64: cover.buffer.toString('base64'), placeholder: true } },
     }).eq('id', version.id)
     await next(seo, 'article_linkplan', articleId, job.topic_id!, { brief: job.payload.brief })
-    return { outcome: 'done', result: { cover: `${cover.width}×${cover.height}`, placeholder: true, why: 'нет OPENAI_API_KEY', cost: 0 } }
+    return { outcome: 'done', result: { cover: `${cover.width}×${cover.height}`, placeholder: true, why, cost: 0 } }
   }
+
+  if (!imagesConfigured()) return fallback('нет ключа поставщика картинок')
 
   const { generateCover, generateInline, coverPrompt, inlinePrompt, figureBlock } = await import('./images')
   const { planScenes } = await import('./generate')
@@ -310,14 +313,20 @@ registerStep('article_cover', async (job: Job, seo: any): Promise<StepOutcome> =
   const headings = [...body.matchAll(/<h2[^>]*>([\s\S]*?)<\/h2>/gi)]
     .map((m) => m[1].replace(/<[^>]+>/g, '').trim()).filter(Boolean)
 
-  const scenes = await planScenes({
-    title: version.title ?? slug,
-    h1: job.payload?.brief?.h1 ?? version.title ?? slug,
-    headings,
-  })
-
-  const cover = await generateCover(coverPrompt(scenes.cover))
-  const inline = await generateInline(inlinePrompt(scenes.inline))
+  let scenes: Awaited<ReturnType<typeof planScenes>>
+  let cover: Awaited<ReturnType<typeof generateCover>>
+  let inline: Awaited<ReturnType<typeof generateInline>>
+  try {
+    scenes = await planScenes({
+      title: version.title ?? slug,
+      h1: job.payload?.brief?.h1 ?? version.title ?? slug,
+      headings,
+    })
+    cover = await generateCover(coverPrompt(scenes.cover))
+    inline = await generateInline(inlinePrompt(scenes.inline))
+  } catch (e: any) {
+    return fallback(`картинки не нарисовались: ${String(e?.message ?? e).slice(0, 120)}`)
+  }
 
   // Вставляем картинку после раздела, который выбрала модель. Если такого
   // подзаголовка в тексте нет — ставим в середину, а не теряем картинку.
