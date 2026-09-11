@@ -34,6 +34,14 @@ export function ArticleActions({ articleId, status, blockers, warnings, isUpdate
 
   const canPublish = status === 'approved' && warnings.length === 0
 
+  // Неактивная кнопка молчит, и человек остаётся с «ничего не происходит».
+  // Поэтому причина всегда написана словами рядом, а не спрятана в подсказке.
+  const whyNoPublish = status !== 'approved'
+    ? 'сначала «Утвердить»'
+    : warnings.length
+      ? `мешает выпуску: ${warnings.length}`
+      : null
+
   return (
     <div style={{ border: '1px solid var(--bor)', borderRadius: 10, padding: 14, background: 'var(--surf)' }}>
       <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>Решение</div>
@@ -75,6 +83,12 @@ export function ArticleActions({ articleId, status, blockers, warnings, isUpdate
           }}>
           {isUpdate ? 'Обновить на сайте' : 'Опубликовать в блог'}
         </button>
+
+        {whyNoPublish && (
+          <span style={{ fontSize: 11, color: 'var(--muted)', alignSelf: 'center' }}>
+            публикация недоступна: {whyNoPublish}
+          </span>
+        )}
 
         <button className="btn-s" disabled={pending}
           onClick={() => start(async () => {
