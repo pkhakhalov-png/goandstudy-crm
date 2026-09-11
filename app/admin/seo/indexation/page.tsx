@@ -35,15 +35,46 @@ export default async function IndexationPage({ searchParams }: { searchParams: P
   const sb = await createAdminClient()
   const seo = sb.schema('seo')
 
-  const { data: pages } = await seo.from('pages')
+  const { data: pagesRaw } = await seo.from('pages')
     .select('id, normalized_url, page_type, first_seen_at')
     .is('removed_at', null).eq('indexable', true).eq('http_status', 200)
+  // Только сам сайт: адреса CRM и поддоменов здесь не при чём
+  const pages = (pagesRaw ?? []).filter((p: any) => p.normalized_url.startsWith('https://goandstudy.com'))
 
   const { data: statuses } = await seo.from('index_status').select('*')
-  const { data: articles } = await seo.from('articles')
-    .select('id, published_at, indexed_at, primary_keyword, current_version_id').eq('status', 'published')
   const byPage = new Map<number, any>((statuses ?? []).map((s: any) => [s.page_id, s]))
+  const DAY = 864e5
 
+  // Наши статьи — то, ради чего этот экран и нужен. У них известна настоящая
+  // дата выхода, а не дата, когда их впервые увидел обход.
+  const { data: articles } = await seo.from('articles')
+    .select('id, published_at, indexed_at, primary_keyword, current_version_id')
+    .eq('status', 'published').order('published_at', { ascending: false })
+
+  const ourArticles: {
+    id: number; keyword: string; url: string; publishedAt: string | null
+    verdict: string | null; coverage: string | null; firstIndexed: string | null; days: number | null
+  }[] = []
+
+  for (const a of articles ?? []) {
+    const { data: v } = await seo.from('article_versions').select('meta').eq('id', a.current_version_id).maybeSingle()
+    const m: any = v?.meta ?? {}
+    const slug = m.publish?.slug ?? m.slug
+    if (!slug) continue
+    const url = `https://goandstudy.com/blog/${slug}`
+    const page = (pagesRaw ?? []).find((p: any) => p.normalized_url === url)
+    const st = page ? byPage.get(page.id) : null
+    const firstIndexed = st?.first_indexed_at ?? a.indexed_at ?? null
+    ourArticles.push({
+      id: a.id, keyword: a.primary_keyword, url, publishedAt: a.published_at,
+      verdict: st?.verdict ?? (m.index_check?.verdict ?? null),
+      coverage: st?.coverage_state ?? (m.index_check?.coverage ?? null),
+      firstIndexed,
+      days: a.published_at
+        ? Math.max(0, Math.round(((firstIndexed ? Date.parse(firstIndexed) : Date.now()) - Date.parse(a.published_at)) / DAY))
+        : null,
+    })
+  }
   // Показы за 28 дней — чтобы сортировать не по алфавиту, а по важности.
   // Читаем страницами: обычный select обрезал бы данные на тысяче строк.
   const since = new Date(Date.now() - 28 * 864e5).toISOString().slice(0, 10)
@@ -121,16 +152,72 @@ export default async function IndexationPage({ searchParams }: { searchParams: P
         <Card label="Всего страниц" value={rows.length} sub="индексируемых" />
       </div>
 
+      {ourArticles.length > 0 && (
+        <div style={{ border: '1px solid var(--bor)', borderRadius: 12, overflow: 'hidden', marginBottom: 16 }}>
+          <div style={{ padding: '10px 14px', background: 'var(--surf2)' }}>
+            <div style={{ fontSize: 13, fontWeight: 700 }}>Наши статьи · {ourArticles.length}</div>
+            <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3, lineHeight: 1.5 }}>
+              Написанные конвейером. Здесь известна настоящая дата выхода, поэтому «дней до индекса» —
+              честный срок, а не разница с датой обхода. Для свежей статьи одна-две недели ожидания — норма:
+              Google приходит по sitemap, заявок на индексацию он не принимает.
+            </div>
+          </div>
+          <div style={{ padding: '0 6px 6px' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+              <thead>
+                <tr style={{ color: 'var(--muted)', textAlign: 'left' }}>
+                  <th style={th}>Статья</th>
+                  <th style={th}>Вышла</th>
+                  <th style={th}>Состояние</th>
+                  <th style={th}>В индексе с</th>
+                  <th style={{ ...th, textAlign: 'right' }}>Дней</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ourArticles.map((a) => {
+                  const l = label(a.verdict, a.coverage)
+                  return (
+                    <tr key={a.id} style={{ borderTop: '1px solid var(--bor)' }}>
+                      <td style={td}>
+                        <Link href={`/admin/seo/articles/${a.id}`} style={{ color: 'var(--purple)', textDecoration: 'none', fontWeight: 600 }}>
+                          {a.keyword}
+                        </Link>
+                        <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                          <a href={`${a.url}/`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--muted)', textDecoration: 'none' }}>
+                            {a.url.replace('https://goandstudy.com', '')}
+                          </a>
+                        </div>
+                      </td>
+                      <td style={{ ...td, whiteSpace: 'nowrap', color: 'var(--muted)' }}>
+                        {a.publishedAt ? new Date(a.publishedAt).toLocaleDateString('ru') : '—'}
+                      </td>
+                      <td style={{ ...td, color: l.color, fontWeight: 600, whiteSpace: 'nowrap' }}>{l.text}</td>
+                      <td style={{ ...td, whiteSpace: 'nowrap', color: 'var(--muted)' }}>
+                        {a.firstIndexed ? new Date(a.firstIndexed).toLocaleDateString('ru') : '—'}
+                      </td>
+                      <td style={{ ...td, textAlign: 'right', color: a.firstIndexed ? 'var(--muted)' : 'var(--purple)' }}>
+                        {a.days === null ? '—' : a.firstIndexed ? a.days : `ждёт ${a.days}`}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       <div style={{ border: '1px solid var(--bor)', borderRadius: 12, overflow: 'hidden', marginBottom: 16 }}>
         <div style={{ padding: '10px 14px', background: 'var(--surf2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
           <div>
-            <div style={{ fontSize: 13, fontWeight: 700 }}>Новые страницы за {days} дней · {fresh.length}</div>
-            <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3 }}>
+            <div style={{ fontSize: 13, fontWeight: 700 }}>Страницы, впервые замеченные обходом · {fresh.length}</div>
+            <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3, lineHeight: 1.5, maxWidth: 700 }}>
               {fresh.length === 0
-                ? 'За период ничего нового не появилось.'
-                : <>В индексе {freshIn.length} из {fresh.length}
-                    {medianWait !== null && <> · обычно попадают за {medianWait} {plural(medianWait)}</>}.
-                    Для свежих статей ожидание в одну-две недели — норма.</>}
+                ? 'За период обход не нашёл ничего нового.'
+                : <>В индексе {freshIn.length} из {fresh.length}.
+                    Это дата, когда страницу впервые увидел <b>наш обход</b>, а не дата публикации:
+                    весь сайт попал в инвентарь 8 сентября, поэтому здесь он и числится «новым».
+                    Настоящие сроки — в таблице наших статей выше.</>}
             </div>
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
