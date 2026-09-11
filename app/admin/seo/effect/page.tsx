@@ -1,6 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { trafficByPage, type Traffic } from '@/lib/seo/gsc-agg'
+import { loadPageDays, summarize, type Traffic } from '@/lib/seo/gsc-agg'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,8 +24,10 @@ export default async function EffectPage() {
   const today = new Date().toISOString().slice(0, 10)
   const since28 = new Date(Date.now() - 28 * DAY).toISOString().slice(0, 10)
 
-  const recent = await trafficByPage(seo, { since: since28 })
-  const allTime = await trafficByPage(seo)
+  // Читаем статистику один раз, окна режем в памяти. Раньше на каждую статью
+  // уходил отдельный полный проход — при тридцати статьях экран бы не открылся.
+  const days = await loadPageDays(seo)
+  const recent = summarize(days, { since: since28 })
 
   /* ── Блог целиком: с чем сравнивать ────────────────────────────────────── */
   const { data: pages } = await seo.from('pages')
@@ -67,7 +69,7 @@ export default async function EffectPage() {
     const end = pub ? new Date(Date.parse(pub) + 28 * DAY).toISOString().slice(0, 10) : today
     const matured = !!pub && Date.parse(pub) + 28 * DAY <= Date.now()
     const window = pub
-      ? (await trafficByPage(seo, { since: pub.slice(0, 10), until: end })).get(url) ?? EMPTY
+      ? summarize(days, { since: pub.slice(0, 10), until: end }).get(url) ?? EMPTY
       : EMPTY
 
     ours.push({

@@ -55,16 +55,31 @@ export function sameFamily(a: string, b: string): boolean {
   return common / sa.size >= 0.6 && common / sb.size >= 0.6
 }
 
-/** Читает таблицу целиком: обычный select обрезал бы выдачу на тысяче строк. */
+/**
+ * Читает таблицу целиком. Клиент отдаёт не больше тысячи строк за запрос, а строк
+ * под двести тысяч — поэтому страницы тянем пачками параллельно. Последовательно
+ * это занимало двадцать секунд: почти двести обращений подряд, каждое по сотне
+ * миллисекунд, и всё это время экран стоял пустой.
+ */
 async function readAll(seo: any, table: string, cols: string, since?: string): Promise<any[]> {
+  const PAGE = 1000
+  const BATCH = 12   // больше — упираемся в лимит одновременных соединений
+
+  const { count } = await seo.from(table).select('*', { count: 'exact', head: true })
+  const pages = Math.ceil((count ?? 0) / PAGE)
+  if (!pages) return []
+
   const out: any[] = []
-  for (let from = 0; ; from += 1000) {
-    let q = seo.from(table).select(cols).range(from, from + 999)
-    if (since) q = q.gte('date', since)
-    const { data, error } = await q
-    if (error || !data?.length) break
-    out.push(...data)
-    if (data.length < 1000) break
+  for (let start = 0; start < pages; start += BATCH) {
+    const chunk = await Promise.all(
+      Array.from({ length: Math.min(BATCH, pages - start) }, (_, i) => {
+        const from = (start + i) * PAGE
+        let q = seo.from(table).select(cols).range(from, from + PAGE - 1)
+        if (since) q = q.gte('date', since)
+        return q.then((r: any) => r.data ?? [])
+      }),
+    )
+    for (const rows of chunk) out.push(...rows)
   }
   return out
 }

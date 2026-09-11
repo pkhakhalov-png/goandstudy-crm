@@ -704,8 +704,10 @@ registerStep('index_check_site', async (_job: Job, seo: any): Promise<StepOutcom
  * вычитку переполнена.
  */
 registerStep('article_autostart', async (_job: Job, seo: any): Promise<StepOutcome> => {
-  const { flowState, markAutoRun } = await import('./flow')
+  const { flowState, markAutoRun, saveSnapshot } = await import('./flow')
   const st = await flowState(seo)
+  // Экран показывает именно этот расчёт — сам он его делать не должен
+  await saveSnapshot(seo, st)
 
   if (st.blocker || !st.nextTopic) {
     return { outcome: 'done', result: { started: false, why: st.blocker ?? 'нет темы', cost: 0 } }

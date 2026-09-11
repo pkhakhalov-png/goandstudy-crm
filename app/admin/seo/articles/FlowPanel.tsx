@@ -3,7 +3,7 @@ import { useState, useTransition } from 'react'
 import { saveFlowSettings, startNextNow } from './actions'
 import type { FlowState } from '@/lib/seo/flow'
 
-export function FlowPanel({ state }: { state: FlowState }) {
+export function FlowPanel({ state }: { state: FlowState & { computedAt?: string | null } }) {
   const [pending, start] = useTransition()
   const [s, setS] = useState(state.settings)
   const [note, setNote] = useState<string | null>(null)
@@ -58,6 +58,11 @@ export function FlowPanel({ state }: { state: FlowState }) {
           {state.nextTopic && (
             <div style={{ fontSize: 11, color: 'var(--green)', marginTop: 3 }}>
               проверено: {state.nextTopic.cannibalReason}
+            </div>
+          )}
+          {state.computedAt && (
+            <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+              подобрано {new Date(state.computedAt).toLocaleString('ru')}
             </div>
           )}
         </div>

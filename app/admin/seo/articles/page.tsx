@@ -63,8 +63,8 @@ async function load() {
       impressions: t.search_volume ?? 0,
     }))
 
-    const { flowState } = await import('@/lib/seo/flow')
-    const flow = await flowState(seo)
+    const { flowSnapshot } = await import('@/lib/seo/flow')
+    const flow = await flowSnapshot(seo)
 
     return { ok: true as const, rows, jobs: jobs ?? [], suggestions, flow }
   } catch (e: any) {

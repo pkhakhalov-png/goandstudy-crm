@@ -76,6 +76,42 @@ export async function markAutoRun(seo: any): Promise<void> {
   await seo.from('settings').upsert({ key: 'last_auto_article', value: { at: new Date().toISOString() } }, { onConflict: 'key' })
 }
 
+/**
+ * Готовый ответ для экрана. Полный расчёт стоит двадцать секунд — столько
+ * держать человека перед пустой страницей нельзя, поэтому считает воркер раз в
+ * час, а экран читает посчитанное.
+ */
+export async function flowSnapshot(seo: any): Promise<FlowState & { computedAt: string | null }> {
+  const settings = await loadFlow(seo)
+
+  const { data } = await seo.from('settings').select('value').eq('key', 'flow_snapshot').maybeSingle()
+  const snap = data?.value as (FlowState & { computedAt: string }) | undefined
+
+  const { count: inReview } = await seo.from('articles')
+    .select('*', { count: 'exact', head: true })
+    .in('status', ['ready_for_review', 'in_review'])
+
+  if (!snap) {
+    return {
+      settings, startedThisWeek: 0, inReview: inReview ?? 0, nextRunAt: null,
+      blocker: 'тема ещё не подобрана — подождите проход воркера',
+      nextTopic: null, skipped: [], computedAt: null,
+    }
+  }
+
+  // Настройки и очередь на вычитку берём свежими: они меняются нажатием кнопки,
+  // и показывать по ним вчерашнее значение было бы враньём
+  return { ...snap, settings, inReview: inReview ?? 0 }
+}
+
+export async function saveSnapshot(seo: any, state: FlowState): Promise<void> {
+  await seo.from('settings').upsert(
+    { key: 'flow_snapshot', value: { ...state, computedAt: new Date().toISOString() } },
+    { onConflict: 'key' },
+  )
+}
+
+/** Полный расчёт. Дорогой: перечитывает запросную статистику целиком. */
 export async function flowState(seo: any): Promise<FlowState> {
   const settings = await loadFlow(seo)
 
