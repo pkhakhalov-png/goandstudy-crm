@@ -50,13 +50,19 @@ export default async function EffectPage() {
   // Обращения: считаем только то, что видим целиком — заявку через нашу форму.
   const { data: touches } = await seo.from('lead_identities')
     .select('first_touch_page, deal_id, lead_at').not('first_touch_page', 'is', null)
+  const { countable, TRACKING_SINCE } = await import('@/lib/seo/attribution')
   const contactsByPage = new Map<number, { leads: number; deals: number }>()
+  let ignoredEarly = 0
   for (const t of touches ?? []) {
+    // Касание с датой до внедрения разметки источника не имеет: считать его
+    // органическим было бы выдумкой
+    if (!countable(t.lead_at)) { ignoredEarly++; continue }
     const c = contactsByPage.get(t.first_touch_page) ?? { leads: 0, deals: 0 }
     c.leads++
     if (t.deal_id) c.deals++
     contactsByPage.set(t.first_touch_page, c)
   }
+  const totalLeads = [...contactsByPage.values()].reduce((a, c) => a + c.leads, 0)
 
   const { data: articles } = await seo.from('articles')
     .select('id, primary_keyword, published_at, current_version_id').eq('status', 'published').order('published_at')
@@ -106,7 +112,8 @@ export default async function EffectPage() {
           это клик, а не заявка, и заявкой мы его не зовём. Звонки, письма и обращения из
           телеграм-группы к странице не привязываются вовсе. Счёт ведётся с 11.09.2026 —
           у более ранних заявок источник не размечен, и восстановить его нельзя.
-          {contactsByPage.size === 0 && ' Пока ни одного размеченного обращения нет — это отсутствие данных, а не ноль.'}
+          {contactsByPage.size === 0 && ' Пока ни одного размеченного обращения нет — это отсутствие данных, а не ноль: заявки идут, но их источник до 11.09 не записывался.'}
+          {ignoredEarly > 0 && ` ${ignoredEarly} касаний с датой до внедрения разметки в счёт не идут — источника у них нет.`}
         </div>
       </div>
 
@@ -116,9 +123,12 @@ export default async function EffectPage() {
         <Card label="Медиана кликов" value={median} sub="за 28 дней, на статью" />
         <Card label="Без единого клика" value={quiet.length} color={quiet.length ? 'var(--purple)' : undefined} sub="показы есть" />
         <Card label="Без показов" value={dead.length} color={dead.length ? 'var(--red)' : undefined} sub="их не находят" />
-        <Card label="Обращений со статей"
-          value={[...contactsByPage.values()].reduce((a, c) => a + c.leads, 0)}
-          sub={contactsByPage.size ? `${[...contactsByPage.values()].reduce((a, c) => a + c.deals, 0)} дошли до сделки` : 'разметка с 11.09'} />
+        <CardText label="Обращений со статей"
+          value={totalLeads > 0 ? String(totalLeads) : 'нет данных'}
+          muted={totalLeads === 0}
+          sub={totalLeads > 0
+            ? `${[...contactsByPage.values()].reduce((a, c) => a + c.deals, 0)} дошли до сделки`
+            : `разметка работает с ${new Date(TRACKING_SINCE).toLocaleDateString('ru')}`} />
       </div>
 
       {/* Наши статьи */}
@@ -248,6 +258,17 @@ function Panel({ title, hint, children, collapsed }: {
       {collapsed
         ? <details><summary style={{ padding: '8px 14px', fontSize: 12, color: 'var(--purple)', cursor: 'pointer' }}>показать список</summary><div style={{ padding: '0 6px 6px' }}>{children}</div></details>
         : <div style={{ padding: '0 6px 6px' }}>{children}</div>}
+    </div>
+  )
+}
+
+/** Карточка, которая умеет сказать «нет данных» вместо нуля. */
+function CardText({ label, value, sub, muted }: { label: string; value: string; sub?: string; muted?: boolean }) {
+  return (
+    <div style={{ border: '1px solid var(--bor)', borderRadius: 12, padding: '12px 14px' }}>
+      <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: muted ? 15 : 24, fontWeight: 700, color: muted ? 'var(--muted)' : 'var(--text)', paddingTop: muted ? 6 : 0 }}>{value}</div>
+      {sub && <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{sub}</div>}
     </div>
   )
 }

@@ -28,7 +28,7 @@ const LONG_STEP_MS = 230_000
 const SERVER_ONLY_STEPS = new Set(['article_publish_blog', 'link_insert_theme'])
 const canRunHere = (step: string) => !(process.env.VERCEL && SERVER_ONLY_STEPS.has(step))
 
-const QUICK_ARTICLE_STEPS = new Set(['article_index_check', 'article_autostart', 'attribution_stitch'])
+const QUICK_ARTICLE_STEPS = new Set(['article_index_check', 'article_autostart', 'attribution_stitch', 'alerts_check'])
 const isLongStep = (step: string) => step.startsWith('article_') && !QUICK_ARTICLE_STEPS.has(step)
 
 export async function POST(req: NextRequest) {
@@ -81,6 +81,13 @@ export async function POST(req: NextRequest) {
         .eq('step', 'article_autostart').in('status', ['pending', 'running', 'waiting']).limit(1)
       if (!ex?.length) {
         await seo.from('jobs').insert({ step: 'article_autostart', lane: 'production', priority: 15, payload: {} })
+      }
+      // Заодно проверяем, не сломалось ли что-нибудь: раз в час — нормальная
+      // частота, чтобы узнать о беде до утра и не превратить это в шум
+      const { data: al } = await seo.from('jobs').select('id')
+        .eq('step', 'alerts_check').in('status', ['pending', 'running', 'waiting']).limit(1)
+      if (!al?.length) {
+        await seo.from('jobs').insert({ step: 'alerts_check', lane: 'findings', priority: 12, payload: {} })
       }
       await seo.from('settings').upsert({ key: 'last_autostart_check', value: { at: new Date().toISOString() } }, { onConflict: 'key' })
     }

@@ -9,6 +9,20 @@
  * Поэтому переходы в мессенджеры считаются отдельно и заявками не зовутся.
  */
 
+/**
+ * День, с которого мы вообще научились связывать страницу и заявку.
+ *
+ * Всё, что раньше, источника не имеет и иметь не может — восстановить его
+ * неоткуда. Касание с более ранней датой считаем ошибкой заливки, а не
+ * органикой: лучше не показать, чем показать неправду.
+ */
+export const TRACKING_SINCE = '2026-09-11'
+
+/** Учитывается ли касание в отчётах. */
+export function countable(leadAt: string | null | undefined): boolean {
+  return !!leadAt && String(leadAt).slice(0, 10) >= TRACKING_SINCE
+}
+
 /** Из адреса, с которого пришли, вытаскиваем страницу нашего сайта. */
 export function landingPathOf(utm: Record<string, string>): string | null {
   const raw = utm.landing_url || utm.referrer || ''

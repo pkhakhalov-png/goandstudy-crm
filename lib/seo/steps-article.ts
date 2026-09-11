@@ -878,3 +878,14 @@ registerStep('article_update_plan', async (job: Job, seo: any): Promise<StepOutc
     },
   }
 })
+
+
+/**
+ * Сторож: рассказать человеку о поломках. Работает часто и дёшево, потому что
+ * молчащий конвейер ночью — это потерянные сутки при ритме «статья в день».
+ */
+registerStep('alerts_check', async (_job: Job, seo: any): Promise<StepOutcome> => {
+  const { notifyAlerts } = await import('./alerts')
+  const res = await notifyAlerts(seo)
+  return { outcome: 'done', result: { ...res, cost: 0 } }
+})

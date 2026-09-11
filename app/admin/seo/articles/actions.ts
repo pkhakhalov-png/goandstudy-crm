@@ -560,3 +560,85 @@ export async function decideTopic(
   revalidatePath('/admin/seo/articles')
   return { ok: true, note: `«${name}» отклонена как дубль` }
 }
+
+/* ── Возврат прежней версии ───────────────────────────────────────────────── */
+
+/**
+ * Вернуть статью к выбранной версии.
+ *
+ * Не переписывает историю: создаёт новую версию с прежним телом. Так виден и
+ * сам откат, и то, от чего откатились — иначе через месяц не понять, что
+ * случилось. На сайт ничего не уходит: публикация остаётся отдельным решением.
+ */
+export async function revertToVersion(articleId: number, versionId: number) {
+  const { error: authErr } = await assertAdmin()
+  if (authErr) return { error: authErr }
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const seo = (await createAdminClient()).schema('seo')
+
+  const { data: source } = await seo.from('article_versions')
+    .select('id, article_id, title, body, meta, version_no').eq('id', versionId).single()
+  if (!source) return { error: 'версия не найдена' }
+  if (source.article_id !== articleId) return { error: 'версия от другой статьи' }
+
+  const { data: article } = await seo.from('articles').select('status, current_version_id').eq('id', articleId).single()
+  if (article?.current_version_id === versionId) return { error: 'эта версия и так текущая' }
+
+  const { data: last } = await seo.from('article_versions')
+    .select('version_no').eq('article_id', articleId).order('version_no', { ascending: false }).limit(1)
+
+  const { data: copy, error: insErr } = await seo.from('article_versions').insert({
+    article_id: articleId,
+    version_no: (last?.[0]?.version_no ?? 0) + 1,
+    origin: 'human_edited',
+    title: source.title,
+    body: source.body,
+    meta: { ...(source.meta ?? {}), reverted_from: versionId, reverted_at: new Date().toISOString() },
+    created_by: user?.id ?? null,
+  }).select('id').single()
+  if (insErr) return { error: `не удалось создать версию: ${insErr.message}` }
+
+  // Возврат снимает согласование: текст изменился, значит читать заново
+  await seo.from('articles').update({
+    current_version_id: copy.id,
+    status: article?.status === 'published' ? 'published' : 'ready_for_review',
+  }).eq('id', articleId)
+
+  await seo.from('change_sets').insert({
+    article_id: articleId, kind: 'revert',
+    from_version: article?.current_version_id ?? null, to_version: copy.id,
+    reason: `возврат к версии ${source.version_no} решением человека`,
+    idempotency_key: `revert:${articleId}:${copy.id}`,
+    status: 'applied', proposed_by: 'human',
+  })
+
+  revalidatePath(`/admin/seo/articles/${articleId}`)
+  return {
+    ok: true,
+    note: article?.status === 'published'
+      ? `Версия ${source.version_no} стала текущей. На сайте пока прежний текст — нажмите «Опубликовать» в режиме обновления.`
+      : `Версия ${source.version_no} стала текущей.`,
+  }
+}
+
+/** Перезапустить упавшую задачу: сбросить попытки и вернуть в очередь. */
+export async function retryJob(jobId: number) {
+  const { error: authErr } = await assertAdmin()
+  if (authErr) return { error: authErr }
+  const seo = (await createAdminClient()).schema('seo')
+
+  const { data: job } = await seo.from('jobs').select('status, step').eq('id', jobId).single()
+  if (!job) return { error: 'задача не найдена' }
+  if (!['failed', 'cancelled'].includes(job.status)) return { error: `задача в состоянии «${job.status}» — перезапускать нечего` }
+
+  const { error } = await seo.from('jobs').update({
+    status: 'pending', attempts: 0, next_run_at: new Date().toISOString(),
+    last_error: null, locked_at: null, locked_by: null,
+  }).eq('id', jobId)
+  if (error) return { error: error.message }
+
+  revalidatePath('/admin/seo/articles')
+  return { ok: true, note: `Задача «${job.step}» вернулась в очередь` }
+}

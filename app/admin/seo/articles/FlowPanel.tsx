@@ -3,6 +3,13 @@ import { useState, useTransition } from 'react'
 import { saveFlowSettings, startNextNow, decideTopic } from './actions'
 import type { FlowState } from '@/lib/seo/flow'
 
+const plural = (n: number, one: string, few: string, many: string) => {
+  const d = n % 10, dd = n % 100
+  if (d === 1 && dd !== 11) return one
+  if (d >= 2 && d <= 4 && (dd < 12 || dd > 14)) return few
+  return many
+}
+
 export function FlowPanel({ state }: { state: FlowState & { computedAt?: string | null } }) {
   const [pending, start] = useTransition()
   const [s, setS] = useState(state.settings)
@@ -75,6 +82,25 @@ export function FlowPanel({ state }: { state: FlowState & { computedAt?: string 
           Запустить сейчас
         </button>
       </div>
+
+      {state.runway && (
+        <div style={{ marginTop: 12, padding: '8px 12px', border: '1px solid var(--bor2)', borderRadius: 8, fontSize: 12 }}>
+          <div>
+            <b>Запас работы: {state.runway.days} {plural(state.runway.days, 'день', 'дня', 'дней')}</b>
+            <span style={{ color: 'var(--muted)' }}>
+              {' '}— {state.runway.safe} {plural(state.runway.safe, 'тема', 'темы', 'тем')} без вопросов
+              {state.runway.unclear > 0 && ` и ${state.runway.unclear} спорных, если одобрите`}
+            </span>
+          </div>
+          <div style={{ color: 'var(--muted)', fontSize: 11, marginTop: 4, lineHeight: 1.5 }}>
+            Отсеяно: {state.runway.dropped.own} уже писали, {state.runway.dropped.twin} переформулировок,
+            {' '}{state.runway.dropped.risky} отобрали бы запросы у своих страниц,
+            {' '}{state.runway.dropped.update} требуют обновления существующей.
+            Число тем в базе и число дней — разные величины: каждая написанная статья
+            занимает свою семью запросов, и соседние формулировки перестают быть темами.
+          </div>
+        </div>
+      )}
 
       <div style={{ marginTop: 10, fontSize: 12, color: state.blocker ? 'var(--muted)' : 'var(--green)' }}>
         {state.blocker

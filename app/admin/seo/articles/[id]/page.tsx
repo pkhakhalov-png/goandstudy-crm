@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { FactGate } from './FactGate'
+import { VersionRow } from './VersionRow'
 import { ArticleActions } from '../ArticleActions'
 
 async function load(id: number) {
@@ -116,14 +117,15 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
           <div style={box}>
             <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Версии</div>
             {versions.map((v: any) => (
-              <div key={v.id} style={{ fontSize: 12, padding: '6px 0', borderTop: '1px solid var(--bor)', display: 'flex', justifyContent: 'space-between', gap: 10 }}>
-                <span>
-                  <b>v{v.version_no}</b> · {v.origin === 'generated' ? 'сгенерирована' : v.origin === 'qa_fixed' ? 'после починки по замечаниям' : v.origin}
-                  {v.id === article.current_version_id && <span style={{ color: 'var(--purple)' }}> · текущая</span>}
-                </span>
-                <span style={{ color: 'var(--muted)' }}>{new Date(v.created_at).toLocaleString('ru')}</span>
-              </div>
+              <VersionRow key={v.id} version={v} articleId={article.id}
+                isCurrent={v.id === article.current_version_id}
+                snapshot={!!v.meta?.snapshot} />
             ))}
+            <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 8, lineHeight: 1.5 }}>
+              Возврат делает выбранный текст текущим и заводит новую версию — история
+              не переписывается. На сайте останется прежний текст, пока не нажмёте
+              «Опубликовать» в режиме обновления.
+            </div>
           </div>
         </div>
 

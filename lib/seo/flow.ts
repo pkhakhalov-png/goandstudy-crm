@@ -47,6 +47,11 @@ export type FlowState = {
   nextTopic: PickedTopic | null
   /** Темы, отброшенные из-за каннибализации — чтобы решение было видно. */
   skipped: { topicId: number; query: string; verdict: string; reason: string; updateTarget: string | null; caveat?: string }[]
+  /**
+   * Запас работы. Число тем в базе и число дней — разные вещи: большая часть
+   * свободных тем отсеивается, и запас тает быстрее, чем кажется по счётчику.
+   */
+  runway: { safe: number; unclear: number; days: number; dropped: { own: number; twin: number; risky: number; update: number } }
 }
 
 /** Понедельник текущей недели — по нему считаем, сколько уже сделано. */
@@ -96,6 +101,7 @@ export async function flowSnapshot(seo: any): Promise<FlowState & { computedAt: 
       settings, startedThisWeek: 0, inReview: inReview ?? 0, nextRunAt: null,
       blocker: 'тема ещё не подобрана — подождите проход воркера',
       nextTopic: null, skipped: [], computedAt: null,
+      runway: { safe: 0, unclear: 0, days: 0, dropped: { own: 0, twin: 0, risky: 0, update: 0 } },
     }
   }
 
@@ -125,6 +131,8 @@ export async function flowState(seo: any): Promise<FlowState> {
 
   const picked = await pickTopic(seo, { withSkipped: true })
   const nextTopic = picked.topic
+  const perDay = Math.max(settings.perWeek, 1) / 7
+  const runway = { ...picked.runway, days: Math.floor((picked.runway.safe + picked.runway.unclear) / perDay) }
 
   const last = await lastAutoRun(seo)
   const readyAt = last + intervalMs(settings.perWeek)
@@ -144,7 +152,7 @@ export async function flowState(seo: any): Promise<FlowState> {
 
   return {
     settings, startedThisWeek: startedThisWeek ?? 0, inReview: inReview ?? 0,
-    nextRunAt, blocker, nextTopic, skipped: picked.skipped,
+    nextRunAt, blocker, nextTopic, skipped: picked.skipped, runway,
   }
 }
 
@@ -160,14 +168,17 @@ export async function flowState(seo: any): Promise<FlowState> {
 export async function pickTopic(
   seo: any,
   opts: { withSkipped?: boolean } = {},
-): Promise<{ topic: PickedTopic | null; skipped: FlowState['skipped'] }> {
+): Promise<{ topic: PickedTopic | null; skipped: FlowState['skipped']; runway: FlowState['runway'] }> {
   const { data: topics } = await seo.from('topics')
     .select('id, title, primary_keyword, search_volume, priority')
-    .eq('status', 'new').eq('origin', 'gsc_gap')
+    // Все свободные темы, а не только добытые из поиска: тему, заведённую
+    // человеком, конвейер игнорировать не должен — её завели осознанно
+    .eq('status', 'new')
     .order('priority', { ascending: false, nullsFirst: false })
-    .limit(40)
+    .limit(120)
   const skipped: FlowState['skipped'] = []
-  if (!topics?.length) return { topic: null, skipped }
+  const runway: FlowState['runway'] = { safe: 0, unclear: 0, days: 0, dropped: { own: 0, twin: 0, risky: 0, update: 0 } }
+  if (!topics?.length) return { topic: null, skipped, runway }
 
   const ids = topics.map((t: any) => t.id)
   const { data: used } = await seo.from('articles').select('topic_id').in('topic_id', ids)
@@ -180,7 +191,7 @@ export async function pickTopic(
   ].filter(Boolean))
 
   const free = topics.filter((t: any) => !taken.has(t.id))
-  if (!free.length) return { topic: null, skipped }
+  if (!free.length) return { topic: null, skipped, runway }
 
   const { loadQueryRows, verdictFor, sameFamily, loadPageTypes } = await import('./cannibal')
   const rows = await loadQueryRows(seo)
@@ -197,27 +208,44 @@ export async function pickTopic(
     ...(busy ?? []).map((r: any) => r.primary_keyword ?? r.title),
   ].filter(Boolean) as string[]
 
+  // Считаем запас целиком, а не только до первой годной темы: иначе на экране
+  // будет число тем в базе, а не число дней работы, и это две разные правды.
+  let first: PickedTopic | null = null
+
   for (const t of free) {
     const query = t.primary_keyword ?? t.title
 
     const twin = ourQueries.find((q) => sameFamily(q, query))
     if (twin) {
-      skipped.push({
-        topicId: t.id, query, verdict: 'update',
-        reason: `то же самое другими словами — у нас уже есть «${twin}»`,
-        updateTarget: null,
-      })
+      runway.dropped[mine?.some((m: any) => m.primary_keyword === twin) ? 'own' : 'twin']++
+      if (!first) {
+        skipped.push({
+          topicId: t.id, query, verdict: 'update',
+          reason: `то же самое другими словами — у нас уже есть «${twin}»`,
+          updateTarget: null,
+        })
+      }
       continue
     }
 
     const v = verdictFor(rows, query, undefined, pageTypes)
+
     if (v.verdict === 'safe') {
+      runway.safe++
       // Тема занимает свою семью: следующие формулировки того же уже не пройдут
       ourQueries.push(query)
-      return { topic: { id: t.id, query, impressions: t.search_volume ?? 0, cannibalReason: v.reason }, skipped }
+      if (!first) first = { id: t.id, query, impressions: t.search_volume ?? 0, cannibalReason: v.reason }
+      continue
     }
-    skipped.push({ topicId: t.id, query, verdict: v.verdict, reason: v.reason, updateTarget: v.updateTarget, caveat: v.caveat })
-    if (!opts.withSkipped && skipped.length > 20) break
+
+    if (v.verdict === 'unclear') runway.unclear++
+    else if (v.verdict === 'risky') runway.dropped.risky++
+    else runway.dropped.update++
+
+    if (!first) {
+      skipped.push({ topicId: t.id, query, verdict: v.verdict, reason: v.reason, updateTarget: v.updateTarget, caveat: v.caveat })
+    }
   }
-  return { topic: null, skipped }
+
+  return { topic: first, skipped, runway }
 }
