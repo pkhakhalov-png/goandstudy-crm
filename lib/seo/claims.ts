@@ -9,6 +9,8 @@
 // работа с ней: загрузка фактов под тему, подача их в промпт и сверка чисел
 // из готового текста с тем, что реально подтверждено.
 
+import { COMPANY_FACTS } from './facts'
+
 export type Claim = {
   id: number
   kind: string
@@ -79,6 +81,12 @@ export function claimsBlock(claims: Claim[]): string {
  */
 export function findUnbackedNumbers(text: string, claims: Claim[]): { value: string; context: string }[] {
   const known = new Set<string>()
+
+  // Собственные цены и показатели компании подтверждать реестром не нужно —
+  // они и есть первоисточник. Без этого статья про наши услуги получала
+  // замечание к каждой цене из прайса, и это сбивало с настоящих проблем.
+  for (const m of COMPANY_FACTS.matchAll(/\d[\d\s  ,.]*/g)) known.add(normalizeNum(m[0]))
+
   for (const c of claims) {
     if (c.value) known.add(normalizeNum(c.value))
     if (c.value_num != null) known.add(normalizeNum(String(c.value_num)))
@@ -100,7 +108,11 @@ export function findUnbackedNumbers(text: string, claims: Claim[]): { value: str
 }
 
 function normalizeNum(s: string): string {
-  return String(s).replace(/[\s  ]/g, '').replace(',', '.').replace(/\.0+$/, '')
+  return String(s)
+    .replace(/[\s  ]/g, '')
+    .replace(',', '.')
+    .replace(/[.,]+$/, '')      // точка в конце предложения — не часть числа
+    .replace(/\.0+$/, '')
 }
 
 /** Ключи предмета из темы: страна и общий ключ, чтобы не заводить их руками. */

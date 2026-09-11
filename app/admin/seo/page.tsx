@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/server'
+import { loadPageDays } from '@/lib/seo/gsc-agg'
 import Link from 'next/link'
 
 async function fetchAll(seo: any, table: string, cols: string, apply?: (q: any) => any): Promise<any[]> {
@@ -18,7 +19,9 @@ async function load() {
     const seo = (await createAdminClient()).schema('seo')
 
     const [pd, pages, findings, opps, exps, schema] = await Promise.all([
-      fetchAll(seo, 'gsc_page_daily', 'clicks, impressions, date'),
+      // Читаем пачками параллельно: последовательно те же строки занимали
+      // три секунды, и всё это время экран стоял пустой
+      loadPageDays(seo),
       seo.from('pages').select('id', { count: 'exact', head: true }).is('removed_at', null),
       fetchAll(seo, 'findings', 'kind', (q) => q.eq('status', 'open')),
       fetchAll(seo, 'opportunities', 'decision, risk, priority, forecast, evidence, status'),

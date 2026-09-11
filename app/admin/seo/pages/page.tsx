@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/server'
+import { loadPageDays } from '@/lib/seo/gsc-agg'
 import { StartInventoryButton } from '../StartInventoryButton'
 
 async function fetchAll(seo: any, table: string, cols: string, apply?: (q: any) => any): Promise<any[]> {
@@ -20,7 +21,8 @@ async function load() {
     const [pages, jobsRaw, gpd, findings] = await Promise.all([
       fetchAll(seo, 'pages', 'id, normalized_url, page_type, http_status, indexable, title, word_count, cluster', (q) => q.is('removed_at', null)),
       seo.from('jobs').select('status').in('step', ['inventory_sitemap', 'crawl_page']),
-      fetchAll(seo, 'gsc_page_daily', 'normalized_url, clicks, impressions, position'),
+      // Пачками параллельно — та же причина, что и на «Обзоре»
+      loadPageDays(seo),
       fetchAll(seo, 'findings', 'page_ids', (q) => q.eq('status', 'open')),
     ])
     const byStatus: Record<string, number> = {}
