@@ -3,11 +3,14 @@
 import { useState, useTransition } from 'react'
 import { approveArticle, rejectArticle, publishToBlog, requestFix, insertIncomingLinks, submitForIndexing, checkIndex } from './actions'
 
-export function ArticleActions({ articleId, status, blockers, warnings }: {
+export function ArticleActions({ articleId, status, blockers, warnings, isUpdate, updateOf }: {
   articleId: number
   status: string
   blockers: number
   warnings: string[]
+  /** Правка вышедшей статьи, а не выпуск новой: адрес и обложка уже есть. */
+  isUpdate?: boolean
+  updateOf?: string | null
 }) {
   const [pending, start] = useTransition()
   const [msg, setMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
@@ -54,17 +57,23 @@ export function ArticleActions({ articleId, status, blockers, warnings }: {
         </button>
 
         <button className="btn-s" disabled={pending}
-          onClick={() => run(() => publishToBlog(articleId, true))}>
+          title="Покажет, какие файлы куда уедут, ничего не трогая"
+          onClick={() => run(() => publishToBlog(articleId, true, isUpdate))}>
           План публикации
         </button>
 
         <button className="btn-s" disabled={pending || !canPublish}
           title={!canPublish ? 'Сначала «Утвердить» и закрыть то, что мешает выпуску' : ''}
           onClick={() => {
-            if (!confirm('Статья появится на сайте в блоге и станет видимой в интернете. Продолжить?')) return
-            run(() => publishToBlog(articleId, false))
+            // Обновление и выпуск новой — разные вещи, и предупреждение разное:
+            // в первом случае страница уже живёт и её увидят изменившейся
+            const ask = isUpdate
+              ? `Текст статьи на сайте будет заменён. Адрес ${updateOf ? `/blog/${updateOf}/` : 'прежний'} сохранится, прежняя версия останется в истории и в резервной копии на сервере. Продолжить?`
+              : 'Статья появится на сайте в блоге и станет видимой в интернете. Продолжить?'
+            if (!confirm(ask)) return
+            run(() => publishToBlog(articleId, false, isUpdate))
           }}>
-          Опубликовать в блог
+          {isUpdate ? 'Обновить на сайте' : 'Опубликовать в блог'}
         </button>
 
         <button className="btn-s" disabled={pending}

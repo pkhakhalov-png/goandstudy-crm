@@ -57,8 +57,12 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
   const warnings: string[] = []
   // Обложка карточки блога лежит в meta.cover (480×320 JPEG). Старое место
   // meta.images.cover осталось от прежнего формата с обложкой 1200×630.
+  // Обновление вышедшей статьи — не то же самое, что выпуск новой. У неё уже
+  // есть обложка, ссылки и адрес; требовать их заново значит мешать работе.
+  const isUpdate = Boolean(meta.update_of)
+
   const hasCover = Boolean(meta.cover?.base64 || meta.images?.cover?.url)
-  if (!hasCover) warnings.push('§9.1: нет обложки карточки')
+  if (!hasCover && !isUpdate) warnings.push('§9.1: нет обложки карточки')
 
   // Выдуманный факт дороже любой стилистики: §14 требует, чтобы в статье не было
   // вымышленных вузов, программ, цен и сроков. Такие замечания держим как блокирующие,
@@ -66,7 +70,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
   const factIssues = issues.filter((i: any) => (i.kind === 'facts' || i.kind === 'promise') && i.severity !== 'minor')
   if (factIssues.length) warnings.push(`§14: непроверенных фактов и обещаний — ${factIssues.length}, нужно снять или подтвердить`)
   const plannedLinks = links.filter((l: any) => l.status === 'proposed' || l.status === 'waiting_target').length
-  if (plannedLinks < 2) warnings.push('§8.9: меньше двух входящих ссылок — статья выйдет сиротой')
+  if (plannedLinks < 2 && !isUpdate) warnings.push('§8.9: меньше двух входящих ссылок — статья выйдет сиротой')
 
   const box = { border: '1px solid var(--bor)', borderRadius: 10, padding: 14, background: 'var(--surf)', marginBottom: 14 }
 
@@ -130,7 +134,8 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
         </div>
 
         <div>
-          <ArticleActions articleId={article.id} status={article.status} blockers={failedB.length} warnings={warnings} />
+          <ArticleActions articleId={article.id} status={article.status} blockers={failedB.length}
+            warnings={warnings} isUpdate={isUpdate} updateOf={meta.update_of ?? null} />
 
           {/* Существенные утверждения */}
           <FactGate blocking={gate.blocking} warnings={gate.warnings} checked={gate.checked} />

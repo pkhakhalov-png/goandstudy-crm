@@ -776,7 +776,7 @@ registerStep('article_update_plan', async (job: Job, seo: any): Promise<StepOutc
   const slug = url.replace(/\/$/, '').split('/').pop() ?? ''
   if (!/^[a-z0-9-]+$/.test(slug)) return { outcome: 'failed', result: { error: `не разобрать адрес: ${url}` } }
 
-  const { readThemeArticle } = await import('./theme-publish')
+  const { readThemeArticle, readThemeCover } = await import('./theme-publish')
   const current = await readThemeArticle(slug)
   if (!current) return { outcome: 'failed', result: { error: `статьи ${slug} нет в теме — обновлять нечего` } }
 
@@ -850,9 +850,25 @@ registerStep('article_update_plan', async (job: Job, seo: any): Promise<StepOutc
   })
   const revised = normalizeBody(await reviseDraft(ctx, brief, current, issues, []))
 
+  // Обложка и описание берутся у вышедшей статьи: при обновлении рисовать
+  // заново незачем, а без обложки публикация откажется работать
+  const cover = await readThemeCover(slug).catch(() => null)
+  const { data: registry } = await seo.from('pages')
+    .select('meta_desc').eq('normalized_url', `https://goandstudy.com/blog/${slug}`).maybeSingle()
+
   const { data: version, error: verErr } = await seo.from('article_versions').insert({
     article_id: articleId, version_no: versionNo, origin: 'qa_fixed', title, body: revised,
-    meta: { slug, updated_from: snapshot?.id, reason: 'предложение правок' },
+    meta: {
+      slug,
+      // По этой пометке экран понимает: это правка живой статьи, а не выпуск
+      // новой. Обложку и входящие ссылки требовать заново не надо.
+      update_of: slug,
+      updated_from: snapshot?.id,
+      description: registry?.meta_desc ?? '',
+      brief: { category: '', h1: title },
+      ...(cover ? { cover: { format: 'jpeg', width: 480, height: 320, base64: cover, from_site: true } } : {}),
+      reason: 'предложение правок',
+    },
   }).select('id').single()
   if (verErr) return { outcome: 'failed', result: { error: `версия с правками: ${verErr.message}`, snapshot_id: snapshot?.id } }
 

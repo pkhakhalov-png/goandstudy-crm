@@ -49,6 +49,14 @@ export async function readThemeArticle(slug: string): Promise<string | null> {
   return out.trim() ? out : null
 }
 
+/** Обложка вышедшей статьи. Нужна при обновлении: рисовать заново незачем. */
+export async function readThemeCover(slug: string): Promise<string | null> {
+  if (!/^[a-z0-9-]+$/.test(slug)) throw new Error(`недопустимый слаг: ${slug}`)
+  const out = await ssh(`base64 -w0 ${THEME}/assets/img/blog/${slug}.jpg 2>/dev/null || true`)
+  const b64 = out.trim()
+  return b64.length > 100 ? b64 : null
+}
+
 /** Строка реестра. Порядок ключей фиксирован — §8. */
 export function registryLine(e: BlogRegistryEntry): string {
   const esc = (v: string) => v.replace(/\\/g, '\\\\').replace(/'/g, "\\'")
