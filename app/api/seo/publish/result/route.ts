@@ -55,6 +55,27 @@ export async function POST(req: NextRequest) {
   }
 
   // Проверяем страницу отсюда: агенту для этого ходить наружу незачем
+  // Уведомление поисковиков — часть выпуска, а не отдельная кнопка. Человек
+  // решает, публиковать ли; сказать об этом Яндексу и остальным решать нечего.
+  // Google так уведомить нельзя — он придёт по sitemap сам.
+  try {
+    const { submitToIndexNow } = await import('@/lib/seo/indexnow')
+    const res = await submitToIndexNow([`https://goandstudy.com/blog/${slug}/`])
+    // Перечитываем мету: выше её уже дополнили отметкой о публикации, и писать
+    // поверх старой копии значило бы эту отметку потерять
+    const { data: fresh } = await seo.from('article_versions').select('meta').eq('id', version?.id).single()
+    await seo.from('article_versions').update({
+      meta: { ...(fresh?.meta ?? meta), indexnow: { at: new Date().toISOString(), status: res.status, note: res.note, auto: true } },
+    }).eq('id', version?.id)
+  } catch { /* уведомление не критично: статья уже вышла */ }
+
+  // И проверку индекса — но не сейчас, а через сутки: раньше Google всё равно
+  // ответит «URL неизвестен», и это не будет значить ничего
+  await seo.from('jobs').insert({
+    step: 'article_index_check', lane: 'findings', priority: 20, payload: {},
+    next_run_at: new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
+  })
+
   const verify = await verifyPublished(slug)
   await seo.from('jobs').update({ result: { dry_run, steps, seed_from, seed_to, verify_ok: verify.ok, checks: verify.results } }).eq('id', job_id)
 

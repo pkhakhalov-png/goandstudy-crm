@@ -10,7 +10,16 @@
  * через шесть часов. Иначе на третий день уведомления начнут игнорировать,
  * и они перестанут работать совсем.
  */
-import { sendTelegramMessage } from '../telegram'
+/** Отправка своим токеном: общий помощник жёстко привязан к одному боту. */
+async function sendRaw(token: string, chatId: string, text: string): Promise<void> {
+  const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chat_id: chatId, text, disable_web_page_preview: true }),
+    signal: AbortSignal.timeout(20000),
+  })
+  if (!res.ok) throw new Error(`telegram ${res.status}: ${(await res.text()).slice(0, 120)}`)
+}
 
 /**
  * Кому писать. Отдельная переменная, а не общий чат заявок: беда конвейера
@@ -19,6 +28,19 @@ import { sendTelegramMessage } from '../telegram'
  */
 function alertChat(): string | null {
   return process.env.SEO_ALERT_CHAT_ID || process.env.TELEGRAM_BOOKINGS_CHAT_ID || null
+}
+
+/**
+ * Бот и чат должны быть от одной пары: токен бота заявок шлёт в чат заявок,
+ * общий бот — в свой. Перепутать легко, а ошибка тихая: Telegram отвечает
+ * «chat not found», и сообщение просто не приходит.
+ */
+function alertToken(): string | null {
+  if (process.env.SEO_ALERT_CHAT_ID) return process.env.TELEGRAM_BOT_TOKEN ?? null
+  if (process.env.TELEGRAM_BOOKINGS_CHAT_ID) {
+    return process.env.TELEGRAM_BOOKINGS_BOT_TOKEN ?? process.env.TELEGRAM_BOT_TOKEN ?? null
+  }
+  return null
 }
 
 const QUIET_HOURS = 6
@@ -82,9 +104,51 @@ export async function collectAlerts(seo: any): Promise<Alert[]> {
   return alerts
 }
 
+/**
+ * Хорошие новости и тупики: то, что человек должен узнать, не заходя в CRM.
+ *
+ * Конвейер пишет ночью. Если он молчит, статья лежит готовая до тех пор, пока
+ * кто-нибудь случайно не откроет экран, — а очередь тем временем упирается в
+ * предел вычитки и работа встаёт. Это не поломка, поэтому и тон другой.
+ */
+export async function collectNews(seo: any): Promise<Alert[]> {
+  const news: Alert[] = []
+
+  const { data: ready, error } = await seo.from('articles')
+    .select('id, primary_keyword, status, created_at')
+    .eq('status', 'ready_for_review').order('id')
+  // Молча вернуть пусто — худшее, что может сделать сторож: он тогда
+  // «не видит» бед и выглядит исправным
+  if (error) throw new Error(`не прочитать статьи на вычитке: ${error.message}`)
+
+  for (const a of ready ?? []) {
+    news.push({
+      key: `ready:${a.id}`,
+      title: `Статья готова к вычитке: «${a.primary_keyword}»`,
+      detail: `crm.goandstudy.com/admin/seo/articles/${a.id}`,
+    })
+  }
+
+  // Поток встал из-за очереди на вычитку — об этом надо сказать отдельно,
+  // иначе выглядит как будто конвейер просто перестал работать
+  const { data: flow } = await seo.from('settings').select('value').eq('key', 'article_flow').maybeSingle()
+  const settings: any = flow?.value ?? {}
+  if (settings.enabled && (ready?.length ?? 0) >= (settings.maxInReview ?? 5)) {
+    news.push({
+      key: `stalled:${ready!.length}`,
+      title: `Конвейер остановлен: на вычитке ${ready!.length}`,
+      detail: 'Новые статьи не запускаются, пока не разберёте накопившееся. '
+        + 'Это защита от завала, а не поломка: предел настраивается на экране «Статьи».',
+    })
+  }
+
+  return news
+}
+
 /** Отправить то, о чём ещё не говорили. Возвращает, сколько ушло. */
 export async function notifyAlerts(seo: any): Promise<{ sent: number; suppressed: number }> {
-  const alerts = await collectAlerts(seo)
+  const [problems, news] = await Promise.all([collectAlerts(seo), collectNews(seo)])
+  const alerts = [...problems, ...news]
   if (!alerts.length) return { sent: 0, suppressed: 0 }
 
   const { data: state } = await seo.from('settings').select('value').eq('key', 'alerts_sent').maybeSingle()
@@ -93,22 +157,31 @@ export async function notifyAlerts(seo: any): Promise<{ sent: number; suppressed
 
   const fresh = alerts.filter((a) => {
     const last = sentBefore[a.key] ? Date.parse(sentBefore[a.key]) : 0
-    return now - last > QUIET_HOURS * 3600 * 1000
+    // О готовой статье напоминаем раз в сутки: она никуда не денется, а частые
+    // напоминания о том же превращаются в шум
+    const quiet = a.key.startsWith('ready:') ? 24 : QUIET_HOURS
+    return now - last > quiet * 3600 * 1000
   })
 
   if (!fresh.length) return { sent: 0, suppressed: alerts.length }
 
+  const broken = fresh.filter((a) => a.key.startsWith('failed:') || a.key.startsWith('stuck:') || a.key === 'silence')
+  const good = fresh.filter((a) => !broken.includes(a))
+
   const text = [
-    fresh.length === 1 ? '⚠️ Конвейер: поломка' : `⚠️ Конвейер: ${fresh.length} поломки`,
+    broken.length ? `⚠️ Конвейер: ${broken.length === 1 ? 'поломка' : `поломок ${broken.length}`}` : '📄 Конвейер',
     '',
-    ...fresh.slice(0, 5).map((a) => `• ${a.title}\n${a.detail}`),
+    ...broken.slice(0, 5).map((a) => `• ${a.title}\n${a.detail}`),
+    broken.length && good.length ? '' : null,
+    ...good.slice(0, 8).map((a) => `• ${a.title}\n${a.detail}`),
     '',
     'Разбор: crm.goandstudy.com/admin/seo/articles',
-  ].join('\n')
+  ].filter((l) => l !== null).join('\n')
 
   const chat = alertChat()
-  const ok = chat
-    ? await sendTelegramMessage(chat, text).then(() => true).catch(() => false)
+  const token = alertToken()
+  const ok = chat && token
+    ? await sendRaw(token, chat, text).then(() => true).catch(() => false)
     : false
 
   const next = { ...sentBefore }
