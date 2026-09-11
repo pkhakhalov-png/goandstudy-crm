@@ -87,9 +87,13 @@ export async function POST(req: NextRequest) {
 
   while (Date.now() - started < TIME_BUDGET_MS) {
     // Просим только то, что умеем: маршрутизация на стороне очереди, а не
-    // «взял и вернул». Пока миграция не применена, функция игнорирует параметр
-    // и выдаёт всё подряд — страховка ниже по коду на этот случай остаётся.
-    const { data: jobs, error } = await seo.rpc('claim_jobs', { p_worker: workerId, p_limit: BATCH, p_runner: 'vercel' })
+    // «взял и вернул». Пока миграция не применена, функции с тремя аргументами
+    // в базе нет — тогда работаем по-старому, а не встаём целиком. Страховка
+    // ниже по коду на этот случай остаётся.
+    let { data: jobs, error } = await seo.rpc('claim_jobs', { p_worker: workerId, p_limit: BATCH, p_runner: 'vercel' })
+    if (error && /claim_jobs|function|schema cache/i.test(error.message)) {
+      ({ data: jobs, error } = await seo.rpc('claim_jobs', { p_worker: workerId, p_limit: BATCH }))
+    }
     if (error) return NextResponse.json({ error: error.message, processed }, { status: 500 })
     if (!jobs || jobs.length === 0) break
 
