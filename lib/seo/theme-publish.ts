@@ -8,7 +8,9 @@
 //
 // Сид-функция на первом хите страницы проходит по реестру и создаёт или обновляет
 // страницы. Поэтому «опубликовать» здесь значит положить файлы и бампнуть флаг.
+import fs from 'node:fs'
 import { execFile } from 'node:child_process'
+import { sanitizeBody } from './blog-style'
 import { promisify } from 'node:util'
 
 const run = promisify(execFile)
@@ -86,7 +88,21 @@ export async function publishToTheme(
   steps.push('прогрев: запрос к главной, чтобы сид отработал')
 
   const url = `https://goandstudy.com/blog/${entry.slug}/`
-  if (dry) return { slug: entry.slug, steps, seedFrom, seedTo, url }
+
+  // Санитария здесь, а не у вызывающего: этот путь публикации используют и шаг
+  // очереди, и ручной скрипт, и любой будущий вызов. Проверка в одном месте
+  // надёжнее трёх одинаковых проверок в разных.
+  const raw = fs.readFileSync(files.bodyPath, 'utf8')
+  const clean = sanitizeBody(raw)
+  if (clean.removed.length) {
+    fs.writeFileSync(files.bodyPath, clean.body)
+    steps.push(`вырезано перед записью: ${clean.removed.join(', ')}`)
+  }
+
+  if (dry) {
+    if (clean.removed.length) steps.push('внимание: в теле статьи была исполняемая разметка')
+    return { slug: entry.slug, steps, seedFrom, seedTo, url }
+  }
 
   // 1–2. Файлы
   await scp(files.bodyPath, `${THEME}/inc/blog-articles/${entry.slug}.html`)

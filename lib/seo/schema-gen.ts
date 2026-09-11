@@ -62,7 +62,7 @@ function buildJsonLd(p: P): { schema_type: string; jsonld: any } {
 }
 
 /** Сгенерировать/обновить предложения schema для страниц без JSON-LD. Возвращает счётчики. */
-export async function generateSchemaProposals(seo: any): Promise<{ generated: number; by_type: Record<string, number> }> {
+export async function generateSchemaProposals(seo: any): Promise<{ generated: number; kept_applied: number; by_type: Record<string, number> }> {
   const out: P[] = []
   for (let from = 0; ; from += 1000) {
     const { data, error } = await seo.from('pages')
@@ -88,9 +88,19 @@ export async function generateSchemaProposals(seo: any): Promise<{ generated: nu
     byType[schema_type] = (byType[schema_type] || 0) + 1
     return { page_id: p.id, schema_type, jsonld, source: 'recommend', status: 'proposed' }
   })
-  for (let i = 0; i < rows.length; i += 200) {
-    const { error } = await seo.from('page_schema').insert(rows.slice(i, i + 200))
-    if (error) throw new Error(`page_schema insert: ${error.message}`)
+  // Уже применённые предложения не трогаем: пересчёт не должен откатывать
+  // страницу к «предложено», если разметка на ней давно стоит.
+  const { data: applied } = await seo.from('page_schema')
+    .select('page_id, schema_type').eq('status', 'applied').in('page_id', ids.length ? ids : [0])
+  const untouchable = new Set((applied ?? []).map((r: any) => `${r.page_id}:${r.schema_type}`))
+  const fresh = rows.filter((r) => !untouchable.has(`${r.page_id}:${r.schema_type}`))
+
+  // Именно insert ронял ночную задачу: у страницы уже была строка того же типа,
+  // а удаление снимало только необработанные. Перезапись идемпотентна.
+  for (let i = 0; i < fresh.length; i += 200) {
+    const { error } = await seo.from('page_schema')
+      .upsert(fresh.slice(i, i + 200), { onConflict: 'page_id,schema_type' })
+    if (error) throw new Error(`page_schema upsert: ${error.message}`)
   }
-  return { generated: rows.length, by_type: byType }
+  return { generated: fresh.length, kept_applied: untouchable.size, by_type: byType }
 }
