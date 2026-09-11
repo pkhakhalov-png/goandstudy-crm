@@ -22,13 +22,15 @@ export type Owner = {
 }
 
 export type CannibalVerdict = {
-  verdict: 'safe' | 'update' | 'risky'
+  verdict: 'safe' | 'update' | 'risky' | 'unclear'
   reason: string
   familySize: number
   familyImpressions: number
   owners: Owner[]
   /** Страница, которую следует обновить вместо написания новой. */
   updateTarget: string | null
+  /** Чем данные ограничены — показывается человеку рядом с решением. */
+  caveat?: string
 }
 
 /** Основы слов запроса: по ним собирается семья родственных запросов. */
@@ -98,13 +100,25 @@ export async function loadQueryRows(seo: any, days = 90): Promise<QueryRow[]> {
 export async function checkCannibalization(
   seo: any,
   query: string,
-  opts: { days?: number; excludeUrl?: string; rows?: QueryRow[] } = {},
+  opts: { days?: number; excludeUrl?: string; rows?: QueryRow[]; pageTypes?: Map<string, string | null> } = {},
 ): Promise<CannibalVerdict> {
   const rows = opts.rows ?? (await loadQueryRows(seo, opts.days ?? 90))
-  return verdictFor(rows, query, opts.excludeUrl)
+  const types = opts.pageTypes ?? (await loadPageTypes(seo))
+  return verdictFor(rows, query, opts.excludeUrl, types)
 }
 
-export function verdictFor(rows: QueryRow[], query: string, excludeUrl?: string): CannibalVerdict {
+/** Тип страницы решает, конкуренты они или соседи: услуга и статья — разное. */
+export async function loadPageTypes(seo: any): Promise<Map<string, string | null>> {
+  const { data } = await seo.from('pages').select('normalized_url, page_type').is('removed_at', null)
+  return new Map((data ?? []).map((p: any) => [String(p.normalized_url).replace(/\/$/, ''), p.page_type]))
+}
+
+export function verdictFor(
+  rows: QueryRow[],
+  query: string,
+  excludeUrl?: string,
+  pageTypes?: Map<string, string | null>,
+): CannibalVerdict {
   const stems = stemsOf(query)
   const opts = { excludeUrl }
 
@@ -153,23 +167,45 @@ export function verdictFor(rows: QueryRow[], query: string, excludeUrl?: string)
 
   const top = owners[0]
   const second = owners[1]
+  const base = { familySize: family.size, familyImpressions, owners: owners.slice(0, 5) }
 
-  // Уже дерутся между собой: две страницы держат сопоставимые доли одной семьи
+  // Данных мало — уверенного вывода быть не может. Запрет по десятку показов
+  // отсекал бы живые темы, а разрешение вслепую плодило бы дубли.
+  if (familyImpressions < 40 || family.size < 3) {
+    return {
+      ...base, verdict: 'unclear',
+      reason: `данных мало: ${familyImpressions} показов по ${family.size} запросам — решать человеку`,
+      updateTarget: top?.url ?? null,
+      caveat: 'при таком объёме разница между «держит» и «случайно показалось» неразличима',
+    }
+  }
+
+  // Тип страницы меняет смысл пересечения. Услуга и статья отвечают на разные
+  // намерения: страница «поступление в Италию» продаёт сопровождение, а статья
+  // объясняет порядок действий. Это соседи, а не конкуренты.
+  const topType = pageTypes?.get(top.url.replace(/\/$/, '')) ?? null
+  const topIsService = topType === 'service' || /^https:\/\/goandstudy\.com\/[a-z0-9-]+\/?$/.test(top.url) && !top.url.includes('/blog/')
+
   if (second && second.share >= 0.2 && top.share <= 0.7) {
     return {
-      verdict: 'risky',
+      ...base, verdict: 'risky',
       reason: `запросы разделены между своими страницами (${Math.round(top.share * 100)}% и ${Math.round(second.share * 100)}%) — это уже каннибализация, новая статья её усилит`,
-      familySize: family.size, familyImpressions, owners: owners.slice(0, 5),
       updateTarget: top.url,
     }
   }
 
-  // Семью уверенно держит своя страница — новую писать незачем
   if (top.share >= 0.5 && top.impressions >= 50) {
+    if (topIsService) {
+      return {
+        ...base, verdict: 'unclear',
+        reason: `семью держит страница услуги (${Math.round(top.share * 100)}%, позиция ${top.position.toFixed(1)}) — статья отвечает на другое намерение, но пересечение есть`,
+        updateTarget: top.url,
+        caveat: 'услуга и статья могут уживаться: решать по тому, что именно спрашивают',
+      }
+    }
     return {
-      verdict: 'update',
-      reason: `${Math.round(top.share * 100)}% показов семьи держит своя страница (позиция ${top.position.toFixed(1)}) — её и надо обновлять, а не писать новую`,
-      familySize: family.size, familyImpressions, owners: owners.slice(0, 5),
+      ...base, verdict: 'update',
+      reason: `${Math.round(top.share * 100)}% показов семьи держит своя статья (позиция ${top.position.toFixed(1)}) — её и надо обновлять, а не писать новую`,
       updateTarget: top.url,
     }
   }

@@ -1,6 +1,6 @@
 'use client'
 import { useState, useTransition } from 'react'
-import { saveFlowSettings, startNextNow } from './actions'
+import { saveFlowSettings, startNextNow, decideTopic } from './actions'
 import type { FlowState } from '@/lib/seo/flow'
 
 export function FlowPanel({ state }: { state: FlowState & { computedAt?: string | null } }) {
@@ -99,23 +99,54 @@ export function FlowPanel({ state }: { state: FlowState & { computedAt?: string 
               <div key={i} style={{ fontSize: 12, borderLeft: '2px solid var(--bor2)', paddingLeft: 8 }}>
                 <div style={{ fontWeight: 600 }}>
                   {sk.query}
-                  <span style={{ color: sk.verdict === 'risky' ? 'var(--red)' : 'var(--purple)', fontWeight: 400, marginLeft: 6 }}>
-                    {sk.verdict === 'risky' ? 'уже дерутся' : 'обновлять существующую'}
+                  <span style={{ color: VERDICT_COLOR[sk.verdict] ?? 'var(--muted)', fontWeight: 400, marginLeft: 6 }}>
+                    {VERDICT_RU[sk.verdict] ?? sk.verdict}
                   </span>
                 </div>
                 <div style={{ color: 'var(--muted)', fontSize: 11 }}>{sk.reason}</div>
+                {sk.caveat && <div style={{ color: 'var(--muted)', fontSize: 11, fontStyle: 'italic' }}>{sk.caveat}</div>}
                 {sk.updateTarget && (
                   <a href={`${sk.updateTarget}/`} target="_blank" rel="noopener noreferrer"
                     style={{ fontSize: 11, color: 'var(--purple)', textDecoration: 'none' }}>
                     {sk.updateTarget.replace('https://goandstudy.com', '')} →
                   </a>
                 )}
+                <div style={{ display: 'flex', gap: 6, marginTop: 5, flexWrap: 'wrap' }}>
+                  <Decide id={sk.topicId} act="create" label="Всё равно писать" disabled={pending} run={start} setNote={setNote} />
+                  {sk.updateTarget && <Decide id={sk.topicId} act="update" url={sk.updateTarget} label="Обновлять ту" disabled={pending} run={start} setNote={setNote} />}
+                  <Decide id={sk.topicId} act="review" label="Отложить" disabled={pending} run={start} setNote={setNote} />
+                  <Decide id={sk.topicId} act="reject" label="Отклонить" disabled={pending} run={start} setNote={setNote} />
+                </div>
               </div>
             ))}
           </div>
         </details>
       )}
     </div>
+  )
+}
+
+const VERDICT_RU: Record<string, string> = {
+  risky: 'уже дерутся', update: 'обновлять существующую', unclear: 'спорно — решать вам',
+}
+const VERDICT_COLOR: Record<string, string> = {
+  risky: 'var(--red)', update: 'var(--purple)', unclear: 'var(--muted)',
+}
+
+/** Решение человека по спорной теме. Машина считает, выбирает человек. */
+function Decide({ id, act, url, label, disabled, run, setNote }: {
+  id: number; act: 'create' | 'update' | 'review' | 'reject'; url?: string
+  label: string; disabled: boolean
+  run: (fn: () => void) => void; setNote: (v: string | null) => void
+}) {
+  return (
+    <button className="btn-s" disabled={disabled} style={{ fontSize: 11, padding: '2px 8px' }}
+      onClick={() => run(async () => {
+        const r = await decideTopic(id, act, url)
+        setNote(r.error ?? r.note ?? null)
+      })}>
+      {label}
+    </button>
   )
 }
 

@@ -5,7 +5,12 @@ config({ path: path.resolve(process.cwd(), '.env.local') })
 import { createClient } from '@supabase/supabase-js'
 import { checkCannibalization } from '../lib/seo/cannibal'
 
-const MARK = { safe: '✓ можно', update: '✗ обновлять существующую', risky: '⚠ уже дерутся' } as const
+const MARK = {
+  safe: '✓ можно',
+  update: '✗ обновлять существующую',
+  risky: '⚠ уже дерутся',
+  unclear: '? на рассмотрение',
+} as const
 
 async function main() {
   const seo = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!).schema('seo')
@@ -17,6 +22,7 @@ async function main() {
   for (const t of topics ?? []) {
     const q = t.primary_keyword ?? t.title
     const v = await checkCannibalization(seo, q)
+    if (v.caveat) console.log()
     console.log(`\n${MARK[v.verdict]}  «${q}»  · ${t.search_volume ?? 0} показов`)
     console.log(`   ${v.reason}`)
     if (v.owners.length) {

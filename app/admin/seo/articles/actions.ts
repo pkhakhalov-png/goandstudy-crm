@@ -447,3 +447,62 @@ export async function startNextNow() {
   revalidatePath('/admin/seo/articles')
   return { ok: true, note: `«${topic.query}» в очереди` }
 }
+
+/* ── Решения по спорным темам ─────────────────────────────────────────────── */
+
+/**
+ * Что делать с темой, которую машина отложила из-за пересечения запросов.
+ * Машина хорошо считает пересечение, но не знает намерения читателя — поэтому
+ * последнее слово за человеком, и оно должно куда-то записываться.
+ */
+export async function decideTopic(
+  topicId: number,
+  action: 'create' | 'update' | 'review' | 'reject',
+  targetUrl?: string,
+) {
+  const { error: authErr } = await assertAdmin()
+  if (authErr) return { error: authErr }
+  const seo = (await createAdminClient()).schema('seo')
+
+  const { data: topic } = await seo.from('topics').select('id, title, primary_keyword').eq('id', topicId).single()
+  if (!topic) return { error: 'тема не найдена' }
+  const name = topic.primary_keyword ?? topic.title
+
+  if (action === 'create') {
+    const { enqueueJob } = await import('@/lib/seo/enqueue')
+    // force: человек посмотрел на конкурентов и решил — машине не переспрашивать
+    const res = await enqueueJob(seo, {
+      step: 'article_brief', lane: 'production', priority: 50, topic_id: topicId,
+      payload: { topic_id: topicId, force: true, decided_by: 'human' },
+      dedup_key: `article:topic:${topicId}:forced:${Date.now()}`,
+    })
+    if (res.error) return { error: res.error }
+    await seo.from('topics').update({ status: 'in_production' }).eq('id', topicId)
+    revalidatePath('/admin/seo/articles')
+    return { ok: true, note: `«${name}» отправлена в работу вашим решением` }
+  }
+
+  if (action === 'update') {
+    if (!targetUrl) return { error: 'не указана страница для обновления' }
+    // Полного обновления пока нет — фиксируем решение и цель, чтобы задача
+    // не потерялась и было видно, что тема разобрана, а не брошена
+    await seo.from('topics').update({ status: 'needs_update' }).eq('id', topicId)
+    await seo.from('change_sets').insert({
+      topic_id: topicId, kind: 'update_existing',
+      reason: `решение человека: обновлять ${targetUrl}, а не писать новую по «${name}»`,
+      idempotency_key: `update-decision:${topicId}`, status: 'proposed', proposed_by: 'human',
+    })
+    revalidatePath('/admin/seo/articles')
+    return { ok: true, note: `Записано: обновлять ${targetUrl.replace('https://goandstudy.com', '')}` }
+  }
+
+  if (action === 'review') {
+    await seo.from('topics').update({ status: 'in_review' }).eq('id', topicId)
+    revalidatePath('/admin/seo/articles')
+    return { ok: true, note: `«${name}» отложена на рассмотрение` }
+  }
+
+  await seo.from('topics').update({ status: 'rejected_duplicate' }).eq('id', topicId)
+  revalidatePath('/admin/seo/articles')
+  return { ok: true, note: `«${name}» отклонена как дубль` }
+}

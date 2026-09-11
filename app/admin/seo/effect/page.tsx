@@ -89,10 +89,18 @@ export default async function EffectPage() {
           кликов ничего не значит, пока не видно, сколько собирает обычная статья. Данные Search
           Console отстают на 2–3 дня.
         </p>
+        <div style={{ marginTop: 10, padding: '8px 12px', border: '1px solid var(--bor2)', borderRadius: 8, fontSize: 12, color: 'var(--muted)', maxWidth: 760, lineHeight: 1.55 }}>
+          <b style={{ color: 'var(--text)' }}>Здесь только поисковые показатели.</b> Обращений и сделок
+          на этом экране нет и не будет, пока не связаны посадочная страница и заявка: переходы
+          на сайте не размечены, `seo.v_page_deals` пуст. Клик по кнопке мессенджера — это клик,
+          а не заявка, и называть его заявкой мы не будем. Что для этого нужно — в
+          `docs/seo/backlog.md`.
+        </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 18 }}>
         <Card label="Статей в блоге" value={blog.length} sub="индексируемых" />
+        <Card label="Наших статей" value={ours.length} sub={ours.filter((o) => o.firstIndexed).length + ' в индексе'} />
         <Card label="Медиана кликов" value={median} sub="за 28 дней, на статью" />
         <Card label="Без единого клика" value={quiet.length} color={quiet.length ? 'var(--purple)' : undefined} sub="показы есть" />
         <Card label="Без показов" value={dead.length} color={dead.length ? 'var(--red)' : undefined} sub="их не находят" />
@@ -133,9 +141,15 @@ export default async function EffectPage() {
                       ? <span style={{ color: 'var(--purple)' }}>ждёт</span>
                       : o.daysToIndex}
                   </td>
-                  <td style={{ ...td, textAlign: 'right' }}>{o.window.impressions.toLocaleString('ru')}{!o.matured && '*'}</td>
+                  <td style={{ ...td, textAlign: 'right' }}>
+                    {o.firstIndexed || o.window.impressions > 0
+                      ? <>{o.window.impressions.toLocaleString('ru')}{!o.matured && '*'}</>
+                      : <span style={{ color: 'var(--muted)' }} title="страница ещё не в индексе — это не ноль, а отсутствие данных">нет данных</span>}
+                  </td>
                   <td style={{ ...td, textAlign: 'right', fontWeight: 700, color: o.window.clicks >= median ? 'var(--green)' : 'var(--text)' }}>
-                    {o.window.clicks}{!o.matured && '*'}
+                    {o.firstIndexed || o.window.impressions > 0
+                      ? <>{o.window.clicks}{!o.matured && '*'}</>
+                      : <span style={{ color: 'var(--muted)', fontWeight: 400 }}>—</span>}
                   </td>
                   <td style={{ ...td, textAlign: 'right', color: 'var(--muted)' }}>
                     {o.window.position ? o.window.position.toFixed(1) : '—'}

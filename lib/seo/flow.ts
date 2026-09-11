@@ -46,7 +46,7 @@ export type FlowState = {
   blocker: string | null
   nextTopic: PickedTopic | null
   /** Темы, отброшенные из-за каннибализации — чтобы решение было видно. */
-  skipped: { query: string; verdict: string; reason: string; updateTarget: string | null }[]
+  skipped: { topicId: number; query: string; verdict: string; reason: string; updateTarget: string | null; caveat?: string }[]
 }
 
 /** Понедельник текущей недели — по нему считаем, сколько уже сделано. */
@@ -182,8 +182,9 @@ export async function pickTopic(
   const free = topics.filter((t: any) => !taken.has(t.id))
   if (!free.length) return { topic: null, skipped }
 
-  const { loadQueryRows, verdictFor, sameFamily } = await import('./cannibal')
+  const { loadQueryRows, verdictFor, sameFamily, loadPageTypes } = await import('./cannibal')
   const rows = await loadQueryRows(seo)
+  const pageTypes = await loadPageTypes(seo)
 
   // Свои же статьи и темы: проверка по показам их не видит, пока они не начали
   // ранжироваться. Без этого конвейер за неделю написал бы четыре статьи об
@@ -202,20 +203,20 @@ export async function pickTopic(
     const twin = ourQueries.find((q) => sameFamily(q, query))
     if (twin) {
       skipped.push({
-        query, verdict: 'update',
+        topicId: t.id, query, verdict: 'update',
         reason: `то же самое другими словами — у нас уже есть «${twin}»`,
         updateTarget: null,
       })
       continue
     }
 
-    const v = verdictFor(rows, query)
+    const v = verdictFor(rows, query, undefined, pageTypes)
     if (v.verdict === 'safe') {
       // Тема занимает свою семью: следующие формулировки того же уже не пройдут
       ourQueries.push(query)
       return { topic: { id: t.id, query, impressions: t.search_volume ?? 0, cannibalReason: v.reason }, skipped }
     }
-    skipped.push({ query, verdict: v.verdict, reason: v.reason, updateTarget: v.updateTarget })
+    skipped.push({ topicId: t.id, query, verdict: v.verdict, reason: v.reason, updateTarget: v.updateTarget, caveat: v.caveat })
     if (!opts.withSkipped && skipped.length > 20) break
   }
   return { topic: null, skipped }

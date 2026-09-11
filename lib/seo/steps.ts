@@ -163,7 +163,31 @@ const registry: Record<string, Handler> = {
       if (rows.length < 25_000) break
     }
 
-    return { outcome: 'done', result: { startDate, endDate, pageRows, queryRows, cost: 0 } }
+    // Сторож полноты. Молчаливая потеря данных уже случалась: импорт две недели
+    // писал 11 страниц в день вместо 165, и заметили это только по «обвалу
+    // трафика». Теперь каждый прогон оставляет след, по которому видно, что
+    // именно приехало, а пустой ответ отличается от настоящего нуля.
+    const health: Record<string, any> = {
+      at: new Date().toISOString(), startDate, endDate, pageRows, queryRows,
+    }
+
+    if (pageRows === 0) {
+      // Пусто бывает по трём причинам: нет трафика, сломался доступ, сузили
+      // период. Первое на живом сайте невероятно, поэтому считаем это бедой.
+      const { count: known } = await seo.from('gsc_page_daily').select('*', { count: 'exact', head: true })
+      health.suspicious = (known ?? 0) > 0 ? 'Google вернул пусто, хотя в базе данные есть' : 'данных нет вовсе'
+    } else {
+      const { count: dayRows } = await seo.from('gsc_page_daily')
+        .select('*', { count: 'exact', head: true }).eq('date', endDate)
+      health.lastDayRows = dayRows ?? 0
+      // За сутки сайт показывается по сотне с лишним адресов. Падение до
+      // десятков означает, что часть строк не доехала.
+      if ((dayRows ?? 0) > 0 && (dayRows ?? 0) < 50) health.suspicious = `на ${endDate} всего ${dayRows} страниц — похоже на потерю`
+    }
+
+    await seo.from('settings').upsert({ key: 'gsc_import_health', value: health }, { onConflict: 'key' })
+
+    return { outcome: 'done', result: { ...health, cost: 0 } }
   },
 
   // ── M5-частично: находки из инвентаря (без GSC) ───────────────────────────
