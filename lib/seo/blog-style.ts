@@ -75,6 +75,11 @@ export function checkBlogStandard(input: BlogCheckInput): Check[] {
   const slugWords = input.slug.split('-').filter(Boolean).length
   add('1 slug 3–7 слов', 'W', slugWords >= 3 && slugWords <= 7, `${slugWords} слов`)
 
+  /* §2.1 Ничего исполняемого в теле */
+  const danger = findDangerous(body)
+  add('2.1 нет исполняемой разметки', 'B', danger.length === 0,
+    danger.length ? `найдено: ${danger.join(', ')}` : 'скриптов, форм и обработчиков нет')
+
   /* §2 Белый список блоков */
   const blocks = [...body.matchAll(/<!--\s*wp:([a-z]+)/g)].map((m) => m[1])
   const alien = [...new Set(blocks.filter((b) => !ALLOWED_BLOCKS.includes(b as any)))]
@@ -177,4 +182,50 @@ export async function loadSiteTargets(seo: any): Promise<{ knownBlogSlugs: Set<s
     if (!data || data.length < 1000) break
   }
   return { knownBlogSlugs, knownPagePaths }
+}
+
+/* ── Санитария тела статьи ────────────────────────────────────────────────── */
+
+/**
+ * Опасные куски разметки. Тело статьи пишет модель, а тема выводит его в
+ * страницу как есть — значит между моделью и посетителем не должно оставаться
+ * ничего исполняемого. PHP не страшен: тема читает файл через file_get_contents,
+ * а не подключает его. А вот скрипт, обработчик события или рамка с чужим
+ * сайтом отработают в браузере читателя.
+ */
+const DANGEROUS: { re: RegExp; what: string }[] = [
+  { re: /<script[\s\S]*?<\/script>|<script[^>]*>/gi, what: 'скрипт' },
+  { re: /<iframe[\s\S]*?<\/iframe>|<iframe[^>]*>/gi, what: 'рамка iframe' },
+  { re: /<object[\s\S]*?<\/object>|<embed[^>]*>/gi, what: 'встроенный объект' },
+  { re: /<form[\s\S]*?<\/form>|<form[^>]*>/gi, what: 'форма' },
+  { re: /<style[\s\S]*?<\/style>/gi, what: 'блок стилей' },
+  { re: /\son[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, what: 'обработчик события' },
+  { re: /(href|src)\s*=\s*("|')?\s*(javascript|data|vbscript):/gi, what: 'ссылка со скриптом' },
+  { re: /<\?php|<\?=/gi, what: 'вставка PHP' },
+]
+
+export function findDangerous(body: string): string[] {
+  const found: string[] = []
+  for (const d of DANGEROUS) if (d.re.test(body)) found.push(d.what)
+  for (const d of DANGEROUS) d.re.lastIndex = 0
+  return [...new Set(found)]
+}
+
+/**
+ * Вырезать опасное. Возвращает очищенный текст и список того, что убрали —
+ * молча чистить нельзя: это признак того, что с генерацией что-то не так,
+ * и человек должен об этом узнать.
+ */
+export function sanitizeBody(body: string): { body: string; removed: string[] } {
+  let out = body
+  const removed: string[] = []
+  for (const d of DANGEROUS) {
+    d.re.lastIndex = 0
+    if (d.re.test(out)) {
+      removed.push(d.what)
+      d.re.lastIndex = 0
+      out = out.replace(d.re, '')
+    }
+  }
+  return { body: out, removed: [...new Set(removed)] }
 }

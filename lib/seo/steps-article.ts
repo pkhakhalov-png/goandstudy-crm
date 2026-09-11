@@ -558,7 +558,9 @@ registerStep('article_publish_blog', async (job: Job, seo: any): Promise<StepOut
     const verify = await verifyPublished(slug)
     return { outcome: 'done', result: { url: report.url, verify_ok: verify.ok, checks: verify.results, cost: 0 } }
   } catch (e: any) {
-    return { outcome: 'failed', result: { error: e?.message ?? String(e) } }
+    // Сеть отвалилась или сервер занят — это повод повторить, а не хоронить статью
+    const { outcomeFor } = await import('./failure')
+    return outcomeFor(e)
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true })
   }

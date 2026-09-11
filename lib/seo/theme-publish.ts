@@ -120,19 +120,53 @@ export async function publishToTheme(
 export async function verifyPublished(slug: string): Promise<{ ok: boolean; results: string[] }> {
   const results: string[] = []
   let ok = true
+  const url = `https://goandstudy.com/blog/${slug}/`
 
-  const page = await fetch(`https://goandstudy.com/blog/${slug}/`, { signal: AbortSignal.timeout(25000) }).catch(() => null)
+  const page = await fetch(url, { signal: AbortSignal.timeout(25000) }).catch(() => null)
   const html = page && page.ok ? await page.text() : ''
   if (!page || !page.ok) { ok = false; results.push(`страница отдаёт ${page?.status ?? 'ошибку'}`) }
   else results.push('страница отдаётся 200')
+
+  // Заголовок X-Robots-Tag закрывает страницу от поиска молча: в разметке
+  // ничего не видно, а индексации не будет
+  const xrobots = page?.headers.get('x-robots-tag')
+  if (xrobots && /noindex/i.test(xrobots)) { ok = false; results.push(`заголовок X-Robots-Tag: ${xrobots}`) }
 
   if (html) {
     const title = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? ''
     results.push(title ? `title: ${title}` : 'title пустой')
     if (!/<meta name="description"/i.test(html)) { ok = false; results.push('нет meta description') }
     if (!/application\/ld\+json/i.test(html)) { ok = false; results.push('нет JSON-LD') }
+
     const h1 = (html.match(/<h1[\s>]/gi) ?? []).length
     if (h1 !== 1) { ok = false; results.push(`h1 на странице: ${h1}, должен быть один`) }
+
+    if (/<meta[^>]+name=["\']robots["\'][^>]+noindex/i.test(html)) {
+      ok = false; results.push('в разметке стоит noindex')
+    }
+
+    // Канонический адрес должен указывать на саму страницу, иначе вес уйдёт
+    // на другой URL, а эта из индекса выпадет
+    const canonical = html.match(/<link[^>]+rel=["\']canonical["\'][^>]*>/i)?.[0]?.match(/href=["\']([^"\']+)/i)?.[1]
+    if (!canonical) { ok = false; results.push('нет canonical') }
+    else if (canonical.replace(/\/$/, '') !== url.replace(/\/$/, '')) {
+      ok = false; results.push(`canonical ведёт на чужой адрес: ${canonical}`)
+    } else results.push('canonical на себя')
+
+    // Каждая картинка должна отдаваться. Сегодня уже был случай, когда тег в
+    // тексте стоял, а файла не было — и проверка этого не заметила.
+    const imgs = [...html.matchAll(/<img[^>]+src=["\']([^"\']+)["\'][^>]*>/gi)]
+      .map((m) => m[1]).filter((src) => src.includes('/blog/'))
+    for (const src of [...new Set(imgs)].slice(0, 6)) {
+      const full = src.startsWith('http') ? src : `https://goandstudy.com${src}`
+      const r = await fetch(full, { method: 'HEAD', signal: AbortSignal.timeout(15000) }).catch(() => null)
+      if (!r || !r.ok) { ok = false; results.push(`картинка не отдаётся (${r?.status ?? 'ошибка'}): ${src}`) }
+    }
+    if (imgs.length) results.push(`картинок в статье: ${new Set(imgs).size}, все отдаются`)
+
+    // Пустой alt — не ошибка вёрстки, но для поиска картинка становится немой
+    const noAlt = (html.match(/<img(?![^>]*\balt=)[^>]*>/gi) ?? []).length
+    if (noAlt) results.push(`картинок без alt: ${noAlt}`)
   }
 
   const index = await fetch('https://goandstudy.com/blog/', { signal: AbortSignal.timeout(25000) }).catch(() => null)
@@ -140,9 +174,12 @@ export async function verifyPublished(slug: string): Promise<{ ok: boolean; resu
   if (!idxHtml.includes(slug)) { ok = false; results.push('карточки нет на /blog/') }
   else results.push('карточка на индексе есть')
 
-  const sitemap = await fetch('https://goandstudy.com/sitemap.xml', { signal: AbortSignal.timeout(25000) }).catch(() => null)
-  const smHtml = sitemap && sitemap.ok ? await sitemap.text() : ''
-  results.push(smHtml.includes(`blog/${slug}/`) ? 'в sitemap есть' : 'в sitemap пока нет (§11.4 даёт сутки)')
+  // Без строки в sitemap Google узнает о статье только по ссылкам, и не скоро
+  const sm = await fetch('https://goandstudy.com/sitemap.xml', { signal: AbortSignal.timeout(25000) }).catch(() => null)
+  const smXml = sm && sm.ok ? await sm.text() : ''
+  if (!smXml) results.push('sitemap не прочитался — проверить вручную')
+  else if (!smXml.includes(slug)) { ok = false; results.push('адреса нет в sitemap.xml') }
+  else results.push('адрес есть в sitemap.xml')
 
   return { ok, results }
 }

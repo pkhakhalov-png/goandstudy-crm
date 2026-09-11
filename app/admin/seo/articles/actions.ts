@@ -2,6 +2,7 @@
 
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { enqueueJob } from '@/lib/seo/enqueue'
 import { finalPreflight, checkPublishRate, publishDraft, promoteToPublish, type PublishInput } from '@/lib/seo/publish'
 import { getAuthor } from '@/lib/seo/authors'
 
@@ -254,8 +255,8 @@ export async function insertIncomingLinks(articleId: number, dryRun = true) {
         .in('status', ['pending', 'running']).contains('payload', { slug: donorSlug }).limit(1)
       if (exists?.length) { report.push({ url: donorUrl, ok: true, note: 'уже в очереди у агента' }); continue }
 
-      await seo.from('jobs').insert({
-        step: 'link_insert_theme', lane: 'production', priority: 15,
+      await enqueueJob(seo, {
+        step: 'link_insert_theme', lane: 'production', priority: 15, runner: 'agent',
         article_id: articleId, topic_id: article.topic_id,
         payload: { slug: donorSlug, anchor: l.anchor, target: targetUrl, suggestion_id: l.id },
       })
@@ -305,12 +306,12 @@ export async function publishToBlog(articleId: number, dryRun = true, update = f
     .in('status', ['pending', 'running', 'waiting']).limit(1)
   if (existing?.length) return { error: 'публикация уже в очереди' }
 
-  const { error } = await seo.from('jobs').insert({
-    step: 'article_publish_blog', lane: 'production', priority: 10,
+  const { error } = await enqueueJob(seo, {
+    step: 'article_publish_blog', lane: 'production', priority: 10, runner: 'agent',
     article_id: articleId, topic_id: article.topic_id,
     payload: { dry_run: dryRun, update },
   })
-  if (error) return { error: error.message }
+  if (error) return { error }
 
   revalidatePath(`/admin/seo/articles/${articleId}`)
   return {

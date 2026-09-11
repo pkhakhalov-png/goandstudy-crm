@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
-import { normalizeBody } from '@/lib/seo/blog-style'
+import { normalizeBody, sanitizeBody } from '@/lib/seo/blog-style'
 
 // Выдача задания агенту публикации, который живёт на сервере сайта.
 //
@@ -59,6 +59,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ job: null, note: 'задание отклонено: нет обложки' })
   }
 
+  const sanitized = sanitizeBody(normalizeBody(String(version?.body ?? '')))
+  if (sanitized.removed.length) {
+    await seo.from('article_versions').update({
+      meta: { ...meta, sanitized: { at: new Date().toISOString(), removed: sanitized.removed } },
+    }).eq('id', version!.id)
+  }
+
   // Помечаем взятым, чтобы второй агент не сделал ту же работу
   await seo.from('jobs').update({ status: 'running', locked_at: new Date().toISOString(), locked_by: 'publish-agent' }).eq('id', job.id)
 
@@ -73,7 +80,10 @@ export async function GET(req: NextRequest) {
       // нечаянно — решение принимает человек кнопкой, а не конвейер.
       update: job.payload?.update === true,
       slug: meta.slug,
-      body: normalizeBody(String(version?.body ?? '')).trimEnd() + '\n',
+      // Последний рубеж перед записью в страницу сайта. Проверка качества это
+      // уже ловит, но она может быть пройдена до правки текста, а сюда попадает
+      // именно то, что станет публичной страницей.
+      body: sanitized.body.trimEnd() + '\n',
       cover_base64: meta.cover.base64,
       // Картинки внутри статьи. Имена уже прописаны в теле, агент кладёт файлы
       // рядом с обложкой — иначе в тексте будут ссылки на пустоту.

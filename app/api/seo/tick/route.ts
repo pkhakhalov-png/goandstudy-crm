@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { runStep, hasStep, registeredSteps } from '@/lib/seo/steps'
+import { outcomeFor } from '@/lib/seo/failure'
 import '@/lib/seo/steps-article'   // регистрация шагов производства статьи
 
 // Воркер SEO-очереди (PRD 10.3). Вызывается pg_cron через pg_net раз в минуту.
@@ -85,7 +86,10 @@ export async function POST(req: NextRequest) {
   } catch { /* поток не критичен для обработки очереди */ }
 
   while (Date.now() - started < TIME_BUDGET_MS) {
-    const { data: jobs, error } = await seo.rpc('claim_jobs', { p_worker: workerId, p_limit: BATCH })
+    // Просим только то, что умеем: маршрутизация на стороне очереди, а не
+    // «взял и вернул». Пока миграция не применена, функция игнорирует параметр
+    // и выдаёт всё подряд — страховка ниже по коду на этот случай остаётся.
+    const { data: jobs, error } = await seo.rpc('claim_jobs', { p_worker: workerId, p_limit: BATCH, p_runner: 'vercel' })
     if (error) return NextResponse.json({ error: error.message, processed }, { status: 500 })
     if (!jobs || jobs.length === 0) break
 
@@ -111,10 +115,11 @@ export async function POST(req: NextRequest) {
         const outcome = await runStep(job, seo)   // { outcome, result }
         await seo.rpc('complete_job', { p_job_id: job.id, p_outcome: outcome.outcome, p_result: outcome.result ?? {} })
       } catch (e: any) {
-        await seo.rpc('complete_job', {
-          p_job_id: job.id, p_outcome: 'retry',
-          p_result: { error: (e?.message ?? 'step error').slice(0, 500) },
-        })
+        // Повторять имеет смысл перегрузку и обрыв связи. Нехватку денег,
+        // неверный ключ и занятый слаг повторять бессмысленно — это только
+        // сожжёт попытки и спрячет причину за общим «retry».
+        const { outcome, result } = outcomeFor(e)
+        await seo.rpc('complete_job', { p_job_id: job.id, p_outcome: outcome, p_result: result })
       }
       processed++
     }
