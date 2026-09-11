@@ -17,8 +17,14 @@ export type BlogCategory = typeof BLOG_CATEGORIES[number]
 export const CTA_HTML =
   '<p>Хотите поступить за рубеж? <a href="https://crm.goandstudy.com/book" target="_blank" rel="noopener noreferrer">Запишитесь на бесплатную консультацию</a> — разберём ваш случай и составим план.</p>'
 
-/** §2: белый список блоков. Всё остальное в теме не стилизовано. */
-export const ALLOWED_BLOCKS = ['paragraph', 'heading', 'list', 'table', 'quote'] as const
+/**
+ * §2: белый список блоков. Всё остальное в теме не стилизовано.
+ *
+ * Блок картинки добавлен позже остальных: в 77 старых статьях изображений внутри
+ * текста нет, формат заводится заново. Ставит его машина после генерации, руками
+ * модель картинки в текст не вписывает.
+ */
+export const ALLOWED_BLOCKS = ['paragraph', 'heading', 'list', 'table', 'quote', 'image'] as const
 
 /**
  * Привести тело к стандарту в том, что не должно зависеть от модели.
@@ -72,7 +78,7 @@ export function checkBlogStandard(input: BlogCheckInput): Check[] {
   /* §2 Белый список блоков */
   const blocks = [...body.matchAll(/<!--\s*wp:([a-z]+)/g)].map((m) => m[1])
   const alien = [...new Set(blocks.filter((b) => !ALLOWED_BLOCKS.includes(b as any)))]
-  add('2 только пять типов блоков', 'B', alien.length === 0,
+  add('2 только разрешённые типы блоков', 'B', alien.length === 0,
     alien.length ? `посторонние: ${alien.join(', ')}` : `${blocks.length} блоков, все разрешённые`)
 
   const opens = (body.match(/<!--\s*wp:/g) ?? []).length

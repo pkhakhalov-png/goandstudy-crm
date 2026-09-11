@@ -467,3 +467,56 @@ function parseJson<T>(res: Anthropic.Message, what: string): T {
     throw new Error(`${what}: модель вернула не-JSON (stop_reason=${res.stop_reason}): ${text.slice(0, 300)}`)
   }
 }
+
+/* ── Сцены для картинок ───────────────────────────────────────────────────── */
+
+const SCENES_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['cover', 'inline', 'inline_alt', 'after_heading'],
+  properties: {
+    cover: { type: 'string', description: 'Сцена для обложки, на английском, 1–2 предложения' },
+    inline: { type: 'string', description: 'Сцена для картинки внутри статьи, на английском, 1–2 предложения' },
+    inline_alt: { type: 'string', description: 'Подпись alt по-русски, 4–12 слов, описывает изображение' },
+    after_heading: { type: 'string', description: 'Точный текст подзаголовка H2, ПОСЛЕ раздела которого встанет картинка' },
+  },
+} as const
+
+export type Scenes = { cover: string; inline: string; inline_alt: string; after_heading: string }
+
+/**
+ * Что именно изобразить. Решает модель, а не шаблон: «Австрия» шаблонно даёт
+ * флаг и башню, а нужна сцена, отвечающая теме статьи.
+ */
+export async function planScenes(input: { title: string; h1: string; headings: string[] }): Promise<Scenes> {
+  const client = getAnthropic()
+  const res = await client.messages.create({
+    model: GEN_MODEL,
+    max_tokens: 2000,
+    output_config: { effort: 'low', format: { type: 'json_schema', schema: SCENES_SCHEMA as any } },
+    system: `Ты подбираешь фотографии к статье образовательного блога.
+
+Описываешь СЦЕНУ для фотографа — что в кадре, где, при каком свете. По-английски,
+одно-два предложения, без художественных эпитетов и без указаний стиля: стиль
+добавляется отдельно.
+
+Правила:
+— никакого текста, вывесок с читаемыми словами, логотипов и флагов крупным планом;
+— не открытка: не главная достопримечательность страны, а место, связанное
+  именно с темой статьи. Про поступление — приёмная комиссия, документы, кампус;
+  про стоимость — быт, жильё, транспорт; про экзамен — аудитория, бланки, стол;
+— обложка задаёт тему целиком, картинка внутри — деталь, а не вторая панорама;
+— люди допустимы, но не позирующие: со спины, за работой, лица не в фокусе.
+
+Поле after_heading — точный текст того подзаголовка из списка, после раздела
+которого картинка уместнее всего. Бери из середины статьи, не первый и не
+последний. Скопируй текст дословно.`,
+    messages: [{
+      role: 'user',
+      content: `Заголовок: ${input.title}\nH1: ${input.h1}\n\nПодзаголовки:\n${input.headings.map((h) => `— ${h}`).join('\n')}`,
+    }],
+  })
+
+  const text = res.content.filter((b: any) => b.type === 'text').map((b: any) => b.text).join('')
+  return JSON.parse(text) as Scenes
+}

@@ -75,6 +75,9 @@ export async function GET(req: NextRequest) {
       slug: meta.slug,
       body: normalizeBody(String(version?.body ?? '')).trimEnd() + '\n',
       cover_base64: meta.cover.base64,
+      // Картинки внутри статьи. Имена уже прописаны в теле, агент кладёт файлы
+      // рядом с обложкой — иначе в тексте будут ссылки на пустоту.
+      inline_images: (meta.images?.inline ?? []).map((im: any) => ({ name: im.name, base64: im.base64 })),
       registry: {
         slug: meta.slug,
         title: String(version?.title ?? ''),

@@ -89,6 +89,7 @@ function publish(array $job): array {
                 'steps' => [
                     ($isUpdate ? 'перезапись тела → ' : 'тело → ') . $bodyFile,
                     ($isUpdate ? 'перезапись обложки → ' : 'обложка → ') . $coverFile,
+                    count($job['inline_images'] ?? []) . ' картинок внутри статьи → ' . THEME . '/assets/img/blog/',
                     $isUpdate ? 'обновление строки реестра, дата правки на сегодня' : 'строка в начало реестра',
                     "сид-флаг $seedFrom → $seedTo",
                     'прогрев главной',
@@ -101,6 +102,17 @@ function publish(array $job): array {
     $steps[] = ($isUpdate ? 'перезаписано тело → ' : 'тело → ') . $bodyFile;
     file_put_contents($coverFile, base64_decode($job['cover_base64']));
     $steps[] = ($isUpdate ? 'перезаписана обложка → ' : 'обложка → ') . $coverFile;
+
+    // Картинки внутри статьи. Имя проверяем тем же правилом, что и слаг: файл
+    // приходит с той стороны, и путь из него собирать вслепую нельзя.
+    foreach (($job['inline_images'] ?? []) as $im) {
+        $name = (string) ($im['name'] ?? '');
+        if (!preg_match('/^[a-z0-9-]+\.jpg$/', $name)) {
+            throw new RuntimeException("недопустимое имя картинки: $name");
+        }
+        file_put_contents(THEME . "/assets/img/blog/$name", base64_decode($im['base64']));
+        $steps[] = 'картинка → ' . THEME . "/assets/img/blog/$name";
+    }
 
     // Реестр правим с резервной копией и проверкой синтаксиса: сломанный PHP положит весь сайт
     $registry = THEME . '/inc/blog-data.php';

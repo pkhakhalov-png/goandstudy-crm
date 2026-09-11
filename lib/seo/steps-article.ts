@@ -285,18 +285,81 @@ registerStep('article_qa', async (job: Job, seo: any): Promise<StepOutcome> => {
 registerStep('article_cover', async (job: Job, seo: any): Promise<StepOutcome> => {
   const articleId = job.article_id!
   const { data: article } = await seo.from('articles').select('current_version_id').eq('id', articleId).single()
-  const { data: version } = await seo.from('article_versions').select('id, meta').eq('id', article.current_version_id).single()
+  const { data: version } = await seo.from('article_versions').select('id, title, body, meta').eq('id', article.current_version_id).single()
   const meta: any = version.meta ?? {}
   const slug: string = meta.slug ?? `article-${articleId}`
 
-  const cover = await renderBlogCover(slug)
+  const { imagesConfigured } = await import('./images')
+
+  // Без ключа картинок не будет, но статья не должна из-за этого встать:
+  // ставим заглушку, как раньше, и идём дальше.
+  if (!imagesConfigured()) {
+    const cover = await renderBlogCover(slug)
+    await seo.from('article_versions').update({
+      meta: { ...meta, cover: { format: 'jpeg', width: cover.width, height: cover.height, bytes: cover.bytes, base64: cover.buffer.toString('base64'), placeholder: true } },
+    }).eq('id', version.id)
+    await next(seo, 'article_linkplan', articleId, job.topic_id!, { brief: job.payload.brief })
+    return { outcome: 'done', result: { cover: `${cover.width}×${cover.height}`, placeholder: true, why: 'нет OPENAI_API_KEY', cost: 0 } }
+  }
+
+  const { generateCover, generateInline, coverPrompt, inlinePrompt, figureBlock } = await import('./images')
+  const { planScenes } = await import('./generate')
+  const { splitBlocks } = await import('./blog-style')
+
+  const body: string = version.body ?? ''
+  const headings = [...body.matchAll(/<h2[^>]*>([\s\S]*?)<\/h2>/gi)]
+    .map((m) => m[1].replace(/<[^>]+>/g, '').trim()).filter(Boolean)
+
+  const scenes = await planScenes({
+    title: version.title ?? slug,
+    h1: job.payload?.brief?.h1 ?? version.title ?? slug,
+    headings,
+  })
+
+  const cover = await generateCover(coverPrompt(scenes.cover))
+  const inline = await generateInline(inlinePrompt(scenes.inline))
+
+  // Вставляем картинку после раздела, который выбрала модель. Если такого
+  // подзаголовка в тексте нет — ставим в середину, а не теряем картинку.
+  const blocks = splitBlocks(body)
+  const target = blocks.findIndex((b) => b.includes('wp:heading') && b.includes(scenes.after_heading.slice(0, 40)))
+  let at = target >= 0 ? nextSectionEnd(blocks, target) : Math.floor(blocks.length / 2)
+  at = Math.min(Math.max(at, 1), blocks.length - 1)
+
+  const src = `/wp-content/themes/goandstudy/assets/img/blog/${slug}-1.jpg`
+  blocks.splice(at, 0, figureBlock(src, scenes.inline_alt))
+
   await seo.from('article_versions').update({
-    meta: { ...meta, cover: { format: 'jpeg', width: cover.width, height: cover.height, bytes: cover.bytes, base64: cover.buffer.toString('base64') } },
+    body: blocks.join('\n\n'),
+    meta: {
+      ...meta,
+      cover: { format: 'jpeg', width: cover.width, height: cover.height, bytes: cover.bytes, base64: cover.buffer.toString('base64') },
+      images: {
+        ...(meta.images ?? {}),
+        scenes,
+        inline: [{ name: `${slug}-1.jpg`, src, alt: scenes.inline_alt, width: inline.width, height: inline.height, bytes: inline.bytes, base64: inline.buffer.toString('base64') }],
+      },
+    },
   }).eq('id', version.id)
 
   await next(seo, 'article_linkplan', articleId, job.topic_id!, { brief: job.payload.brief })
-  return { outcome: 'done', result: { cover: `${cover.width}×${cover.height}`, kb: Math.round(cover.bytes / 102.4) / 10, cost: 0 } }
+  return {
+    outcome: 'done',
+    result: {
+      cover: `${cover.width}×${cover.height}`, kb: Math.round(cover.bytes / 102.4) / 10,
+      inline: `${inline.width}×${inline.height}`, after: target >= 0 ? scenes.after_heading : 'середина текста',
+      cost: 0,
+    },
+  }
 })
+
+/** Конец раздела: следующий подзаголовок того же уровня или конец статьи. */
+function nextSectionEnd(blocks: string[], headingIndex: number): number {
+  for (let i = headingIndex + 1; i < blocks.length; i++) {
+    if (blocks[i].includes('wp:heading')) return i
+  }
+  return blocks.length
+}
 
 /* ── Шаг 5: план входящих ссылок ──────────────────────────────────────────── */
 
