@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import Link from 'next/link'
+import { FactGate } from './FactGate'
 import { ArticleActions } from '../ArticleActions'
 
 async function load(id: number) {
@@ -32,6 +33,13 @@ async function load(id: number) {
 export default async function ArticlePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const data = await load(Number(id))
+
+  // Ворота достоверности считаем здесь: в них смысл экрана вычитки — человек
+  // должен видеть, что мешает выпуску, до того как жмёт «Утвердить».
+  const { createAdminClient } = await import('@/lib/supabase/server')
+  const { checkFactsFor } = await import('../actions')
+  const gate = await checkFactsFor((await createAdminClient()).schema('seo'), Number(id))
+    .catch(() => ({ blocking: [], warnings: [], checked: 0 }))
   if (!data) return <div style={{ fontSize: 13 }}>Статья не найдена. <Link href="/admin/seo/articles">К списку</Link></div>
 
   const { article, versions, changes, links, donorById } = data
@@ -121,6 +129,9 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
 
         <div>
           <ArticleActions articleId={article.id} status={article.status} blockers={failedB.length} warnings={warnings} />
+
+          {/* Существенные утверждения */}
+          <FactGate blocking={gate.blocking} warnings={gate.warnings} checked={gate.checked} />
 
           {/* Индексация */}
           {(meta.indexnow || meta.index_check) && (

@@ -70,10 +70,56 @@ export async function approveArticle(articleId: number) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
+  // Ворота достоверности. Согласовать статью с неподтверждённой стоимостью или
+  // дедлайном нельзя: ошибка в таком утверждении стоит читателю денег или года.
+  const gate = await checkFactsFor(seo, articleId)
+  if (gate.blocking.length) {
+    return {
+      error: `Нельзя утвердить: ${gate.blocking.length} существенных утверждений без подтверждения. `
+        + gate.blocking.slice(0, 2).map((b) => `«${b.statement}» — ${b.why}`).join('; ')
+        + '. Подтвердите их в разделе «Факты» или уберите из текста.',
+    }
+  }
+
   const { error } = await seo.from('articles').update({ status: 'approved', author_id: user?.id ?? null }).eq('id', articleId)
   if (error) return { error: error.message }
   revalidatePath(`/admin/seo/articles/${articleId}`)
-  return { ok: true }
+  return { ok: true, note: gate.warnings.length ? `Утверждено. Осталось ${gate.warnings.length} замечаний, не блокирующих выпуск.` : undefined }
+}
+
+/** Собрать текст статьи и прогнать через ворота достоверности. */
+export async function checkFactsFor(seo: any, articleId: number) {
+  const { factGate } = await import('@/lib/seo/fact-gate')
+  const { subjectKeysFor } = await import('@/lib/seo/claims')
+
+  const { data: article } = await seo.from('articles').select('current_version_id, primary_keyword, topic_id').eq('id', articleId).single()
+  if (!article) return { blocking: [], warnings: [], checked: 0 }
+
+  const { data: version } = await seo.from('article_versions').select('title, body').eq('id', article.current_version_id).single()
+  const { data: topic } = article.topic_id
+    ? await seo.from('topics').select('title, primary_keyword').eq('id', article.topic_id).single()
+    : { data: null }
+
+  const subject = [article.primary_keyword, topic?.primary_keyword, topic?.title].filter(Boolean).join(' ')
+  return factGate(seo, `${version?.title ?? ''} ${version?.body ?? ''}`, subjectKeysFor(subject))
+}
+
+/** Подтверждение эксперта: подпись, а не галочка — с записью, кто и когда. */
+export async function confirmFact(claimId: number, note: string) {
+  const { error: authErr } = await assertAdmin()
+  if (authErr) return { error: authErr }
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'нужен вход' }
+
+  const seo = (await createAdminClient()).schema('seo')
+  const { confirmByExpert } = await import('@/lib/seo/fact-gate')
+  const res = await confirmByExpert(seo, claimId, user.id, note)
+  if (res.error) return { error: res.error }
+
+  revalidatePath('/admin/seo/articles')
+  return { ok: true, note: 'Подтверждено. Запись о том, кто поручился, сохранена.' }
 }
 
 export async function rejectArticle(articleId: number, reason: string) {
