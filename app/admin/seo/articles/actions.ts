@@ -530,16 +530,24 @@ export async function decideTopic(
 
   if (action === 'update') {
     if (!targetUrl) return { error: 'не указана страница для обновления' }
-    // Полного обновления пока нет — фиксируем решение и цель, чтобы задача
-    // не потерялась и было видно, что тема разобрана, а не брошена
-    await seo.from('topics').update({ status: 'needs_update' }).eq('id', topicId)
-    await seo.from('change_sets').insert({
-      topic_id: topicId, kind: 'update_existing',
-      reason: `решение человека: обновлять ${targetUrl}, а не писать новую по «${name}»`,
-      idempotency_key: `update-decision:${topicId}`, status: 'proposed', proposed_by: 'human',
+    if (!/\/blog\//.test(targetUrl)) {
+      // Страницы услуг живут не в теме, а в WordPress — их правка идёт другим
+      // путём и отдельным решением
+      await seo.from('topics').update({ status: 'needs_update' }).eq('id', topicId)
+      return { ok: true, note: `Записано. ${targetUrl.replace('https://goandstudy.com', '')} — не статья блога, её правку согласуем отдельно.` }
+    }
+
+    const { enqueueJob } = await import('@/lib/seo/enqueue')
+    const res = await enqueueJob(seo, {
+      step: 'article_update_plan', lane: 'production', priority: 45, topic_id: topicId,
+      payload: { url: targetUrl, query: name },
+      dedup_key: `update:${targetUrl}`,
     })
+    if (res.error) return { error: res.error }
+
+    await seo.from('topics').update({ status: 'needs_update' }).eq('id', topicId)
     revalidatePath('/admin/seo/articles')
-    return { ok: true, note: `Записано: обновлять ${targetUrl.replace('https://goandstudy.com', '')}` }
+    return { ok: true, note: `Готовлю правку ${targetUrl.replace('https://goandstudy.com', '')}: снимок, предложение изменений, разница — придёт на вычитку.` }
   }
 
   if (action === 'review') {

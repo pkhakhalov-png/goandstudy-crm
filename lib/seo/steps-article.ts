@@ -756,3 +756,125 @@ registerStep('attribution_stitch', async (_job: Job, seo: any): Promise<StepOutc
   const res = await stitchDeals(seo, sb)
   return { outcome: 'done', result: { ...res, cost: 0 } }
 })
+
+
+/* ── Обновление вышедшей статьи ───────────────────────────────────────────── */
+
+/**
+ * Готовит правку существующей статьи, а не пишет новую.
+ *
+ * Порядок такой: снимок того, что сейчас на сайте → поиск устаревшего и
+ * пробелов → предложение правок отдельной версией → человек смотрит разницу
+ * и решает. Публикация идёт прежним путём в режиме обновления, поэтому адрес
+ * сохраняется, а откат остаётся возможен.
+ *
+ * Целиком статью не переписываем: работающий текст — ценность, которую легко
+ * потерять ради красоты.
+ */
+registerStep('article_update_plan', async (job: Job, seo: any): Promise<StepOutcome> => {
+  const url = String(job.payload?.url ?? '')
+  const slug = url.replace(/\/$/, '').split('/').pop() ?? ''
+  if (!/^[a-z0-9-]+$/.test(slug)) return { outcome: 'failed', result: { error: `не разобрать адрес: ${url}` } }
+
+  const { readThemeArticle } = await import('./theme-publish')
+  const current = await readThemeArticle(slug)
+  if (!current) return { outcome: 'failed', result: { error: `статьи ${slug} нет в теме — обновлять нечего` } }
+
+  // Статья могла быть написана до конвейера: тогда заводим для неё запись,
+  // чтобы у правки была история версий и согласование
+  let articleId = job.article_id as number | null
+  if (!articleId) {
+    const { data: existing } = await seo.from('articles')
+      .select('id').eq('topic_id', job.topic_id ?? -1).maybeSingle()
+    articleId = existing?.id ?? null
+  }
+  if (!articleId) {
+    const { data: created, error } = await seo.from('articles')
+      .insert({ topic_id: job.topic_id ?? null, primary_keyword: job.payload?.query ?? slug, status: 'in_production' })
+      .select('id').single()
+    if (error) return { outcome: 'failed', result: { error: `создание записи статьи: ${error.message}` } }
+    articleId = created.id
+  }
+
+  // Снимок: что было до правки. Без него нельзя ни сравнить, ни вернуть
+  const title = current.match(/<h2[^>]*>([\s\S]*?)<\/h2>/i)?.[1]?.replace(/<[^>]+>/g, '').trim() ?? slug
+
+  // Номер версии обязателен и уникален в рамках статьи
+  const { data: last } = await seo.from('article_versions')
+    .select('version_no').eq('article_id', articleId).order('version_no', { ascending: false }).limit(1)
+  let versionNo = (last?.[0]?.version_no ?? 0) + 1
+
+  const { data: snapshot, error: snapErr } = await seo.from('article_versions').insert({
+    article_id: articleId, version_no: versionNo++, origin: 'human_edited', title, body: current,
+    meta: { slug, snapshot: true, taken_at: new Date().toISOString(), reason: 'состояние до обновления' },
+  }).select('id').single()
+  // Снимок — основа отката. Без него продолжать нельзя: сравнивать будет не с чем
+  if (snapErr) return { outcome: 'failed', result: { error: `снимок статьи: ${snapErr.message}` } }
+
+  // Что чинить: проверки стандарта и ворота достоверности по текущему тексту
+  const { checkBlogStandard, loadSiteTargets } = await import('./blog-style')
+  const targets = await loadSiteTargets(seo).catch(() => ({ knownBlogSlugs: new Set<string>(), knownPagePaths: new Set<string>() }))
+  const checks = checkBlogStandard({
+    body: current, title, excerpt: '', slug, category: '',
+    knownBlogSlugs: targets.knownBlogSlugs, knownPagePaths: targets.knownPagePaths,
+  })
+  const failed = checks.filter((c) => !c.ok && c.level === 'B')
+
+  const { factGate } = await import('./fact-gate')
+  const { subjectKeysFor } = await import('./claims')
+  const gate = await factGate(seo, current, subjectKeysFor(`${title} ${slug}`))
+
+  const issues = [
+    ...failed.map((c: any) => ({ id: c.id, detail: c.detail ?? '' })),
+    ...gate.blocking.map((b) => ({ id: `факт: ${b.kind}`, detail: `${b.statement} — ${b.why}` })),
+  ]
+
+  if (!issues.length) {
+    await seo.from('articles').update({ status: 'ready_for_review' }).eq('id', articleId)
+    return {
+      outcome: 'done',
+      result: { article_id: articleId, snapshot_id: snapshot?.id, nothing_to_fix: true,
+        note: 'статья соответствует стандарту и подтверждена — правка не нужна', cost: 0 },
+    }
+  }
+
+  const { reviseDraft } = await import('./generate')
+  const { normalizeBody } = await import('./blog-style')
+  const brief: any = { title, h1: title, slug, primary_keyword: job.payload?.query ?? slug, secondary_keywords: [] }
+
+  // Тот же контекст, что и при написании новой статьи: факты, соседние
+  // страницы, запросы. Без него правка пишется вслепую и легко противоречит
+  // тому, что уже есть на сайте.
+  const ctx = await buildContext(seo, {
+    id: job.topic_id ?? null, title, primary_keyword: job.payload?.query ?? slug, cluster: null,
+  })
+  const revised = normalizeBody(await reviseDraft(ctx, brief, current, issues, []))
+
+  const { data: version, error: verErr } = await seo.from('article_versions').insert({
+    article_id: articleId, version_no: versionNo, origin: 'qa_fixed', title, body: revised,
+    meta: { slug, updated_from: snapshot?.id, reason: 'предложение правок' },
+  }).select('id').single()
+  if (verErr) return { outcome: 'failed', result: { error: `версия с правками: ${verErr.message}`, snapshot_id: snapshot?.id } }
+
+  await seo.from('articles').update({ current_version_id: version?.id, status: 'ready_for_review' }).eq('id', articleId)
+
+  await seo.from('change_sets').insert({
+    article_id: articleId, kind: 'update_existing',
+    from_version: snapshot?.id, to_version: version?.id,
+    diff: {
+      was_chars: current.length, now_chars: revised.length,
+      issues_fixed: issues.map((i) => i.id).slice(0, 12),
+    },
+    reason: `обновление ${slug}: ${issues.length} замечаний — ${issues.slice(0, 3).map((i) => i.id).join(', ')}`,
+    idempotency_key: `update:${slug}:${snapshot?.id}`,
+    status: 'proposed', proposed_by: 'system',
+  })
+
+  return {
+    outcome: 'done',
+    result: {
+      article_id: articleId, snapshot_id: snapshot?.id, version_id: version?.id,
+      issues: issues.length, was_chars: current.length, now_chars: revised.length, cost: 0,
+    },
+  }
+})

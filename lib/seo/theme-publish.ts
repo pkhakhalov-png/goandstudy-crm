@@ -42,6 +42,13 @@ export async function listPublishedSlugs(): Promise<string[]> {
   return out.split('\n').map((s) => s.trim()).filter((s) => s.endsWith('.html')).map((s) => s.replace(/\.html$/, ''))
 }
 
+/** Текст вышедшей статьи — источник правды при обновлении. */
+export async function readThemeArticle(slug: string): Promise<string | null> {
+  if (!/^[a-z0-9-]+$/.test(slug)) throw new Error(`недопустимый слаг: ${slug}`)
+  const out = await ssh(`cat ${THEME}/inc/blog-articles/${slug}.html 2>/dev/null || true`)
+  return out.trim() ? out : null
+}
+
 /** Строка реестра. Порядок ключей фиксирован — §8. */
 export function registryLine(e: BlogRegistryEntry): string {
   const esc = (v: string) => v.replace(/\\/g, '\\\\').replace(/'/g, "\\'")
