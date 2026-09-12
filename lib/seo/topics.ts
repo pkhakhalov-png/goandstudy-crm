@@ -161,7 +161,7 @@ export async function reclusterTopics(seo: any): Promise<{ updated: number }> {
     try { e = typeof e === 'string' ? JSON.parse(e) : e } catch { e = null }
     if (!e) continue
     const a = assignCluster(e, centroids)
-    if (a) { await seo.from('topics').update({ cluster: a.name }).eq('id', t.id); updated++ }
+    if (a) { await seo.from('topics').update({ cluster: a.name }).eq('id', t.id).throwOnError(); updated++ }
   }
   return { updated }
 }

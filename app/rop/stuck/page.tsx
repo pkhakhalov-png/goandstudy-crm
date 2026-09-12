@@ -2,6 +2,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { RopSidebar } from '../RopSidebar'
 import { StuckDashboard } from './StuckDashboard'
+import { readAll } from '@/lib/supabase/read-all'
 
 export default async function StuckPage() {
   const supabase = await createClient()
@@ -19,7 +20,7 @@ export default async function StuckPage() {
     { data: settings },
   ] = await Promise.all([
     admin.from('users').select('id, name, is_active').eq('role', 'salesperson').order('name'),
-    admin.from('deals').select('id, title, stage_id, salesperson_id, budget, updated_at, deleted_at').is('deleted_at', null),
+    readAll(() => admin.from('deals').select('id, title, stage_id, salesperson_id, budget, updated_at, deleted_at').is('deleted_at', null).order('id')).then(data => ({ data })),
     admin.from('pipeline_stages').select('id, name, position, stage_type').eq('is_active', true).order('position'),
     admin.from('rop_settings').select('key, value'),
   ])

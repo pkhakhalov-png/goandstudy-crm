@@ -2,6 +2,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { RopSidebar } from '../RopSidebar'
 import { FunnelClient } from '../../admin/funnel/FunnelClient'
+import { readAll } from '@/lib/supabase/read-all'
 
 export default async function RopFunnelPage() {
   const supabase = await createClient()
@@ -27,7 +28,7 @@ export default async function RopFunnelPage() {
     admin.from('deals').select('id, contact_name, contact_phone, budget, stage_id, deleted_at').not('deleted_at', 'is', null).order('deleted_at', { ascending: false }).limit(50),
     admin.from('deals').select('*', { count: 'exact', head: true }).is('deleted_at', null),
     admin.from('curators').select('id, name').eq('is_active', true).order('name'),
-    admin.from('deals').select('id, title, custom_fields').not('custom_fields->>group_chat_id', 'is', null).is('deleted_at', null),
+    readAll(() => admin.from('deals').select('id, title, custom_fields').not('custom_fields->>group_chat_id', 'is', null).is('deleted_at', null).order('id')).then(data => ({ data })),
   ])
 
   const availableGroups = (groupDeals ?? []).map(d => ({

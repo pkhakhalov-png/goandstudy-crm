@@ -13,16 +13,41 @@ async function load() {
       .order('created_at', { ascending: false })
 
     const ids = (articles ?? []).map((a: any) => a.current_version_id).filter(Boolean)
-    const { data: versions } = ids.length
-      ? await seo.from('article_versions').select('id, article_id, version_no, title, origin, qa_report, meta').in('id', ids)
-      : { data: [] as any[] }
-    const byId = new Map((versions ?? []).map((v: any) => [v.id, v]))
-
-    // Считаем версии по id статей на экране, а не вытягиваем таблицу целиком
     const articleIds = (articles ?? []).map((a: any) => a.id)
-    const { data: counts } = articleIds.length
-      ? await seo.from('article_versions').select('article_id').in('article_id', articleIds)
-      : { data: [] as any[] }
+
+    // Всё остальное не зависит друг от друга — читаем одной пачкой.
+    // Раньше эти шесть выборок шли цепочкой, и экран ждал каждую по очереди.
+    const [
+      { data: versions },
+      { data: counts },
+      { data: jobs },
+      { data: topics },
+      flow,
+    ] = await Promise.all([
+      // Из meta нужны только картинки. Целиком она весит около десяти килобайт
+      // на версию — там же лежат отчёты и служебные данные, экрану не нужные.
+      ids.length
+        ? seo.from('article_versions').select('id, article_id, version_no, title, origin, qa_report, images:meta->images').in('id', ids)
+        : Promise.resolve({ data: [] as any[] }),
+      // Считаем версии по id статей на экране, а не вытягиваем таблицу целиком
+      articleIds.length
+        ? seo.from('article_versions').select('article_id').in('article_id', articleIds)
+        : Promise.resolve({ data: [] as any[] }),
+      // Очередь: что сейчас делает конвейер
+      seo.from('jobs')
+        .select('id, step, status, article_id, topic_id, attempts, last_error, result, created_at')
+        .like('step', 'article_%').order('id', { ascending: false }).limit(40),
+      // Подсказки тем берём из seo.topics — их считает шаг topics_from_gsc.
+      // Раньше здесь на каждой отрисовке вытягивалось 152 тысячи строк GSC (153 запроса
+      // к базе), из-за чего экран открывался несколько секунд.
+      seo.from('topics')
+        .select('id, title, primary_keyword, search_volume, priority, status')
+        .eq('status', 'new').eq('origin', 'gsc_gap')
+        .order('priority', { ascending: false, nullsFirst: false }).limit(10),
+      import('@/lib/seo/flow').then((m) => m.flowSnapshot(seo)),
+    ])
+
+    const byId = new Map((versions ?? []).map((v: any) => [v.id, v]))
     const versionCount = new Map<number, number>()
     for (const c of counts ?? []) versionCount.set(c.article_id, (versionCount.get(c.article_id) || 0) + 1)
 
@@ -40,31 +65,15 @@ async function load() {
         verdict: report.verdict ?? '—',
         failedB,
         issues: issues.length,
-        hasCover: Boolean(v?.meta?.images?.cover?.url),
-        figures: (v?.meta?.images?.figures ?? []).length,
+        hasCover: Boolean(v?.images?.cover?.url),
+        figures: (v?.images?.figures ?? []).length,
       }
     })
-    // Очередь: что сейчас делает конвейер
-    const { data: jobs } = await seo.from('jobs')
-      .select('id, step, status, article_id, topic_id, attempts, last_error, result, created_at')
-      .like('step', 'article_%').order('id', { ascending: false }).limit(40)
-
-    // Подсказки тем берём из seo.topics — их считает шаг topics_from_gsc.
-    // Раньше здесь на каждой отрисовке вытягивалось 152 тысячи строк GSC (153 запроса
-    // к базе), из-за чего экран открывался несколько секунд.
-    const { data: topics } = await seo.from('topics')
-      .select('id, title, primary_keyword, search_volume, priority, status')
-      .eq('status', 'new').eq('origin', 'gsc_gap')
-      .order('priority', { ascending: false, nullsFirst: false }).limit(10)
-
     const suggestions = (topics ?? []).map((t: any) => ({
       topicId: t.id,
       query: t.primary_keyword ?? t.title,
       impressions: t.search_volume ?? 0,
     }))
-
-    const { flowSnapshot } = await import('@/lib/seo/flow')
-    const flow = await flowSnapshot(seo)
 
     return { ok: true as const, rows, jobs: jobs ?? [], suggestions, flow }
   } catch (e: any) {

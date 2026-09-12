@@ -103,7 +103,14 @@ async function readAll(seo: any, table: string, cols: string, since?: string): P
   const PAGE = 1000
   const BATCH = 12   // больше — упираемся в лимит одновременных соединений
 
-  const { count } = await seo.from(table).select('*', { count: 'exact', head: true })
+  // Считаем строки с тем же условием, с каким читаем. Раньше счёт шёл по всей
+  // таблице: при выборке за 90 дней это давало 192 похода вместо 90, и сотня
+  // из них возвращала пустоту.
+  let countQuery = seo.from(table).select('*', { count: 'exact', head: true })
+  if (since) countQuery = countQuery.gte('date', since)
+  const { count, error: countError } = await countQuery
+  if (countError) throw new Error(`${table}: ${countError.message}`)
+
   const pages = Math.ceil((count ?? 0) / PAGE)
   if (!pages) return []
 
@@ -112,9 +119,19 @@ async function readAll(seo: any, table: string, cols: string, since?: string): P
     const chunk = await Promise.all(
       Array.from({ length: Math.min(BATCH, pages - start) }, (_, i) => {
         const from = (start + i) * PAGE
-        let q = seo.from(table).select(cols).range(from, from + PAGE - 1)
+        // Порядок обязателен: без него Postgres не обещает одинаковую
+        // последовательность строк между запросами, и соседние страницы выдачи
+        // могут перекрыться или разойтись. Сортируем по первичному ключу.
+        let q = seo.from(table).select(cols)
+          .order('normalized_url', { ascending: true })
+          .order('query', { ascending: true })
+          .order('date', { ascending: true })
+          .range(from, from + PAGE - 1)
         if (since) q = q.gte('date', since)
-        return q.then((r: any) => r.data ?? [])
+        return q.then((r: any) => {
+          if (r.error) throw new Error(`${table}: ${r.error.message}`)
+          return r.data ?? []
+        })
       }),
     )
     for (const rows of chunk) out.push(...rows)

@@ -154,7 +154,7 @@ export async function publishDraft(
   }
 
   if (changeSet) {
-    await seo.from('change_sets').update({ status: 'applied', applied_at: new Date().toISOString() }).eq('id', changeSet.id)
+    await seo.from('change_sets').update({ status: 'applied', applied_at: new Date().toISOString() }).eq('id', changeSet.id).throwOnError()
   }
   return { ok: true as const, postId, url, changeSetId: changeSet?.id ?? null, schemaProblems: problems }
 }
@@ -205,20 +205,20 @@ export async function promoteToPublish(seo: any, articleId: number, postId: numb
   if (!rate.ok) return { ok: false as const, reason: rate.reason }
 
   await wp.patchPost(postId, { status: 'publish', idempotency_key: `promote:${articleId}` })
-  await seo.from('articles').update({ status: 'published', published_at: new Date().toISOString() }).eq('id', articleId)
+  await seo.from('articles').update({ status: 'published', published_at: new Date().toISOString() }).eq('id', articleId).throwOnError()
   // Пока статья была черновиком, план входящих ссылок лежал как waiting_target:
   // ставить ссылку на несуществующую страницу нельзя. Теперь цель есть.
   const { data: art } = await seo.from('articles').select('topic_id').eq('id', articleId).single()
   if (art?.topic_id) {
     await seo.from('link_suggestions').update({ status: 'proposed' })
-      .eq('to_topic_id', art.topic_id).eq('status', 'waiting_target')
+      .eq('to_topic_id', art.topic_id).eq('status', 'waiting_target').throwOnError()
   }
 
   await seo.from('change_sets').insert({
     article_id: articleId, kind: 'new_article', reason: 'перевод черновика в публикацию',
     idempotency_key: `promote:${articleId}`, status: 'applied', proposed_by: 'human',
     applied_at: new Date().toISOString(),
-  })
+  }).throwOnError()
 
   // §12: через 60 секунд смотрим на опубликованную страницу так, как её видит бот
   if (input) {
@@ -227,7 +227,7 @@ export async function promoteToPublish(seo: any, articleId: number, postId: numb
     if (!verify.ok) {
       // Критичный провал — возвращаем в черновик, чтобы битая страница не жила в индексе
       await wp.patchPost(postId, { status: 'draft', idempotency_key: `rollback:${articleId}` })
-      await seo.from('articles').update({ status: 'ready_for_review', published_at: null }).eq('id', articleId)
+      await seo.from('articles').update({ status: 'ready_for_review', published_at: null }).eq('id', articleId).throwOnError()
       return { ok: false as const, reason: `post_publish_verify не пройден, вернули в черновик: ${verify.critical.join('; ')}` }
     }
     return { ok: true as const, verify }

@@ -200,7 +200,7 @@ export async function notifyAlerts(seo: any): Promise<{ sent: number; suppressed
   for (const k of Object.keys(next)) {
     if (now - Date.parse(next[k]) > 7 * 864e5) delete next[k]
   }
-  await seo.from('settings').upsert({ key: 'alerts_sent', value: next }, { onConflict: 'key' })
+  await seo.from('settings').upsert({ key: 'alerts_sent', value: next }, { onConflict: 'key' }).throwOnError()
 
   // Если отправить не вышло, не помечаем как сказанное — иначе беда утонет
   if (!ok) return { sent: 0, suppressed: alerts.length - fresh.length }

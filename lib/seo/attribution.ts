@@ -85,18 +85,30 @@ export async function stitchDeals(seo: any, sb: any): Promise<{ matched: number;
   if (!unmatched?.length) return { matched: 0, pending: 0 }
 
   const ids = unmatched.map((l: any) => l.external_lead_id)
-  const { data: deals } = await sb.from('deals').select('id, booking_id, client_id').in('booking_id', ids)
+  const { data: deals, error: dealsError } = await sb.from('deals')
+    .select('id, booking_id, client_id').in('booking_id', ids)
+  if (dealsError) throw new Error(`сделки для сшивки: ${dealsError.message}`)
   const byBooking = new Map((deals ?? []).map((d: any) => [String(d.booking_id), d]))
 
+  const pairs = unmatched
+    .map((lead: any) => ({ lead, deal: byBooking.get(String(lead.external_lead_id)) as any }))
+    .filter((p: any) => p.deal)
+
+  // Обновления идут пачками, а не по одному подряд: при полусотне совпадений
+  // последовательные запросы складывались в несколько секунд ожидания.
+  const at = new Date().toISOString()
   let matched = 0
-  for (const lead of unmatched) {
-    const deal: any = byBooking.get(String(lead.external_lead_id))
-    if (!deal) continue
-    await seo.from('lead_identities').update({
-      deal_id: deal.id, client_id: deal.client_id ?? null,
-      matched_by: 'bookings.id', matched_at: new Date().toISOString(),
-    }).eq('id', lead.id)
-    matched++
+  for (let i = 0; i < pairs.length; i += 10) {
+    await Promise.all(pairs.slice(i, i + 10).map(async ({ lead, deal }: any) => {
+      const { error } = await seo.from('lead_identities').update({
+        deal_id: deal.id, client_id: deal.client_id ?? null,
+        matched_by: 'bookings.id', matched_at: at,
+      }).eq('id', lead.id)
+      // Молча пропущенная ошибка означала бы, что заявка навсегда останется
+      // непривязанной, а отчёт покажет её как привязанную
+      if (error) throw new Error(`привязка заявки ${lead.id}: ${error.message}`)
+      matched++
+    }))
   }
 
   return { matched, pending: unmatched.length - matched }

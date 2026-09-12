@@ -184,7 +184,7 @@ export async function computeClusters(seo: any, opts: { k?: number; seed?: numbe
 
   // сохранить центроиды в settings — чтобы новые топики/статьи мгновенно относились к теме
   const centroidPayload = names.map((name, c) => ({ name, size: sizes[c], centroid: centers[c] }))
-  await seo.from('settings').upsert({ key: 'cluster_centroids', value: centroidPayload as any }, { onConflict: 'key' })
+  await seo.from('settings').upsert({ key: 'cluster_centroids', value: centroidPayload as any }, { onConflict: 'key' }).throwOnError()
 
   // запись pages.cluster батчами по id
   const now = new Date().toISOString()

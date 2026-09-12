@@ -30,6 +30,26 @@ function label(verdict: string | null, coverage: string | null): { text: string;
   return { text: 'не в индексе', color: 'var(--purple)' }
 }
 
+/** Переключатель поисковиков. Нужен обеим вкладкам, поэтому вынесен отдельно. */
+function Tabs({ active }: { active: string }) {
+  return (
+    <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+      {[['google', 'Google'], ['yandex', 'Яндекс']].map(([key, label]) => (
+        <Link key={key} href={`/admin/seo/indexation?poisk=${key}`}
+          style={{
+            padding: '6px 16px', borderRadius: 8, fontSize: 13, textDecoration: 'none',
+            border: `1px solid ${active === key ? 'var(--purple)' : 'var(--bor2)'}`,
+            background: active === key ? 'rgba(177,94,204,.10)' : 'var(--surf2)',
+            color: active === key ? 'var(--purple)' : 'var(--text)',
+            fontWeight: active === key ? 700 : 400,
+          }}>
+          {label}
+        </Link>
+      ))}
+    </div>
+  )
+}
+
 export default async function IndexationPage({ searchParams }: { searchParams: Promise<{ dni?: string; poisk?: string }> }) {
   const params = await searchParams
   const days = Math.min(365, Math.max(7, Number(params.dni ?? 30)))
@@ -37,28 +57,63 @@ export default async function IndexationPage({ searchParams }: { searchParams: P
   const sb = await createAdminClient()
   const seo = sb.schema('seo')
 
-  const { data: pagesRaw } = await seo.from('pages')
-    .select('id, normalized_url, page_type, first_seen_at')
-    .is('removed_at', null).eq('indexable', true).eq('http_status', 200)
-  // Только сам сайт: адреса CRM и поддоменов здесь не при чём
-  const pages = (pagesRaw ?? []).filter((p: any) => p.normalized_url.startsWith('https://goandstudy.com'))
+  const DAY = 864e5
+  const since = new Date(Date.now() - 28 * DAY).toISOString().slice(0, 10)
 
-  const { data: statuses } = await seo.from('index_status').select('*')
+  // Вкладке Яндекса нужен только снимок. Раньше она всё равно поднимала всю
+  // гугловую часть — страницы, статусы, статистику — и выбрасывала её.
+  if (poisk === 'yandex') {
+    const { data: ya } = await seo.from('settings').select('value').eq('key', 'yandex_snapshot').maybeSingle()
+    return (
+      <div>
+        <Tabs active="yandex" />
+        <YandexTab snapshot={(ya?.value as any) ?? null} />
+      </div>
+    )
+  }
 
-  // Яндекс — половина рынка в СНГ, и до сих пор её тут не было вовсе
-  const { data: ya } = await seo.from('settings').select('value').eq('key', 'yandex_snapshot').maybeSingle()
+  // Всё независимое — одной пачкой. Раньше эти выборки шли одна за другой,
+  // и к ним добавлялся запрос на каждую статью.
+  const [
+    { data: pagesRaw },
+    { data: statuses },
+    { data: articles },
+    traffic,
+    { data: ya },
+  ] = await Promise.all([
+    seo.from('pages').select('id, normalized_url, page_type, first_seen_at')
+      .is('removed_at', null).eq('indexable', true).eq('http_status', 200),
+    seo.from('index_status').select('page_id, verdict, coverage_state, last_crawl, checked_at, first_indexed_at'),
+    // Наши статьи — то, ради чего этот экран и нужен. У них известна настоящая
+    // дата выхода, а не дата, когда их впервые увидел обход.
+    seo.from('articles').select('id, published_at, indexed_at, primary_keyword, current_version_id')
+      .eq('status', 'published').order('published_at', { ascending: false }),
+    // Показы за 28 дней — чтобы сортировать не по алфавиту, а по важности.
+    // Читаем страницами: обычный select обрезал бы данные на тысяче строк.
+    trafficByPage(seo, { since }),
+    // Нужен и здесь: в таблице наших статей есть колонка с состоянием в Яндексе
+    seo.from('settings').select('value').eq('key', 'yandex_snapshot').maybeSingle(),
+  ])
+
   const yandex: any = ya?.value ?? null
   const yandexByUrl = new Map<string, any>(
     (yandex?.articles ?? []).map((a: any) => [String(a.url).replace(/\/$/, ''), a]),
   )
-  const byPage = new Map<number, any>((statuses ?? []).map((s: any) => [s.page_id, s]))
-  const DAY = 864e5
 
-  // Наши статьи — то, ради чего этот экран и нужен. У них известна настоящая
-  // дата выхода, а не дата, когда их впервые увидел обход.
-  const { data: articles } = await seo.from('articles')
-    .select('id, published_at, indexed_at, primary_keyword, current_version_id')
-    .eq('status', 'published').order('published_at', { ascending: false })
+  // Только сам сайт: адреса CRM и поддоменов здесь не при чём
+  const pages = (pagesRaw ?? []).filter((p: any) => p.normalized_url.startsWith('https://goandstudy.com'))
+  const byPage = new Map<number, any>((statuses ?? []).map((s: any) => [s.page_id, s]))
+  const pageByUrl = new Map<string, any>((pagesRaw ?? []).map((p: any) => [p.normalized_url, p]))
+
+  // Версии статей — одной выборкой, и только те поля meta, что нужны экрану.
+  // Целиком meta весит около десяти килобайт на версию.
+  const versionIds = (articles ?? []).map((a: any) => a.current_version_id).filter(Boolean)
+  const { data: versions } = versionIds.length
+    ? await seo.from('article_versions')
+        .select('id, slug_pub:meta->publish->>slug, slug_flat:meta->>slug, verdict:meta->index_check->>verdict, coverage:meta->index_check->>coverage')
+        .in('id', versionIds)
+    : { data: [] as any[] }
+  const verById = new Map<number, any>((versions ?? []).map((v: any) => [v.id, v]))
 
   const ourArticles: {
     id: number; keyword: string; url: string; publishedAt: string | null
@@ -66,28 +121,23 @@ export default async function IndexationPage({ searchParams }: { searchParams: P
   }[] = []
 
   for (const a of articles ?? []) {
-    const { data: v } = await seo.from('article_versions').select('meta').eq('id', a.current_version_id).maybeSingle()
-    const m: any = v?.meta ?? {}
-    const slug = m.publish?.slug ?? m.slug
+    const m = verById.get(a.current_version_id)
+    const slug = m?.slug_pub ?? m?.slug_flat
     if (!slug) continue
     const url = `https://goandstudy.com/blog/${slug}`
-    const page = (pagesRaw ?? []).find((p: any) => p.normalized_url === url)
+    const page = pageByUrl.get(url)
     const st = page ? byPage.get(page.id) : null
     const firstIndexed = st?.first_indexed_at ?? a.indexed_at ?? null
     ourArticles.push({
       id: a.id, keyword: a.primary_keyword, url, publishedAt: a.published_at,
-      verdict: st?.verdict ?? (m.index_check?.verdict ?? null),
-      coverage: st?.coverage_state ?? (m.index_check?.coverage ?? null),
+      verdict: st?.verdict ?? (m?.verdict ?? null),
+      coverage: st?.coverage_state ?? (m?.coverage ?? null),
       firstIndexed,
       days: a.published_at
         ? Math.max(0, Math.round(((firstIndexed ? Date.parse(firstIndexed) : Date.now()) - Date.parse(a.published_at)) / DAY))
         : null,
     })
   }
-  // Показы за 28 дней — чтобы сортировать не по алфавиту, а по важности.
-  // Читаем страницами: обычный select обрезал бы данные на тысяче строк.
-  const since = new Date(Date.now() - 28 * 864e5).toISOString().slice(0, 10)
-  const traffic = await trafficByPage(seo, { since })
 
   const rows: Row[] = (pages ?? []).map((p: any) => {
     const st = byPage.get(p.id)
@@ -139,24 +189,8 @@ export default async function IndexationPage({ searchParams }: { searchParams: P
 
   return (
     <div>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-        {[['google', 'Google'], ['yandex', 'Яндекс']].map(([key, label]) => (
-          <Link key={key} href={`/admin/seo/indexation?poisk=${key}`}
-            style={{
-              padding: '6px 16px', borderRadius: 8, fontSize: 13, textDecoration: 'none',
-              border: `1px solid ${poisk === key ? 'var(--purple)' : 'var(--bor2)'}`,
-              background: poisk === key ? 'rgba(177,94,204,.10)' : 'var(--surf2)',
-              color: poisk === key ? 'var(--purple)' : 'var(--text)',
-              fontWeight: poisk === key ? 700 : 400,
-            }}>
-            {label}
-          </Link>
-        ))}
-      </div>
+      <Tabs active={poisk} />
 
-      {poisk === 'yandex' ? (
-        <YandexTab snapshot={yandex} />
-      ) : (
       <>
       <div style={{ marginBottom: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
         <div>
@@ -356,7 +390,6 @@ export default async function IndexationPage({ searchParams }: { searchParams: P
         </div>
       )}
       </>
-      )}
     </div>
   )
 }

@@ -2,6 +2,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { RopSidebar } from '../RopSidebar'
 import { PipelineDashboard } from './PipelineDashboard'
+import { readAll } from '@/lib/supabase/read-all'
 
 export default async function PipelinePage() {
   const supabase = await createClient()
@@ -17,7 +18,7 @@ export default async function PipelinePage() {
     { data: stages },
     { data: salespersons },
   ] = await Promise.all([
-    admin.from('deals').select('id, title, stage_id, salesperson_id, budget, deleted_at').is('deleted_at', null),
+    readAll(() => admin.from('deals').select('id, title, stage_id, salesperson_id, budget, deleted_at').is('deleted_at', null).order('id')).then(data => ({ data })),
     admin.from('pipeline_stages').select('id, name, position, stage_type, color, weight').eq('is_active', true).order('position'),
     admin.from('users').select('id, name, is_active').eq('role', 'salesperson').order('name'),
   ])

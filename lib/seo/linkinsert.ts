@@ -98,6 +98,6 @@ export async function applyInsertion(seo: any, plan: InsertPlan, newHtml: string
     idempotency_key: `link:${plan.donorPostId}:${plan.targetUrl}`,
   })
 
-  if (cs) await seo.from('change_sets').update({ status: 'applied', applied_at: new Date().toISOString() }).eq('id', cs.id)
+  if (cs) await seo.from('change_sets').update({ status: 'applied', applied_at: new Date().toISOString() }).eq('id', cs.id).throwOnError()
   return { changeSetId: cs?.id ?? null }
 }

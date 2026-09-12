@@ -24,7 +24,17 @@ export async function loadPageDays(seo: any, opts: { since?: string; until?: str
   const PAGE = 1000
   const BATCH = 12
 
-  const { count } = await seo.from('gsc_page_daily').select('*', { count: 'exact', head: true })
+  const filtered = (q: any) => {
+    if (opts.since) q = q.gte('date', opts.since)
+    if (opts.until) q = q.lte('date', opts.until)
+    return q
+  }
+
+  // Считаем строки с теми же условиями, что и читаем. Раньше здесь был счёт по
+  // всей таблице: при запросе за 28 дней это давало восемнадцать походов вместо
+  // четырёх, и четырнадцать из них возвращали пустоту.
+  const { count, error } = await filtered(seo.from('gsc_page_daily').select('*', { count: 'exact', head: true }))
+  if (error) throw new Error(`gsc_page_daily: ${error.message}`)
   const pages = Math.ceil((count ?? 0) / PAGE)
   if (!pages) return []
 
@@ -33,11 +43,20 @@ export async function loadPageDays(seo: any, opts: { since?: string; until?: str
     const chunk = await Promise.all(
       Array.from({ length: Math.min(BATCH, pages - start) }, (_, i) => {
         const from = (start + i) * PAGE
-        let q = seo.from('gsc_page_daily').select('normalized_url, date, clicks, impressions, position')
-          .range(from, from + PAGE - 1)
-        if (opts.since) q = q.gte('date', opts.since)
-        if (opts.until) q = q.lte('date', opts.until)
-        return q.then((r: any) => (r.data ?? []) as PageDay[])
+        // Порядок обязателен. Без него Postgres не обещает одинаковую
+        // последовательность строк между запросами, и соседние страницы выдачи
+        // могут перекрыться или разойтись — цифры поедут, и никто не заметит.
+        // Сортируем по первичному ключу: он уже проиндексирован.
+        const q = filtered(
+          seo.from('gsc_page_daily').select('normalized_url, date, clicks, impressions, position')
+            .order('normalized_url', { ascending: true })
+            .order('date', { ascending: true })
+            .range(from, from + PAGE - 1),
+        )
+        return q.then((r: any) => {
+          if (r.error) throw new Error(`gsc_page_daily: ${r.error.message}`)
+          return (r.data ?? []) as PageDay[]
+        })
       }),
     )
     for (const rows of chunk) out.push(...rows)

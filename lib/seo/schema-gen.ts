@@ -80,7 +80,7 @@ export async function generateSchemaProposals(seo: any): Promise<{ generated: nu
 
   // пере-генерируем только необработанные предложения (status='proposed', source='recommend')
   const ids = content.map((p) => p.id)
-  if (ids.length) await seo.from('page_schema').delete().eq('source', 'recommend').eq('status', 'proposed').in('page_id', ids)
+  if (ids.length) await seo.from('page_schema').delete().eq('source', 'recommend').eq('status', 'proposed').in('page_id', ids).throwOnError()
 
   const byType: Record<string, number> = {}
   const rows = content.map((p) => {

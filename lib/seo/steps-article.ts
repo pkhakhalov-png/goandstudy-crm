@@ -6,6 +6,7 @@
 //
 //   article_brief → article_draft → article_qa → article_illustrate → article_linkplan
 import { registerStep, type Job, type StepOutcome } from './steps'
+import { metaByVersion, urlsOfArticles, slugOf } from './article-meta'
 import { generateBrief, generateDraft, reviseDraft, qaWithModel, qaDeterministic, GEN_MODEL, PROMPT_VERSION, type GenContext, type Brief, type QaReport } from './generate'
 import { summarize } from './standard'
 import { loadSiteTargets, normalizeBody } from './blog-style'
@@ -132,7 +133,7 @@ async function pageEmbeddings(seo: any) {
 }
 
 function next(seo: any, step: string, articleId: number, topicId: number, payload: any = {}) {
-  return seo.from('jobs').insert({ step, lane: 'production', priority: 50, article_id: articleId, topic_id: topicId, payload })
+  return seo.from('jobs').insert({ step, lane: 'production', priority: 50, article_id: articleId, topic_id: topicId, payload }).throwOnError()
 }
 
 /* ── Шаг 1: тема → бриф → черновик статьи в БД ────────────────────────────── */
@@ -165,7 +166,7 @@ registerStep('article_brief', async (job: Job, seo: any): Promise<StepOutcome> =
     const { data: mine } = await seo.from('articles').select('id, primary_keyword').neq('status', 'rejected')
     const twin = (mine ?? []).find((r: any) => r.primary_keyword && sameFamily(r.primary_keyword, query))
     if (twin) {
-      await seo.from('topics').update({ status: 'rejected_duplicate' }).eq('id', topic.id)
+      await seo.from('topics').update({ status: 'rejected_duplicate' }).eq('id', topic.id).throwOnError()
       return {
         outcome: 'done',
         result: { skipped: true, verdict: 'duplicate', reason: `то же самое другими словами — статья #${twin.id} «${twin.primary_keyword}»`, cost: 0 },
@@ -174,7 +175,7 @@ registerStep('article_brief', async (job: Job, seo: any): Promise<StepOutcome> =
 
     const v = await checkCannibalization(seo, query)
     if (v.verdict !== 'safe') {
-      await seo.from('topics').update({ status: 'rejected_duplicate' }).eq('id', topic.id)
+      await seo.from('topics').update({ status: 'rejected_duplicate' }).eq('id', topic.id).throwOnError()
       return {
         outcome: 'done',
         result: {
@@ -243,11 +244,11 @@ registerStep('article_qa', async (job: Job, seo: any): Promise<StepOutcome> => {
     issues: [...det.issues.filter((i) => i.kind !== 'structure'), ...modelIssues],
     verdict: verdict as QaReport['verdict'],
   }
-  await seo.from('article_versions').update({ qa_report: report, qa_version: 'v1' }).eq('id', version.id)
+  await seo.from('article_versions').update({ qa_report: report, qa_version: 'v1' }).eq('id', version.id).throwOnError()
 
   const needFix = failedB.length > 0 || blockingIssues.length > 0
   if (!needFix) {
-    await seo.from('articles').update({ status: 'ready_for_review' }).eq('id', articleId)
+    await seo.from('articles').update({ status: 'ready_for_review' }).eq('id', articleId).throwOnError()
     await next(seo, 'article_cover', articleId, job.topic_id!, { brief, ctx })
     return { outcome: 'done', result: { verdict: 'ready_for_review', checks_failed: 0, issues: report.issues.length, cost: 0 } }
   }
@@ -298,7 +299,7 @@ registerStep('article_cover', async (job: Job, seo: any): Promise<StepOutcome> =
     const cover = await renderBlogCover(slug)
     await seo.from('article_versions').update({
       meta: { ...meta, cover: { format: 'jpeg', width: cover.width, height: cover.height, bytes: cover.bytes, base64: cover.buffer.toString('base64'), placeholder: true } },
-    }).eq('id', version.id)
+    }).eq('id', version.id).throwOnError()
     await next(seo, 'article_linkplan', articleId, job.topic_id!, { brief: job.payload.brief })
     return { outcome: 'done', result: { cover: `${cover.width}×${cover.height}`, placeholder: true, why, cost: 0 } }
   }
@@ -349,7 +350,7 @@ registerStep('article_cover', async (job: Job, seo: any): Promise<StepOutcome> =
         inline: [{ name: `${slug}-1.jpg`, src, alt: scenes.inline_alt, width: inline.width, height: inline.height, bytes: inline.bytes, base64: inline.buffer.toString('base64') }],
       },
     },
-  }).eq('id', version.id)
+  }).eq('id', version.id).throwOnError()
 
   await next(seo, 'article_linkplan', articleId, job.topic_id!, { brief: job.payload.brief })
   return {
@@ -404,7 +405,7 @@ registerStep('article_linkplan', async (job: Job, seo: any): Promise<StepOutcome
     },
   })
   await saveLinkPlan(seo, donors, { topicId: job.topic_id!, pageId: null })
-  await seo.from('topics').update({ status: 'produced' }).eq('id', job.topic_id!)
+  await seo.from('topics').update({ status: 'produced' }).eq('id', job.topic_id!).throwOnError()
 
   const ready = donors.filter((d) => d.status === 'proposed').length
   return { outcome: 'done', result: { donors: donors.length, ready, orphan_risk: ready < 2, cost: 0 } }
@@ -487,17 +488,17 @@ registerStep('article_verify', async (job: Job, seo: any): Promise<StepOutcome> 
   if (!verify.ok) {
     // Битую страницу в индексе не оставляем: возвращаем в черновик и зовём человека
     await wp.patchPost(postId, { status: 'draft', idempotency_key: `rollback:${articleId}` })
-    await seo.from('articles').update({ status: 'ready_for_review', published_at: null }).eq('id', articleId)
+    await seo.from('articles').update({ status: 'ready_for_review', published_at: null }).eq('id', articleId).throwOnError()
     await seo.from('change_sets').insert({
       article_id: articleId, kind: 'new_article',
       reason: `откат: проверка после публикации нашла критичное — ${verify.critical.join('; ')}`,
       idempotency_key: `rollback:${articleId}:${job.id}`, status: 'rolled_back', proposed_by: 'system',
-    })
+    }).throwOnError()
     return { outcome: 'done', result: { rolled_back: true, critical: verify.critical, cost: 0 } }
   }
 
   await seo.from('change_sets').update({ verified_at: new Date().toISOString() })
-    .eq('article_id', articleId).eq('kind', 'new_article').eq('status', 'applied').is('verified_at', null)
+    .eq('article_id', articleId).eq('kind', 'new_article').eq('status', 'applied').is('verified_at', null).throwOnError()
   return { outcome: 'done', result: { ok: true, warnings: verify.warnings, cost: 0 } }
 })
 
@@ -540,19 +541,19 @@ registerStep('article_publish_blog', async (job: Job, seo: any): Promise<StepOut
     const report = await publishToTheme(entry, { bodyPath, coverPath }, { dryRun })
     if (dryRun) return { outcome: 'done', result: { dry_run: true, ...report, cost: 0 } }
 
-    await seo.from('articles').update({ status: 'published', published_at: new Date().toISOString() }).eq('id', articleId)
-    await seo.from('article_versions').update({ meta: { ...meta, publish: { path: `/blog/${slug}/`, seed: report.seedTo, at: new Date().toISOString() } } }).eq('id', version.id)
+    await seo.from('articles').update({ status: 'published', published_at: new Date().toISOString() }).eq('id', articleId).throwOnError()
+    await seo.from('article_versions').update({ meta: { ...meta, publish: { path: `/blog/${slug}/`, seed: report.seedTo, at: new Date().toISOString() } } }).eq('id', version.id).throwOnError()
     await seo.from('change_sets').insert({
       article_id: articleId, kind: 'new_article',
       reason: `публикация в блог: тело, обложка, реестр, сид-флаг ${report.seedFrom} → ${report.seedTo}`,
       idempotency_key: `blogpublish:${version.id}`, status: 'applied', proposed_by: 'human',
       applied_at: new Date().toISOString(),
-    })
+    }).throwOnError()
 
     // Ссылки на статью теперь ведут на существующую страницу
     if (job.topic_id) {
       await seo.from('link_suggestions').update({ status: 'proposed' })
-        .eq('to_topic_id', job.topic_id).eq('status', 'waiting_target')
+        .eq('to_topic_id', job.topic_id).eq('status', 'waiting_target').throwOnError()
     }
 
     const verify = await verifyPublished(slug)
@@ -626,9 +627,9 @@ registerStep('article_fix', async (job: Job, seo: any): Promise<StepOutcome> => 
       verdict: sum2.verdict,
     },
     qa_version: 'v1',
-  }).eq('id', nv.id)
+  }).eq('id', nv.id).throwOnError()
 
-  await seo.from('articles').update({ current_version_id: nv.id, status: 'ready_for_review' }).eq('id', articleId)
+  await seo.from('articles').update({ current_version_id: nv.id, status: 'ready_for_review' }).eq('id', articleId).throwOnError()
 
   return {
     outcome: 'done',
@@ -660,10 +661,13 @@ registerStep('article_index_check', async (job: Job, seo: any): Promise<StepOutc
   let checked = 0
   const indexed: number[] = []
 
+  // Служебные данные всех версий разом. Раньше здесь был поход в базу на
+  // каждую статью, и при выпуске по статье в день это росло бы без предела.
+  const metas = await metaByVersion(seo, (articles as any[]).map((a) => a.current_version_id))
+
   for (const a of articles as any[]) {
-    const { data: version } = await seo.from('article_versions').select('id, meta').eq('id', a.current_version_id).single()
-    const meta: any = version?.meta ?? {}
-    const slug = meta.publish?.slug ?? meta.slug
+    const meta: any = metas.get(a.current_version_id) ?? {}
+    const slug = slugOf(meta)
     if (!slug) continue
 
     // Уже в индексе и проверено недавно — не тратим квоту
@@ -681,10 +685,10 @@ registerStep('article_index_check', async (job: Job, seo: any): Promise<StepOutc
 
     await seo.from('article_versions').update({
       meta: { ...meta, index_check: { at: new Date().toISOString(), verdict: res.verdict, coverage: res.coverageState, note: res.note, last_crawl: res.lastCrawl } },
-    }).eq('id', version!.id)
+    }).eq('id', a.current_version_id).throwOnError()
 
     if (res.verdict === 'PASS' && !a.indexed_at) {
-      await seo.from('articles').update({ indexed_at: new Date().toISOString() }).eq('id', a.id)
+      await seo.from('articles').update({ indexed_at: new Date().toISOString() }).eq('id', a.id).throwOnError()
       indexed.push(a.id)
     }
   }
@@ -703,7 +707,7 @@ registerStep('index_check_site', async (_job: Job, seo: any): Promise<StepOutcom
 
   // Осталось непроверенное — ставим продолжение, а не бросаем на середине
   if (res.checked >= 60) {
-    await seo.from('jobs').insert({ step: 'index_check_site', lane: 'findings', priority: 95, payload: {} })
+    await seo.from('jobs').insert({ step: 'index_check_site', lane: 'findings', priority: 95, payload: {} }).throwOnError()
   }
   return { outcome: 'done', result: { checked: res.checked, stopped: res.stopped ?? null, cost: 0 } }
 })
@@ -729,7 +733,7 @@ registerStep('article_autostart', async (_job: Job, seo: any): Promise<StepOutco
     topic_id: st.nextTopic.id,
     payload: { topic_id: st.nextTopic.id, auto: true },
     dedup_key: `article:topic:${st.nextTopic.id}:auto`,
-  })
+  }).throwOnError()
   await markAutoRun(seo)
 
   return {
@@ -830,7 +834,7 @@ registerStep('article_update_plan', async (job: Job, seo: any): Promise<StepOutc
   ]
 
   if (!issues.length) {
-    await seo.from('articles').update({ status: 'ready_for_review' }).eq('id', articleId)
+    await seo.from('articles').update({ status: 'ready_for_review' }).eq('id', articleId).throwOnError()
     return {
       outcome: 'done',
       result: { article_id: articleId, snapshot_id: snapshot?.id, nothing_to_fix: true,
@@ -917,15 +921,10 @@ registerStep('positions_snapshot', async (_job: Job, seo: any): Promise<StepOutc
 
   // Наши статьи — те, что написал конвейер: по ним движение интереснее всего
   const { data: arts } = await seo.from('articles').select('current_version_id').eq('status', 'published')
-  const ourUrls = new Set<string>()
-  for (const a of arts ?? []) {
-    const { data: v } = await seo.from('article_versions').select('meta').eq('id', a.current_version_id).maybeSingle()
-    const slug = (v?.meta as any)?.publish?.slug ?? (v?.meta as any)?.slug
-    if (slug) ourUrls.add(`https://goandstudy.com/blog/${slug}`)
-  }
+  const ourUrls = new Set<string>((await urlsOfArticles(seo, arts ?? [])).values())
 
   const snapshot = await buildSnapshot(seo, ourUrls)
-  await seo.from('settings').upsert({ key: 'positions_snapshot', value: snapshot }, { onConflict: 'key' })
+  await seo.from('settings').upsert({ key: 'positions_snapshot', value: snapshot }, { onConflict: 'key' }).throwOnError()
 
   return { outcome: 'done', result: { ...snapshot.summary, window: `${snapshot.windowFrom}…${snapshot.windowTo}`, cost: 0 } }
 })
@@ -984,9 +983,16 @@ registerStep('article_autopublish', async (_job: Job, seo: any): Promise<StepOut
 
   const rejected: string[] = []
 
+  // Версии кандидатов — одной выборкой. Тело статьи тяжёлое, но походов в базу
+  // теперь один вместо одного на кандидата.
+  const { data: candVersions, error: candErr } = await seo.from('article_versions')
+    .select('id, title, body, meta, qa_report')
+    .in('id', candidates.map((c: any) => c.current_version_id).filter(Boolean))
+  if (candErr) throw new Error(`версии кандидатов: ${candErr.message}`)
+  const byVersion = new Map<number, any>((candVersions ?? []).map((v: any) => [v.id, v]))
+
   for (const a of candidates) {
-    const { data: v } = await seo.from('article_versions')
-      .select('id, title, body, meta, qa_report').eq('id', a.current_version_id).maybeSingle()
+    const v = byVersion.get(a.current_version_id)
     if (!v) continue
     const meta: any = v.meta ?? {}
     const report: any = v.qa_report ?? {}
@@ -1078,9 +1084,9 @@ registerStep('yandex_sync', async (_job: Job, seo: any): Promise<StepOutcome> =>
   const { data: arts } = await seo.from('articles')
     .select('id, primary_keyword, current_version_id, published_at').eq('status', 'published')
   const ours: { id: number; keyword: string; url: string }[] = []
+  const yaMetas = await metaByVersion(seo, (arts ?? []).map((a: any) => a.current_version_id))
   for (const a of arts ?? []) {
-    const { data: v } = await seo.from('article_versions').select('meta').eq('id', a.current_version_id).maybeSingle()
-    const slug = (v?.meta as any)?.publish?.slug ?? (v?.meta as any)?.slug
+    const slug = slugOf(yaMetas.get(a.current_version_id))
     if (slug) ours.push({ id: a.id, keyword: a.primary_keyword, url: `https://goandstudy.com/blog/${slug}/` })
   }
 
@@ -1115,7 +1121,7 @@ registerStep('yandex_sync', async (_job: Job, seo: any): Promise<StepOutcome> =>
   const { data: prevRow } = await seo.from('settings').select('value').eq('key', 'yandex_snapshot').maybeSingle()
   const prev: any = prevRow?.value ?? null
   if (prev?.computedAt && Date.now() - Date.parse(prev.computedAt) > 6 * 864e5) {
-    await seo.from('settings').upsert({ key: 'yandex_snapshot_prev', value: prev }, { onConflict: 'key' })
+    await seo.from('settings').upsert({ key: 'yandex_snapshot_prev', value: prev }, { onConflict: 'key' }).throwOnError()
   }
 
   await seo.from('settings').upsert({
@@ -1136,7 +1142,7 @@ registerStep('yandex_sync', async (_job: Job, seo: any): Promise<StepOutcome> =>
         clicks: queries.reduce((s, q) => s + q.clicks, 0),
       },
     },
-  }, { onConflict: 'key' })
+  }, { onConflict: 'key' }).throwOnError()
 
   return {
     outcome: 'done',

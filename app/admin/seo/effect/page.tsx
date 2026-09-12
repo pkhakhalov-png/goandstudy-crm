@@ -24,15 +24,70 @@ export default async function EffectPage() {
   const today = new Date().toISOString().slice(0, 10)
   const since28 = new Date(Date.now() - 28 * DAY).toISOString().slice(0, 10)
 
-  // Читаем статистику один раз, окна режем в памяти. Раньше на каждую статью
-  // уходил отдельный полный проход — при тридцати статьях экран бы не открылся.
-  const days = await loadPageDays(seo)
+  /* ── Статьи и их адреса: одной выборкой, а не запросом на каждую ───────── */
+  // Раньше здесь был цикл: на статью приходилось три похода в базу, и экран
+  // открывался полторы секунды. Теперь три выборки на все статьи сразу.
+  const { data: articles } = await seo.from('articles')
+    .select('id, primary_keyword, published_at, current_version_id').eq('status', 'published').order('published_at')
+
+  const versionIds = (articles ?? []).map((a: any) => a.current_version_id).filter(Boolean)
+
+  // Самая ранняя дата выхода: статистика старше неё на этом экране не нужна
+  const earliestPub = (articles ?? [])
+    .map((a: any) => a.published_at as string | null).filter(Boolean).sort()[0] ?? null
+  const since = earliestPub && earliestPub.slice(0, 10) < since28 ? earliestPub.slice(0, 10) : since28
+
+  // Всё, что не зависит друг от друга, — одной пачкой. Раньше эти выборки шли
+  // цепочкой, и экран ждал каждую по очереди.
+  const [
+    { data: versions },
+    { data: blogPages },
+    { data: touches },
+    days,
+    { data: statuses },
+  ] = await Promise.all([
+    // Из meta берём только нужные поля. Целиком это около десяти килобайт на
+    // версию — тело статьи, отчёты проверок; тащить их сюда незачем.
+    versionIds.length
+      ? seo.from('article_versions')
+          .select('id, slug_pub:meta->publish->>slug, slug_flat:meta->>slug, verdict:meta->index_check->>verdict, crawl:meta->index_check->>last_crawl')
+          .in('id', versionIds)
+      : Promise.resolve({ data: [] as any[] }),
+    // Одна выборка вместо двух: отбор по indexable и removed_at делаем в памяти,
+    // а искать страницу статьи по адресу нужно без этих условий — как и раньше
+    seo.from('pages').select('id, normalized_url, title, first_seen_at, indexable, removed_at')
+      .like('normalized_url', '%/blog/%'),
+    seo.from('lead_identities').select('first_touch_page, deal_id, lead_at').not('first_touch_page', 'is', null),
+    loadPageDays(seo, { since }),
+    seo.from('index_status').select('page_id, first_indexed_at'),
+  ])
+
+  const verById = new Map<number, any>((versions ?? []).map((v: any) => [v.id, v]))
+
+  const slugOf = (a: any) => {
+    const v = verById.get(a.current_version_id)
+    return (v?.slug_pub ?? v?.slug_flat ?? null) as string | null
+  }
+  const urlOf = (a: any) => {
+    const s = slugOf(a)
+    return s ? `https://goandstudy.com/blog/${s}` : null
+  }
+  const ourUrls = (articles ?? []).map(urlOf).filter(Boolean) as string[]
+
   const recent = summarize(days, { since: since28 })
 
+  // Строки по адресам наших статей — чтобы окно «первые 28 дней» считать
+  // проходом по сотне строк одной статьи, а не по всей статистике заново
+  const ourDays = new Map<string, typeof days>()
+  const ourSet = new Set(ourUrls)
+  for (const r of days) {
+    if (!ourSet.has(r.normalized_url)) continue
+    const arr = ourDays.get(r.normalized_url)
+    if (arr) arr.push(r); else ourDays.set(r.normalized_url, [r])
+  }
+
   /* ── Блог целиком: с чем сравнивать ────────────────────────────────────── */
-  const { data: pages } = await seo.from('pages')
-    .select('id, normalized_url, title, first_seen_at')
-    .is('removed_at', null).eq('indexable', true).like('normalized_url', '%/blog/%')
+  const pages = (blogPages ?? []).filter((p: any) => p.removed_at === null && p.indexable === true)
 
   const blog = (pages ?? []).map((p: any) => ({
     url: p.normalized_url as string,
@@ -48,8 +103,6 @@ export default async function EffectPage() {
 
   /* ── Наши статьи ───────────────────────────────────────────────────────── */
   // Обращения: считаем только то, что видим целиком — заявку через нашу форму.
-  const { data: touches } = await seo.from('lead_identities')
-    .select('first_touch_page, deal_id, lead_at').not('first_touch_page', 'is', null)
   const { countable, TRACKING_SINCE } = await import('@/lib/seo/attribution')
   const contactsByPage = new Map<number, { leads: number; deals: number }>()
   let ignoredEarly = 0
@@ -64,29 +117,29 @@ export default async function EffectPage() {
   }
   const totalLeads = [...contactsByPage.values()].reduce((a, c) => a + c.leads, 0)
 
-  const { data: articles } = await seo.from('articles')
-    .select('id, primary_keyword, published_at, current_version_id').eq('status', 'published').order('published_at')
+  // Страница статьи и её состояние индексации — из уже прочитанного,
+  // поиском по карте вместо запроса на каждую статью
+  const pageIdByUrl = new Map<string, number>((blogPages ?? []).map((p: any) => [p.normalized_url, p.id]))
+  const firstIndexedByPage = new Map<number, string | null>(
+    (statuses ?? []).map((s: any) => [s.page_id, s.first_indexed_at ?? null]),
+  )
 
   const ours: Ours[] = []
   for (const a of articles ?? []) {
-    const { data: v } = await seo.from('article_versions').select('meta').eq('id', a.current_version_id).single()
-    const meta: any = v?.meta ?? {}
-    const slug = meta.publish?.slug ?? meta.slug
-    if (!slug) continue
-    const url = `https://goandstudy.com/blog/${slug}`
+    const url = urlOf(a)
+    if (!url) continue
+    const v = verById.get(a.current_version_id)
 
-    const { data: page } = await seo.from('pages').select('id').eq('normalized_url', url).maybeSingle()
-    let firstIndexed: string | null = meta.index_check?.verdict === 'PASS' ? (meta.index_check.last_crawl ?? null) : null
-    if (page?.id) {
-      const { data: st } = await seo.from('index_status').select('first_indexed_at').eq('page_id', page.id).maybeSingle()
-      firstIndexed = st?.first_indexed_at ?? firstIndexed
-    }
+    const pageId = pageIdByUrl.get(url)
+    let firstIndexed: string | null = v?.verdict === 'PASS' ? (v.crawl ?? null) : null
+    if (pageId !== undefined) firstIndexed = firstIndexedByPage.get(pageId) ?? firstIndexed
 
     const pub = a.published_at as string | null
     const end = pub ? new Date(Date.parse(pub) + 28 * DAY).toISOString().slice(0, 10) : today
     const matured = !!pub && Date.parse(pub) + 28 * DAY <= Date.now()
+    // Проход только по строкам этой статьи, а не по всей статистике заново
     const window = pub
-      ? summarize(days, { since: pub.slice(0, 10), until: end }).get(url) ?? EMPTY
+      ? summarize(ourDays.get(url) ?? [], { since: pub.slice(0, 10), until: end }).get(url) ?? EMPTY
       : EMPTY
 
     ours.push({

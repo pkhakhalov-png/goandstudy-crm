@@ -1,0 +1,3321 @@
+[
+  {
+    "name": "positions_snapshot",
+    "source": "lib/seo/steps-article.ts",
+    "total": 1770.4902500000007,
+    "calls": [
+      {
+        "table": "gsc_daily",
+        "ms": 358.2525830000013,
+        "rows": 1000,
+        "total": 32739,
+        "ranged": false,
+        "head": true,
+        "detail": "date=gte.2026-08-22"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 227.55775000000176,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "date=gte.2026-08-22 order=normalized_url.asc,query.asc,date.asc offset=1000 limit=1000"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 397.8569159999988,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "date=gte.2026-08-22 order=normalized_url.asc,query.asc,date.asc offset=3000 limit=1000"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 410.2193329999991,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "date=gte.2026-08-22 order=normalized_url.asc,query.asc,date.asc offset=2000 limit=1000"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 559.4082500000004,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "date=gte.2026-08-22 order=normalized_url.asc,query.asc,date.asc offset=5000 limit=1000"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 587.4981250000001,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "date=gte.2026-08-22 order=normalized_url.asc,query.asc,date.asc offset=0 limit=1000"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 641.2945830000008,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "date=gte.2026-08-22 order=normalized_url.asc,query.asc,date.asc offset=7000 limit=1000"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 700.3823329999996,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "date=gte.2026-08-22 order=normalized_url.asc,query.asc,date.asc offset=8000 limit=1000"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 706.5135829999999,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "date=gte.2026-08-22 order=normalized_url.asc,query.asc,date.asc offset=9000 limit=1000"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 745.3478749999995,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "date=gte.2026-08-22 order=normalized_url.asc,query.asc,date.asc offset=4000 limit=1000"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 777.8792079999985,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "date=gte.2026-08-22 order=normalized_url.asc,query.asc,date.asc offset=10000 limit=1000"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 816.1560829999999,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "date=gte.2026-08-22 order=normalized_url.asc,query.asc,date.asc offset=6000 limit=1000"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 813.8640409999989,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "date=gte.2026-08-22 order=normalized_url.asc,query.asc,date.asc offset=11000 limit=1000"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 176.18379099999947,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "date=gte.2026-08-22 order=normalized_url.asc,query.asc,date.asc offset=12000 limit=1000"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 214.78004200000032,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "date=gte.2026-08-22 order=normalized_url.asc,query.asc,date.asc offset=14000 limit=1000"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 220.0467919999992,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "date=gte.2026-08-22 order=normalized_url.asc,query.asc,date.asc offset=13000 limit=1000"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 225.4652500000011,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "date=gte.2026-08-22 order=normalized_url.asc,query.asc,date.asc offset=15000 limit=1000"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 240.13783300000068,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "date=gte.2026-08-22 order=normalized_url.asc,query.asc,date.asc offset=16000 limit=1000"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 252.82037499999933,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "date=gte.2026-08-22 order=normalized_url.asc,query.asc,date.asc offset=17000 limit=1000"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 253.27333399999952,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "date=gte.2026-08-22 order=normalized_url.asc,query.asc,date.asc offset=18000 limit=1000"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 274.286333,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "date=gte.2026-08-22 order=normalized_url.asc,query.asc,date.asc offset=20000 limit=1000"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 281.04249999999956,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "date=gte.2026-08-22 order=normalized_url.asc,query.asc,date.asc offset=21000 limit=1000"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 289.3850000000002,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "date=gte.2026-08-22 order=normalized_url.asc,query.asc,date.asc offset=19000 limit=1000"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 290.3325420000001,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "date=gte.2026-08-22 order=normalized_url.asc,query.asc,date.asc offset=22000 limit=1000"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 298.71879199999967,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "date=gte.2026-08-22 order=normalized_url.asc,query.asc,date.asc offset=23000 limit=1000"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 216.60191599999962,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "date=gte.2026-08-22 order=normalized_url.asc,query.asc,date.asc offset=25000 limit=1000"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 223.00145900000098,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "date=gte.2026-08-22 order=normalized_url.asc,query.asc,date.asc offset=26000 limit=1000"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 232.64541699999972,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "date=gte.2026-08-22 order=normalized_url.asc,query.asc,date.asc offset=24000 limit=1000"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 239.09799999999996,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "date=gte.2026-08-22 order=normalized_url.asc,query.asc,date.asc offset=27000 limit=1000"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 247.01012499999888,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "date=gte.2026-08-22 order=normalized_url.asc,query.asc,date.asc offset=28000 limit=1000"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 253.00795899999866,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "date=gte.2026-08-22 order=normalized_url.asc,query.asc,date.asc offset=29000 limit=1000"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 267.580750000001,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "date=gte.2026-08-22 order=normalized_url.asc,query.asc,date.asc offset=30000 limit=1000"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 274.6165000000001,
+        "rows": 739,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "date=gte.2026-08-22 order=normalized_url.asc,query.asc,date.asc offset=32000 limit=1000"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 277.1777499999989,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "date=gte.2026-08-22 order=normalized_url.asc,query.asc,date.asc offset=31000 limit=1000"
+      }
+    ],
+    "slowest": {
+      "table": "gsc_daily",
+      "ms": 816.1560829999999,
+      "rows": 1000,
+      "total": null,
+      "ranged": true,
+      "head": false,
+      "detail": "date=gte.2026-08-22 order=normalized_url.asc,query.asc,date.asc offset=6000 limit=1000"
+    },
+    "truncated": []
+  },
+  {
+    "name": "article_autostart",
+    "source": "lib/seo/steps-article.ts",
+    "total": 4974.720207999999,
+    "calls": [
+      {
+        "table": "pages",
+        "ms": 125.76716700000179,
+        "rows": 219,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "removed_at=is.null"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 164.34024999999747,
+        "rows": 1000,
+        "total": 138150,
+        "ranged": false,
+        "head": true,
+        "detail": "date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 104.4519169999985,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=7000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 135.69891700000153,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=6000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 137.6593750000029,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=10000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 140.50433399999747,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=5000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 140.93800000000192,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=0 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 143.51733299999978,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=1000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 146.8300829999971,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=2000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 154.21700000000055,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=3000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 164.750082999999,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=4000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 164.58608299999833,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=8000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 164.52987500000017,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=11000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 171.2333749999998,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=9000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 139.82887499999924,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=15000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 147.3528329999972,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=17000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 158.82633400000122,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=21000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 179.79837500000212,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=13000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 179.34162500000093,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=12000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 186.36054200000217,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=14000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 190.43895899999916,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=16000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 196.882834,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=20000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 197.981749999999,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=18000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 202.55083300000115,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=22000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 204.88637499999822,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=23000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 205.55862500000148,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=19000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 157.49075000000084,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=27000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 162.45683400000053,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=29000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 216.5549170000013,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=24000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 228.61937500000204,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=26000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 229.62920799999847,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=28000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 234.9283749999995,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=25000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 240.36666700000205,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=31000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 242.34287499999846,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=30000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 244.27691699999923,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=34000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 245.37404199999946,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=33000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 250.01291700000002,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=32000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 252.0826249999991,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=35000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 262.9433749999989,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=36000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 265.6348750000034,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=38000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 266.56354199999987,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=39000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 267.7282500000001,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=37000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 267.0928329999988,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=44000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 267.8368750000009,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=42000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 269.1073329999999,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=41000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 269.5587090000008,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=45000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 269.9436249999999,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=47000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 271.47783400000117,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=46000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 283.77279199999975,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=43000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 297.02037500000006,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=40000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 279.7837499999987,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=49000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 281.1622499999976,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=50000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 283.5866249999999,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=48000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 285.8839169999992,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=51000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 292.9367910000001,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=53000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 296.0099999999984,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=52000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 305.57766699999775,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=57000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 345.7938329999997,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=56000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 346.3060000000005,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=54000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 346.12774999999965,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=59000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 347.0034999999989,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=55000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 352.76124999999956,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=58000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 248.46016600000075,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=62000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 254.9913340000021,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=64000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 261.37274999999863,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=65000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 308.0917499999996,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=60000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 315.6917089999988,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=71000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 331.6117919999997,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=61000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 334.5935000000027,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=70000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 352.37908400000015,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=66000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 353.4435420000009,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=63000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 358.9712499999987,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=68000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 381.5114590000012,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=67000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 397.6038750000007,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=69000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 275.90733399999954,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=73000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 280.3829579999983,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=75000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 343.84641700000066,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=83000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 356.86275000000023,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=78000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 404.00220799999806,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=74000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 413.3265840000022,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=76000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 415.9737920000007,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=77000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 419.25116600000183,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=79000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 421.53191700000025,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=80000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 423.80591600000116,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=81000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 428.88983299999745,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=82000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 430.49320799999987,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=72000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 332.3423330000005,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=85000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 345.57624999999825,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=91000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 355.2400830000006,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=93000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 409.2319580000003,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=87000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 411.6117090000007,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=86000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 414.86362499999814,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=84000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 416.0970000000016,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=88000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 418.9631670000017,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=89000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 424.6827080000003,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=92000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 427.32087500000125,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=90000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 486.4717500000006,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=94000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 490.6275830000013,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=95000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 405.8060000000005,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=97000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 439.3650839999973,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=98000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 455.2947079999976,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=96000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 456.81029099999796,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=99000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 456.6104579999992,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=106000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 457.28870800000004,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=105000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 460.27795900000274,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=100000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 466.84333400000105,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=104000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 470.9439999999995,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=103000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 471.5645000000004,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=101000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 531.0848330000008,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=102000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 544.028957999999,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=107000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 433.3084999999992,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=108000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 466.2897090000006,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=117000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 478.08416699999725,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=113000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 478.59912500000064,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=112000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 478.89629200000127,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=116000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 482.21491700000115,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=111000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 483.000208999998,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=109000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 482.9261250000018,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=110000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 482.89537500000006,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=114000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 491.4512080000022,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=118000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 560.4655840000014,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=119000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 569.081041999998,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=115000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 426.2089999999989,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=120000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 434.80312499999854,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=122000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 461.52237500000047,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=128000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 531.7221250000002,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=121000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 532.4787090000027,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=123000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 543.9324579999993,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=124000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 543.9840409999997,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=129000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 558.0238329999993,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=126000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 560.5279579999988,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=131000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 572.3382500000007,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=130000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 602.7455840000002,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=125000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 630.5536670000001,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=127000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 378.41620899999907,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=132000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 390.30570799999987,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=133000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 392.3302920000024,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=134000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 391.84441700000025,
+        "rows": 150,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=138000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 394.92562499999985,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=135000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 401.77908300000126,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=137000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 405.5736250000009,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=136000 limit=1000 date=gte.2026-06-14"
+      }
+    ],
+    "slowest": {
+      "table": "gsc_daily",
+      "ms": 630.5536670000001,
+      "rows": 1000,
+      "total": null,
+      "ranged": true,
+      "head": false,
+      "detail": "order=normalized_url.asc,query.asc,date.asc offset=127000 limit=1000 date=gte.2026-06-14"
+    },
+    "truncated": []
+  },
+  {
+    "name": "index_check_site",
+    "source": "lib/seo/steps-article.ts",
+    "total": 184.24304199999824,
+    "calls": [
+      {
+        "table": "pages",
+        "ms": 91.38104200000089,
+        "rows": 159,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "removed_at=is.null indexable=eq.true http_status=eq.200"
+      },
+      {
+        "table": "index_status",
+        "ms": 89.68316699999923,
+        "rows": 160,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": ""
+      }
+    ],
+    "slowest": {
+      "table": "pages",
+      "ms": 91.38104200000089,
+      "rows": 159,
+      "total": null,
+      "ranged": false,
+      "head": false,
+      "detail": "removed_at=is.null indexable=eq.true http_status=eq.200"
+    },
+    "truncated": []
+  },
+  {
+    "name": "attribution_stitch",
+    "source": "lib/seo/attribution.ts",
+    "total": 94.66866700000173,
+    "calls": [
+      {
+        "table": "lead_identities",
+        "ms": 93.71279199999844,
+        "rows": 0,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "deal_id=is.null lead_source=eq.book limit=500"
+      }
+    ],
+    "slowest": {
+      "table": "lead_identities",
+      "ms": 93.71279199999844,
+      "rows": 0,
+      "total": null,
+      "ranged": true,
+      "head": false,
+      "detail": "deal_id=is.null lead_source=eq.book limit=500"
+    },
+    "truncated": []
+  },
+  {
+    "name": "alerts_check",
+    "source": "lib/seo/alerts.ts",
+    "total": 102.85233299999891,
+    "calls": [
+      {
+        "table": "articles",
+        "ms": 101.47758299999987,
+        "rows": 4,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "status=eq.ready_for_review"
+      },
+      {
+        "table": "jobs",
+        "ms": 100.77850000000035,
+        "rows": 0,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "status=in.(failed,running)"
+      }
+    ],
+    "slowest": {
+      "table": "articles",
+      "ms": 101.47758299999987,
+      "rows": 4,
+      "total": null,
+      "ranged": false,
+      "head": false,
+      "detail": "status=eq.ready_for_review"
+    },
+    "truncated": []
+  },
+  {
+    "name": "gsc_import (чтение)",
+    "source": "lib/seo/steps.ts",
+    "total": 203.91949999999997,
+    "calls": [
+      {
+        "table": "gsc_daily",
+        "ms": 111.20458299999882,
+        "rows": 1,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=date.desc limit=1"
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 91.09266600000046,
+        "rows": 1,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=date.desc limit=1"
+      }
+    ],
+    "slowest": {
+      "table": "gsc_daily",
+      "ms": 111.20458299999882,
+      "rows": 1,
+      "total": null,
+      "ranged": true,
+      "head": false,
+      "detail": "order=date.desc limit=1"
+    },
+    "truncated": []
+  },
+  {
+    "name": "topics_from_gsc",
+    "source": "lib/seo/steps-article.ts",
+    "total": 5345.659499999998,
+    "calls": [
+      {
+        "table": "gsc_daily",
+        "ms": 492.0224999999991,
+        "rows": 1000,
+        "total": 138150,
+        "ranged": false,
+        "head": true,
+        "detail": "date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 110.45545800000036,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=1000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 126.76037499999802,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=2000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 136.03783399999884,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=3000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 144.8582920000008,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=4000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 146.94924999999785,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=0 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 149.47895800000333,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=5000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 160.47345799999675,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=8000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 160.27066699999705,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=11000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 167.06683300000077,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=7000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 169.67270800000188,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=9000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 169.65100000000166,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=10000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 173.8847080000014,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=6000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 154.11549999999988,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=16000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 162.4576670000024,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=17000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 163.50537500000064,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=18000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 176.58829200000037,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=20000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 179.53841699999975,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=15000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 182.56383300000016,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=14000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 192.61762499999895,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=19000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 194.9882080000025,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=22000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 198.6772920000003,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=21000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 199.66058300000077,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=23000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 206.83762500000012,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=12000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 209.5112079999999,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=13000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 206.6565410000003,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=26000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 209.179583000001,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=25000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 213.26037500000166,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=30000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 217.79650000000038,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=34000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 242.57837500000096,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=24000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 257.66149999999834,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=27000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 259.13104100000055,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=29000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 260.21308299999873,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=28000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 266.8342499999999,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=33000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 267.3145829999994,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=31000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 272.34483399999954,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=35000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 272.8576670000002,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=32000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 144.0413750000007,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=38000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 184.3708749999969,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=37000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 221.10150000000067,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=39000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 236.29137499999706,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=41000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 240.94137499999852,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=46000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 272.83391699999993,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=36000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 284.8629580000015,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=40000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 290.7964580000007,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=42000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 290.7581250000003,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=47000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 296.6090409999997,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=45000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 299.87679200000275,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=44000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 305.8644170000007,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=43000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 288.5535830000008,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=48000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 295.8858330000003,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=50000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 301.8693749999984,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=49000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 311.17049999999654,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=52000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 321.98499999999694,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=58000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 323.4279999999999,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=54000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 328.7247500000012,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=56000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 328.6285420000022,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=59000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 334.30075000000215,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=55000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 337.90416600000026,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=57000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 361.8553749999992,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=51000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 375.8785409999982,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=53000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 257.67854200000147,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=61000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 271.71241700000246,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=64000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 295.7252499999995,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=70000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 310.0891670000019,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=60000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 329.83108399999765,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=62000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 330.6906250000029,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=63000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 349.9497080000001,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=68000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 350.8784999999989,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=66000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 351.4046669999989,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=65000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 351.8922910000001,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=69000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 381.4800000000032,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=71000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 387.4955829999999,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=67000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 269.34449999999924,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=79000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 277.29383300000336,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=80000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 344.742207999996,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=73000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 354.06041700000424,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=78000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 398.07570799999667,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=75000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 398.5340840000026,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=72000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 399.5390000000043,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=74000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 402.401167,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=77000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 409.0621250000004,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=76000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 413.8569580000003,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=81000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 419.57108300000255,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=82000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 438.98316599999816,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=83000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 401.49212499999703,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=84000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 407.2512080000015,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=85000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 416.1814579999991,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=88000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 416.9642079999976,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=90000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 423.0564169999998,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=87000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 429.12204100000235,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=86000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 431.3308750000069,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=95000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 440.9379170000029,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=92000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 443.05066700000316,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=93000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 447.6887499999939,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=94000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 496.69191700000374,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=91000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 500.3537920000017,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=89000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 381.908666000003,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=97000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 387.9650410000031,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=102000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 399.5202089999948,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=103000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 420.3045409999977,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=107000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 442.94316699999763,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=98000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 445.85520800000086,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=99000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 454.0717089999962,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=100000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 466.89033299999574,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=104000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 468.07424999999785,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=105000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 472.67749999999796,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=106000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 492.4791250000053,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=101000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 526.9212909999987,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=96000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 402.88208300000406,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=110000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 404.35174999999435,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=112000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 421.29262500000186,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=116000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 463.8097080000007,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=108000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 494.34474999999657,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=113000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 494.4481250000026,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=119000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 499.44183299999713,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=114000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 503.1243750000067,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=117000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 503.9331249999959,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=111000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 507.9001669999998,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=118000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 569.1965419999979,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=115000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 574.1726669999989,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=109000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 485.2702500000014,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=120000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 495.61941600000137,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=122000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 502.33983300000546,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=123000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 513.5934579999957,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=124000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 514.015999999996,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=125000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 515.3462500000023,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=121000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 518.4497499999998,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=131000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 522.9983750000029,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=128000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 532.4084169999987,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=130000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 535.349000000002,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=129000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 602.8498330000002,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=127000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 613.0905839999978,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=126000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 377.7450830000016,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=135000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 391.958000000006,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=137000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 393.18649999999616,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=133000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 397.8220419999998,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=132000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 412.7632920000033,
+        "rows": 150,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=138000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 416.5817909999969,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=136000 limit=1000 date=gte.2026-06-14"
+      },
+      {
+        "table": "gsc_daily",
+        "ms": 423.2920410000006,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,query.asc,date.asc offset=134000 limit=1000 date=gte.2026-06-14"
+      }
+    ],
+    "slowest": {
+      "table": "gsc_daily",
+      "ms": 613.0905839999978,
+      "rows": 1000,
+      "total": null,
+      "ranged": true,
+      "head": false,
+      "detail": "order=normalized_url.asc,query.asc,date.asc offset=126000 limit=1000 date=gte.2026-06-14"
+    },
+    "truncated": []
+  },
+  {
+    "name": "article_update_plan",
+    "source": "lib/seo/steps-article.ts",
+    "total": 459.6655840000021,
+    "calls": [
+      {
+        "table": "gsc_page_daily",
+        "ms": 93.34704200000124,
+        "rows": 1000,
+        "total": 18089,
+        "ranged": false,
+        "head": true,
+        "detail": ""
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 122.19762499999342,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,date.asc offset=0 limit=1000"
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 124.77929199999926,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,date.asc offset=3000 limit=1000"
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 140.9362089999995,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,date.asc offset=4000 limit=1000"
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 141.7250419999982,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,date.asc offset=7000 limit=1000"
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 142.1429169999974,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,date.asc offset=10000 limit=1000"
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 149.0232079999987,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,date.asc offset=5000 limit=1000"
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 151.06175000000076,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,date.asc offset=11000 limit=1000"
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 151.72129100000166,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,date.asc offset=9000 limit=1000"
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 152.56333299999824,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,date.asc offset=6000 limit=1000"
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 158.1912089999969,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,date.asc offset=1000 limit=1000"
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 180.67420899999706,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,date.asc offset=2000 limit=1000"
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 212.96224999999686,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,date.asc offset=8000 limit=1000"
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 117.5725420000017,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,date.asc offset=14000 limit=1000"
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 117.77312499999971,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,date.asc offset=17000 limit=1000"
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 132.77900000000227,
+        "rows": 89,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,date.asc offset=18000 limit=1000"
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 133.99483399999735,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,date.asc offset=12000 limit=1000"
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 134.91304200000013,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,date.asc offset=16000 limit=1000"
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 142.47495799999888,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,date.asc offset=15000 limit=1000"
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 144.51087499999994,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,date.asc offset=13000 limit=1000"
+      }
+    ],
+    "slowest": {
+      "table": "gsc_page_daily",
+      "ms": 212.96224999999686,
+      "rows": 1000,
+      "total": null,
+      "ranged": true,
+      "head": false,
+      "detail": "order=normalized_url.asc,date.asc offset=8000 limit=1000"
+    },
+    "truncated": []
+  },
+  {
+    "name": "article_index_check",
+    "source": "lib/seo/steps-article.ts",
+    "total": 422.4382079999996,
+    "calls": [
+      {
+        "table": "articles",
+        "ms": 87.85925000000134,
+        "rows": 3,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "status=eq.published order=id.asc"
+      },
+      {
+        "table": "article_versions",
+        "ms": 197.3237919999956,
+        "rows": 3,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "id=in.(15,21,30)"
+      }
+    ],
+    "slowest": {
+      "table": "article_versions",
+      "ms": 197.3237919999956,
+      "rows": 3,
+      "total": null,
+      "ranged": false,
+      "head": false,
+      "detail": "id=in.(15,21,30)"
+    },
+    "truncated": []
+  },
+  {
+    "name": "article_autopublish (отбор)",
+    "source": "lib/seo/steps-article.ts",
+    "total": 525.5646249999991,
+    "calls": [
+      {
+        "table": "articles",
+        "ms": 103.47495799999888,
+        "rows": 4,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "status=eq.ready_for_review"
+      },
+      {
+        "table": "article_versions",
+        "ms": 213.78525000000081,
+        "rows": 4,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "id=in.(22,34,14,35)"
+      }
+    ],
+    "slowest": {
+      "table": "article_versions",
+      "ms": 213.78525000000081,
+      "rows": 4,
+      "total": null,
+      "ranged": false,
+      "head": false,
+      "detail": "id=in.(22,34,14,35)"
+    },
+    "truncated": []
+  },
+  {
+    "name": "шаг статьи: чтение статьи и версии",
+    "source": "lib/seo/steps-article.ts",
+    "total": 344.0019170000014,
+    "calls": [
+      {
+        "table": "articles",
+        "ms": 91.23570800000016,
+        "rows": 1,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "limit=1"
+      },
+      {
+        "table": "article_versions",
+        "ms": 181.3473329999979,
+        "rows": 1,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "id=eq.22"
+      }
+    ],
+    "slowest": {
+      "table": "article_versions",
+      "ms": 181.3473329999979,
+      "rows": 1,
+      "total": null,
+      "ranged": false,
+      "head": false,
+      "detail": "id=eq.22"
+    },
+    "truncated": []
+  }
+]

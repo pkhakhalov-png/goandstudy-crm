@@ -45,7 +45,7 @@ export async function loadFlow(seo: any): Promise<FlowSettings> {
 }
 
 export async function saveFlow(seo: any, next: FlowSettings): Promise<void> {
-  await seo.from('settings').upsert({ key: 'article_flow', value: next }, { onConflict: 'key' })
+  await seo.from('settings').upsert({ key: 'article_flow', value: next }, { onConflict: 'key' }).throwOnError()
 }
 
 export type PickedTopic = {
@@ -146,18 +146,18 @@ export async function nextPublishAt(seo: any, settings: FlowSettings): Promise<D
   if (at) return new Date(at)
 
   const first = firstPublishTime(settings)
-  await seo.from('settings').upsert({ key: 'next_publish_at', value: { at: first.toISOString() } }, { onConflict: 'key' })
+  await seo.from('settings').upsert({ key: 'next_publish_at', value: { at: first.toISOString() } }, { onConflict: 'key' }).throwOnError()
   return first
 }
 
 export async function scheduleNextPublish(seo: any, settings: FlowSettings): Promise<Date> {
   const next = planNextPublish(settings)
-  await seo.from('settings').upsert({ key: 'next_publish_at', value: { at: next.toISOString() } }, { onConflict: 'key' })
+  await seo.from('settings').upsert({ key: 'next_publish_at', value: { at: next.toISOString() } }, { onConflict: 'key' }).throwOnError()
   return next
 }
 
 export async function markAutoRun(seo: any): Promise<void> {
-  await seo.from('settings').upsert({ key: 'last_auto_article', value: { at: new Date().toISOString() } }, { onConflict: 'key' })
+  await seo.from('settings').upsert({ key: 'last_auto_article', value: { at: new Date().toISOString() } }, { onConflict: 'key' }).throwOnError()
 }
 
 /**
@@ -166,14 +166,15 @@ export async function markAutoRun(seo: any): Promise<void> {
  * час, а экран читает посчитанное.
  */
 export async function flowSnapshot(seo: any): Promise<FlowState & { computedAt: string | null }> {
-  const settings = await loadFlow(seo)
-
-  const { data } = await seo.from('settings').select('value').eq('key', 'flow_snapshot').maybeSingle()
+  // Три независимых чтения — одной пачкой. Одно за другим они стоили экрану
+  // трёх походов до базы подряд там, где хватает одного по времени.
+  const [settings, { data }, { count: inReview }] = await Promise.all([
+    loadFlow(seo),
+    seo.from('settings').select('value').eq('key', 'flow_snapshot').maybeSingle(),
+    seo.from('articles').select('*', { count: 'exact', head: true })
+      .in('status', ['ready_for_review', 'in_review']),
+  ])
   const snap = data?.value as (FlowState & { computedAt: string }) | undefined
-
-  const { count: inReview } = await seo.from('articles')
-    .select('*', { count: 'exact', head: true })
-    .in('status', ['ready_for_review', 'in_review'])
 
   if (!snap) {
     return {
@@ -190,10 +191,13 @@ export async function flowSnapshot(seo: any): Promise<FlowState & { computedAt: 
 }
 
 export async function saveSnapshot(seo: any, state: FlowState): Promise<void> {
-  await seo.from('settings').upsert(
+  const { error } = await seo.from('settings').upsert(
     { key: 'flow_snapshot', value: { ...state, computedAt: new Date().toISOString() } },
     { onConflict: 'key' },
   )
+  // Без этой проверки неудачная запись проходила молча, а экран неделями
+  // показывал бы старое состояние конвейера как текущее
+  if (error) throw new Error(`снимок конвейера не сохранился: ${error.message}`)
 }
 
 /** Полный расчёт. Дорогой: перечитывает запросную статистику целиком. */

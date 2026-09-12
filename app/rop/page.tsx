@@ -2,6 +2,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { RopSidebar } from './RopSidebar'
 import { RopDashboard } from './RopDashboard'
+import { readAll } from '@/lib/supabase/read-all'
 
 export default async function RopPage() {
   const supabase = await createClient()
@@ -37,10 +38,10 @@ export default async function RopPage() {
     admin.from('users').select('id, name, is_active').eq('role', 'salesperson').order('name'),
     admin.from('sales_plans').select('*'),
     admin.from('clients').select('id, name, salesperson_id, status'),
-    admin.from('deals').select('id, title, stage_id, salesperson_id, source, budget, is_critical, custom_fields, created_at, updated_at, deleted_at').is('deleted_at', null),
+    readAll(() => admin.from('deals').select('id, title, stage_id, salesperson_id, source, budget, is_critical, custom_fields, created_at, updated_at, deleted_at').is('deleted_at', null).order('id')).then(data => ({ data })),
     admin.from('pipeline_stages').select('id, name, position, stage_type, color, weight').eq('is_active', true).order('position'),
-    admin.from('deal_messages').select('id, deal_id, direction, created_at').order('created_at', { ascending: false }),
-    admin.from('deal_tasks').select('id, deal_id, title, deadline, is_done, assigned_to, task_type').eq('is_done', false),
+    readAll(() => admin.from('deal_messages').select('id, deal_id, direction, created_at').order('created_at', { ascending: false }).order('id')).then(data => ({ data })),
+    readAll(() => admin.from('deal_tasks').select('id, deal_id, title, deadline, is_done, assigned_to, task_type').eq('is_done', false).order('id')).then(data => ({ data })),
     admin.from('rop_settings').select('key, value'),
   ])
 

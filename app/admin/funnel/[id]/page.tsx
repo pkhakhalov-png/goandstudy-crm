@@ -2,6 +2,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { Sidebar } from '../../Sidebar'
 import { DealCard } from './DealCard'
+import { readAll } from '@/lib/supabase/read-all'
 
 export default async function DealPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -23,11 +24,11 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
     supabase.from('users').select('name, role').eq('id', user.id).single(),
     supabase.from('deals').select('*').eq('id', id).single(),
     supabase.from('pipeline_stages').select('id, name, color, position, stage_type').eq('is_active', true).order('position'),
-    supabase.from('deal_activities').select('id, deal_id, user_id, activity_type, content, metadata, created_at').eq('deal_id', id).order('created_at', { ascending: false }),
+    readAll<any>(() => supabase.from('deal_activities').select('id, deal_id, user_id, activity_type, content, metadata, created_at').eq('deal_id', id).order('created_at', { ascending: false }).order('id')).then(data => ({ data })),
     supabase.from('users').select('id, name').eq('role', 'salesperson').eq('is_active', true).order('name'),
     supabase.from('users').select('id, name'),
-    supabase.from('deal_files').select('id, deal_id, name, url, size, mime_type, source, created_at').eq('deal_id', id).order('created_at', { ascending: false }),
-    supabase.from('deal_messages').select('id, deal_id, direction, channel, sender_name, content, file_id, created_at').eq('deal_id', id).order('created_at', { ascending: true }),
+    readAll<any>(() => supabase.from('deal_files').select('id, deal_id, name, url, size, mime_type, source, created_at').eq('deal_id', id).order('created_at', { ascending: false }).order('id')).then(data => ({ data })),
+    readAll<any>(() => supabase.from('deal_messages').select('id, deal_id, direction, channel, sender_name, content, file_id, created_at').eq('deal_id', id).order('created_at', { ascending: true }).order('id')).then(data => ({ data })),
     supabase.from('deal_tasks').select('id, deal_id, title, deadline, is_done, assigned_to, completed_at, created_at').eq('deal_id', id).order('created_at', { ascending: true }),
   ])
 
@@ -46,7 +47,9 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
     { data: groupDeals },
   ] = await Promise.all([
     createAdminClient().then(a => a.from('curators').select('id, name').eq('is_active', true).order('name')),
-    createAdminClient().then(a => a.from('deals').select('id, title, custom_fields').not('custom_fields->>group_chat_id', 'is', null).is('deleted_at', null)),
+    createAdminClient().then(a => readAll(() => a.from('deals').select('id, title, custom_fields')
+      .not('custom_fields->>group_chat_id', 'is', null).is('deleted_at', null).order('id'),
+      { label: 'сделки с группами' }).then(data => ({ data }))),
   ])
 
   const availableGroups = (groupDeals ?? []).map(d => ({

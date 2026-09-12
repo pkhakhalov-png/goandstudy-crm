@@ -1,0 +1,1865 @@
+[
+  {
+    "name": "/admin",
+    "source": "app/admin/page.tsx",
+    "total": 226.33220900000003,
+    "calls": [
+      {
+        "table": "users",
+        "ms": 97.24012499999992,
+        "rows": 1,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "clients",
+        "ms": 104.50466700000004,
+        "rows": 68,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "payments_view",
+        "ms": 110.51945799999999,
+        "rows": 174,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "users",
+        "ms": 121.09145799999999,
+        "rows": 9,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "fixed_expenses",
+        "ms": 121.04279099999985,
+        "rows": null,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "expenses",
+        "ms": 123.00937499999998,
+        "rows": 163,
+        "ranged": false,
+        "head": false
+      }
+    ],
+    "slowest": {
+      "table": "expenses",
+      "ms": 123.00937499999998,
+      "rows": 163,
+      "ranged": false,
+      "head": false
+    },
+    "truncated": []
+  },
+  {
+    "name": "/admin/clients",
+    "source": "app/admin/clients/page.tsx",
+    "total": 214.78695800000014,
+    "calls": [
+      {
+        "table": "users",
+        "ms": 93.17283300000008,
+        "rows": 1,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "curators",
+        "ms": 95.20000000000005,
+        "rows": 10,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "payments_view",
+        "ms": 99.01737500000013,
+        "rows": 174,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "users",
+        "ms": 100.13679100000013,
+        "rows": 8,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "expenses",
+        "ms": 101.01620899999989,
+        "rows": 163,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "invoices",
+        "ms": 101.46229099999982,
+        "rows": 20,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "clients",
+        "ms": 112.73062499999992,
+        "rows": 68,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "curators",
+        "ms": 117.1563749999998,
+        "rows": 9,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "users",
+        "ms": 118.59404100000006,
+        "rows": 41,
+        "ranged": false,
+        "head": false
+      }
+    ],
+    "slowest": {
+      "table": "users",
+      "ms": 118.59404100000006,
+      "rows": 41,
+      "ranged": false,
+      "head": false
+    },
+    "truncated": []
+  },
+  {
+    "name": "/admin/payments",
+    "source": "app/admin/payments/page.tsx",
+    "total": 188.87800000000016,
+    "calls": [
+      {
+        "table": "users",
+        "ms": 89.4894589999999,
+        "rows": 1,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "users",
+        "ms": 86.57458299999985,
+        "rows": 41,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "users",
+        "ms": 89.7662499999999,
+        "rows": 8,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "curators",
+        "ms": 91.32641699999999,
+        "rows": 10,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "curators",
+        "ms": 91.26545899999996,
+        "rows": 9,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "clients",
+        "ms": 92.936958,
+        "rows": 68,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "payments_view",
+        "ms": 95.356583,
+        "rows": 174,
+        "ranged": false,
+        "head": false
+      }
+    ],
+    "slowest": {
+      "table": "payments_view",
+      "ms": 95.356583,
+      "rows": 174,
+      "ranged": false,
+      "head": false
+    },
+    "truncated": []
+  },
+  {
+    "name": "/admin/expenses",
+    "source": "app/admin/expenses/page.tsx",
+    "total": 186.2599580000001,
+    "calls": [
+      {
+        "table": "users",
+        "ms": 85.6200409999999,
+        "rows": 1,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "clients",
+        "ms": 90.8597500000003,
+        "rows": 68,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "expenses",
+        "ms": 95.10637499999984,
+        "rows": 163,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "fixed_expenses",
+        "ms": 95.31541700000002,
+        "rows": 2,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "fixed_expense_records",
+        "ms": 99.330917,
+        "rows": 0,
+        "ranged": false,
+        "head": false
+      }
+    ],
+    "slowest": {
+      "table": "fixed_expense_records",
+      "ms": 99.330917,
+      "rows": 0,
+      "ranged": false,
+      "head": false
+    },
+    "truncated": []
+  },
+  {
+    "name": "/admin/funnel",
+    "source": "app/admin/funnel/page.tsx",
+    "total": 752.4186669999999,
+    "calls": [
+      {
+        "table": "users",
+        "ms": 96.15841599999976,
+        "rows": 1,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "users",
+        "ms": 88.64249999999993,
+        "rows": 8,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "deals",
+        "ms": 100.81645900000012,
+        "rows": 1000,
+        "ranged": false,
+        "head": true
+      },
+      {
+        "table": "curators",
+        "ms": 113.70962499999996,
+        "rows": 9,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "deals",
+        "ms": 114.90950000000021,
+        "rows": 0,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "pipeline_stages",
+        "ms": 120.74316700000008,
+        "rows": 14,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "deals",
+        "ms": 177.9240420000001,
+        "rows": 439,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "deals",
+        "ms": 106.58420800000022,
+        "rows": 264,
+        "ranged": false,
+        "head": true
+      },
+      {
+        "table": "deals",
+        "ms": 106.64750000000004,
+        "rows": 17,
+        "ranged": false,
+        "head": true
+      },
+      {
+        "table": "deals",
+        "ms": 114.06779200000028,
+        "rows": 50,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "deals",
+        "ms": 117.72983399999976,
+        "rows": 1,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "deals",
+        "ms": 126.69837499999994,
+        "rows": 94,
+        "ranged": false,
+        "head": true
+      },
+      {
+        "table": "deals",
+        "ms": 122.36987499999987,
+        "rows": 3,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "deals",
+        "ms": 128.25062500000013,
+        "rows": 50,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "deals",
+        "ms": 129.5683750000003,
+        "rows": 43,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "deals",
+        "ms": 129.99820899999986,
+        "rows": 0,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "deals",
+        "ms": 130.717666,
+        "rows": 6,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "deals",
+        "ms": 133.11312499999985,
+        "rows": 50,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "deals",
+        "ms": 145.729875,
+        "rows": 50,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "deals",
+        "ms": 150.09683300000006,
+        "rows": 17,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "deals",
+        "ms": 145.02874999999995,
+        "rows": 50,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "deals",
+        "ms": 144.18229100000008,
+        "rows": 50,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "deals",
+        "ms": 150.00808299999971,
+        "rows": 6,
+        "ranged": false,
+        "head": true
+      },
+      {
+        "table": "deals",
+        "ms": 148.76216699999986,
+        "rows": 10,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "deals",
+        "ms": 156.9972090000001,
+        "rows": 50,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "deals",
+        "ms": 159.12212499999987,
+        "rows": 109,
+        "ranged": false,
+        "head": true
+      },
+      {
+        "table": "deals",
+        "ms": 160.6461250000002,
+        "rows": 3,
+        "ranged": false,
+        "head": true
+      },
+      {
+        "table": "deals",
+        "ms": 160.2867080000001,
+        "rows": 0,
+        "ranged": false,
+        "head": true
+      },
+      {
+        "table": "deals",
+        "ms": 165.71520799999962,
+        "rows": 43,
+        "ranged": false,
+        "head": true
+      },
+      {
+        "table": "deals",
+        "ms": 161.46754099999998,
+        "rows": 72,
+        "ranged": false,
+        "head": true
+      },
+      {
+        "table": "deals",
+        "ms": 160.96320800000012,
+        "rows": 208,
+        "ranged": false,
+        "head": true
+      },
+      {
+        "table": "deals",
+        "ms": 165.42170799999985,
+        "rows": 159,
+        "ranged": false,
+        "head": true
+      },
+      {
+        "table": "deals",
+        "ms": 168.6265840000001,
+        "rows": 60,
+        "ranged": false,
+        "head": true
+      },
+      {
+        "table": "deals",
+        "ms": 172.81391699999995,
+        "rows": 1,
+        "ranged": false,
+        "head": true
+      },
+      {
+        "table": "deals",
+        "ms": 399.6241250000003,
+        "rows": 10,
+        "ranged": false,
+        "head": true
+      }
+    ],
+    "slowest": {
+      "table": "deals",
+      "ms": 399.6241250000003,
+      "rows": 10,
+      "ranged": false,
+      "head": true
+    },
+    "truncated": [
+      {
+        "table": "deals",
+        "ms": 100.81645900000012,
+        "rows": 1000,
+        "ranged": false,
+        "head": true
+      }
+    ]
+  },
+  {
+    "name": "/admin/sales",
+    "source": "app/admin/sales/page.tsx",
+    "total": 189.9045419999993,
+    "calls": [
+      {
+        "table": "users",
+        "ms": 86.67158299999937,
+        "rows": 1,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "users",
+        "ms": 90.4975830000003,
+        "rows": 9,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "sales_plans",
+        "ms": 94.4123750000008,
+        "rows": 4,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "clients",
+        "ms": 96.4984170000007,
+        "rows": 68,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "bookings",
+        "ms": 96.59116600000016,
+        "rows": 248,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "payments_view",
+        "ms": 99.0327500000003,
+        "rows": 174,
+        "ranged": false,
+        "head": false
+      }
+    ],
+    "slowest": {
+      "table": "payments_view",
+      "ms": 99.0327500000003,
+      "rows": 174,
+      "ranged": false,
+      "head": false
+    },
+    "truncated": []
+  },
+  {
+    "name": "/admin/analytics",
+    "source": "app/admin/analytics/page.tsx",
+    "total": 272.01066700000047,
+    "calls": [
+      {
+        "table": "users",
+        "ms": 87.47954200000004,
+        "rows": 1,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "expenses",
+        "ms": 89.56358399999954,
+        "rows": 15,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "curators",
+        "ms": 89.48125000000073,
+        "rows": 10,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "clients",
+        "ms": 91.54266699999971,
+        "rows": 15,
+        "ranged": false,
+        "head": false
+      }
+    ],
+    "slowest": {
+      "table": "clients",
+      "ms": 91.54266699999971,
+      "rows": 15,
+      "ranged": false,
+      "head": false
+    },
+    "truncated": []
+  },
+  {
+    "name": "/admin/invoices",
+    "source": "app/admin/invoices/page.tsx",
+    "total": 179.29679100000067,
+    "calls": [
+      {
+        "table": "users",
+        "ms": 85.1103750000002,
+        "rows": 1,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "invoices",
+        "ms": 90.45979199999965,
+        "rows": 20,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "clients",
+        "ms": 91.99070800000027,
+        "rows": 54,
+        "ranged": false,
+        "head": false
+      }
+    ],
+    "slowest": {
+      "table": "clients",
+      "ms": 91.99070800000027,
+      "rows": 54,
+      "ranged": false,
+      "head": false
+    },
+    "truncated": []
+  },
+  {
+    "name": "/admin/calendar",
+    "source": "app/admin/calendar/page.tsx",
+    "total": 185.3467499999997,
+    "calls": [
+      {
+        "table": "users",
+        "ms": 87.71879199999967,
+        "rows": 1,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "users",
+        "ms": 86.00754200000029,
+        "rows": 41,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "curators",
+        "ms": 87.05591599999934,
+        "rows": 10,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "clients",
+        "ms": 93.207042,
+        "rows": 68,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "users",
+        "ms": 93.77020900000025,
+        "rows": 8,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "payments_view",
+        "ms": 94.9707499999995,
+        "rows": 174,
+        "ranged": false,
+        "head": false
+      }
+    ],
+    "slowest": {
+      "table": "payments_view",
+      "ms": 94.9707499999995,
+      "rows": 174,
+      "ranged": false,
+      "head": false
+    },
+    "truncated": []
+  },
+  {
+    "name": "/admin/curators",
+    "source": "app/admin/curators/page.tsx",
+    "total": 178.66137499999968,
+    "calls": [
+      {
+        "table": "users",
+        "ms": 85.29562499999975,
+        "rows": 1,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "users",
+        "ms": 89.90791700000045,
+        "rows": 6,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "curators",
+        "ms": 90.69916699999976,
+        "rows": 10,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "clients",
+        "ms": 91.83712500000001,
+        "rows": 45,
+        "ranged": false,
+        "head": false
+      }
+    ],
+    "slowest": {
+      "table": "clients",
+      "ms": 91.83712500000001,
+      "rows": 45,
+      "ranged": false,
+      "head": false
+    },
+    "truncated": []
+  },
+  {
+    "name": "/admin/settings",
+    "source": "app/admin/settings/page.tsx",
+    "total": 261.27099999999973,
+    "calls": [
+      {
+        "table": "users",
+        "ms": 88.01900000000023,
+        "rows": 1,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "fixed_expenses",
+        "ms": 90.05774999999994,
+        "rows": 2,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "users",
+        "ms": 89.78974999999991,
+        "rows": 9,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "curators",
+        "ms": 91.66116599999987,
+        "rows": 10,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "sales_plans",
+        "ms": 91.409584,
+        "rows": 4,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "bookings",
+        "ms": 167.823042,
+        "rows": 248,
+        "ranged": true,
+        "head": false
+      }
+    ],
+    "slowest": {
+      "table": "bookings",
+      "ms": 167.823042,
+      "rows": 248,
+      "ranged": true,
+      "head": false
+    },
+    "truncated": []
+  },
+  {
+    "name": "/admin/seo",
+    "source": "app/admin/seo/page.tsx",
+    "total": 534.8076249999995,
+    "calls": [
+      {
+        "table": "page_schema",
+        "ms": 89.75129199999992,
+        "rows": 1,
+        "ranged": false,
+        "head": true
+      },
+      {
+        "table": "findings",
+        "ms": 90.95558400000027,
+        "rows": 503,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "experiments",
+        "ms": 95.3603750000002,
+        "rows": 0,
+        "ranged": false,
+        "head": true
+      },
+      {
+        "table": "pages",
+        "ms": 96.02820799999972,
+        "rows": 219,
+        "ranged": false,
+        "head": true
+      },
+      {
+        "table": "opportunities",
+        "ms": 98.93020799999977,
+        "rows": 251,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 99.20858299999963,
+        "rows": 1000,
+        "ranged": false,
+        "head": true
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 104.55933399999958,
+        "rows": 1000,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 117.19370900000013,
+        "rows": 1000,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 124.52504200000021,
+        "rows": 1000,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 139.77812499999982,
+        "rows": 1000,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 160.68120800000088,
+        "rows": 1000,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 165.26875000000018,
+        "rows": 1000,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 189.90529199999946,
+        "rows": 1000,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 196.6753750000007,
+        "rows": 1000,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 199.89558300000044,
+        "rows": 1000,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 200.4110409999994,
+        "rows": 1000,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 215.2830840000006,
+        "rows": 1000,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 243.3688749999992,
+        "rows": 1000,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 114.95366599999943,
+        "rows": 1000,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 124.02258299999994,
+        "rows": 1000,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 170.43483299999934,
+        "rows": 1000,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 173.33741699999882,
+        "rows": 1000,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 176.60404199999903,
+        "rows": 956,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 181.60745899999893,
+        "rows": 1000,
+        "ranged": true,
+        "head": false
+      }
+    ],
+    "slowest": {
+      "table": "gsc_page_daily",
+      "ms": 243.3688749999992,
+      "rows": 1000,
+      "ranged": true,
+      "head": false
+    },
+    "truncated": [
+      {
+        "table": "gsc_page_daily",
+        "ms": 99.20858299999963,
+        "rows": 1000,
+        "ranged": false,
+        "head": true
+      }
+    ]
+  },
+  {
+    "name": "/admin/seo/articles",
+    "source": "app/admin/seo/articles/page.tsx",
+    "total": 678.3782079999983,
+    "calls": [
+      {
+        "table": "articles",
+        "ms": 92.7573339999999,
+        "rows": 13,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "settings",
+        "ms": 91.07458300000144,
+        "rows": 1,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "jobs",
+        "ms": 94.00604200000089,
+        "rows": 40,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "topics",
+        "ms": 94.39041700000053,
+        "rows": 10,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "settings",
+        "ms": 155.91062500000044,
+        "rows": 1,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "article_versions",
+        "ms": 248.45829200000117,
+        "rows": 30,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "article_versions",
+        "ms": 313.0217080000002,
+        "rows": 13,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "articles",
+        "ms": 115.61291700000038,
+        "rows": 3,
+        "ranged": false,
+        "head": true
+      }
+    ],
+    "slowest": {
+      "table": "article_versions",
+      "ms": 313.0217080000002,
+      "rows": 13,
+      "ranged": false,
+      "head": false
+    },
+    "truncated": []
+  },
+  {
+    "name": "/admin/seo/pages",
+    "source": "app/admin/seo/pages/page.tsx",
+    "total": 487.63075000000026,
+    "calls": [
+      {
+        "table": "findings",
+        "ms": 94.74791600000026,
+        "rows": 503,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 96.78345900000022,
+        "rows": 1000,
+        "ranged": false,
+        "head": true
+      },
+      {
+        "table": "jobs",
+        "ms": 100.88316599999962,
+        "rows": 160,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "pages",
+        "ms": 101.86479099999997,
+        "rows": 219,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 106.18895900000098,
+        "rows": 1000,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 126.97241600000052,
+        "rows": 1000,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 128.30099999999948,
+        "rows": 1000,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 131.95141599999988,
+        "rows": 1000,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 134.09595799999988,
+        "rows": 1000,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 141.05158299999857,
+        "rows": 1000,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 138.9104580000003,
+        "rows": 1000,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 143.18137500000012,
+        "rows": 1000,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 175.03341700000055,
+        "rows": 1000,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 192.26004199999988,
+        "rows": 1000,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 197.93504200000098,
+        "rows": 1000,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 199.9056670000009,
+        "rows": 1000,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 103.87279099999978,
+        "rows": 956,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 110.97087499999907,
+        "rows": 1000,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 119.73629200000141,
+        "rows": 1000,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 164.5959159999984,
+        "rows": 1000,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 179.24162500000057,
+        "rows": 1000,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 180.06912499999999,
+        "rows": 1000,
+        "ranged": true,
+        "head": false
+      }
+    ],
+    "slowest": {
+      "table": "gsc_page_daily",
+      "ms": 199.9056670000009,
+      "rows": 1000,
+      "ranged": true,
+      "head": false
+    },
+    "truncated": [
+      {
+        "table": "gsc_page_daily",
+        "ms": 96.78345900000022,
+        "rows": 1000,
+        "ranged": false,
+        "head": true
+      }
+    ]
+  },
+  {
+    "name": "/admin/seo/effect",
+    "source": "app/admin/seo/effect/page.tsx",
+    "total": 1587.5483330000006,
+    "calls": [
+      {
+        "table": "gsc_page_daily",
+        "ms": 96.99800000000141,
+        "rows": 1000,
+        "ranged": false,
+        "head": true
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 137.7379579999997,
+        "rows": 1000,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 172.87424999999894,
+        "rows": 1000,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 176.855540999999,
+        "rows": 1000,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 180.2544999999991,
+        "rows": 1000,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 188.25179099999878,
+        "rows": 1000,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 189.75783299999966,
+        "rows": 1000,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 193.82224999999926,
+        "rows": 1000,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 196.02533399999993,
+        "rows": 1000,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 198.57779200000004,
+        "rows": 1000,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 200.55191700000069,
+        "rows": 1000,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 203.67962500000067,
+        "rows": 1000,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 208.68320900000072,
+        "rows": 1000,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 111.52166600000055,
+        "rows": 1000,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 148.82658400000037,
+        "rows": 1000,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 161.9600420000006,
+        "rows": 956,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 166.8923330000016,
+        "rows": 1000,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 171.43320900000072,
+        "rows": 1000,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 178.43012500000077,
+        "rows": 1000,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "pages",
+        "ms": 87.05175000000054,
+        "rows": 76,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "lead_identities",
+        "ms": 87.42841699999917,
+        "rows": 0,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "articles",
+        "ms": 90.15387499999997,
+        "rows": 3,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "article_versions",
+        "ms": 161.56087500000103,
+        "rows": 1,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "pages",
+        "ms": 88.28070800000023,
+        "rows": 0,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "article_versions",
+        "ms": 162.2549999999992,
+        "rows": 1,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "pages",
+        "ms": 86.21358399999917,
+        "rows": 0,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "article_versions",
+        "ms": 90.41199999999844,
+        "rows": 1,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "pages",
+        "ms": 89.47112500000003,
+        "rows": 0,
+        "ranged": false,
+        "head": false
+      }
+    ],
+    "slowest": {
+      "table": "gsc_page_daily",
+      "ms": 208.68320900000072,
+      "rows": 1000,
+      "ranged": true,
+      "head": false
+    },
+    "truncated": [
+      {
+        "table": "gsc_page_daily",
+        "ms": 96.99800000000141,
+        "rows": 1000,
+        "ranged": false,
+        "head": true
+      }
+    ]
+  },
+  {
+    "name": "/admin/seo/indexation?google",
+    "source": "app/admin/seo/indexation/page.tsx",
+    "total": 1360.9860410000001,
+    "calls": [
+      {
+        "table": "pages",
+        "ms": 94.80945799999972,
+        "rows": 159,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "index_status",
+        "ms": 99.61716700000034,
+        "rows": 160,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "settings",
+        "ms": 94.34391700000015,
+        "rows": 1,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "articles",
+        "ms": 93.61883400000079,
+        "rows": 3,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "article_versions",
+        "ms": 93.71558399999958,
+        "rows": 1,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "article_versions",
+        "ms": 159.4390000000003,
+        "rows": 1,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "article_versions",
+        "ms": 166.32916699999987,
+        "rows": 1,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 89.71058300000004,
+        "rows": 1000,
+        "ranged": false,
+        "head": true
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 108.92100000000028,
+        "rows": 0,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 108.76324999999997,
+        "rows": 0,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 110.81912499999999,
+        "rows": 0,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 111.73899999999958,
+        "rows": 0,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 114.21320800000103,
+        "rows": 0,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 119.47029199999997,
+        "rows": 470,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 119.8150829999995,
+        "rows": 0,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 123.0535830000008,
+        "rows": 0,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 127.09820899999977,
+        "rows": 0,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 166.68079099999886,
+        "rows": 1000,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 186.1426250000004,
+        "rows": 1000,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 193.27195799999936,
+        "rows": 1000,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 90.2447919999995,
+        "rows": 0,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 90.85170900000048,
+        "rows": 0,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 91.96495800000048,
+        "rows": 0,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 94.78325000000041,
+        "rows": 0,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 97.30245800000012,
+        "rows": 0,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 118.88037500000064,
+        "rows": 0,
+        "ranged": true,
+        "head": false
+      }
+    ],
+    "slowest": {
+      "table": "gsc_page_daily",
+      "ms": 193.27195799999936,
+      "rows": 1000,
+      "ranged": true,
+      "head": false
+    },
+    "truncated": [
+      {
+        "table": "gsc_page_daily",
+        "ms": 89.71058300000004,
+        "rows": 1000,
+        "ranged": false,
+        "head": true
+      }
+    ]
+  },
+  {
+    "name": "/admin/seo/positions?google",
+    "source": "app/admin/seo/positions/page.tsx",
+    "total": 91.54712499999732,
+    "calls": [
+      {
+        "table": "settings",
+        "ms": 90.18929200000275,
+        "rows": 1,
+        "ranged": false,
+        "head": false
+      }
+    ],
+    "slowest": {
+      "table": "settings",
+      "ms": 90.18929200000275,
+      "rows": 1,
+      "ranged": false,
+      "head": false
+    },
+    "truncated": []
+  },
+  {
+    "name": "/admin/seo/positions?yandex",
+    "source": "app/admin/seo/positions/page.tsx",
+    "total": 95.3369590000002,
+    "calls": [
+      {
+        "table": "settings",
+        "ms": 89.05945799999972,
+        "rows": 0,
+        "ranged": false,
+        "head": false
+      },
+      {
+        "table": "settings",
+        "ms": 93.60229100000288,
+        "rows": 1,
+        "ranged": false,
+        "head": false
+      }
+    ],
+    "slowest": {
+      "table": "settings",
+      "ms": 93.60229100000288,
+      "rows": 1,
+      "ranged": false,
+      "head": false
+    },
+    "truncated": []
+  },
+  {
+    "name": "/admin/seo/topics",
+    "source": "app/admin/seo/topics/page.tsx",
+    "total": 95.92895900000076,
+    "calls": [
+      {
+        "table": "topics",
+        "ms": 93.30133299999943,
+        "rows": 132,
+        "ranged": true,
+        "head": false
+      }
+    ],
+    "slowest": {
+      "table": "topics",
+      "ms": 93.30133299999943,
+      "rows": 132,
+      "ranged": true,
+      "head": false
+    },
+    "truncated": []
+  },
+  {
+    "name": "/admin/seo/clusters",
+    "source": "app/admin/seo/clusters/page.tsx",
+    "total": 95.02824999999939,
+    "calls": [
+      {
+        "table": "pages",
+        "ms": 91.20808399999805,
+        "rows": 219,
+        "ranged": true,
+        "head": false
+      }
+    ],
+    "slowest": {
+      "table": "pages",
+      "ms": 91.20808399999805,
+      "rows": 219,
+      "ranged": true,
+      "head": false
+    },
+    "truncated": []
+  },
+  {
+    "name": "/admin/seo/findings",
+    "source": "app/admin/seo/findings/page.tsx",
+    "total": 173.1065000000017,
+    "calls": [
+      {
+        "table": "findings",
+        "ms": 167.78279199999815,
+        "rows": 503,
+        "ranged": true,
+        "head": false
+      }
+    ],
+    "slowest": {
+      "table": "findings",
+      "ms": 167.78279199999815,
+      "rows": 503,
+      "ranged": true,
+      "head": false
+    },
+    "truncated": []
+  },
+  {
+    "name": "/admin/seo/opportunities",
+    "source": "app/admin/seo/opportunities/page.tsx",
+    "total": 95.21249999999782,
+    "calls": [
+      {
+        "table": "opportunities",
+        "ms": 94.4164579999997,
+        "rows": null,
+        "ranged": true,
+        "head": false
+      }
+    ],
+    "slowest": {
+      "table": "opportunities",
+      "ms": 94.4164579999997,
+      "rows": null,
+      "ranged": true,
+      "head": false
+    },
+    "truncated": []
+  },
+  {
+    "name": "/admin/seo/schema",
+    "source": "app/admin/seo/schema/page.tsx",
+    "total": 180.15095900000233,
+    "calls": [
+      {
+        "table": "page_schema",
+        "ms": 88.43366600000081,
+        "rows": 1,
+        "ranged": true,
+        "head": false
+      },
+      {
+        "table": "pages",
+        "ms": 88.91912500000035,
+        "rows": 1,
+        "ranged": false,
+        "head": false
+      }
+    ],
+    "slowest": {
+      "table": "pages",
+      "ms": 88.91912500000035,
+      "rows": 1,
+      "ranged": false,
+      "head": false
+    },
+    "truncated": []
+  },
+  {
+    "name": "/admin/seo/experiments",
+    "source": "app/admin/seo/experiments/page.tsx",
+    "total": 88.52216700000281,
+    "calls": [
+      {
+        "table": "experiments",
+        "ms": 88.16170799999963,
+        "rows": null,
+        "ranged": true,
+        "head": false
+      }
+    ],
+    "slowest": {
+      "table": "experiments",
+      "ms": 88.16170799999963,
+      "rows": null,
+      "ranged": true,
+      "head": false
+    },
+    "truncated": []
+  }
+]

@@ -1,0 +1,2466 @@
+[
+  {
+    "name": "/admin",
+    "source": "app/admin/page.tsx",
+    "total": 194.675,
+    "calls": [
+      {
+        "table": "users",
+        "ms": 91.18208399999997,
+        "rows": 1,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "limit=1"
+      },
+      {
+        "table": "users",
+        "ms": 89.67216700000006,
+        "rows": 9,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "role=eq.salesperson order=name.asc"
+      },
+      {
+        "table": "clients",
+        "ms": 92.51525000000004,
+        "rows": 68,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": ""
+      },
+      {
+        "table": "payments_view",
+        "ms": 97.95500000000004,
+        "rows": 174,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": ""
+      },
+      {
+        "table": "fixed_expenses",
+        "ms": 97.67366700000002,
+        "rows": null,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "is_active=eq.true"
+      },
+      {
+        "table": "expenses",
+        "ms": 99.49591599999997,
+        "rows": 163,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": ""
+      }
+    ],
+    "slowest": {
+      "table": "expenses",
+      "ms": 99.49591599999997,
+      "rows": 163,
+      "total": null,
+      "ranged": false,
+      "head": false,
+      "detail": ""
+    },
+    "truncated": []
+  },
+  {
+    "name": "/admin/clients",
+    "source": "app/admin/clients/page.tsx",
+    "total": 195.9292499999999,
+    "calls": [
+      {
+        "table": "users",
+        "ms": 88.2171249999999,
+        "rows": 1,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "limit=1"
+      },
+      {
+        "table": "payments_view",
+        "ms": 94.82520899999986,
+        "rows": 174,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": ""
+      },
+      {
+        "table": "users",
+        "ms": 95.00912500000004,
+        "rows": 8,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "role=eq.salesperson is_active=eq.true order=name.asc"
+      },
+      {
+        "table": "curators",
+        "ms": 96.32758399999989,
+        "rows": 10,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": ""
+      },
+      {
+        "table": "curators",
+        "ms": 96.60658399999988,
+        "rows": 9,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "is_active=eq.true order=name.asc"
+      },
+      {
+        "table": "clients",
+        "ms": 97.51904100000002,
+        "rows": 68,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "order=created_at.desc"
+      },
+      {
+        "table": "expenses",
+        "ms": 99.23220900000001,
+        "rows": 163,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": ""
+      },
+      {
+        "table": "users",
+        "ms": 101.35975000000008,
+        "rows": 41,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": ""
+      },
+      {
+        "table": "invoices",
+        "ms": 101.44158400000015,
+        "rows": 20,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": ""
+      }
+    ],
+    "slowest": {
+      "table": "invoices",
+      "ms": 101.44158400000015,
+      "rows": 20,
+      "total": null,
+      "ranged": false,
+      "head": false,
+      "detail": ""
+    },
+    "truncated": []
+  },
+  {
+    "name": "/admin/payments",
+    "source": "app/admin/payments/page.tsx",
+    "total": 186.73995800000012,
+    "calls": [
+      {
+        "table": "users",
+        "ms": 88.42499999999995,
+        "rows": 1,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "limit=1"
+      },
+      {
+        "table": "users",
+        "ms": 86.96866600000021,
+        "rows": 41,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": ""
+      },
+      {
+        "table": "users",
+        "ms": 90.44954200000006,
+        "rows": 8,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "role=eq.salesperson is_active=eq.true order=name.asc"
+      },
+      {
+        "table": "curators",
+        "ms": 90.93616699999984,
+        "rows": 9,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "is_active=eq.true order=name.asc"
+      },
+      {
+        "table": "clients",
+        "ms": 91.49637500000017,
+        "rows": 68,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": ""
+      },
+      {
+        "table": "payments_view",
+        "ms": 93.92387500000018,
+        "rows": 174,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "order=plan_date.asc"
+      },
+      {
+        "table": "curators",
+        "ms": 95.46429199999989,
+        "rows": 10,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": ""
+      }
+    ],
+    "slowest": {
+      "table": "curators",
+      "ms": 95.46429199999989,
+      "rows": 10,
+      "total": null,
+      "ranged": false,
+      "head": false,
+      "detail": ""
+    },
+    "truncated": []
+  },
+  {
+    "name": "/admin/expenses",
+    "source": "app/admin/expenses/page.tsx",
+    "total": 185.45074999999997,
+    "calls": [
+      {
+        "table": "users",
+        "ms": 85.68204199999991,
+        "rows": 1,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "limit=1"
+      },
+      {
+        "table": "clients",
+        "ms": 89.44937500000015,
+        "rows": 68,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "order=created_at.desc"
+      },
+      {
+        "table": "fixed_expenses",
+        "ms": 91.22466600000007,
+        "rows": 2,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "is_active=eq.true order=created_at.asc"
+      },
+      {
+        "table": "fixed_expense_records",
+        "ms": 93.44262500000013,
+        "rows": 0,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "order=month.desc"
+      },
+      {
+        "table": "expenses",
+        "ms": 96.80899999999974,
+        "rows": 163,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "order=created_at.desc"
+      }
+    ],
+    "slowest": {
+      "table": "expenses",
+      "ms": 96.80899999999974,
+      "rows": 163,
+      "total": null,
+      "ranged": false,
+      "head": false,
+      "detail": "order=created_at.desc"
+    },
+    "truncated": []
+  },
+  {
+    "name": "/admin/funnel",
+    "source": "app/admin/funnel/page.tsx",
+    "total": 440.3318340000001,
+    "calls": [
+      {
+        "table": "users",
+        "ms": 85.66445799999974,
+        "rows": 1,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "limit=1"
+      },
+      {
+        "table": "deals",
+        "ms": 88.76141700000016,
+        "rows": 0,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "deleted_at=not.is.null order=deleted_at.desc limit=50"
+      },
+      {
+        "table": "users",
+        "ms": 91.34437500000013,
+        "rows": 8,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "role=eq.salesperson is_active=eq.true order=name.asc"
+      },
+      {
+        "table": "curators",
+        "ms": 89.01820799999996,
+        "rows": 9,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "is_active=eq.true order=name.asc"
+      },
+      {
+        "table": "pipeline_stages",
+        "ms": 102.33275000000003,
+        "rows": 14,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "is_active=eq.true order=position.asc"
+      },
+      {
+        "table": "deals",
+        "ms": 138.22870799999964,
+        "rows": 1000,
+        "total": 1047,
+        "ranged": false,
+        "head": true,
+        "detail": "deleted_at=is.null"
+      },
+      {
+        "table": "deals",
+        "ms": 175.45133299999998,
+        "rows": 440,
+        "total": 440,
+        "ranged": true,
+        "head": false,
+        "detail": "custom_fields->>group_chat_id=not.is.null deleted_at=is.null order=id.asc offset=0 limit=1000"
+      },
+      {
+        "table": "deals",
+        "ms": 183.55700000000024,
+        "rows": 1000,
+        "total": 1047,
+        "ranged": true,
+        "head": false,
+        "detail": "deleted_at=is.null order=updated_at.desc,id.desc offset=0 limit=1000"
+      },
+      {
+        "table": "deals",
+        "ms": 92.6267499999999,
+        "rows": 47,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "deleted_at=is.null order=updated_at.desc,id.desc offset=1000 limit=1000"
+      }
+    ],
+    "slowest": {
+      "table": "deals",
+      "ms": 183.55700000000024,
+      "rows": 1000,
+      "total": 1047,
+      "ranged": true,
+      "head": false,
+      "detail": "deleted_at=is.null order=updated_at.desc,id.desc offset=0 limit=1000"
+    },
+    "truncated": []
+  },
+  {
+    "name": "/admin/sales",
+    "source": "app/admin/sales/page.tsx",
+    "total": 189.41633400000046,
+    "calls": [
+      {
+        "table": "users",
+        "ms": 86.71904099999938,
+        "rows": 1,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "limit=1"
+      },
+      {
+        "table": "users",
+        "ms": 92.1440419999999,
+        "rows": 9,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "role=eq.salesperson order=name.asc"
+      },
+      {
+        "table": "sales_plans",
+        "ms": 93.1547499999997,
+        "rows": 4,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": ""
+      },
+      {
+        "table": "clients",
+        "ms": 94.5152079999998,
+        "rows": 68,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": ""
+      },
+      {
+        "table": "bookings",
+        "ms": 95.14095799999996,
+        "rows": 248,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": ""
+      },
+      {
+        "table": "payments_view",
+        "ms": 97.85583299999962,
+        "rows": 174,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": ""
+      }
+    ],
+    "slowest": {
+      "table": "payments_view",
+      "ms": 97.85583299999962,
+      "rows": 174,
+      "total": null,
+      "ranged": false,
+      "head": false,
+      "detail": ""
+    },
+    "truncated": []
+  },
+  {
+    "name": "/admin/analytics",
+    "source": "app/admin/analytics/page.tsx",
+    "total": 285.8277079999998,
+    "calls": [
+      {
+        "table": "users",
+        "ms": 89.66583300000002,
+        "rows": 1,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "limit=1"
+      },
+      {
+        "table": "expenses",
+        "ms": 90.00483299999996,
+        "rows": 15,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "article=eq.curator is_paid=eq.false note=eq.Куратор+—+этап+2"
+      },
+      {
+        "table": "curators",
+        "ms": 89.86029199999939,
+        "rows": 10,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": ""
+      },
+      {
+        "table": "clients",
+        "ms": 100.16791700000067,
+        "rows": 15,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "id=in.(133,124,126,129,130,131,134,123,135,136,138,139,140,142,143)"
+      }
+    ],
+    "slowest": {
+      "table": "clients",
+      "ms": 100.16791700000067,
+      "rows": 15,
+      "total": null,
+      "ranged": false,
+      "head": false,
+      "detail": "id=in.(133,124,126,129,130,131,134,123,135,136,138,139,140,142,143)"
+    },
+    "truncated": []
+  },
+  {
+    "name": "/admin/invoices",
+    "source": "app/admin/invoices/page.tsx",
+    "total": 196.32587499999954,
+    "calls": [
+      {
+        "table": "users",
+        "ms": 89.36816700000054,
+        "rows": 1,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "limit=1"
+      },
+      {
+        "table": "clients",
+        "ms": 90.57983300000069,
+        "rows": 54,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "status=neq.completed order=name.asc"
+      },
+      {
+        "table": "invoices",
+        "ms": 103.81999999999971,
+        "rows": 20,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "order=created_at.desc"
+      }
+    ],
+    "slowest": {
+      "table": "invoices",
+      "ms": 103.81999999999971,
+      "rows": 20,
+      "total": null,
+      "ranged": false,
+      "head": false,
+      "detail": "order=created_at.desc"
+    },
+    "truncated": []
+  },
+  {
+    "name": "/admin/calendar",
+    "source": "app/admin/calendar/page.tsx",
+    "total": 188.50575000000026,
+    "calls": [
+      {
+        "table": "users",
+        "ms": 89.8836250000004,
+        "rows": 1,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "limit=1"
+      },
+      {
+        "table": "users",
+        "ms": 88.61641599999984,
+        "rows": 41,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": ""
+      },
+      {
+        "table": "payments_view",
+        "ms": 89.95575000000008,
+        "rows": 174,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "order=plan_date.asc"
+      },
+      {
+        "table": "users",
+        "ms": 90.47533300000032,
+        "rows": 8,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "role=eq.salesperson is_active=eq.true order=name.asc"
+      },
+      {
+        "table": "curators",
+        "ms": 91.4975000000004,
+        "rows": 10,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": ""
+      },
+      {
+        "table": "clients",
+        "ms": 95.9907090000006,
+        "rows": 68,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": ""
+      }
+    ],
+    "slowest": {
+      "table": "clients",
+      "ms": 95.9907090000006,
+      "rows": 68,
+      "total": null,
+      "ranged": false,
+      "head": false,
+      "detail": ""
+    },
+    "truncated": []
+  },
+  {
+    "name": "/admin/curators",
+    "source": "app/admin/curators/page.tsx",
+    "total": 179.07366599999932,
+    "calls": [
+      {
+        "table": "users",
+        "ms": 86.4033329999993,
+        "rows": 1,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "limit=1"
+      },
+      {
+        "table": "clients",
+        "ms": 87.99237499999981,
+        "rows": 45,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "status=eq.active"
+      },
+      {
+        "table": "curators",
+        "ms": 88.15804200000002,
+        "rows": 10,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "order=name.asc"
+      },
+      {
+        "table": "users",
+        "ms": 90.45291600000019,
+        "rows": 6,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "role=eq.curator"
+      }
+    ],
+    "slowest": {
+      "table": "users",
+      "ms": 90.45291600000019,
+      "rows": 6,
+      "total": null,
+      "ranged": false,
+      "head": false,
+      "detail": "role=eq.curator"
+    },
+    "truncated": []
+  },
+  {
+    "name": "/admin/settings",
+    "source": "app/admin/settings/page.tsx",
+    "total": 254.91820899999948,
+    "calls": [
+      {
+        "table": "users",
+        "ms": 85.71245900000031,
+        "rows": 1,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "limit=1"
+      },
+      {
+        "table": "curators",
+        "ms": 88.34170900000026,
+        "rows": 10,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "order=created_at.asc"
+      },
+      {
+        "table": "sales_plans",
+        "ms": 91.50287500000013,
+        "rows": 4,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": ""
+      },
+      {
+        "table": "fixed_expenses",
+        "ms": 92.66858400000001,
+        "rows": 2,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "order=created_at.asc"
+      },
+      {
+        "table": "users",
+        "ms": 92.50195800000074,
+        "rows": 9,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "role=eq.salesperson order=created_at.asc"
+      },
+      {
+        "table": "bookings",
+        "ms": 163.07145799999944,
+        "rows": 248,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=booking_date.desc limit=500"
+      }
+    ],
+    "slowest": {
+      "table": "bookings",
+      "ms": 163.07145799999944,
+      "rows": 248,
+      "total": null,
+      "ranged": true,
+      "head": false,
+      "detail": "order=booking_date.desc limit=500"
+    },
+    "truncated": []
+  },
+  {
+    "name": "/rop",
+    "source": "app/rop/page.tsx",
+    "total": 1261.8046669999994,
+    "calls": [
+      {
+        "table": "users",
+        "ms": 87.64837499999976,
+        "rows": 1,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "limit=1"
+      },
+      {
+        "table": "clients",
+        "ms": 90.36225000000013,
+        "rows": 68,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": ""
+      },
+      {
+        "table": "users",
+        "ms": 91.32312499999989,
+        "rows": 9,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "role=eq.salesperson order=name.asc"
+      },
+      {
+        "table": "sales_plans",
+        "ms": 92.32695800000056,
+        "rows": 4,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": ""
+      },
+      {
+        "table": "pipeline_stages",
+        "ms": 135.07516599999963,
+        "rows": 14,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "is_active=eq.true order=position.asc"
+      },
+      {
+        "table": "rop_settings",
+        "ms": 134.43008299999929,
+        "rows": 6,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": ""
+      },
+      {
+        "table": "deal_tasks",
+        "ms": 183.68329200000062,
+        "rows": 300,
+        "total": 300,
+        "ranged": true,
+        "head": false,
+        "detail": "is_done=eq.false order=id.asc offset=0 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 186.12233299999934,
+        "rows": 1000,
+        "total": 23070,
+        "ranged": true,
+        "head": false,
+        "detail": "order=created_at.desc,id.asc offset=0 limit=1000"
+      },
+      {
+        "table": "deals",
+        "ms": 265.81987500000014,
+        "rows": 1000,
+        "total": 1047,
+        "ranged": true,
+        "head": false,
+        "detail": "deleted_at=is.null order=id.asc offset=0 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 208.74566699999923,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=created_at.desc,id.asc offset=6000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 214.0816250000007,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=created_at.desc,id.asc offset=5000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 235.85608300000058,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=created_at.desc,id.asc offset=1000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 239.63783300000068,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=created_at.desc,id.asc offset=2000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 239.3622919999998,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=created_at.desc,id.asc offset=4000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 246.1326250000002,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=created_at.desc,id.asc offset=3000 limit=1000"
+      },
+      {
+        "table": "deals",
+        "ms": 167.7833750000009,
+        "rows": 47,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "deleted_at=is.null order=id.asc offset=1000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 226.67983400000048,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=created_at.desc,id.asc offset=8000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 233.16733300000124,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=created_at.desc,id.asc offset=9000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 247.4455829999988,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=created_at.desc,id.asc offset=7000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 257.8607499999998,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=created_at.desc,id.asc offset=10000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 257.9756670000006,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=created_at.desc,id.asc offset=11000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 261.4837499999994,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=created_at.desc,id.asc offset=12000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 161.06874999999854,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=created_at.desc,id.asc offset=13000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 212.63770799999838,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=created_at.desc,id.asc offset=15000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 229.32887499999924,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=created_at.desc,id.asc offset=14000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 233.2840410000008,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=created_at.desc,id.asc offset=17000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 238.51733299999978,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=created_at.desc,id.asc offset=16000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 238.62525000000096,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=created_at.desc,id.asc offset=18000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 140.20058400000016,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=created_at.desc,id.asc offset=19000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 146.48679200000151,
+        "rows": 70,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=created_at.desc,id.asc offset=23000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 205.10379199999988,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=created_at.desc,id.asc offset=21000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 207.8226250000007,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=created_at.desc,id.asc offset=20000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 217.15970799999923,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=created_at.desc,id.asc offset=22000 limit=1000"
+      }
+    ],
+    "slowest": {
+      "table": "deals",
+      "ms": 265.81987500000014,
+      "rows": 1000,
+      "total": 1047,
+      "ranged": true,
+      "head": false,
+      "detail": "deleted_at=is.null order=id.asc offset=0 limit=1000"
+    },
+    "truncated": []
+  },
+  {
+    "name": "/rop/analytics",
+    "source": "app/rop/analytics/page.tsx",
+    "total": 447.911583000001,
+    "calls": [
+      {
+        "table": "users",
+        "ms": 98.22125000000051,
+        "rows": 1,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "limit=1"
+      },
+      {
+        "table": "pipeline_stages",
+        "ms": 94.312417000001,
+        "rows": 14,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "is_active=eq.true order=position.asc"
+      },
+      {
+        "table": "users",
+        "ms": 95.2771249999987,
+        "rows": 9,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "role=eq.salesperson order=name.asc"
+      },
+      {
+        "table": "deals",
+        "ms": 173.55754200000047,
+        "rows": 1000,
+        "total": 1047,
+        "ranged": true,
+        "head": false,
+        "detail": "deleted_at=is.null order=id.asc offset=0 limit=1000"
+      },
+      {
+        "table": "deal_activities",
+        "ms": 182.35091699999975,
+        "rows": 1000,
+        "total": 1106,
+        "ranged": true,
+        "head": false,
+        "detail": "activity_type=eq.stage_change order=id.asc offset=0 limit=1000"
+      },
+      {
+        "table": "deals",
+        "ms": 99.7510000000002,
+        "rows": 47,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "deleted_at=is.null order=id.asc offset=1000 limit=1000"
+      },
+      {
+        "table": "deal_activities",
+        "ms": 95.32537500000035,
+        "rows": 106,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "activity_type=eq.stage_change order=id.asc offset=1000 limit=1000"
+      }
+    ],
+    "slowest": {
+      "table": "deal_activities",
+      "ms": 182.35091699999975,
+      "rows": 1000,
+      "total": 1106,
+      "ranged": true,
+      "head": false,
+      "detail": "activity_type=eq.stage_change order=id.asc offset=0 limit=1000"
+    },
+    "truncated": []
+  },
+  {
+    "name": "/rop/response-times",
+    "source": "app/rop/response-times/page.tsx",
+    "total": 1229.991250000001,
+    "calls": [
+      {
+        "table": "users",
+        "ms": 84.57854199999929,
+        "rows": 1,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "limit=1"
+      },
+      {
+        "table": "rop_settings",
+        "ms": 90.34654099999898,
+        "rows": 6,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": ""
+      },
+      {
+        "table": "pipeline_stages",
+        "ms": 91.88474999999926,
+        "rows": 14,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "is_active=eq.true order=position.asc"
+      },
+      {
+        "table": "users",
+        "ms": 92.96345800000017,
+        "rows": 9,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "role=eq.salesperson order=name.asc"
+      },
+      {
+        "table": "deals",
+        "ms": 169.47904200000085,
+        "rows": 1000,
+        "total": 1047,
+        "ranged": true,
+        "head": false,
+        "detail": "deleted_at=is.null order=id.asc offset=0 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 177.28791600000113,
+        "rows": 1000,
+        "total": 23070,
+        "ranged": true,
+        "head": false,
+        "detail": "order=created_at.asc,id.asc offset=0 limit=1000"
+      },
+      {
+        "table": "deals",
+        "ms": 101.81275000000096,
+        "rows": 47,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "deleted_at=is.null order=id.asc offset=1000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 190.72583300000042,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=created_at.asc,id.asc offset=5000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 197.52137499999844,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=created_at.asc,id.asc offset=2000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 204.96191700000054,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=created_at.asc,id.asc offset=1000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 222.88095799999974,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=created_at.asc,id.asc offset=4000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 223.9205409999995,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=created_at.asc,id.asc offset=3000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 228.77149999999892,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=created_at.asc,id.asc offset=6000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 201.40508299999965,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=created_at.asc,id.asc offset=11000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 216.41104199999972,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=created_at.asc,id.asc offset=10000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 236.3842080000013,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=created_at.asc,id.asc offset=7000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 238.02637500000128,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=created_at.asc,id.asc offset=9000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 241.1083749999998,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=created_at.asc,id.asc offset=12000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 244.47437499999978,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=created_at.asc,id.asc offset=8000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 199.8874169999999,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=created_at.asc,id.asc offset=18000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 203.1040409999987,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=created_at.asc,id.asc offset=17000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 221.86316599999918,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=created_at.asc,id.asc offset=13000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 228.11504199999945,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=created_at.asc,id.asc offset=14000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 230.83616699999948,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=created_at.asc,id.asc offset=15000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 232.14870800000062,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=created_at.asc,id.asc offset=16000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 130.73383300000023,
+        "rows": 70,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=created_at.asc,id.asc offset=23000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 198.96362500000032,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=created_at.asc,id.asc offset=19000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 208.11449999999968,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=created_at.asc,id.asc offset=22000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 212.10354199999892,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=created_at.asc,id.asc offset=20000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 221.95433400000002,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=created_at.asc,id.asc offset=21000 limit=1000"
+      }
+    ],
+    "slowest": {
+      "table": "deal_messages",
+      "ms": 244.47437499999978,
+      "rows": 1000,
+      "total": null,
+      "ranged": true,
+      "head": false,
+      "detail": "order=created_at.asc,id.asc offset=8000 limit=1000"
+    },
+    "truncated": []
+  },
+  {
+    "name": "/rop/conversions",
+    "source": "app/rop/conversions/page.tsx",
+    "total": 1052.757458,
+    "calls": [
+      {
+        "table": "users",
+        "ms": 87.65279100000043,
+        "rows": 1,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "limit=1"
+      },
+      {
+        "table": "pipeline_stages",
+        "ms": 88.56529099999898,
+        "rows": 14,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "is_active=eq.true order=position.asc"
+      },
+      {
+        "table": "users",
+        "ms": 89.83224999999948,
+        "rows": 9,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "role=eq.salesperson order=name.asc"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 163.67974999999933,
+        "rows": 1000,
+        "total": 23070,
+        "ranged": true,
+        "head": false,
+        "detail": "order=id.asc offset=0 limit=1000"
+      },
+      {
+        "table": "deal_activities",
+        "ms": 195.78966600000058,
+        "rows": 1000,
+        "total": 1106,
+        "ranged": true,
+        "head": false,
+        "detail": "activity_type=eq.stage_change order=id.asc offset=0 limit=1000"
+      },
+      {
+        "table": "deals",
+        "ms": 195.6883749999979,
+        "rows": 1000,
+        "total": 1047,
+        "ranged": true,
+        "head": false,
+        "detail": "deleted_at=is.null order=id.asc offset=0 limit=1000"
+      },
+      {
+        "table": "deals",
+        "ms": 92.62770799999998,
+        "rows": 47,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "deleted_at=is.null order=id.asc offset=1000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 163.65199999999822,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=id.asc offset=2000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 167.58733399999983,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=id.asc offset=4000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 170.41500000000087,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=id.asc offset=6000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 175.72670799999833,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=id.asc offset=5000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 176.57479200000307,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=id.asc offset=3000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 195.0457920000008,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=id.asc offset=1000 limit=1000"
+      },
+      {
+        "table": "deal_activities",
+        "ms": 106.10633299999972,
+        "rows": 106,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "activity_type=eq.stage_change order=id.asc offset=1000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 163.66220800000156,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=id.asc offset=8000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 179.11670799999774,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=id.asc offset=10000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 179.8433330000007,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=id.asc offset=11000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 180.68604199999754,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=id.asc offset=9000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 183.88304199999766,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=id.asc offset=7000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 185.52745800000048,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=id.asc offset=12000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 133.34875000000102,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=id.asc offset=14000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 133.4727090000015,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=id.asc offset=16000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 186.9576249999991,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=id.asc offset=13000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 192.88441600000078,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=id.asc offset=17000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 196.08412500000122,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=id.asc offset=15000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 197.73670800000036,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=id.asc offset=18000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 127.49066700000185,
+        "rows": 70,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=id.asc offset=23000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 172.55474999999933,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=id.asc offset=19000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 195.56812499999796,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=id.asc offset=20000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 197.50104199999987,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=id.asc offset=22000 limit=1000"
+      },
+      {
+        "table": "deal_messages",
+        "ms": 205.28504100000282,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=id.asc offset=21000 limit=1000"
+      }
+    ],
+    "slowest": {
+      "table": "deal_messages",
+      "ms": 205.28504100000282,
+      "rows": 1000,
+      "total": null,
+      "ranged": true,
+      "head": false,
+      "detail": "order=id.asc offset=21000 limit=1000"
+    },
+    "truncated": []
+  },
+  {
+    "name": "/admin/seo",
+    "source": "app/admin/seo/page.tsx",
+    "total": 132.92583300000115,
+    "calls": [
+      {
+        "table": "gsc_page_daily",
+        "ms": 86.23837499999718,
+        "rows": 1,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=date.desc limit=1"
+      },
+      {
+        "table": "opportunities",
+        "ms": 95.99891600000046,
+        "rows": 251,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "offset=0 limit=1000"
+      },
+      {
+        "table": "settings",
+        "ms": 97.59300000000076,
+        "rows": 1,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "key=eq.traffic_snapshot"
+      },
+      {
+        "table": "pages",
+        "ms": 107.56195799999841,
+        "rows": 219,
+        "total": 219,
+        "ranged": false,
+        "head": true,
+        "detail": "removed_at=is.null"
+      },
+      {
+        "table": "findings",
+        "ms": 118.40650000000096,
+        "rows": 553,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "offset=0 limit=1000 status=eq.open"
+      },
+      {
+        "table": "page_schema",
+        "ms": 117.22962499999994,
+        "rows": 1,
+        "total": 1,
+        "ranged": false,
+        "head": true,
+        "detail": "status=eq.proposed"
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 125.65479200000118,
+        "rows": 1000,
+        "total": 18089,
+        "ranged": false,
+        "head": true,
+        "detail": ""
+      },
+      {
+        "table": "experiments",
+        "ms": 130.04037499999686,
+        "rows": 0,
+        "total": 0,
+        "ranged": false,
+        "head": true,
+        "detail": ""
+      }
+    ],
+    "slowest": {
+      "table": "experiments",
+      "ms": 130.04037499999686,
+      "rows": 0,
+      "total": 0,
+      "ranged": false,
+      "head": true,
+      "detail": ""
+    },
+    "truncated": []
+  },
+  {
+    "name": "/admin/seo/articles",
+    "source": "app/admin/seo/articles/page.tsx",
+    "total": 518.2138750000013,
+    "calls": [
+      {
+        "table": "articles",
+        "ms": 87.74908399999913,
+        "rows": 14,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "order=created_at.desc"
+      },
+      {
+        "table": "settings",
+        "ms": 89.13500000000204,
+        "rows": 1,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "key=eq.flow_snapshot"
+      },
+      {
+        "table": "article_versions",
+        "ms": 91.5835420000003,
+        "rows": 31,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "article_id=in.(17,16,15,14,10,9,8,7,6,5,4,3,2,1)"
+      },
+      {
+        "table": "settings",
+        "ms": 92.02754199999981,
+        "rows": 1,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "key=eq.article_flow"
+      },
+      {
+        "table": "jobs",
+        "ms": 95.67299999999886,
+        "rows": 40,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "step=like.article_% order=id.desc limit=40"
+      },
+      {
+        "table": "topics",
+        "ms": 96.65799999999945,
+        "rows": 10,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=priority.desc.nullslast limit=10"
+      },
+      {
+        "table": "articles",
+        "ms": 122.2402089999996,
+        "rows": 4,
+        "total": 4,
+        "ranged": false,
+        "head": true,
+        "detail": "status=in.(ready_for_review,in_review)"
+      },
+      {
+        "table": "article_versions",
+        "ms": 222.2232499999991,
+        "rows": 14,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "id=in.(35,34,30,28,22,21,20,18,14,19,15,8,5,2)"
+      }
+    ],
+    "slowest": {
+      "table": "article_versions",
+      "ms": 222.2232499999991,
+      "rows": 14,
+      "total": null,
+      "ranged": false,
+      "head": false,
+      "detail": "id=in.(35,34,30,28,22,21,20,18,14,19,15,8,5,2)"
+    },
+    "truncated": []
+  },
+  {
+    "name": "/admin/seo/pages",
+    "source": "app/admin/seo/pages/page.tsx",
+    "total": 102.45208300000013,
+    "calls": [
+      {
+        "table": "jobs",
+        "ms": 91.99554100000023,
+        "rows": 160,
+        "total": 160,
+        "ranged": true,
+        "head": false,
+        "detail": "step=in.(inventory_sitemap,crawl_page) order=id.asc offset=0 limit=1000"
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 92.31112500000017,
+        "rows": 1,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=date.desc limit=1"
+      },
+      {
+        "table": "findings",
+        "ms": 92.8739170000008,
+        "rows": 553,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "offset=0 limit=1000 status=eq.open"
+      },
+      {
+        "table": "settings",
+        "ms": 95.93154100000174,
+        "rows": 1,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "key=eq.traffic_snapshot"
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 97.93770799999766,
+        "rows": 1000,
+        "total": 18089,
+        "ranged": false,
+        "head": true,
+        "detail": ""
+      },
+      {
+        "table": "pages",
+        "ms": 98.14520800000173,
+        "rows": 219,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "offset=0 limit=1000 removed_at=is.null"
+      }
+    ],
+    "slowest": {
+      "table": "pages",
+      "ms": 98.14520800000173,
+      "rows": 219,
+      "total": null,
+      "ranged": true,
+      "head": false,
+      "detail": "offset=0 limit=1000 removed_at=is.null"
+    },
+    "truncated": []
+  },
+  {
+    "name": "/admin/seo/effect",
+    "source": "app/admin/seo/effect/page.tsx",
+    "total": 377.221666999998,
+    "calls": [
+      {
+        "table": "articles",
+        "ms": 87.63004200000069,
+        "rows": 3,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "status=eq.published order=published_at.asc"
+      },
+      {
+        "table": "article_versions",
+        "ms": 93.67320800000016,
+        "rows": 3,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "id=in.(21,30,15)"
+      },
+      {
+        "table": "lead_identities",
+        "ms": 93.67912499999875,
+        "rows": 0,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "first_touch_page=not.is.null"
+      },
+      {
+        "table": "pages",
+        "ms": 94.05854199999885,
+        "rows": 76,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "normalized_url=like.%/blog/%"
+      },
+      {
+        "table": "index_status",
+        "ms": 95.10512500000186,
+        "rows": 160,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": ""
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 113.79487499999959,
+        "rows": 1000,
+        "total": 3603,
+        "ranged": false,
+        "head": true,
+        "detail": "date=gte.2026-08-15"
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 109.30433300000004,
+        "rows": 603,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,date.asc offset=3000 limit=1000 date=gte.2026-08-15"
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 110.12449999999808,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,date.asc offset=2000 limit=1000 date=gte.2026-08-15"
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 161.89995799999815,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,date.asc offset=0 limit=1000 date=gte.2026-08-15"
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 170.33712500000183,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,date.asc offset=1000 limit=1000 date=gte.2026-08-15"
+      }
+    ],
+    "slowest": {
+      "table": "gsc_page_daily",
+      "ms": 170.33712500000183,
+      "rows": 1000,
+      "total": null,
+      "ranged": true,
+      "head": false,
+      "detail": "order=normalized_url.asc,date.asc offset=1000 limit=1000 date=gte.2026-08-15"
+    },
+    "truncated": []
+  },
+  {
+    "name": "/admin/seo/indexation?google",
+    "source": "app/admin/seo/indexation/page.tsx",
+    "total": 385.7704159999994,
+    "calls": [
+      {
+        "table": "articles",
+        "ms": 90.78979199999958,
+        "rows": 3,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "status=eq.published order=published_at.desc"
+      },
+      {
+        "table": "pages",
+        "ms": 92.53208400000221,
+        "rows": 159,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "removed_at=is.null indexable=eq.true http_status=eq.200"
+      },
+      {
+        "table": "settings",
+        "ms": 93.05208400000265,
+        "rows": 1,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "key=eq.yandex_snapshot"
+      },
+      {
+        "table": "index_status",
+        "ms": 95.00608400000056,
+        "rows": 160,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": ""
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 129.04991700000028,
+        "rows": 1000,
+        "total": 3603,
+        "ranged": false,
+        "head": true,
+        "detail": "date=gte.2026-08-15"
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 104.54866699999911,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,date.asc offset=2000 limit=1000 date=gte.2026-08-15"
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 105.72558299999946,
+        "rows": 603,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,date.asc offset=3000 limit=1000 date=gte.2026-08-15"
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 156.89012499999808,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,date.asc offset=0 limit=1000 date=gte.2026-08-15"
+      },
+      {
+        "table": "gsc_page_daily",
+        "ms": 162.44124999999985,
+        "rows": 1000,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=normalized_url.asc,date.asc offset=1000 limit=1000 date=gte.2026-08-15"
+      },
+      {
+        "table": "article_versions",
+        "ms": 87.03591700000106,
+        "rows": 3,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "id=in.(15,30,21)"
+      }
+    ],
+    "slowest": {
+      "table": "gsc_page_daily",
+      "ms": 162.44124999999985,
+      "rows": 1000,
+      "total": null,
+      "ranged": true,
+      "head": false,
+      "detail": "order=normalized_url.asc,date.asc offset=1000 limit=1000 date=gte.2026-08-15"
+    },
+    "truncated": []
+  },
+  {
+    "name": "/admin/seo/indexation?yandex",
+    "source": "app/admin/seo/indexation/page.tsx",
+    "total": 91.18954200000007,
+    "calls": [
+      {
+        "table": "settings",
+        "ms": 89.85704199999964,
+        "rows": 1,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "key=eq.yandex_snapshot"
+      }
+    ],
+    "slowest": {
+      "table": "settings",
+      "ms": 89.85704199999964,
+      "rows": 1,
+      "total": null,
+      "ranged": false,
+      "head": false,
+      "detail": "key=eq.yandex_snapshot"
+    },
+    "truncated": []
+  },
+  {
+    "name": "/admin/seo/positions?google",
+    "source": "app/admin/seo/positions/page.tsx",
+    "total": 89.59508300000016,
+    "calls": [
+      {
+        "table": "settings",
+        "ms": 88.1383339999993,
+        "rows": 1,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "key=eq.positions_snapshot"
+      }
+    ],
+    "slowest": {
+      "table": "settings",
+      "ms": 88.1383339999993,
+      "rows": 1,
+      "total": null,
+      "ranged": false,
+      "head": false,
+      "detail": "key=eq.positions_snapshot"
+    },
+    "truncated": []
+  },
+  {
+    "name": "/admin/seo/positions?yandex",
+    "source": "app/admin/seo/positions/page.tsx",
+    "total": 95.46020800000042,
+    "calls": [
+      {
+        "table": "settings",
+        "ms": 88.7278750000005,
+        "rows": 0,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "key=eq.yandex_snapshot_prev"
+      },
+      {
+        "table": "settings",
+        "ms": 92.08779200000208,
+        "rows": 1,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "key=eq.yandex_snapshot"
+      }
+    ],
+    "slowest": {
+      "table": "settings",
+      "ms": 92.08779200000208,
+      "rows": 1,
+      "total": null,
+      "ranged": false,
+      "head": false,
+      "detail": "key=eq.yandex_snapshot"
+    },
+    "truncated": []
+  },
+  {
+    "name": "/admin/seo/topics",
+    "source": "app/admin/seo/topics/page.tsx",
+    "total": 97.12566700000025,
+    "calls": [
+      {
+        "table": "topics",
+        "ms": 95.12658300000112,
+        "rows": 132,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=created_at.desc limit=500"
+      }
+    ],
+    "slowest": {
+      "table": "topics",
+      "ms": 95.12658300000112,
+      "rows": 132,
+      "total": null,
+      "ranged": true,
+      "head": false,
+      "detail": "order=created_at.desc limit=500"
+    },
+    "truncated": []
+  },
+  {
+    "name": "/admin/seo/clusters",
+    "source": "app/admin/seo/clusters/page.tsx",
+    "total": 97.61916700000074,
+    "calls": [
+      {
+        "table": "pages",
+        "ms": 94.63804099999834,
+        "rows": 219,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "offset=0 limit=1000 removed_at=is.null"
+      }
+    ],
+    "slowest": {
+      "table": "pages",
+      "ms": 94.63804099999834,
+      "rows": 219,
+      "total": null,
+      "ranged": true,
+      "head": false,
+      "detail": "offset=0 limit=1000 removed_at=is.null"
+    },
+    "truncated": []
+  },
+  {
+    "name": "/admin/seo/findings",
+    "source": "app/admin/seo/findings/page.tsx",
+    "total": 164.03958399999829,
+    "calls": [
+      {
+        "table": "findings",
+        "ms": 160.6481249999997,
+        "rows": 553,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "status=eq.open order=kind.asc limit=2000"
+      }
+    ],
+    "slowest": {
+      "table": "findings",
+      "ms": 160.6481249999997,
+      "rows": 553,
+      "total": null,
+      "ranged": true,
+      "head": false,
+      "detail": "status=eq.open order=kind.asc limit=2000"
+    },
+    "truncated": []
+  },
+  {
+    "name": "/admin/seo/opportunities",
+    "source": "app/admin/seo/opportunities/page.tsx",
+    "total": 88.57033299999966,
+    "calls": [
+      {
+        "table": "opportunities",
+        "ms": 87.61424999999872,
+        "rows": null,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=priority.desc limit=1000"
+      }
+    ],
+    "slowest": {
+      "table": "opportunities",
+      "ms": 87.61424999999872,
+      "rows": null,
+      "total": null,
+      "ranged": true,
+      "head": false,
+      "detail": "order=priority.desc limit=1000"
+    },
+    "truncated": []
+  },
+  {
+    "name": "/admin/seo/schema",
+    "source": "app/admin/seo/schema/page.tsx",
+    "total": 182.2462919999998,
+    "calls": [
+      {
+        "table": "page_schema",
+        "ms": 92.45733399999881,
+        "rows": 1,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "status=eq.proposed limit=500"
+      },
+      {
+        "table": "pages",
+        "ms": 86.28199999999924,
+        "rows": 1,
+        "total": null,
+        "ranged": false,
+        "head": false,
+        "detail": "id=in.(378)"
+      }
+    ],
+    "slowest": {
+      "table": "page_schema",
+      "ms": 92.45733399999881,
+      "rows": 1,
+      "total": null,
+      "ranged": true,
+      "head": false,
+      "detail": "status=eq.proposed limit=500"
+    },
+    "truncated": []
+  },
+  {
+    "name": "/admin/seo/experiments",
+    "source": "app/admin/seo/experiments/page.tsx",
+    "total": 86.57358300000124,
+    "calls": [
+      {
+        "table": "experiments",
+        "ms": 86.00312499999927,
+        "rows": null,
+        "total": null,
+        "ranged": true,
+        "head": false,
+        "detail": "order=started_at.desc limit=200"
+      }
+    ],
+    "slowest": {
+      "table": "experiments",
+      "ms": 86.00312499999927,
+      "rows": null,
+      "total": null,
+      "ranged": true,
+      "head": false,
+      "detail": "order=started_at.desc limit=200"
+    },
+    "truncated": []
+  }
+]

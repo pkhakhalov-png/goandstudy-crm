@@ -1,5 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/server'
-import { loadPageDays } from '@/lib/seo/gsc-agg'
+import { trafficSnapshot } from '@/lib/seo/traffic-snapshot'
 import Link from 'next/link'
 
 async function fetchAll(seo: any, table: string, cols: string, apply?: (q: any) => any): Promise<any[]> {
@@ -18,10 +18,10 @@ async function load() {
   try {
     const seo = (await createAdminClient()).schema('seo')
 
-    const [pd, pages, findings, opps, exps, schema] = await Promise.all([
-      // Читаем пачками параллельно: последовательно те же строки занимали
-      // три секунды, и всё это время экран стоял пустой
-      loadPageDays(seo),
+    const [{ snap }, pages, findings, opps, exps, schema] = await Promise.all([
+      // Итоги по страницам считает воркер после импорта. Раньше экран сам
+      // складывал восемнадцать тысяч дневных строк — ради шести чисел ниже.
+      trafficSnapshot(seo),
       seo.from('pages').select('id', { count: 'exact', head: true }).is('removed_at', null),
       fetchAll(seo, 'findings', 'kind', (q) => q.eq('status', 'open')),
       fetchAll(seo, 'opportunities', 'decision, risk, priority, forecast, evidence, status'),
@@ -30,18 +30,10 @@ async function load() {
     ])
 
     // трафик: последние 28 дней vs предыдущие 28 (якорь — макс. дата данных)
-    let maxDate = ''
-    for (const r of pd) if (r.date > maxDate) maxDate = r.date
-    const dayMs = 86400000
-    const anchor = maxDate ? Date.parse(maxDate) : 0
-    const cur = { clicks: 0, impr: 0 }, prev = { clicks: 0, impr: 0 }
-    let totalClicks = 0, totalImpr = 0
-    for (const r of pd) {
-      totalClicks += r.clicks; totalImpr += r.impressions
-      const age = (anchor - Date.parse(r.date)) / dayMs
-      if (age < 28) { cur.clicks += r.clicks; cur.impr += r.impressions }
-      else if (age < 56) { prev.clicks += r.clicks; prev.impr += r.impressions }
-    }
+    const maxDate = snap.dataThrough ?? ''
+    const { cur, prev } = snap
+    const totalClicks = snap.totals.clicks
+    const totalImpr = snap.totals.impressions
 
     const findingsByKind: Record<string, number> = {}
     for (const f of findings) findingsByKind[f.kind] = (findingsByKind[f.kind] || 0) + 1

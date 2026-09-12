@@ -10,6 +10,7 @@ import { persistOpportunities } from './opportunities'
 import { generateSchemaProposals } from './schema-gen'
 import { embed, toPgVector } from './embeddings'
 import { gscConfigured, getAccessToken, searchAnalytics, daysAgo } from './gsc'
+import { computeTrafficSnapshot, saveTrafficSnapshot } from './traffic-snapshot'
 
 export type Job = {
   id: number
@@ -87,13 +88,13 @@ const registry: Record<string, Handler> = {
         [p.title, p.h1, p.meta_desc].filter(Boolean).join(' — ').slice(0, 2000) || p.title || '(no text)')
       const vecs = await embed(texts)
       for (let j = 0; j < batch.length; j++) {
-        await seo.from('pages').update({ embedding: toPgVector(vecs[j]), embedding_model: model }).eq('id', batch[j].id)
+        await seo.from('pages').update({ embedding: toPgVector(vecs[j]), embedding_model: model }).eq('id', batch[j].id).throwOnError()
         done++
       }
     }
     // если ещё остались — поставить продолжение
     const more = pages.length === 300
-    if (more) await seo.from('jobs').insert({ step: 'embed_pages', lane: 'production', priority: 60, payload: {} })
+    if (more) await seo.from('jobs').insert({ step: 'embed_pages', lane: 'production', priority: 60, payload: {} }).throwOnError()
     return { outcome: 'done', result: { embedded: done, more, cost: 0 } }
   },
 
@@ -185,9 +186,32 @@ const registry: Record<string, Handler> = {
       if ((dayRows ?? 0) > 0 && (dayRows ?? 0) < 50) health.suspicious = `на ${endDate} всего ${dayRows} страниц — похоже на потерю`
     }
 
-    await seo.from('settings').upsert({ key: 'gsc_import_health', value: health }, { onConflict: 'key' })
+    const { error: healthErr } = await seo.from('settings')
+      .upsert({ key: 'gsc_import_health', value: health }, { onConflict: 'key' })
+    if (healthErr) throw new Error(`след импорта не сохранился: ${healthErr.message}`)
+
+    // Пересчитываем итоги по страницам сразу после записи данных. Только этот
+    // шаг пишет в gsc_page_daily, поэтому снимок остаётся точным до следующего
+    // импорта, а экраны больше не складывают восемнадцать тысяч строк при
+    // каждом открытии.
+    try {
+      await saveTrafficSnapshot(seo, await computeTrafficSnapshot(seo))
+      health.trafficSnapshot = 'пересчитан'
+    } catch (e: any) {
+      // Импорт важнее снимка: данные уже записаны, и ронять шаг из-за итогов
+      // неправильно. Экраны в этом случае посчитают сами — медленнее, но верно.
+      health.trafficSnapshot = `не пересчитан: ${String(e?.message ?? e).slice(0, 120)}`
+    }
 
     return { outcome: 'done', result: { ...health, cost: 0 } }
+  },
+
+  // Пересчёт итогов по страницам отдельной командой — на случай, когда снимок
+  // потерялся или его нужно обновить, не трогая импорт.
+  traffic_snapshot: async (_job, seo) => {
+    const snap = await computeTrafficSnapshot(seo)
+    await saveTrafficSnapshot(seo, snap)
+    return { outcome: 'done', result: { pages: Object.keys(snap.byPage).length, rows: snap.rowCount, dataThrough: snap.dataThrough, cost: 0 } }
   },
 
   // ── M5-частично: находки из инвентаря (без GSC) ───────────────────────────
@@ -260,13 +284,13 @@ const registry: Record<string, Handler> = {
       if (!r.ok && (r.status === 404 || r.status === 410)) broken.push({ url, status: r.status })
     }
     // перезаписать broken_link находки
-    await seo.from('findings').delete().eq('kind', 'broken_link').eq('status', 'open').is('change_set_id', null)
+    await seo.from('findings').delete().eq('kind', 'broken_link').eq('status', 'open').is('change_set_id', null).throwOnError()
     if (broken.length) {
       const now = new Date().toISOString()
       await seo.from('findings').insert(broken.map((b) => ({
         kind: 'broken_link', confidence: 'high', page_ids: [],
         evidence: { url: b.url, status: b.status }, status: 'open', detected_at: now, last_seen_at: now,
-      })))
+      }))).throwOnError()
     }
     return { outcome: 'done', result: { checked, broken: broken.length, cost: 0 } }
   },

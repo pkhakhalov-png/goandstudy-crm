@@ -2,6 +2,7 @@
 
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { readAll } from '@/lib/supabase/read-all'
 
 async function assertAdmin() {
   const supabase = await createClient()
@@ -195,11 +196,12 @@ export async function getAvailableGroups() {
   const admin = await createAdminClient()
 
   // Get all group chats from deals
-  const { data: deals } = await admin
+  const deals = await readAll<any>(() => admin
     .from('deals')
     .select('id, title, custom_fields')
     .not('custom_fields->>group_chat_id', 'is', null)
     .is('deleted_at', null)
+    .order('id'), { label: 'сделки с группами' })
 
   // Get already linked client groups
   const { data: linkedClients } = await admin

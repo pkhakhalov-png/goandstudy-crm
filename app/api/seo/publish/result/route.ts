@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
 
   // Вставка ссылки в файл темы: отмечаем предложение применённым и выходим
   if (body.kind === 'link_insert') {
-    if (body.suggestion_id) await seo.from('link_suggestions').update({ status: 'applied' }).eq('id', body.suggestion_id)
+    if (body.suggestion_id) await seo.from('link_suggestions').update({ status: 'applied' }).eq('id', body.suggestion_id).throwOnError()
     return NextResponse.json({ ok: true })
   }
 
@@ -39,19 +39,19 @@ export async function POST(req: NextRequest) {
   const { data: version } = await seo.from('article_versions').select('id, meta').eq('id', article?.current_version_id).single()
   const meta: any = version?.meta ?? {}
 
-  await seo.from('articles').update({ status: 'published', published_at: new Date().toISOString() }).eq('id', article_id)
+  await seo.from('articles').update({ status: 'published', published_at: new Date().toISOString() }).eq('id', article_id).throwOnError()
   await seo.from('article_versions')
     .update({ meta: { ...meta, publish: { path: `/blog/${slug}/`, seed: seed_to, at: new Date().toISOString() } } })
-    .eq('id', version?.id)
+    .eq('id', version?.id).throwOnError()
   await seo.from('change_sets').insert({
     article_id, kind: 'new_article',
     reason: `публикация в блог: тело, обложка, реестр, сид-флаг ${seed_from} → ${seed_to}`,
     idempotency_key: `blogpublish:${version?.id}`, status: 'applied', proposed_by: 'human',
     applied_at: new Date().toISOString(),
-  })
+  }).throwOnError()
   if (article?.topic_id) {
     await seo.from('link_suggestions').update({ status: 'proposed' })
-      .eq('to_topic_id', article.topic_id).eq('status', 'waiting_target')
+      .eq('to_topic_id', article.topic_id).eq('status', 'waiting_target').throwOnError()
   }
 
   // Проверяем страницу отсюда: агенту для этого ходить наружу незачем
@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
     const { data: fresh } = await seo.from('article_versions').select('meta').eq('id', version?.id).single()
     await seo.from('article_versions').update({
       meta: { ...(fresh?.meta ?? meta), indexnow: { at: new Date().toISOString(), status: res.status, note: res.note, auto: true } },
-    }).eq('id', version?.id)
+    }).eq('id', version?.id).throwOnError()
   } catch { /* уведомление не критично: статья уже вышла */ }
 
   // Яндекс, в отличие от Google, принимает заявку на переобход. Квота 700 в
@@ -90,10 +90,10 @@ export async function POST(req: NextRequest) {
   await seo.from('jobs').insert({
     step: 'article_index_check', lane: 'findings', priority: 20, payload: {},
     next_run_at: new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
-  })
+  }).throwOnError()
 
   const verify = await verifyPublished(slug)
-  await seo.from('jobs').update({ result: { dry_run, steps, seed_from, seed_to, verify_ok: verify.ok, checks: verify.results } }).eq('id', job_id)
+  await seo.from('jobs').update({ result: { dry_run, steps, seed_from, seed_to, verify_ok: verify.ok, checks: verify.results } }).eq('id', job_id).throwOnError()
 
   return NextResponse.json({ ok: true, verify })
 }

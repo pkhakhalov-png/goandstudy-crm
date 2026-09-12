@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/server'
-import { loadPageDays } from '@/lib/seo/gsc-agg'
+import { trafficSnapshot } from '@/lib/seo/traffic-snapshot'
+import { readAll } from '@/lib/supabase/read-all'
 import { StartInventoryButton } from '../StartInventoryButton'
 
 async function fetchAll(seo: any, table: string, cols: string, apply?: (q: any) => any): Promise<any[]> {
@@ -18,25 +19,26 @@ async function load() {
   try {
     const admin = await createAdminClient()
     const seo = admin.schema('seo')
-    const [pages, jobsRaw, gpd, findings] = await Promise.all([
+    const [pages, jobsRaw, { snap }, findings] = await Promise.all([
       fetchAll(seo, 'pages', 'id, normalized_url, page_type, http_status, indexable, title, word_count, cluster', (q) => q.is('removed_at', null)),
-      seo.from('jobs').select('status').in('step', ['inventory_sitemap', 'crawl_page']),
-      // Пачками параллельно — та же причина, что и на «Обзоре»
-      loadPageDays(seo),
+      readAll(() => seo.from('jobs').select('status').in('step', ['inventory_sitemap', 'crawl_page']).order('id'), { label: 'задания' })
+        .then((data) => ({ data })),
+      // Итоги по страницам берём готовыми: их считает воркер после импорта.
+      // Раньше экран читал всю дневную статистику — восемнадцать запросов.
+      trafficSnapshot(seo),
       fetchAll(seo, 'findings', 'page_ids', (q) => q.eq('status', 'open')),
     ])
     const byStatus: Record<string, number> = {}
     for (const j of (jobsRaw.data ?? []) as any[]) byStatus[j.status] = (byStatus[j.status] || 0) + 1
     const running = (byStatus['pending'] || 0) + (byStatus['running'] || 0) + (byStatus['waiting'] || 0) > 0
 
-    // агрегируем GSC по URL
-    const gsc = new Map<string, { c: number; i: number; pw: number }>()
-    for (const r of gpd) { const a = gsc.get(r.normalized_url) ?? { c: 0, i: 0, pw: 0 }; a.c += r.clicks; a.i += r.impressions; a.pw += (r.position || 0) * (r.impressions || 0); gsc.set(r.normalized_url, a) }
+    // итоги по адресам — из снимка
+    const gsc = snap.byPage
     const findCount = new Map<number, number>()
     for (const f of findings) for (const id of f.page_ids ?? []) findCount.set(id, (findCount.get(id) || 0) + 1)
 
     const rows = pages.map((p: any) => {
-      const g = gsc.get(p.normalized_url)
+      const g = gsc[p.normalized_url]
       return { ...p, clicks: g?.c ?? 0, impressions: g?.i ?? 0, position: g && g.i ? Math.round((g.pw / g.i) * 10) / 10 : null, findings: findCount.get(p.id) || 0 }
     }).sort((a: any, b: any) => b.clicks - a.clicks || b.impressions - a.impressions)
 

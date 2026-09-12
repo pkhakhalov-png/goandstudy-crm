@@ -128,7 +128,7 @@ export async function crawlPage(
         page_type: classifyUrl(new URL(normalizedUrl)).page_type, http_status: res.status ?? 0,
         indexable: false, last_crawled_at: now },
       { onConflict: 'normalized_url' },
-    ).select('id').single()
+    ).select('id').single().throwOnError()
     return { ok: false, pageId: data?.id, reason: res.reason }
   }
 
@@ -190,12 +190,12 @@ export async function crawlPage(
         last_seen_at: now,
       }
     })
-    await seo.from('link_edges').insert(rows)
+    await seo.from('link_edges').insert(rows).throwOnError()
 
     // discovered внутренние URL → в universe (origin=crawl), без авто-обхода
     const discovered = internalUrls.map((u) => ({ normalized_url: u, origins: ['crawl'], page_id: idByUrl.get(u) ?? null }))
     if (discovered.length) {
-      await seo.from('url_universe').upsert(discovered, { onConflict: 'normalized_url', ignoreDuplicates: true })
+      await seo.from('url_universe').upsert(discovered, { onConflict: 'normalized_url', ignoreDuplicates: true }).throwOnError()
     }
   }
 

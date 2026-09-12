@@ -64,11 +64,14 @@ export async function POST(req: NextRequest) {
         { step: 'positions_snapshot', lane: 'findings', priority: 16, payload: {} },
         { step: 'yandex_sync', lane: 'findings', priority: 17, payload: {} },
       ]
-      const { data: ex } = await seo.from('jobs').select('step').in('step', steps.map((s) => s.step)).in('status', ['pending', 'running', 'waiting'])
+      // Ограничение обязательно: без него при затыке очереди выдача обрежется
+      // на тысяче строк, шаг сочтёт себя незапланированным и добавится заново
+      const { data: ex } = await seo.from('jobs').select('step')
+        .in('step', steps.map((s) => s.step)).in('status', ['pending', 'running', 'waiting']).limit(1000)
       const have = new Set((ex ?? []).map((e: any) => e.step))
       const toAdd = steps.filter((s) => !have.has(s.step))
-      if (toAdd.length) await seo.from('jobs').insert(toAdd)
-      await seo.from('settings').upsert({ key: 'last_auto_refresh', value: { at: new Date().toISOString() } }, { onConflict: 'key' })
+      if (toAdd.length) await seo.from('jobs').insert(toAdd).throwOnError()
+      await seo.from('settings').upsert({ key: 'last_auto_refresh', value: { at: new Date().toISOString() } }, { onConflict: 'key' }).throwOnError()
     }
   } catch { /* авто-обновление не критично для обработки очереди */ }
 
@@ -82,14 +85,14 @@ export async function POST(req: NextRequest) {
       const { data: ex } = await seo.from('jobs').select('id')
         .eq('step', 'article_autostart').in('status', ['pending', 'running', 'waiting']).limit(1)
       if (!ex?.length) {
-        await seo.from('jobs').insert({ step: 'article_autostart', lane: 'production', priority: 15, payload: {} })
+        await seo.from('jobs').insert({ step: 'article_autostart', lane: 'production', priority: 15, payload: {} }).throwOnError()
       }
       // Заодно проверяем, не сломалось ли что-нибудь: раз в час — нормальная
       // частота, чтобы узнать о беде до утра и не превратить это в шум
       const { data: al } = await seo.from('jobs').select('id')
         .eq('step', 'alerts_check').in('status', ['pending', 'running', 'waiting']).limit(1)
       if (!al?.length) {
-        await seo.from('jobs').insert({ step: 'alerts_check', lane: 'findings', priority: 12, payload: {} })
+        await seo.from('jobs').insert({ step: 'alerts_check', lane: 'findings', priority: 12, payload: {} }).throwOnError()
       }
 
       // Самостоятельный выпуск. Шаг дешёвый и сам решает, пора ли: суточный
@@ -97,7 +100,7 @@ export async function POST(req: NextRequest) {
       const { data: ap } = await seo.from('jobs').select('id')
         .eq('step', 'article_autopublish').in('status', ['pending', 'running', 'waiting']).limit(1)
       if (!ap?.length) {
-        await seo.from('jobs').insert({ step: 'article_autopublish', lane: 'production', priority: 14, payload: {} })
+        await seo.from('jobs').insert({ step: 'article_autopublish', lane: 'production', priority: 14, payload: {} }).throwOnError()
       }
       await seo.from('settings').upsert({ key: 'last_autostart_check', value: { at: new Date().toISOString() } }, { onConflict: 'key' })
     }

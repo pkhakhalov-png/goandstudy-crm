@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
 
   if (linkJobs?.[0]) {
     const lj = linkJobs[0]
-    await seo.from('jobs').update({ status: 'running', locked_at: new Date().toISOString(), locked_by: 'publish-agent' }).eq('id', lj.id)
+    await seo.from('jobs').update({ status: 'running', locked_at: new Date().toISOString(), locked_by: 'publish-agent' }).eq('id', lj.id).throwOnError()
     return NextResponse.json({
       job: {
         id: lj.id, article_id: lj.article_id, kind: 'link_insert',
@@ -55,7 +55,7 @@ export async function GET(req: NextRequest) {
   const meta: any = version?.meta ?? {}
   const brief: any = meta.brief ?? {}
   if (!meta.cover?.base64) {
-    await seo.from('jobs').update({ status: 'failed', last_error: 'нет обложки карточки' }).eq('id', job.id)
+    await seo.from('jobs').update({ status: 'failed', last_error: 'нет обложки карточки' }).eq('id', job.id).throwOnError()
     return NextResponse.json({ job: null, note: 'задание отклонено: нет обложки' })
   }
 
@@ -63,11 +63,11 @@ export async function GET(req: NextRequest) {
   if (sanitized.removed.length) {
     await seo.from('article_versions').update({
       meta: { ...meta, sanitized: { at: new Date().toISOString(), removed: sanitized.removed } },
-    }).eq('id', version!.id)
+    }).eq('id', version!.id).throwOnError()
   }
 
   // Помечаем взятым, чтобы второй агент не сделал ту же работу
-  await seo.from('jobs').update({ status: 'running', locked_at: new Date().toISOString(), locked_by: 'publish-agent' }).eq('id', job.id)
+  await seo.from('jobs').update({ status: 'running', locked_at: new Date().toISOString(), locked_by: 'publish-agent' }).eq('id', job.id).throwOnError()
 
   const today = new Date().toISOString().slice(0, 10)
   return NextResponse.json({

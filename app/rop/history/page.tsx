@@ -1,6 +1,7 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { RopSidebar } from '../RopSidebar'
+import { readAll } from '@/lib/supabase/read-all'
 
 const actionLabels: Record<string, string> = {
   set_plan: 'Установил план',
@@ -27,7 +28,7 @@ export default async function HistoryPage() {
     .limit(100)
 
   const { data: allUsers } = await admin.from('users').select('id, name')
-  const { data: deals } = await admin.from('deals').select('id, title')
+  const { data: deals } = { data: await readAll<any>(() => admin.from('deals').select('id, title').order('id')) }
   const userMap = Object.fromEntries((allUsers ?? []).map(u => [u.id, u.name]))
   const dealMap = Object.fromEntries((deals ?? []).map(d => [d.id, d.title]))
 
