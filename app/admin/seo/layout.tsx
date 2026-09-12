@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { logout } from '@/app/login/actions'
 import { Sidebar } from '../Sidebar'
+import { SeoTabs } from './SeoTabs'
 
 // Каркас раздела SEO. Под существующей авторизацией CRM (роль admin; позже — seo).
 export default async function SeoLayout({ children }: { children: React.ReactNode }) {
@@ -12,21 +13,6 @@ export default async function SeoLayout({ children }: { children: React.ReactNod
   const { data: profile } = await supabase.from('users').select('name, role').eq('id', user.id).single()
   if (profile?.role !== 'admin') redirect('/')
 
-  const tabs = [
-    { href: '/admin/seo', label: 'Обзор' },
-    { href: '/admin/seo/opportunities', label: 'Возможности' },
-    { href: '/admin/seo/pages', label: 'Страницы' },
-    { href: '/admin/seo/clusters', label: 'Кластеры' },
-    { href: '/admin/seo/articles', label: 'Статьи' },
-    { href: '/admin/seo/positions', label: 'Позиции' },
-    { href: '/admin/seo/indexation', label: 'Индексация' },
-    { href: '/admin/seo/effect', label: 'Эффект' },
-    { href: '/admin/seo/topics', label: 'Темы' },
-    { href: '/admin/seo/experiments', label: 'Эксперименты' },
-    { href: '/admin/seo/schema', label: 'Schema' },
-    { href: '/admin/seo/findings', label: 'Находки' },
-    { href: '/admin/seo/experts', label: 'Эксперт' },
-  ]
 
   return (
     <div className="app">
@@ -39,13 +25,7 @@ export default async function SeoLayout({ children }: { children: React.ReactNod
             <form action={logout}><button className="btn-s">Выйти</button></form>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 8, padding: '10px 28px', borderBottom: '1px solid var(--bor)', background: 'var(--surf)' }}>
-          {tabs.map(t => (
-            <Link key={t.href} href={t.href} style={{ padding: '6px 14px', borderRadius: 8, fontSize: 13, color: 'var(--text)', textDecoration: 'none', border: '1px solid var(--bor2)', background: 'var(--surf2)' }}>
-              {t.label}
-            </Link>
-          ))}
-        </div>
+        <SeoTabs />
         <div style={{ flex: 1, padding: '18px 28px 40px', overflowY: 'auto' }}>{children}</div>
       </div>
     </div>
