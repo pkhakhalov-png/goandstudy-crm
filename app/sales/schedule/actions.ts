@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { warnOnError } from '@/lib/supabase/write-guard'
 
 export async function saveWeekSlots(formData: FormData) {
   const supabase = await createClient()
@@ -12,7 +13,7 @@ export async function saveWeekSlots(formData: FormData) {
   const slots: { day_of_week: number; start_time: string; end_time: string }[] = JSON.parse(slotsJson)
 
   // Delete all existing slots for this user
-  await supabase.from('schedule_slots').delete().eq('user_id', user.id)
+  await supabase.from('schedule_slots').delete().eq('user_id', user.id).then(warnOnError('schedule_slots · app/sales/schedule/actions.ts:15'))
 
   // Insert new slots
   if (slots.length > 0) {

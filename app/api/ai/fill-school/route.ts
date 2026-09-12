@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createParserClient, createParserAdminClient } from '@/lib/supabase/parser'
 import { getAnthropic } from '@/lib/ai'
 import { revalidatePath } from 'next/cache'
+import { warnOnError } from '@/lib/supabase/write-guard'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -674,7 +675,7 @@ async function handle(req: NextRequest) {
     console.warn('[fill-school] campus_photo_url column missing, retrying without it')
     const { campus_photo_url, ...rest } = update as Record<string, unknown>
     void campus_photo_url
-    const r = await admin.from('schools').update(rest).eq('id', schoolId)
+    const r = await admin.from('schools').update(rest).eq('id', schoolId).then(warnOnError('schools · app/api/ai/fill-school/route.ts:677'))
     dbErr = r.error
   }
   if (dbErr) return NextResponse.json({ ok: false, error: `DB: ${dbErr.message}` }, { status: 500 })

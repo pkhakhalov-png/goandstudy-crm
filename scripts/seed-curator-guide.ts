@@ -10,6 +10,7 @@
 import { config } from 'dotenv'
 import path from 'path'
 import { createClient } from '@supabase/supabase-js'
+import { warnOnError } from '../lib/supabase/write-guard'
 
 config({ path: path.resolve(process.cwd(), '.env.local') })
 
@@ -223,7 +224,7 @@ async function main() {
   const stageIdByCode = new Map<string, string>(dbStages?.map(s => [s.code, s.id]) ?? [])
 
   // 3) Wipe old checklist & insert new
-  await sb.from('curator_stage_checklist').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+  await sb.from('curator_stage_checklist').delete().neq('id', '00000000-0000-0000-0000-000000000000').then(warnOnError('curator_stage_checklist · scripts/seed-curator-guide.ts:226'))
   console.log('\nстарые чек-листы удалены\n')
 
   let total = 0

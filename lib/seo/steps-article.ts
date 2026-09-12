@@ -7,6 +7,7 @@
 //   article_brief → article_draft → article_qa → article_illustrate → article_linkplan
 import { registerStep, type Job, type StepOutcome } from './steps'
 import { metaByVersion, urlsOfArticles, slugOf } from './article-meta'
+import { readAll } from '@/lib/supabase/read-all'
 import { generateBrief, generateDraft, reviseDraft, qaWithModel, qaDeterministic, GEN_MODEL, PROMPT_VERSION, type GenContext, type Brief, type QaReport } from './generate'
 import { summarize } from './standard'
 import { loadSiteTargets, normalizeBody } from './blog-style'
@@ -25,17 +26,32 @@ const MAX_REVISIONS = 2   // §12.2
 
 /* ── Общие загрузчики ─────────────────────────────────────────────────────── */
 
-async function fetchAll(seo: any, table: string, cols: string, apply?: (q: any) => any): Promise<any[]> {
-  const out: any[] = []
-  for (let from = 0; ; from += 500) {
-    let q = seo.from(table).select(cols).range(from, from + 499)
+/**
+ * Чтение таблицы целиком.
+ *
+ * Было: страницами по 500 строк, одна за другой, без заданного порядка. На
+ * `gsc_daily` это 381 поход до базы подряд — около минуты при бюджете шага в
+ * тридцать секунд. И порядок строк между походами Postgres не обещает, так что
+ * часть строк могла потеряться, а часть удвоиться, и никто бы не заметил.
+ *
+ * Стало: общий помощник `readAll` — страницами по тысяче, пачками параллельно,
+ * с явной сортировкой по первичному ключу, который уже проиндексирован.
+ *
+ * Экспортируется, чтобы замер (`scripts/perf-audit.ts --steps`) вызывал ту же
+ * функцию, что и сам воркер, а не её копию.
+ */
+const PK_ORDER: Record<string, string[]> = {
+  gsc_daily: ['normalized_url', 'query', 'date'],
+  gsc_page_daily: ['normalized_url', 'date'],
+}
+
+export async function fetchAll(seo: any, table: string, cols: string, apply?: (q: any) => any): Promise<any[]> {
+  return readAll<any>(() => {
+    let q = seo.from(table).select(cols)
     if (apply) q = apply(q)
-    const { data, error } = await q
-    if (error) throw new Error(`${table}: ${error.message}`)
-    out.push(...(data ?? []))
-    if (!data || data.length < 500) break
-  }
-  return out
+    for (const col of PK_ORDER[table] ?? ['id']) q = q.order(col, { ascending: true })
+    return q
+  }, { label: table })
 }
 
 function vec(raw: any): number[] { return typeof raw === 'string' ? JSON.parse(raw) : raw }
@@ -196,7 +212,7 @@ registerStep('article_brief', async (job: Job, seo: any): Promise<StepOutcome> =
     .select('id').single()
   if (aerr) return { outcome: 'failed', result: { error: `articles: ${aerr.message}` } }
 
-  await seo.from('topics').update({ status: 'in_production' }).eq('id', topic.id)
+  await seo.from('topics').update({ status: 'in_production' }).eq('id', topic.id).throwOnError()
   await next(seo, 'article_draft', article.id, topic.id, { brief, ctx })
   return { outcome: 'done', result: { article_id: article.id, title: brief.title, unique_value: brief.unique_value, cost: 0 } }
 })
@@ -216,7 +232,7 @@ registerStep('article_draft', async (job: Job, seo: any): Promise<StepOutcome> =
   }).select('id').single()
   if (error) return { outcome: 'failed', result: { error: `article_versions: ${error.message}` } }
 
-  await seo.from('articles').update({ current_version_id: v.id }).eq('id', articleId)
+  await seo.from('articles').update({ current_version_id: v.id }).eq('id', articleId).throwOnError()
   await next(seo, 'article_qa', articleId, job.topic_id!, { brief, ctx, attempt: 0 })
   return { outcome: 'done', result: { version_id: v.id, chars: html.length, cost: 0 } }
 })
@@ -255,7 +271,7 @@ registerStep('article_qa', async (job: Job, seo: any): Promise<StepOutcome> => {
 
   if (attempt >= MAX_REVISIONS) {
     // §12.2: две попытки — и дальше решает человек, а не машина по кругу
-    await seo.from('articles').update({ status: 'ready_for_review' }).eq('id', articleId)
+    await seo.from('articles').update({ status: 'ready_for_review' }).eq('id', articleId).throwOnError()
     await next(seo, 'article_cover', articleId, job.topic_id!, { brief, ctx })
     return { outcome: 'done', result: { verdict: 'needs_human', checks_failed: failedB.length, issues: report.issues.length, cost: 0 } }
   }
@@ -267,7 +283,7 @@ registerStep('article_qa', async (job: Job, seo: any): Promise<StepOutcome> => {
     prompt_version: PROMPT_VERSION, model: GEN_MODEL,
   }).select('id').single()
   if (error) return { outcome: 'failed', result: { error: `article_versions: ${error.message}` } }
-  await seo.from('articles').update({ current_version_id: nv.id }).eq('id', articleId)
+  await seo.from('articles').update({ current_version_id: nv.id }).eq('id', articleId).throwOnError()
 
   await next(seo, 'article_qa', articleId, job.topic_id!, { brief, ctx, attempt: attempt + 1 })
   return { outcome: 'done', result: { verdict: 'revised', attempt: attempt + 1, checks_failed: failedB.length, cost: 0 } }
@@ -876,7 +892,7 @@ registerStep('article_update_plan', async (job: Job, seo: any): Promise<StepOutc
   }).select('id').single()
   if (verErr) return { outcome: 'failed', result: { error: `версия с правками: ${verErr.message}`, snapshot_id: snapshot?.id } }
 
-  await seo.from('articles').update({ current_version_id: version?.id, status: 'ready_for_review' }).eq('id', articleId)
+  await seo.from('articles').update({ current_version_id: version?.id, status: 'ready_for_review' }).eq('id', articleId).throwOnError()
 
   await seo.from('change_sets').insert({
     article_id: articleId, kind: 'update_existing',
@@ -888,7 +904,7 @@ registerStep('article_update_plan', async (job: Job, seo: any): Promise<StepOutc
     reason: `обновление ${slug}: ${issues.length} замечаний — ${issues.slice(0, 3).map((i) => i.id).join(', ')}`,
     idempotency_key: `update:${slug}:${snapshot?.id}`,
     status: 'proposed', proposed_by: 'system',
-  })
+  }).throwOnError()
 
   return {
     outcome: 'done',
@@ -1038,7 +1054,7 @@ registerStep('article_autopublish', async (_job: Job, seo: any): Promise<StepOut
     }
 
     // Ворота пройдены — выпускаем
-    await seo.from('articles').update({ status: 'approved' }).eq('id', a.id)
+    await seo.from('articles').update({ status: 'approved' }).eq('id', a.id).throwOnError()
     const res = await enqueueJob(seo, {
       step: 'article_publish_blog', lane: 'production', priority: 60, runner: 'agent',
       article_id: a.id, topic_id: a.topic_id,

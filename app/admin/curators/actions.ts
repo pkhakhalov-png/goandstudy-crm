@@ -4,6 +4,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { randomBytes } from 'crypto'
+import { warnOnError } from '@/lib/supabase/write-guard'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://crm.goandstudy.com'
 const INVITE_TTL_DAYS = 30
@@ -119,7 +120,7 @@ export async function updateCurator(curatorId: string, formData: FormData) {
   // Also update name in users table if linked
   const { data: curator } = await admin.from('curators').select('user_id').eq('id', curatorId).single()
   if (curator?.user_id) {
-    await admin.from('users').update({ name, is_active: isActive }).eq('id', curator.user_id)
+    await admin.from('users').update({ name, is_active: isActive }).eq('id', curator.user_id).then(warnOnError('users · app/admin/curators/actions.ts:122'))
   }
 
   revalidatePath('/admin/curators')
@@ -165,9 +166,9 @@ export async function prepareCuratorAccess(curatorId: string): Promise<AccessRes
     })
     if (upErr) return { kind: 'error', error: `auth: ${upErr.message}` }
     await admin.from('users').update({ email, name: curator.name, role: 'curator', is_active: true })
-      .eq('id', curator.user_id)
+      .eq('id', curator.user_id).then(warnOnError('users · app/admin/curators/actions.ts:167'))
     // sync curators.email тоже
-    if (!curator.email) await admin.from('curators').update({ email }).eq('id', curatorId)
+    if (!curator.email) await admin.from('curators').update({ email }).eq('id', curatorId).then(warnOnError('curators · app/admin/curators/actions.ts:170'))
 
     const { sent, error: mailErr } = await sendWelcomeEmail({ to: email, name: curator.name || '', password })
     return {
@@ -194,13 +195,13 @@ export async function prepareCuratorAccess(curatorId: string): Promise<AccessRes
       expires_at: expiresAt.toISOString(),
     })
     if (insErr) return { kind: 'error', error: `invite: ${insErr.message}` }
-    if (!curator.email) await admin.from('curators').update({ email }).eq('id', curatorId)
+    if (!curator.email) await admin.from('curators').update({ email }).eq('id', curatorId).then(warnOnError('curators · app/admin/curators/actions.ts:197'))
   }
 
   const url = `${APP_URL}/invite/curator/${token}`
   const { sent, error: mailErr } = await sendInviteEmail({ to: email, name: curator.name || '', url })
   if (sent && token && !existing?.email_sent_at) {
-    await admin.from('curator_invitations').update({ email_sent_at: new Date().toISOString() }).eq('token', token)
+    await admin.from('curator_invitations').update({ email_sent_at: new Date().toISOString() }).eq('token', token).then(warnOnError('curator_invitations · app/admin/curators/actions.ts:203'))
   }
 
   return { kind: 'invite', email, url, emailSent: sent, emailError: mailErr }

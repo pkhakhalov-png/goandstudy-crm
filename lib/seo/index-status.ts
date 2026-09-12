@@ -119,7 +119,7 @@ export async function saveIndexStatus(seo: any, pageId: number, v: IndexVerdict)
   // Колонка появляется миграцией; пока её нет, пишем без неё, а не теряем проверку
   if (error && /first_indexed_at/.test(error.message)) {
     delete row.first_indexed_at
-    await seo.from('index_status').upsert(row, { onConflict: 'page_id' })
+    await seo.from('index_status').upsert(row, { onConflict: 'page_id' }).throwOnError()
   }
 }
 

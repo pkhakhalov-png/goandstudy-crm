@@ -15,6 +15,7 @@
 import { config } from 'dotenv'
 import path from 'path'
 import { createClient } from '@supabase/supabase-js'
+import { warnOnError } from '../lib/supabase/write-guard'
 config({ path: path.resolve(process.cwd(), '.env.local') })
 const parser = createClient(process.env.NEXT_PUBLIC_PARSER_SUPABASE_URL!, process.env.PARSER_SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } })
 
@@ -77,7 +78,7 @@ const stuPrograms = (schoolId: number) => [
 async function insertProgram(prog: any) {
   const { data: exist } = await parser.from('programs').select('id').eq('school_id', prog.school_id).eq('name', prog.name)
   if (exist?.length) { console.log(`  ⚠️ "${prog.name}" (school ${prog.school_id}) уже есть — пропуск`); return }
-  const r = await parser.from('programs').insert(prog).select('id, name, school_id').single()
+  const r = await parser.from('programs').insert(prog).select('id, name, school_id').single().then(warnOnError('programs · scripts/add-slovakia-programs.ts:80'))
   if (r.error) { console.error(`  ❌ "${prog.name}" INSERT ERR:`, r.error.message); process.exit(1) }
   console.log(`  ✅ ${prog.name} → #${r.data.id} (school ${r.data.school_id})`)
 }
@@ -85,7 +86,7 @@ async function insertProgram(prog: any) {
 async function ensureSchool(school: any, matchLike: string): Promise<number> {
   const { data: exist } = await parser.from('schools').select('id, name').ilike('name', matchLike)
   if (exist?.length) { console.log(`⚠️ Школа уже есть: ${JSON.stringify(exist[0])}`); return exist[0].id }
-  const r = await parser.from('schools').insert(school).select('id, name').single()
+  const r = await parser.from('schools').insert(school).select('id, name').single().then(warnOnError('schools · scripts/add-slovakia-programs.ts:88'))
   if (r.error) { console.error('❌ SCHOOL INSERT ERR:', r.error.message); process.exit(1) }
   console.log(`✅ Школа создана: #${r.data.id} ${r.data.name}`)
   return r.data.id

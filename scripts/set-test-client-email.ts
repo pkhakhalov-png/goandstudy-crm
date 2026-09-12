@@ -1,6 +1,7 @@
 import { config } from 'dotenv'
 import path from 'path'
 import { createClient } from '@supabase/supabase-js'
+import { warnOnError } from '../lib/supabase/write-guard'
 
 config({ path: path.resolve(process.cwd(), '.env.local') })
 
@@ -27,7 +28,7 @@ async function main() {
     if (!inv.used_at && new Date(inv.expires_at) > new Date()) {
       await sb.from('client_invitations')
         .update({ expires_at: new Date(Date.now() - 1000).toISOString() })
-        .eq('id', inv.id)
+        .eq('id', inv.id).then(warnOnError('client_invitations · scripts/set-test-client-email.ts:29'))
       console.log('expired stale invitation', inv.id)
     }
   }

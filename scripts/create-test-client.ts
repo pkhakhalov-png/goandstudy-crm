@@ -6,6 +6,7 @@
 import { config } from 'dotenv'
 import path from 'path'
 import { createClient } from '@supabase/supabase-js'
+import { warnOnError } from '../lib/supabase/write-guard'
 
 config({ path: path.resolve(process.cwd(), '.env.local') })
 
@@ -26,10 +27,10 @@ async function main() {
   const { data: list } = await sb.auth.admin.listUsers()
   const existing = list?.users?.find(u => u.email?.toLowerCase() === EMAIL.toLowerCase())
   if (existing) {
-    await sb.from('users').delete().eq('id', existing.id)
+    await sb.from('users').delete().eq('id', existing.id).then(warnOnError('users · scripts/create-test-client.ts:29'))
     await sb.auth.admin.deleteUser(existing.id)
   }
-  await sb.from('clients').delete().eq('email', EMAIL)
+  await sb.from('clients').delete().eq('email', EMAIL).then(warnOnError('clients · scripts/create-test-client.ts:32'))
 
   // 2. Создаём auth user
   const { data: authData, error: authErr } = await sb.auth.admin.createUser({
@@ -41,7 +42,7 @@ async function main() {
   const userId = authData.user!.id
 
   // 3. public.users
-  await sb.from('users').insert({ id: userId, email: EMAIL, role: 'client' })
+  await sb.from('users').insert({ id: userId, email: EMAIL, role: 'client' }).then(warnOnError('users · scripts/create-test-client.ts:44'))
 
   // 4. clients row
   const { data: client, error } = await sb.from('clients').insert({

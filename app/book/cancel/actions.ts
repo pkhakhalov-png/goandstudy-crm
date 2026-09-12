@@ -2,6 +2,7 @@
 
 import { createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { warnOnError } from '@/lib/supabase/write-guard'
 
 export async function cancelBooking(bookingId: string) {
   const supabase = await createAdminClient()
@@ -21,7 +22,7 @@ export async function cancelBooking(bookingId: string) {
   await supabase
     .from('bookings')
     .update({ status: 'cancelled' })
-    .eq('id', bookingId)
+    .eq('id', bookingId).then(warnOnError('bookings · app/book/cancel/actions.ts:23'))
 
   if (booking.salesperson_id) {
     const { data: u } = await supabase
@@ -34,7 +35,7 @@ export async function cancelBooking(bookingId: string) {
       await supabase
         .from('users')
         .update({ round_robin_count: cur - 1 })
-        .eq('id', booking.salesperson_id)
+        .eq('id', booking.salesperson_id).then(warnOnError('users · app/book/cancel/actions.ts:36'))
     }
   }
 

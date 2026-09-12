@@ -7,6 +7,7 @@
 import { config } from 'dotenv'
 import path from 'path'
 import { createClient } from '@supabase/supabase-js'
+import { warnOnError } from '../lib/supabase/write-guard'
 
 config({ path: path.resolve(process.cwd(), '.env.local') })
 
@@ -44,13 +45,13 @@ async function main() {
 
   // client_shortlists (legacy таблица — на всякий случай)
   try {
-    await sb.from('client_shortlists').delete().in('client_id', TEST_CLIENT_IDS)
+    await sb.from('client_shortlists').delete().in('client_id', TEST_CLIENT_IDS).then(warnOnError('client_shortlists · scripts/clean-test-data.ts:47'))
     console.log('  ✓ client_shortlists')
   } catch {}
 
   // unlocked scholarships
   try {
-    await sb.from('client_scholarship_unlocks').delete().in('client_id', TEST_CLIENT_IDS)
+    await sb.from('client_scholarship_unlocks').delete().in('client_id', TEST_CLIENT_IDS).then(warnOnError('client_scholarship_unlocks · scripts/clean-test-data.ts:53'))
     console.log('  ✓ client_scholarship_unlocks')
   } catch {}
 
@@ -67,11 +68,11 @@ async function main() {
     const dealIds = testDeals.map(d => d.id)
     for (const tbl of ['deal_messages', 'deal_files', 'deal_tasks', 'deal_activities']) {
       try {
-        await sb.from(tbl).delete().in('deal_id', dealIds)
+        await sb.from(tbl).delete().in('deal_id', dealIds).then(warnOnError('deals · scripts/clean-test-data.ts:70'))
         console.log(`  ✓ ${tbl}`)
       } catch {}
     }
-    await sb.from('deals').delete().in('id', dealIds)
+    await sb.from('deals').delete().in('id', dealIds).then(warnOnError('deals · scripts/clean-test-data.ts:74'))
     console.log('  ✓ deals')
   } else {
     console.log('  ✓ deals (нет привязанных)')
@@ -88,13 +89,13 @@ async function main() {
     const authUser = authList?.users?.find(u => u.email?.toLowerCase() === email.toLowerCase())
     if (authUser) {
       // public.users
-      await sb.from('users').delete().eq('id', authUser.id)
+      await sb.from('users').delete().eq('id', authUser.id).then(warnOnError('users · scripts/clean-test-data.ts:91'))
       // auth.users
       await sb.auth.admin.deleteUser(authUser.id)
       console.log(`  ✓ удалён auth+public для ${email}`)
     } else {
       // На всякий — public.users по email
-      await sb.from('users').delete().eq('email', email)
+      await sb.from('users').delete().eq('email', email).then(warnOnError('users · scripts/clean-test-data.ts:97'))
       console.log(`  · ${email}: auth не найден, public.users удалён по email`)
     }
   }

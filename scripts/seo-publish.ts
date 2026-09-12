@@ -17,6 +17,7 @@ import { createClient } from '@supabase/supabase-js'
 import { getAuthor } from '../lib/seo/authors'
 config({ path: path.resolve(process.cwd(), '.env.local') })
 import { finalPreflight, checkPublishRate, publishDraft, promoteToPublish, type PublishInput } from '../lib/seo/publish'
+import { warnOnError } from '../lib/supabase/write-guard'
 
 const seo = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } }).schema('seo')
 const APPLY = process.argv.includes('--apply')
@@ -144,7 +145,7 @@ async function main() {
   const vm: any = vrow?.meta ?? {}
   await seo.from('article_versions')
     .update({ meta: { ...vm, publish: { ...(vm.publish ?? {}), post_id: res.postId, post_type: POST_TYPE, slug, reclaim: RECLAIM || undefined } } })
-    .eq('id', version.id)
+    .eq('id', version.id).then(warnOnError('article_versions · scripts/seo-publish.ts:146'))
 
   console.log(`\n✓ черновик создан: post_id=${res.postId}`)
   for (const p of res.schemaProblems ?? []) console.log(`⚠ разметка: ${p}`)

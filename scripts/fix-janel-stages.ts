@@ -1,4 +1,5 @@
 import { config } from 'dotenv'; import path from 'path'; import { createClient } from '@supabase/supabase-js'
+import { warnOnError } from '../lib/supabase/write-guard'
 config({ path: path.resolve(process.cwd(), '.env.local') })
 const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } })
 const JANEL = '532db56c-b7de-4003-9fb4-80bcd483d160'
@@ -7,7 +8,7 @@ async function main() {
   const before = await sb.from('clients').select('id, name, status, current_stage_code').in('id', NEED_STAGE).order('id')
   console.log('=== ДО ==='); for (const c of before.data ?? []) console.log(`  ${c.id} | ${c.name} | ${c.status} | stage=${c.current_stage_code||'—'}`)
 
-  const r = await sb.from('clients').update({ current_stage_code: 'strategy' }).in('id', NEED_STAGE).is('current_stage_code', null)
+  const r = await sb.from('clients').update({ current_stage_code: 'strategy' }).in('id', NEED_STAGE).is('current_stage_code', null).then(warnOnError('clients · scripts/fix-janel-stages.ts:10'))
   if (r.error) { console.error('err:', r.error.message); process.exit(1) }
 
   const after = await sb.from('clients').select('id, name, status, current_stage_code').eq('curator_id', JANEL).eq('status','active').order('id')

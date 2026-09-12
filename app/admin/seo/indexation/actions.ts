@@ -1,6 +1,7 @@
 'use server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { warnOnError } from '@/lib/supabase/write-guard'
 
 async function assertAdmin() {
   const sb = await createClient()
@@ -23,8 +24,8 @@ export async function enqueueSiteIndexCheck() {
   if (running?.length) return { note: 'проверка уже в очереди — результат появится здесь сам' }
 
   // Сбрасываем сроки, иначе шаг возьмёт только просроченные и «сейчас» ничего не изменит
-  await seo.from('index_status').update({ next_check_at: new Date().toISOString() }).gt('page_id', 0)
-  await seo.from('jobs').insert({ step: 'index_check_site', lane: 'findings', priority: 95, payload: {} })
+  await seo.from('index_status').update({ next_check_at: new Date().toISOString() }).gt('page_id', 0).then(warnOnError('index_status · app/admin/seo/indexation/actions.ts:26'))
+  await seo.from('jobs').insert({ step: 'index_check_site', lane: 'findings', priority: 95, payload: {} }).then(warnOnError('jobs · app/admin/seo/indexation/actions.ts:27'))
 
   revalidatePath('/admin/seo/indexation')
   return { note: 'Поставлено в очередь. Порциями по 60 адресов за тик — на весь сайт уходит несколько минут.' }

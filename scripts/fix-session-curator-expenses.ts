@@ -1,6 +1,7 @@
 import { config } from 'dotenv'
 import path from 'path'
 import { createClient } from '@supabase/supabase-js'
+import { warnOnError } from '../lib/supabase/write-guard'
 config({ path: path.resolve(process.cwd(), '.env.local') })
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } })
 
@@ -27,7 +28,7 @@ async function main() {
 
     // Удаляем старые 2×25000 (все pending curator)
     const ids = (curExp || []).map(e => e.id)
-    if (ids.length) await db.from('expenses').delete().in('id', ids)
+    if (ids.length) await db.from('expenses').delete().in('id', ids).then(warnOnError('expenses · scripts/fix-session-curator-expenses.ts:30'))
 
     // Вставляем одну выплату 7500
     const { data: pay } = await db.from('payments').select('plan_date').eq('client_id', cid).order('num').limit(1).single()

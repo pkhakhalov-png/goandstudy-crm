@@ -1,6 +1,7 @@
 import { config } from 'dotenv'
 import path from 'path'
 import { createClient } from '@supabase/supabase-js'
+import { warnOnError } from '../lib/supabase/write-guard'
 
 config({ path: path.resolve(process.cwd(), '.env.local') })
 
@@ -39,9 +40,9 @@ async function main() {
   if (deals?.length) {
     const ids = deals.map(d => d.id)
     for (const t of ['deal_messages', 'deal_files', 'deal_tasks', 'deal_activities']) {
-      await sb.from(t).delete().in('deal_id', ids)
+      await sb.from(t).delete().in('deal_id', ids).then(warnOnError('deals · scripts/delete-client-61.ts:42'))
     }
-    await sb.from('deals').delete().in('id', ids)
+    await sb.from('deals').delete().in('id', ids).then(warnOnError('deals · scripts/delete-client-61.ts:44'))
     console.log('deals + cascades ✓')
   }
 
@@ -55,7 +56,7 @@ async function main() {
     const { data: list } = await sb.auth.admin.listUsers()
     const u = list?.users?.find(x => x.email?.toLowerCase() === client.email!.toLowerCase())
     if (u) {
-      await sb.from('users').delete().eq('id', u.id)
+      await sb.from('users').delete().eq('id', u.id).then(warnOnError('users · scripts/delete-client-61.ts:58'))
       await sb.auth.admin.deleteUser(u.id)
       console.log(`auth+public для ${client.email} ✓`)
     }

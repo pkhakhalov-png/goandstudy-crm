@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { warnOnError } from '@/lib/supabase/write-guard'
 
 export async function markPaymentPaid(formData: FormData): Promise<void> {
   const supabase = await createClient()
@@ -22,7 +23,7 @@ export async function markPaymentPaid(formData: FormData): Promise<void> {
       comment: comment || null,
       updated_by: user.id,
     })
-    .eq('id', paymentId)
+    .eq('id', paymentId).then(warnOnError('payments · app/admin/payments/actions.ts:18'))
 
   revalidatePath('/admin/payments')
 }
@@ -43,7 +44,7 @@ export async function unmarkPaymentPaid(formData: FormData): Promise<void> {
       comment: null,
       updated_by: user.id,
     })
-    .eq('id', paymentId)
+    .eq('id', paymentId).then(warnOnError('payments · app/admin/payments/actions.ts:39'))
 
   revalidatePath('/admin/payments')
 }
@@ -66,7 +67,7 @@ export async function editPayment(formData: FormData): Promise<void> {
       comment: comment || null,
       updated_by: user.id,
     })
-    .eq('id', paymentId)
+    .eq('id', paymentId).then(warnOnError('payments · app/admin/payments/actions.ts:63'))
 
   revalidatePath('/admin/payments')
 }

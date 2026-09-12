@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { normalizePhone } from '@/lib/phone'
 import { downloadWazzupFile, type WazzupMessage } from '@/lib/wazzup'
+import { warnOnError } from '@/lib/supabase/write-guard'
 
 interface WebhookPayload {
   messages?: WazzupMessage[]
@@ -276,7 +277,7 @@ async function processMessage(supabase: SupabaseAdmin, msg: WazzupMessage) {
         await supabase
           .from('users')
           .update({ round_robin_count: (salespersons?.[0]?.round_robin_count ?? 0) + 1 })
-          .eq('id', assignedId)
+          .eq('id', assignedId).then(warnOnError('users · app/api/wazzup/webhook/route.ts:278'))
       }
 
       await supabase.from('deal_activities').insert({
@@ -285,7 +286,7 @@ async function processMessage(supabase: SupabaseAdmin, msg: WazzupMessage) {
         content: isGroup
           ? `Групповой чат создан из ${channelLabel === 'whatsapp' ? 'WhatsApp' : 'Telegram'}`
           : `Сделка создана из ${channelLabel === 'whatsapp' ? 'WhatsApp' : 'Telegram'}`,
-      })
+      }).then(warnOnError('deal_activities · app/api/wazzup/webhook/route.ts:282'))
     }
   }
 
@@ -319,7 +320,7 @@ async function processMessage(supabase: SupabaseAdmin, msg: WazzupMessage) {
             source: channelLabel,
           })
           .select('id')
-          .single()
+          .single().then(warnOnError('deal_files · app/api/wazzup/webhook/route.ts:314'))
         if (insertedFile) fileId = insertedFile.id
       }
     } catch (e) {
@@ -336,7 +337,7 @@ async function processMessage(supabase: SupabaseAdmin, msg: WazzupMessage) {
 
   if (existing) {
     if (fileId && !existing.file_id) {
-      await supabase.from('deal_messages').update({ file_id: fileId }).eq('id', existing.id)
+      await supabase.from('deal_messages').update({ file_id: fileId }).eq('id', existing.id).then(warnOnError('deal_messages · app/api/wazzup/webhook/route.ts:339'))
     }
   } else {
     await supabase.from('deal_messages').insert({
@@ -353,11 +354,11 @@ async function processMessage(supabase: SupabaseAdmin, msg: WazzupMessage) {
         type: msg.type,
         isGroup,
       },
-    })
+    }).then(warnOnError('deal_messages · app/api/wazzup/webhook/route.ts:342'))
   }
 
   // Bump deal updated_at so it rises to the top of the kanban
-  await supabase.from('deals').update({ updated_at: new Date().toISOString() }).eq('id', dealId)
+  await supabase.from('deals').update({ updated_at: new Date().toISOString() }).eq('id', dealId).then(warnOnError('deals · app/api/wazzup/webhook/route.ts:360'))
 
   // Auto-create task "Клиент написал — необходимо ответить" for incoming messages
   if (!msg.isEcho && !existing) {
@@ -382,7 +383,7 @@ async function processMessage(supabase: SupabaseAdmin, msg: WazzupMessage) {
           task_type: 'reply',
           deadline: new Date(Date.now() + 30 * 60 * 1000).toISOString(), // 30 min deadline
           is_done: false,
-        })
+        }).then(warnOnError('deal_tasks · app/api/wazzup/webhook/route.ts:378'))
       }
     }
   }
@@ -394,7 +395,7 @@ async function processMessage(supabase: SupabaseAdmin, msg: WazzupMessage) {
       .update({ is_done: true, completed_at: new Date().toISOString() })
       .eq('deal_id', dealId)
       .eq('task_type', 'reply')
-      .eq('is_done', false)
+      .eq('is_done', false).then(warnOnError('deal_tasks · app/api/wazzup/webhook/route.ts:394'))
   }
 
   // Log activity
@@ -405,5 +406,5 @@ async function processMessage(supabase: SupabaseAdmin, msg: WazzupMessage) {
       ? `Исходящее ${channelLabel}: ${(msg.text || msg.type).slice(0, 100)}`
       : `Входящее ${channelLabel}: ${(msg.text || msg.type).slice(0, 100)}`,
     metadata: { channel: channelLabel, direction: msg.isEcho ? 'outgoing' : 'incoming' },
-  })
+  }).then(warnOnError('deal_activities · app/api/wazzup/webhook/route.ts:401'))
 }

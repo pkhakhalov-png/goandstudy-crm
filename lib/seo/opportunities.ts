@@ -138,7 +138,7 @@ export async function persistOpportunities(seo: any): Promise<{ inserted: number
   const opps = computeOpportunities((findings ?? []) as any[])
 
   const { count: kept } = await seo.from('opportunities').select('*', { count: 'exact', head: true }).neq('status', 'new')
-  await seo.from('opportunities').delete().eq('status', 'new')
+  await seo.from('opportunities').delete().eq('status', 'new').throwOnError()
 
   const now = new Date().toISOString()
   const rows = opps.map((o) => ({

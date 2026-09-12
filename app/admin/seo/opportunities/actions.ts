@@ -3,6 +3,7 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { persistOpportunities } from '@/lib/seo/opportunities'
+import { warnOnError } from '@/lib/supabase/write-guard'
 
 async function assertAdmin() {
   const supabase = await createClient()
@@ -68,7 +69,7 @@ export async function startExperiment(opportunityId: number) {
   }).select('id').single()
   if (e) return { error: e.message }
 
-  await seo.from('opportunities').update({ status: 'in_production', updated_at: new Date().toISOString() }).eq('id', opportunityId)
+  await seo.from('opportunities').update({ status: 'in_production', updated_at: new Date().toISOString() }).eq('id', opportunityId).then(warnOnError('opportunities · app/admin/seo/opportunities/actions.ts:71'))
   revalidatePath('/admin/seo/opportunities')
   revalidatePath('/admin/seo/experiments')
   return { success: true, experiment_id: exp.id }

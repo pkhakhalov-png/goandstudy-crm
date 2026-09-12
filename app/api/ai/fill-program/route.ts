@@ -3,6 +3,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { createParserClient } from '@/lib/supabase/parser'
 import { getAnthropic } from '@/lib/ai'
 import { revalidatePath } from 'next/cache'
+import { warnOnError } from '@/lib/supabase/write-guard'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -216,7 +217,7 @@ export async function POST(req: NextRequest) {
       program_id: programId,
       snapshot: payload,
       updated_by: curatorId || null,
-    })
+    }).then(warnOnError('program_curator_data_history · app/api/ai/fill-program/route.ts:215'))
 
     revalidatePath(`/curator/programs/${programId}`)
 

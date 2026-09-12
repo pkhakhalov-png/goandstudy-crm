@@ -6,6 +6,7 @@
 import { config } from 'dotenv'
 import path from 'path'
 import { createClient } from '@supabase/supabase-js'
+import { warnOnError } from '../lib/supabase/write-guard'
 
 config({ path: path.resolve(process.cwd(), '.env.local') })
 
@@ -50,15 +51,15 @@ async function main() {
   const { data: existingPublic } = await sb.from('users').select('id, role').eq('email', client.email).maybeSingle()
   if (existingPublic) {
     if (existingPublic.id !== authUserId || existingPublic.role !== 'client') {
-      await sb.from('users').update({ id: authUserId, role: 'client' }).eq('email', client.email)
+      await sb.from('users').update({ id: authUserId, role: 'client' }).eq('email', client.email).then(warnOnError('users · scripts/setup-test-client-50.ts:53'))
     }
   } else {
-    await sb.from('users').insert({ id: authUserId, email: client.email, role: 'client' })
+    await sb.from('users').insert({ id: authUserId, email: client.email, role: 'client' }).then(warnOnError('users · scripts/setup-test-client-50.ts:56'))
   }
 
   // mark invitation used (если есть active)
   await sb.from('client_invitations').update({ used_at: new Date().toISOString() })
-    .eq('client_id', CLIENT_ID).is('used_at', null)
+    .eq('client_id', CLIENT_ID).is('used_at', null).then(warnOnError('client_invitations · scripts/setup-test-client-50.ts:60'))
 
   console.log('---')
   console.log('email:', client.email)

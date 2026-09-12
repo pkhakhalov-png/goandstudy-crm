@@ -65,7 +65,7 @@ const registry: Record<string, Handler> = {
     await seo.from('url_universe').upsert(
       norm.map((u) => ({ normalized_url: u, origins: ['sitemap'] })),
       { onConflict: 'normalized_url', ignoreDuplicates: true },
-    )
+    ).throwOnError()
     // fan-out: по одной crawl-задаче на URL (lane=crawl)
     const jobs = norm.map((u) => ({ step: 'crawl_page', lane: 'crawl', priority: 100, payload: { url: u } }))
     for (let i = 0; i < jobs.length; i += 100) {

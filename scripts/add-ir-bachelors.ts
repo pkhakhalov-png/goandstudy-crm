@@ -8,6 +8,7 @@
 import { config } from 'dotenv'
 import path from 'path'
 import { createClient } from '@supabase/supabase-js'
+import { warnOnError } from '../lib/supabase/write-guard'
 config({ path: path.resolve(process.cwd(), '.env.local') })
 const parser = createClient(process.env.NEXT_PUBLIC_PARSER_SUPABASE_URL!, process.env.PARSER_SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } })
 const CONFIRM = process.argv.includes('--confirm')
@@ -116,7 +117,7 @@ async function ensureProgram(schoolId: number, p: Prog): Promise<'exists' | 'ins
   const { data: ex } = await parser.from('programs').select('id, name').eq('school_id', schoolId).ilike('name', `%${p.name.split('(')[0].trim().slice(0, 12)}%`)
   if (ex?.length) return 'exists'
   if (CONFIRM) {
-    const r = await parser.from('programs').insert(base(p, schoolId)).select('id').single()
+    const r = await parser.from('programs').insert(base(p, schoolId)).select('id').single().then(warnOnError('programs · scripts/add-ir-bachelors.ts:119'))
     if (r.error) throw new Error(`program "${p.name}" @ ${schoolId}: ${r.error.message}`)
   }
   return 'insert'
@@ -140,7 +141,7 @@ async function main() {
     let schoolId: number
     if (exS?.length) { schoolId = exS[0].id; console.log(`\n[${schoolId}] ${s.name} — уже есть`) }
     else if (CONFIRM) {
-      const r = await parser.from('schools').insert({ name: s.name, city: s.city, country_code: s.country_code, source: 'curator_gh' }).select('id').single()
+      const r = await parser.from('schools').insert({ name: s.name, city: s.city, country_code: s.country_code, source: 'curator_gh' }).select('id').single().then(warnOnError('schools · scripts/add-ir-bachelors.ts:143'))
       if (r.error) throw new Error(`school "${s.name}": ${r.error.message}`)
       schoolId = r.data.id; console.log(`\n[${schoolId}] ✅ создан вуз: ${s.name} (${s.city}, ${s.country_code})`)
     } else { schoolId = -1; console.log(`\n[NEW] ＋ будет создан вуз: ${s.name} (${s.city}, ${s.country_code})`) }

@@ -179,7 +179,7 @@ export async function confirmByExpert(
     confidence: 'confirmed',
     status: 'active',
     expires_at: new Date(Date.now() + ttlDays * 864e5).toISOString(),
-  }).eq('id', claimId)
+  }).eq('id', claimId).throwOnError()
 
   return { ok: true }
 }

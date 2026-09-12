@@ -2,6 +2,7 @@
 
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { warnOnError } from '@/lib/supabase/write-guard'
 
 async function assertCurator() {
   const supabase = await createClient()
@@ -48,7 +49,7 @@ export async function advanceStage(formData: FormData) {
     user_id: userId,
     activity_type: 'stage_change',
     content: `Этап изменён на: ${stage?.title || stageCode}`,
-  })
+  }).then(warnOnError('client_activities · app/curator/clients/[id]/actions.ts:46'))
 
   revalidatePath(`/curator/clients/${clientId}`)
   revalidatePath('/curator/clients')
@@ -234,7 +235,7 @@ export async function publishShortlist(formData: FormData) {
     user_id: userId,
     activity_type: 'note',
     content: 'Куратор отправил подборку клиенту на ознакомление',
-  })
+  }).then(warnOnError('client_activities · app/curator/clients/[id]/actions.ts:232'))
 
   revalidatePath(`/curator/clients/${clientId}`)
   revalidatePath('/client', 'layout')

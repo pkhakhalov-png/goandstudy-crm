@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true })
   }
 
-  await seo.from('jobs').update({ status: 'done', result: { dry_run, steps, seed_from, seed_to } }).eq('id', job_id)
+  await seo.from('jobs').update({ status: 'done', result: { dry_run, steps, seed_from, seed_to } }).eq('id', job_id).throwOnError()
 
   // Вставка ссылки в файл темы: отмечаем предложение применённым и выходим
   if (body.kind === 'link_insert') {

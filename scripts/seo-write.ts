@@ -25,6 +25,7 @@ import { reviseDraft } from '../lib/seo/generate'
 import { planIncomingLinks, saveLinkPlan } from '../lib/seo/linkplan'
 import { finalPreflight, checkPublishRate, publishDraft, postPublishVerify } from '../lib/seo/publish'
 import { summarize as summarizeChecks } from '../lib/seo/standard'
+import { warnOnError } from '../lib/supabase/write-guard'
 
 const seo = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } }).schema('seo')
 
@@ -147,8 +148,8 @@ async function main() {
   await seo.from('articles').update({
     current_version_id: last.id,
     status: report.verdict === 'ready_for_review' ? 'ready_for_review' : 'draft',
-  }).eq('id', article.id)
-  await seo.from('topics').update({ status: 'produced' }).eq('id', topic.id)
+  }).eq('id', article.id).then(warnOnError('articles · scripts/seo-write.ts:147'))
+  await seo.from('topics').update({ status: 'produced' }).eq('id', topic.id).then(warnOnError('topics · scripts/seo-write.ts:151'))
 
   const dir = path.resolve(process.cwd(), 'out/seo')
   fs.mkdirSync(dir, { recursive: true })

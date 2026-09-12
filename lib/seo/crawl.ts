@@ -166,7 +166,7 @@ export async function crawlPage(
   if (error) return { ok: false, reason: error.message }
 
   // ссылки: пере-записываем набор для этой страницы (идемпотентно)
-  await seo.from('link_edges').delete().eq('from_page_id', page.id)
+  await seo.from('link_edges').delete().eq('from_page_id', page.id).throwOnError()
   if (p.links.length) {
     // резолвим to_page_id по известным страницам
     const internalUrls = [...new Set(p.links.filter((l) => isSameSite(l.href)).map((l) => norm(l.href, false)))]

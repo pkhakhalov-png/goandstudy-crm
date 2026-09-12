@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { normalizePhone } from '@/lib/phone'
+import { warnOnError } from '@/lib/supabase/write-guard'
 
 export async function createClient_action(formData: FormData): Promise<void> {
   const supabase = await createClient()
@@ -67,7 +68,7 @@ export async function createClient_action(formData: FormData): Promise<void> {
       updates.curator_assigned_at = new Date().toISOString()
     }
     if (Object.keys(updates).length > 0) {
-      await supabase.from('clients').update(updates).eq('id', newClient.id)
+      await supabase.from('clients').update(updates).eq('id', newClient.id).then(warnOnError('clients · app/admin/clients/new/actions.ts:70'))
     }
   }
 

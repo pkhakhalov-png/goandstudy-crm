@@ -1,4 +1,5 @@
 import { config } from 'dotenv'; import path from 'path'; import { createClient } from '@supabase/supabase-js'
+import { warnOnError } from '../lib/supabase/write-guard'
 config({ path: path.resolve(process.cwd(), '.env.local') })
 const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } })
 const seo = sb.schema('seo')
@@ -24,7 +25,7 @@ async function main(){
   console.log('orphan-кандидаты (индекс., без входящих content-ссылок):', orphans.length)
   for (const o of orphans.slice(0,12)) console.log('   -', o.normalized_url.replace('https://goandstudy.com',''))
   // вернуть краул в норму
-  await seo.from('settings').update({ value:{"production":3,"crawl":3,"gsc":1,"freshness":2,"index":1,"attribution":1,"autopilot":1} }).eq('key','worker_concurrency_by_lane')
+  await seo.from('settings').update({ value:{"production":3,"crawl":3,"gsc":1,"freshness":2,"index":1,"attribution":1,"autopilot":1} }).eq('key','worker_concurrency_by_lane').then(warnOnError('settings · scripts/seo-inventory-summary.ts:27'))
   console.log('\ncrawl concurrency возвращён в 3')
 }
 main().catch(e=>{console.error(e);process.exit(1)})

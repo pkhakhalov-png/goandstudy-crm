@@ -7,6 +7,7 @@
 import { config } from 'dotenv'; import path from 'path'
 config({ path: path.resolve(process.cwd(), '.env.local') })
 import { createClient } from '@supabase/supabase-js'
+import { warnOnError } from '../lib/supabase/write-guard'
 
 const seo = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!).schema('seo')
 
@@ -25,7 +26,7 @@ async function main() {
   /* ── Очередь ─────────────────────────────────────────────────────────── */
 
   await test('два исполнителя не возьмут одну задачу', async () => {
-    const { data: job } = await seo.from('jobs').insert({ step: 'noop', lane: 'test', priority: 1, payload: {} }).select('id').single()
+    const { data: job } = await seo.from('jobs').insert({ step: 'noop', lane: 'test', priority: 1, payload: {} }).select('id').single().then(warnOnError('jobs · scripts/seo-selftest.ts:28'))
     try {
       const [a, b] = await Promise.all([
         seo.rpc('claim_jobs', { p_worker: 'test-a', p_limit: 5 }),
@@ -35,7 +36,7 @@ async function main() {
       assert(mine.length <= 1, `задачу выдали ${mine.length} раз — потеряна защита от двойного захвата`)
       return mine.length === 1 ? 'выдана ровно одному' : 'не выдана (занята дорожка) — тоже допустимо'
     } finally {
-      await seo.from('jobs').delete().eq('id', job!.id)
+      await seo.from('jobs').delete().eq('id', job!.id).then(warnOnError('jobs · scripts/seo-selftest.ts:38'))
     }
   })
 
@@ -43,14 +44,14 @@ async function main() {
     const long = new Date(Date.now() - 20 * 60000).toISOString()
     const { data: job } = await seo.from('jobs')
       .insert({ step: 'noop', lane: 'test', priority: 1, payload: {}, status: 'running', locked_at: long, locked_by: 'умерший-воркер' })
-      .select('id').single()
+      .select('id').single().then(warnOnError('jobs · scripts/seo-selftest.ts:45'))
     try {
       await seo.rpc('claim_jobs', { p_worker: 'test-c', p_limit: 1 })
       const { data: after } = await seo.from('jobs').select('status, attempts').eq('id', job!.id).single()
       assert(after!.status !== 'running' || after!.attempts > 0, 'задача осталась висеть на мёртвом исполнителе')
       return `статус после разблокировки: ${after!.status}`
     } finally {
-      await seo.from('jobs').delete().eq('id', job!.id)
+      await seo.from('jobs').delete().eq('id', job!.id).then(warnOnError('jobs · scripts/seo-selftest.ts:53'))
     }
   })
 

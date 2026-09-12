@@ -9,6 +9,7 @@
 import { config } from 'dotenv'
 import path from 'path'
 import { createClient } from '@supabase/supabase-js'
+import { warnOnError } from '../lib/supabase/write-guard'
 config({ path: path.resolve(process.cwd(), '.env.local') })
 const parser = createClient(process.env.NEXT_PUBLIC_PARSER_SUPABASE_URL!, process.env.PARSER_SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } })
 
@@ -87,13 +88,13 @@ async function main() {
   if (!CONFIRM) { console.log('\n⚠️ dry-run. Запусти с --confirm чтобы выполнить.'); return }
 
   // 1) rename
-  const r1 = await parser.from('schools').update({ name: HEIDELBERG_NEW_NAME }).eq('id', HEIDELBERG_ID)
+  const r1 = await parser.from('schools').update({ name: HEIDELBERG_NEW_NAME }).eq('id', HEIDELBERG_ID).then(warnOnError('schools · scripts/add-heidelberg-euhem.ts:90'))
   if (r1.error) { console.error('RENAME ERR:', r1.error.message); process.exit(1) }
   console.log('✅ Heidelberg переименован')
 
   // 2) int health
   if (!existIH?.length) {
-    const r2 = await parser.from('programs').insert(intHealth).select('id, name').single()
+    const r2 = await parser.from('programs').insert(intHealth).select('id, name').single().then(warnOnError('programs · scripts/add-heidelberg-euhem.ts:96'))
     if (r2.error) { console.error('IH INSERT ERR:', r2.error.message); process.exit(1) }
     console.log('✅ MSc International Health вставлен:', JSON.stringify(r2.data))
   }
@@ -103,14 +104,14 @@ async function main() {
   if (existEu?.length) {
     euSchoolId = existEu[0].id
   } else {
-    const r3 = await parser.from('schools').insert(euhemSchool).select('id, name').single()
+    const r3 = await parser.from('schools').insert(euhemSchool).select('id, name').single().then(warnOnError('schools · scripts/add-heidelberg-euhem.ts:106'))
     if (r3.error) { console.error('EU SCHOOL INSERT ERR:', r3.error.message); process.exit(1) }
     euSchoolId = r3.data.id
     console.log('✅ Eu-HEM школа создана:', JSON.stringify(r3.data))
   }
   const { data: existEuProg } = await parser.from('programs').select('id').eq('school_id', euSchoolId).ilike('name', '%eu-hem%')
   if (!existEuProg?.length) {
-    const r4 = await parser.from('programs').insert(euhemProgram(euSchoolId)).select('id, name, school_id').single()
+    const r4 = await parser.from('programs').insert(euhemProgram(euSchoolId)).select('id, name, school_id').single().then(warnOnError('programs · scripts/add-heidelberg-euhem.ts:113'))
     if (r4.error) { console.error('EU PROG INSERT ERR:', r4.error.message); process.exit(1) }
     console.log('✅ Eu-HEM программа вставлена:', JSON.stringify(r4.data))
   }

@@ -11,6 +11,7 @@ import { config } from 'dotenv'
 import path from 'path'
 import { createClient } from '@supabase/supabase-js'
 import { randomBytes } from 'crypto'
+import { warnOnError } from '../lib/supabase/write-guard'
 
 config({ path: path.resolve(process.cwd(), '.env.local') })
 
@@ -72,7 +73,7 @@ async function processCurator(c: { name: string; email: string }): Promise<Resul
     if (authErr) return { kind: 'error', name: c.name, email: c.email, error: `auth update: ${authErr.message}` }
     // sync public.users
     await sb.from('users').update({ email: c.email, name: c.name, role: 'curator', is_active: true })
-      .eq('id', curator.user_id)
+      .eq('id', curator.user_id).then(warnOnError('users · scripts/setup-curators-access.ts:74'))
     return {
       kind: 'reset-password', name: c.name, email: c.email,
       password, loginUrl: `${APP_URL}/login`,

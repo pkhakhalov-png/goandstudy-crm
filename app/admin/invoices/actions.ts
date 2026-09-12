@@ -3,6 +3,7 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { tbankInit, tbankGetQr, tbankGetState } from '@/lib/tbank'
 import { revalidatePath } from 'next/cache'
+import { warnOnError } from '@/lib/supabase/write-guard'
 
 export async function createInvoice(formData: FormData) {
   const supabase = await createClient()
@@ -89,7 +90,7 @@ export async function refreshInvoiceStatus(invoiceId: string) {
   await admin
     .from('invoices')
     .update({ status: stateRes.Status, updated_at: new Date().toISOString() })
-    .eq('id', invoiceId)
+    .eq('id', invoiceId).then(warnOnError('invoices · app/admin/invoices/actions.ts:91'))
 
   revalidatePath('/admin/invoices')
   revalidatePath('/sales/invoices')

@@ -3,6 +3,7 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { readAll } from '@/lib/supabase/read-all'
+import { warnOnError } from '@/lib/supabase/write-guard'
 
 async function assertAdmin() {
   const supabase = await createClient()
@@ -180,7 +181,7 @@ export async function assignCurator(clientId: number, curatorId: string) {
     .update({ who: curator.name })
     .eq('client_id', clientId)
     .eq('article', 'curator')
-    .or('who.is.null,who.eq.')
+    .or('who.is.null,who.eq.').then(warnOnError('expenses · app/admin/clients/actions.ts:180'))
 
   revalidatePath('/admin/clients')
   revalidatePath('/admin/expenses')

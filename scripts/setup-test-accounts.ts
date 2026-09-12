@@ -1,6 +1,7 @@
 import { config } from 'dotenv'
 import path from 'path'
 import { createClient } from '@supabase/supabase-js'
+import { warnOnError } from '../lib/supabase/write-guard'
 
 config({ path: path.resolve(process.cwd(), '.env.local') })
 
@@ -56,7 +57,7 @@ async function ensureCurator(): Promise<{ userId: string; curatorId: string }> {
     curatorId = newCur.id
     console.log(`public.curators → создан (${curatorId}) ✓`)
   } else {
-    await sb.from('curators').update({ is_active: true, contact: CURATOR_EMAIL }).eq('id', curatorId)
+    await sb.from('curators').update({ is_active: true, contact: CURATOR_EMAIL }).eq('id', curatorId).then(warnOnError('curators · scripts/setup-test-accounts.ts:59'))
     console.log(`public.curators → ${curatorId} ✓`)
   }
 
@@ -84,7 +85,7 @@ async function ensureClient(curatorId: string): Promise<{ clientId: number; user
       curator_assigned_at: new Date().toISOString(),
       name: CLIENT_NAME,
       status: 'active',
-    }).eq('id', clientId)
+    }).eq('id', clientId).then(warnOnError('clients · scripts/setup-test-accounts.ts:82'))
   } else {
     const salespersonId = await ensureSalesperson()
     const { data: newClient, error } = await sb.from('clients').insert({
@@ -124,7 +125,7 @@ async function ensureClient(curatorId: string): Promise<{ clientId: number; user
   await sb.from('users').upsert(
     { id: userId, email: CLIENT_EMAIL, name: CLIENT_NAME, role: 'client', is_active: true },
     { onConflict: 'id' },
-  )
+  ).then(warnOnError('users · scripts/setup-test-accounts.ts:124'))
   console.log('public.users → role=client ✓')
 
   return { clientId, userId }

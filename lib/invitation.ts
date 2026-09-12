@@ -9,6 +9,7 @@
 
 import { createAdminClient } from './supabase/server'
 import { randomBytes } from 'crypto'
+import { warnOnError } from '@/lib/supabase/write-guard'
 
 const INVITE_TTL_DAYS = 30
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://crm.goandstudy.com'
@@ -108,7 +109,7 @@ export async function createClientInvitation(
       email_sent_at: emailSent ? new Date().toISOString() : null,
       email_error: emailError || null,
     })
-    .eq('id', invite.id)
+    .eq('id', invite.id).then(warnOnError('client_invitations · lib/invitation.ts:107'))
 
   return { ok: true, url, emailSent, emailError }
 }
@@ -163,7 +164,7 @@ export async function resendClientInvitation(
   if (existing) {
     inviteId = existing.id
     token = existing.token
-    await admin.from('client_invitations').update({ email }).eq('id', inviteId)
+    await admin.from('client_invitations').update({ email }).eq('id', inviteId).then(warnOnError('client_invitations · lib/invitation.ts:166'))
   } else {
     token = randomBytes(24).toString('hex')
     const expiresAt = new Date(now.getTime() + INVITE_TTL_DAYS * 86400_000)
@@ -196,7 +197,7 @@ export async function resendClientInvitation(
 
   await admin.from('client_invitations')
     .update({ email_sent_at: emailSent ? new Date().toISOString() : null, email_error: emailError || null })
-    .eq('id', inviteId)
+    .eq('id', inviteId).then(warnOnError('client_invitations · lib/invitation.ts:198'))
 
   return { ok: true, url, emailSent, emailError }
 }

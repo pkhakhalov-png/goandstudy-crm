@@ -4,6 +4,7 @@
 // поэтому helper выносим отдельно.
 
 import { createAdminClient } from '@/lib/supabase/server'
+import { warnOnError } from '@/lib/supabase/write-guard'
 
 /**
  * Авто-привязка всех совпадающих глобальных документов клиента к заявке.
@@ -59,6 +60,6 @@ export async function autoLinkGlobalDocs(applicationId: string): Promise<void> {
     }))
 
   if (toInsert.length > 0) {
-    await admin.from('application_documents').insert(toInsert)
+    await admin.from('application_documents').insert(toInsert).then(warnOnError('application_documents · app/client/applications/[id]/wizard/auto-link-helper.ts:62'))
   }
 }

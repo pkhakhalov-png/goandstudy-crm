@@ -2,6 +2,7 @@
 
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { warnOnError } from '@/lib/supabase/write-guard'
 
 export async function uploadDealFile(formData: FormData) {
   const supabase = await createClient()
@@ -48,9 +49,9 @@ export async function uploadDealFile(formData: FormData) {
     user_id: user.id,
     activity_type: 'file_upload',
     content: `Загружен файл: ${file.name}`,
-  })
+  }).then(warnOnError('deal_activities · app/admin/funnel/[id]/fileActions.ts:47'))
 
-  await admin.from('deals').update({ updated_at: new Date().toISOString() }).eq('id', dealId)
+  await admin.from('deals').update({ updated_at: new Date().toISOString() }).eq('id', dealId).then(warnOnError('deals · app/admin/funnel/[id]/fileActions.ts:54'))
 
   revalidatePath(`/admin/funnel/${dealId}`)
   return { success: true }
@@ -77,7 +78,7 @@ export async function deleteDealFile(formData: FormData) {
   }
 
   // Delete from DB
-  await admin.from('deal_files').delete().eq('id', fileId)
+  await admin.from('deal_files').delete().eq('id', fileId).then(warnOnError('deal_files · app/admin/funnel/[id]/fileActions.ts:80'))
 
   // Log
   await admin.from('deal_activities').insert({
@@ -85,7 +86,7 @@ export async function deleteDealFile(formData: FormData) {
     user_id: user.id,
     activity_type: 'system',
     content: `Удалён файл: ${file.name}`,
-  })
+  }).then(warnOnError('deal_activities · app/admin/funnel/[id]/fileActions.ts:83'))
 
   revalidatePath(`/admin/funnel/${dealId}`)
   return { success: true }

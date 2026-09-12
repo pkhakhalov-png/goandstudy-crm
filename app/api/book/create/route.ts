@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { warnOnError } from '@/lib/supabase/write-guard'
 
 export async function POST(request: NextRequest) {
   const body = await request.json()
@@ -76,7 +77,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: bookErr.message }, { status: 500 })
   }
 
-  await supabase.from('users').update({ round_robin_count: candidates[0].round_robin_count + 1 }).eq('id', assignedId)
+  await supabase.from('users').update({ round_robin_count: candidates[0].round_robin_count + 1 }).eq('id', assignedId).then(warnOnError('users · app/api/book/create/route.ts:79'))
 
   return NextResponse.json({ success: true })
 }

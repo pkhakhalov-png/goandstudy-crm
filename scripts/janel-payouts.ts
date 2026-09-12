@@ -8,6 +8,7 @@
 import { config } from 'dotenv'; import path from 'path'
 config({ path: path.resolve(process.cwd(), '.env.local') })
 import { createClient } from '@supabase/supabase-js'
+import { warnOnError } from '../lib/supabase/write-guard'
 
 const APPLY = process.argv.includes('--apply')
 const TODAY = '2026-09-11'
@@ -36,7 +37,7 @@ async function main() {
 
     if (REASSIGN.includes(id)) {
       console.log(`   куратор → ${JANEL}`)
-      if (APPLY) await sb.from('clients').update({ curator_id: janel!.id }).eq('id', id)
+      if (APPLY) await sb.from('clients').update({ curator_id: janel!.id }).eq('id', id).then(warnOnError('clients · scripts/janel-payouts.ts:39'))
     }
 
     if (kind === 'с нуля') {
@@ -44,7 +45,7 @@ async function main() {
       for (const e of ex) {
         if (e.who !== JANEL) {
           console.log(`   получатель этапа ${e.plan_sum} → ${JANEL} (было «${e.who}»)`)
-          if (APPLY) await sb.from('expenses').update({ who: JANEL }).eq('id', e.id)
+          if (APPLY) await sb.from('expenses').update({ who: JANEL }).eq('id', e.id).then(warnOnError('expenses · scripts/janel-payouts.ts:47'))
         }
       }
       const first = ex.find((e: any) => !e.is_paid)
@@ -53,7 +54,7 @@ async function main() {
       if (APPLY) {
         await sb.from('expenses').update({
           is_paid: true, fact_sum: 25000, fact_date: TODAY, who: JANEL, status: 'paid',
-        }).eq('id', first.id)
+        }).eq('id', first.id).then(warnOnError('expenses · scripts/janel-payouts.ts:54'))
       }
       paidNow += 25000
       const rest = ex.filter((e: any) => e.id !== first.id && !e.is_paid)
@@ -72,12 +73,12 @@ async function main() {
       await sb.from('expenses').update({
         plan_sum: 12500, fact_sum: 12500, fact_date: TODAY, is_paid: true, status: 'paid',
         who: JANEL, note: `${hers.note ?? 'Куратор — этап 2'} · половина 1 из 2`,
-      }).eq('id', hers.id)
+      }).eq('id', hers.id).then(warnOnError('expenses · scripts/janel-payouts.ts:72'))
       await sb.from('expenses').insert({
         client_id: id, article: 'curator', who: JANEL,
         plan_sum: 12500, plan_date: hers.plan_date, is_paid: false, status: 'planned',
         note: `${hers.note ?? 'Куратор — этап 2'} · половина 2 из 2, остаток к выплате`,
-      })
+      }).then(warnOnError('expenses · scripts/janel-payouts.ts:76'))
     }
     paidNow += 12500
     owed += 12500

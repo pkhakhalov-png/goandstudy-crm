@@ -8,6 +8,7 @@
 import { config } from 'dotenv'
 import path from 'path'
 import { createClient } from '@supabase/supabase-js'
+import { warnOnError } from '../lib/supabase/write-guard'
 
 config({ path: path.resolve(process.cwd(), '.env.local') })
 
@@ -61,11 +62,11 @@ async function main() {
   // public.users
   await sb.from('users').upsert({
     id: userId, email, name, role: 'curator', is_active: true,
-  }, { onConflict: 'id' })
+  }, { onConflict: 'id' }).then(warnOnError('users · scripts/activate-curator.ts:62'))
 
   // curators — привязка
   if (!curator.user_id) {
-    await sb.from('curators').update({ user_id: userId, email }).eq('id', curator.id)
+    await sb.from('curators').update({ user_id: userId, email }).eq('id', curator.id).then(warnOnError('curators · scripts/activate-curator.ts:68'))
     console.log('curators.user_id привязан')
   }
 
@@ -75,7 +76,7 @@ async function main() {
   if (invites && invites.length > 0) {
     await sb.from('curator_invitations')
       .update({ used_at: new Date().toISOString() })
-      .eq('curator_id', curator.id).is('used_at', null)
+      .eq('curator_id', curator.id).is('used_at', null).then(warnOnError('curator_invitations · scripts/activate-curator.ts:77'))
     console.log(`погашено invitations: ${invites.length}`)
   }
 

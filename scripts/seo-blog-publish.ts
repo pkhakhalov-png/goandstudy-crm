@@ -9,6 +9,7 @@ import { createClient } from '@supabase/supabase-js'
 config({ path: path.resolve(process.cwd(), '.env.local') })
 import { publishToTheme, verifyPublished } from '../lib/seo/theme-publish'
 import { normalizeBody } from '../lib/seo/blog-style'
+import { warnOnError } from '../lib/supabase/write-guard'
 
 const seo = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } }).schema('seo')
 const APPLY = process.argv.includes('--apply')
@@ -53,16 +54,16 @@ async function main() {
 
     if (!APPLY) { console.log('\nСухой прогон. Выложить: --apply'); return }
 
-    await seo.from('articles').update({ status: 'published', published_at: new Date().toISOString() }).eq('id', articleId)
-    await seo.from('article_versions').update({ meta: { ...meta, publish: { path: `/blog/${entry.slug}/`, seed: report.seedTo, at: new Date().toISOString() } } }).eq('id', version!.id)
+    await seo.from('articles').update({ status: 'published', published_at: new Date().toISOString() }).eq('id', articleId).then(warnOnError('articles · scripts/seo-blog-publish.ts:56'))
+    await seo.from('article_versions').update({ meta: { ...meta, publish: { path: `/blog/${entry.slug}/`, seed: report.seedTo, at: new Date().toISOString() } } }).eq('id', version!.id).then(warnOnError('article_versions · scripts/seo-blog-publish.ts:57'))
     await seo.from('change_sets').insert({
       article_id: articleId, kind: 'new_article',
       reason: `публикация в блог: тело, обложка, реестр, сид-флаг ${report.seedFrom} → ${report.seedTo}`,
       idempotency_key: `blogpublish:${version!.id}`, status: 'applied', proposed_by: 'human',
       applied_at: new Date().toISOString(),
-    })
+    }).then(warnOnError('change_sets · scripts/seo-blog-publish.ts:58'))
     if (article.topic_id) {
-      await seo.from('link_suggestions').update({ status: 'proposed' }).eq('to_topic_id', article.topic_id).eq('status', 'waiting_target')
+      await seo.from('link_suggestions').update({ status: 'proposed' }).eq('to_topic_id', article.topic_id).eq('status', 'waiting_target').then(warnOnError('link_suggestions · scripts/seo-blog-publish.ts:65'))
     }
 
     console.log('\nПроверяю страницу…')

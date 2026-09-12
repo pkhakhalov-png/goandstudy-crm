@@ -7,6 +7,7 @@ import {
   downloadTelegramFile,
 } from '@/lib/telegram'
 import { normalizePhone } from '@/lib/phone'
+import { warnOnError } from '@/lib/supabase/write-guard'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -113,12 +114,12 @@ async function processTelegramMessage(
           is_group: true,
           previous_chat_id: oldCustom.tg_chat_id || oldCustom.group_chat_id,
         },
-      }).eq('id', dealId)
+      }).eq('id', dealId).then(warnOnError('deals · app/api/telegram/webhook/route.ts:106')).then(warnOnError('deals · перенос chat_id после миграции группы'))
       await supabase.from('deal_activities').insert({
         deal_id: dealId,
         activity_type: 'system',
         content: `Telegram-чат мигрировал в supergroup: ${oldCustom.tg_chat_id || oldCustom.group_chat_id} → ${chatIdStr}`,
-      })
+      }).then(warnOnError('deal_activities · app/api/telegram/webhook/route.ts:117'))
     }
   }
 
@@ -222,7 +223,7 @@ async function processTelegramMessage(
         await supabase
           .from('users')
           .update({ round_robin_count: (salespersons?.[0]?.round_robin_count ?? 0) + 1 })
-          .eq('id', assignedId)
+          .eq('id', assignedId).then(warnOnError('users · app/api/telegram/webhook/route.ts:224'))
       }
       await supabase.from('deal_activities').insert({
         deal_id: dealId,
@@ -230,7 +231,7 @@ async function processTelegramMessage(
         content: isGroup
           ? `Групповой чат «${msg.chat.title}» подключён через Telegram бота`
           : `Личный чат с ${senderName} подключён через Telegram бота`,
-      })
+      }).then(warnOnError('deal_activities · app/api/telegram/webhook/route.ts:227'))
     }
   }
 
@@ -292,7 +293,7 @@ async function processTelegramMessage(
             source: 'telegram',
           })
           .select('id')
-          .single()
+          .single().then(warnOnError('deal_files · app/api/telegram/webhook/route.ts:286'))
         if (insertedFile) fileId = insertedFile.id
       }
     } catch (e) {
@@ -311,7 +312,7 @@ async function processTelegramMessage(
 
   if (existing) {
     if (fileId && !existing.file_id) {
-      await supabase.from('deal_messages').update({ file_id: fileId, content }).eq('id', existing.id)
+      await supabase.from('deal_messages').update({ file_id: fileId, content }).eq('id', existing.id).then(warnOnError('deal_messages · app/api/telegram/webhook/route.ts:314'))
     }
   } else {
     await supabase.from('deal_messages').insert({
@@ -330,11 +331,11 @@ async function processTelegramMessage(
         chatType: msg.chat.type,
         chatTitle: msg.chat.title,
       },
-    })
+    }).then(warnOnError('deal_messages · app/api/telegram/webhook/route.ts:317'))
   }
 
   // Bump deal updated_at
-  await supabase.from('deals').update({ updated_at: new Date().toISOString() }).eq('id', dealId)
+  await supabase.from('deals').update({ updated_at: new Date().toISOString() }).eq('id', dealId).then(warnOnError('deals · app/api/telegram/webhook/route.ts:337'))
 
   if (!existing) {
     await supabase.from('deal_activities').insert({
@@ -342,7 +343,7 @@ async function processTelegramMessage(
       activity_type: 'message',
       content: `${isEdited ? 'Изменено' : 'Входящее'} TG (${senderName}): ${content.slice(0, 100)}`,
       metadata: { channel: 'telegram', direction: 'incoming', sender: senderName },
-    })
+    }).then(warnOnError('deal_activities · app/api/telegram/webhook/route.ts:340'))
 
     // Auto-create task for incoming messages
     if (!isEdited) {
@@ -365,7 +366,7 @@ async function processTelegramMessage(
             task_type: 'reply',
             deadline: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
             is_done: false,
-          })
+          }).then(warnOnError('deal_tasks · app/api/telegram/webhook/route.ts:361'))
         }
       }
     }
@@ -420,7 +421,7 @@ async function mirrorToClientChat(
             await supabase.from('clients').update({
               tg_group_chat_id: chatId,
               tg_group_title: title,
-            }).eq('id', clientId)
+            }).eq('id', clientId).then(warnOnError('clients · app/api/telegram/webhook/route.ts:420'))
             console.log(`[telegram] Linked group "${title}" to client ${clientId}`)
             break
           }
@@ -460,7 +461,7 @@ async function mirrorToClientChat(
             uploaded_by: senderName,
           })
           .select('id')
-          .single()
+          .single().then(warnOnError('client_tg_files · app/api/telegram/webhook/route.ts:453')).then(warnOnError('client_tg_files · файл из телеграма'))
         if (inserted) clientFileId = inserted.id
       }
     } catch (e) {
@@ -485,5 +486,5 @@ async function mirrorToClientChat(
       chat_title: msg.chat.title,
     },
     sent_at: new Date(msg.date * 1000).toISOString(),
-  })
+  }).then(warnOnError('client_tg_messages · app/api/telegram/webhook/route.ts:473'))
 }

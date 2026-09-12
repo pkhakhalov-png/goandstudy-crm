@@ -11,6 +11,7 @@ config({ path: path.resolve(process.cwd(), '.env.local') })
 import { renderCover, coverFilename } from '../lib/seo/cover'
 import { proposeDiagrams, renderDiagram, insertFigures } from '../lib/seo/diagrams'
 import { wp, wpConfigured } from '../lib/seo/wp'
+import { warnOnError } from '../lib/supabase/write-guard'
 
 const seo = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } }).schema('seo')
 const APPLY = process.argv.includes('--apply')
@@ -88,7 +89,7 @@ async function main() {
     prompt_version: meta.prompt_version ?? 'v1', model: 'claude-opus-5', qa_version: 'v1', qa_report: version.qa_report,
   }).select('id').single()
   if (nerr) throw new Error(`article_versions: ${nerr.message}`)
-  await seo.from('articles').update({ current_version_id: nv.id }).eq('id', articleId)
+  await seo.from('articles').update({ current_version_id: nv.id }).eq('id', articleId).then(warnOnError('articles · scripts/seo-illustrate.ts:91'))
 
   fs.writeFileSync(path.join(dir, `${slug}.illustrated.html`), `<h1>${brief.h1 ?? ''}</h1>\n${illustrated}\n`)
   console.log(`\n✓ версия ${nextNo} сохранена (id=${nv.id}), обложка media_id=${coverUp.media_id}`)

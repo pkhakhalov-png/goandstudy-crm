@@ -1,4 +1,5 @@
 import { config } from 'dotenv'; import path from 'path'; import { createClient } from '@supabase/supabase-js'
+import { warnOnError } from '../lib/supabase/write-guard'
 config({ path: path.resolve(process.cwd(), '.env.local') })
 const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } })
 const seo = sb.schema('seo')
@@ -6,7 +7,7 @@ async function main(){
   const action = process.argv[2] || 'status'
   if (action === 'start'){
     // ускорить краул на время инвентаря
-    await seo.from('settings').update({ value: {"production":3,"crawl":8,"gsc":1,"freshness":2,"index":1,"attribution":1,"autopilot":1} }).eq('key','worker_concurrency_by_lane')
+    await seo.from('settings').update({ value: {"production":3,"crawl":8,"gsc":1,"freshness":2,"index":1,"attribution":1,"autopilot":1} }).eq('key','worker_concurrency_by_lane').then(warnOnError('settings · scripts/seo-run-inventory.ts:9'))
     // не плодить дубли
     const { data: ex } = await seo.from('jobs').select('id').in('step',['inventory_sitemap','crawl_page']).in('status',['pending','running','waiting']).limit(1)
     if (ex?.length){ console.log('уже идёт'); return }

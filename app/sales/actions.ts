@@ -2,6 +2,7 @@
 
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { warnOnError } from '@/lib/supabase/write-guard'
 
 export async function markPaymentPaidSales(formData: FormData): Promise<void> {
   const supabase = await createClient()
@@ -16,7 +17,7 @@ export async function markPaymentPaidSales(formData: FormData): Promise<void> {
       fact_sum: Number(formData.get('fact_sum')),
       comment: formData.get('comment') as string || null,
     })
-    .eq('id', formData.get('payment_id') as string)
+    .eq('id', formData.get('payment_id') as string).then(warnOnError('payments · app/sales/actions.ts:13'))
 
   revalidatePath('/sales')
 }
@@ -34,7 +35,7 @@ export async function unmarkPaymentPaidSales(formData: FormData): Promise<void> 
       fact_sum: null,
       comment: null,
     })
-    .eq('id', formData.get('payment_id') as string)
+    .eq('id', formData.get('payment_id') as string).then(warnOnError('payments · app/sales/actions.ts:31'))
 
   revalidatePath('/sales')
 }
@@ -50,7 +51,7 @@ export async function completeTask(formData: FormData) {
   await admin.from('deal_tasks').update({
     is_done: true,
     completed_at: new Date().toISOString(),
-  }).eq('id', taskId)
+  }).eq('id', taskId).then(warnOnError('deal_tasks · app/sales/actions.ts:51'))
 
   revalidatePath('/sales')
   revalidatePath('/rop')

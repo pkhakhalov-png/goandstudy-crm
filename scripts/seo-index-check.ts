@@ -4,6 +4,7 @@ import { config } from 'dotenv'; import path from 'path'
 config({ path: path.resolve(process.cwd(), '.env.local') })
 import { createClient } from '@supabase/supabase-js'
 import { inspectPage, saveIndexStatus } from '../lib/seo/index-status'
+import { warnOnError } from '../lib/supabase/write-guard'
 
 async function main() {
   const seo = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
@@ -30,7 +31,7 @@ async function main() {
 
     await seo.from('article_versions').update({
       meta: { ...meta, index_check: { at: new Date().toISOString(), verdict: res.verdict, coverage: res.coverageState, note: res.note, last_crawl: res.lastCrawl } },
-    }).eq('id', v!.id)
+    }).eq('id', v!.id).then(warnOnError('article_versions · scripts/seo-index-check.ts:31'))
   }
 }
 main().catch((e) => { console.error('✗', e.message); process.exit(1) })

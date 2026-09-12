@@ -7,6 +7,7 @@ import { sendWazzupMessage, getTgapiChannelId, type ChatType } from '@/lib/wazzu
 import { sendTelegramMessage } from '@/lib/telegram'
 import { suggestSalesReply } from '@/lib/ai'
 import { createClientInvitation } from '@/lib/invitation'
+import { warnOnError } from '@/lib/supabase/write-guard'
 
 function reval() {
   revalidatePath('/admin/funnel')
@@ -44,7 +45,7 @@ export async function moveDeal(formData: FormData) {
     activity_type: 'stage_change',
     content: `${oldStageName} → ${newStageName}`,
     metadata: { from_stage: oldStageName, to_stage: newStageName },
-  })
+  }).then(warnOnError('deal_activities · app/admin/funnel/actions.ts:42'))
 
   // Отдельная запись с основанием — отображается в истории как комментарий менеджера
   if (lostReason) {
@@ -54,7 +55,7 @@ export async function moveDeal(formData: FormData) {
       activity_type: 'note',
       content: `Основание «НЕ ЦЕЛЕВЫЕ»: ${lostReason}`,
       metadata: { reason: lostReason, stage: newStageName },
-    })
+    }).then(warnOnError('deal_activities · app/admin/funnel/actions.ts:51'))
   }
 
   // Auto-link to client when reaching payment stages
@@ -106,7 +107,7 @@ export async function moveDeal(formData: FormData) {
             if (created) clientId = created.id
 
             if (clientId && normalized) {
-              await admin.from('clients').update({ phone_normalized: normalized }).eq('id', clientId).is('phone_normalized', null)
+              await admin.from('clients').update({ phone_normalized: normalized }).eq('id', clientId).is('phone_normalized', null).then(warnOnError('clients · app/admin/funnel/actions.ts:109'))
             }
           } else {
             const { data: newClient } = await admin.from('clients').insert({
@@ -117,7 +118,7 @@ export async function moveDeal(formData: FormData) {
               salesperson_id: deal.salesperson_id,
               status: 'active',
               phone_normalized: normalized,
-            }).select('id').single()
+            }).select('id').single().then(warnOnError('clients · app/admin/funnel/actions.ts:112'))
             if (newClient) clientId = newClient.id
           }
         } else if (totalAmount > 0 && months > 0) {
@@ -140,7 +141,7 @@ export async function moveDeal(formData: FormData) {
                 is_paid: false,
               })
             }
-            await admin.from('payments').insert(paymentRows)
+            await admin.from('payments').insert(paymentRows).then(warnOnError('payments · app/admin/funnel/actions.ts:143'))
 
             // Update client months and first_payment_date.
             // 4+ month installments accrue salesperson commission per received
@@ -150,7 +151,7 @@ export async function moveDeal(formData: FormData) {
               months,
               first_payment_date: firstPayDate,
               commission_per_payment: perPayment,
-            }).eq('id', clientId)
+            }).eq('id', clientId).then(warnOnError('clients · app/admin/funnel/actions.ts:149'))
 
             // Create expenses (same as RPC does)
             const { data: existingExpenses } = await admin.from('expenses').select('id').eq('client_id', clientId!).limit(1)
@@ -172,13 +173,13 @@ export async function moveDeal(formData: FormData) {
               if (!perPayment) {
                 expenseRows.push({ client_id: clientId, article: 'salesperson', who: sp?.name ?? null, plan_date: firstPayDate, plan_sum: Math.round(totalAmount * 0.1), note: 'ЗП продажника — 10% от ' + totalAmount.toLocaleString('ru') + ' ₽' })
               }
-              await admin.from('expenses').insert(expenseRows)
+              await admin.from('expenses').insert(expenseRows).then(warnOnError('expenses · app/admin/funnel/actions.ts:175'))
             }
           }
         }
 
         if (clientId) {
-          await admin.from('deals').update({ client_id: clientId }).eq('id', dealId)
+          await admin.from('deals').update({ client_id: clientId }).eq('id', dealId).then(warnOnError('deals · app/admin/funnel/actions.ts:181'))
 
           // Set curator and initial stage if provided
           if (curatorId) {
@@ -186,7 +187,7 @@ export async function moveDeal(formData: FormData) {
               curator_id: curatorId,
               curator_assigned_at: new Date().toISOString(),
               current_stage_code: 'strategy_session',
-            }).eq('id', clientId)
+            }).eq('id', clientId).then(warnOnError('clients · app/admin/funnel/actions.ts:185'))
           }
 
           // Link TG group
@@ -197,10 +198,10 @@ export async function moveDeal(formData: FormData) {
             await admin.from('clients').update({
               tg_group_chat_id: Number(groupChatId),
               tg_group_title: groupTitle || groupDeal?.custom_fields?.tg_chat_title || 'Группа',
-            }).eq('id', clientId)
+            }).eq('id', clientId).then(warnOnError('clients · app/admin/funnel/actions.ts:197'))
           }
 
-          await admin.from('deal_activities').insert({ deal_id: dealId, user_id: user.id, activity_type: 'system', content: 'Клиент оформлен' })
+          await admin.from('deal_activities').insert({ deal_id: dealId, user_id: user.id, activity_type: 'system', content: 'Клиент оформлен' }).then(warnOnError('deal_activities · app/admin/funnel/actions.ts:203'))
 
           // Генерируем invite-ссылку для клиента (если есть email).
           // Если ссылка уже была — createClientInvitation вернёт существующую.
@@ -256,14 +257,14 @@ export async function createDeal(formData: FormData) {
       const updates: Record<string, any> = { updated_at: new Date().toISOString() }
       if (!duplicate.contact_telegram && contactTelegram) updates.contact_telegram = contactTelegram
       if (budget > 0) updates.budget = budget
-      await supabase.from('deals').update(updates).eq('id', duplicate.id)
+      await supabase.from('deals').update(updates).eq('id', duplicate.id).then(warnOnError('deals · app/admin/funnel/actions.ts:259'))
 
       await supabase.from('deal_activities').insert({
         deal_id: duplicate.id,
         user_id: user.id,
         activity_type: 'system',
         content: `Дубль объединён: ${contactName} (${contactPhone})`,
-      })
+      }).then(warnOnError('deal_activities · app/admin/funnel/actions.ts:261'))
 
       reval()
       return { success: true, merged: true }
@@ -290,7 +291,7 @@ export async function createDeal(formData: FormData) {
     user_id: user.id,
     activity_type: 'system',
     content: 'Сделка создана',
-  })
+  }).then(warnOnError('deal_activities · app/admin/funnel/actions.ts:289'))
 
   reval()
   return { success: true }
@@ -311,9 +312,9 @@ export async function addDealNote(formData: FormData) {
     user_id: user.id,
     activity_type: 'note',
     content,
-  })
+  }).then(warnOnError('deal_activities · app/admin/funnel/actions.ts:310'))
 
-  await supabase.from('deals').update({ updated_at: new Date().toISOString() }).eq('id', dealId)
+  await supabase.from('deals').update({ updated_at: new Date().toISOString() }).eq('id', dealId).then(warnOnError('deals · app/admin/funnel/actions.ts:317'))
 
   reval()
   return { success: true }
@@ -377,7 +378,7 @@ export async function softDeleteDeal(formData: FormData) {
   if (!user) return { error: 'Не авторизован' }
 
   const dealId = formData.get('deal_id') as string
-  await supabase.from('deals').update({ deleted_at: new Date().toISOString() }).eq('id', dealId)
+  await supabase.from('deals').update({ deleted_at: new Date().toISOString() }).eq('id', dealId).then(warnOnError('deals · app/admin/funnel/actions.ts:381'))
   reval()
   return { success: true }
 }
@@ -388,7 +389,7 @@ export async function restoreDeal(formData: FormData) {
   if (!user) return { error: 'Не авторизован' }
 
   const dealId = formData.get('deal_id') as string
-  await supabase.from('deals').update({ deleted_at: null }).eq('id', dealId)
+  await supabase.from('deals').update({ deleted_at: null }).eq('id', dealId).then(warnOnError('deals · app/admin/funnel/actions.ts:392'))
   reval()
   return { success: true }
 }
@@ -399,7 +400,7 @@ export async function permanentDeleteDeal(formData: FormData) {
   if (!user) return { error: 'Не авторизован' }
 
   const dealId = formData.get('deal_id') as string
-  await supabase.from('deals').delete().eq('id', dealId)
+  await supabase.from('deals').delete().eq('id', dealId).then(warnOnError('deals · app/admin/funnel/actions.ts:403'))
   reval()
   return { success: true }
 }
@@ -409,7 +410,7 @@ export async function emptyTrash() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Не авторизован' }
 
-  await supabase.from('deals').delete().not('deleted_at', 'is', null)
+  await supabase.from('deals').delete().not('deleted_at', 'is', null).then(warnOnError('deals · app/admin/funnel/actions.ts:413'))
   reval()
   return { success: true }
 }
@@ -417,7 +418,7 @@ export async function emptyTrash() {
 export async function autoCleanTrash() {
   const supabase = await createAdminClient()
   const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString()
-  await supabase.from('deals').delete().not('deleted_at', 'is', null).lt('deleted_at', weekAgo)
+  await supabase.from('deals').delete().not('deleted_at', 'is', null).lt('deleted_at', weekAgo).then(warnOnError('deals · app/admin/funnel/actions.ts:421'))
 }
 
 // ═══ BULK ACTIONS ═══
@@ -430,7 +431,7 @@ export async function bulkMoveDeals(formData: FormData) {
   const dealIds: string[] = JSON.parse(formData.get('deal_ids') as string)
   const stageId = formData.get('stage_id') as string
 
-  await supabase.from('deals').update({ stage_id: stageId, updated_at: new Date().toISOString() }).in('id', dealIds)
+  await supabase.from('deals').update({ stage_id: stageId, updated_at: new Date().toISOString() }).in('id', dealIds).then(warnOnError('deals · app/admin/funnel/actions.ts:434'))
   reval()
   return { success: true }
 }
@@ -441,7 +442,7 @@ export async function bulkDeleteDeals(formData: FormData) {
   if (!user) return { error: 'Не авторизован' }
 
   const dealIds: string[] = JSON.parse(formData.get('deal_ids') as string)
-  await supabase.from('deals').update({ deleted_at: new Date().toISOString() }).in('id', dealIds)
+  await supabase.from('deals').update({ deleted_at: new Date().toISOString() }).in('id', dealIds).then(warnOnError('deals · app/admin/funnel/actions.ts:445'))
   reval()
   return { success: true }
 }
@@ -463,14 +464,14 @@ export async function addStage(formData: FormData) {
     const { data: toShift } = await supabase.from('pipeline_stages').select('id, position').gte('position', insertAt).order('position', { ascending: false })
     if (toShift) {
       for (const s of toShift) {
-        await supabase.from('pipeline_stages').update({ position: s.position + 1 }).eq('id', s.id)
+        await supabase.from('pipeline_stages').update({ position: s.position + 1 }).eq('id', s.id).then(warnOnError('pipeline_stages · app/admin/funnel/actions.ts:466'))
       }
     }
-    await supabase.from('pipeline_stages').insert({ name, color: '#B15ECC', position: insertAt, stage_type: 'active', is_active: true })
+    await supabase.from('pipeline_stages').insert({ name, color: '#B15ECC', position: insertAt, stage_type: 'active', is_active: true }).then(warnOnError('pipeline_stages · app/admin/funnel/actions.ts:469'))
   } else {
     const { data: maxPos } = await supabase.from('pipeline_stages').select('position').order('position', { ascending: false }).limit(1).single()
     const position = (maxPos?.position ?? 0) + 1
-    await supabase.from('pipeline_stages').insert({ name, color: '#B15ECC', position, stage_type: 'active', is_active: true })
+    await supabase.from('pipeline_stages').insert({ name, color: '#B15ECC', position, stage_type: 'active', is_active: true }).then(warnOnError('pipeline_stages · app/admin/funnel/actions.ts:473'))
   }
 
   reval()
@@ -486,7 +487,7 @@ export async function removeStage(formData: FormData) {
   const { data: dealsInStage } = await supabase.from('deals').select('id').eq('stage_id', stageId).is('deleted_at', null).limit(1)
   if (dealsInStage && dealsInStage.length > 0) return { error: 'Нельзя удалить этап с активными сделками' }
 
-  await supabase.from('pipeline_stages').update({ is_active: false }).eq('id', stageId)
+  await supabase.from('pipeline_stages').update({ is_active: false }).eq('id', stageId).then(warnOnError('pipeline_stages · app/admin/funnel/actions.ts:490'))
   reval()
   return { success: true }
 }
@@ -507,11 +508,11 @@ export async function createDealTask(formData: FormData) {
 
   await supabase.from('deal_tasks').insert({
     deal_id: dealId, title, deadline, assigned_to: assignedTo, created_by: user.id,
-  })
+  }).then(warnOnError('deal_tasks · app/admin/funnel/actions.ts:509'))
 
   await supabase.from('deal_activities').insert({
     deal_id: dealId, user_id: user.id, activity_type: 'system', content: `Задача: ${title}`,
-  })
+  }).then(warnOnError('deal_activities · app/admin/funnel/actions.ts:513'))
 
   reval()
   revalidatePath(`/admin/funnel/${dealId}`)
@@ -529,7 +530,7 @@ export async function toggleDealTask(formData: FormData) {
   await supabase.from('deal_tasks').update({
     is_done: !isDone,
     completed_at: !isDone ? new Date().toISOString() : null,
-  }).eq('id', taskId)
+  }).eq('id', taskId).then(warnOnError('deal_tasks · app/admin/funnel/actions.ts:530'))
 
   reval()
   return { success: true }
@@ -541,7 +542,7 @@ export async function deleteDealTask(formData: FormData) {
   if (!user) return { error: 'Не авторизован' }
 
   const taskId = formData.get('task_id') as string
-  await supabase.from('deal_tasks').delete().eq('id', taskId)
+  await supabase.from('deal_tasks').delete().eq('id', taskId).then(warnOnError('deal_tasks · app/admin/funnel/actions.ts:545'))
   reval()
   return { success: true }
 }
@@ -556,10 +557,10 @@ export async function linkDealToClient(formData: FormData) {
   const dealId = formData.get('deal_id') as string
   const clientId = formData.get('client_id') as string
 
-  await supabase.from('deals').update({ client_id: clientId ? Number(clientId) : null, updated_at: new Date().toISOString() }).eq('id', dealId)
+  await supabase.from('deals').update({ client_id: clientId ? Number(clientId) : null, updated_at: new Date().toISOString() }).eq('id', dealId).then(warnOnError('deals · app/admin/funnel/actions.ts:560'))
 
   if (clientId) {
-    await supabase.from('deal_activities').insert({ deal_id: dealId, user_id: user.id, activity_type: 'system', content: 'Клиент привязан вручную' })
+    await supabase.from('deal_activities').insert({ deal_id: dealId, user_id: user.id, activity_type: 'system', content: 'Клиент привязан вручную' }).then(warnOnError('deal_activities · app/admin/funnel/actions.ts:562'))
   }
 
   reval()
@@ -621,7 +622,7 @@ export async function sendDealMessage(formData: FormData) {
           content: text,
           external_id: messageId,
           metadata: { tgChatId: String(groupChatId), sentBy: user.id, viaBotApi: true },
-        })
+        }).then(warnOnError('deal_messages · app/admin/funnel/actions.ts:616'))
       }
 
       await supabase.from('deal_activities').insert({
@@ -630,9 +631,9 @@ export async function sendDealMessage(formData: FormData) {
         activity_type: 'message',
         content: `Исходящее telegram (group): ${text.slice(0, 100)}`,
         metadata: { channel: 'telegram', direction: 'outgoing' },
-      })
+      }).then(warnOnError('deal_activities · app/admin/funnel/actions.ts:627'))
 
-      await supabase.from('deals').update({ updated_at: new Date().toISOString() }).eq('id', dealId)
+      await supabase.from('deals').update({ updated_at: new Date().toISOString() }).eq('id', dealId).then(warnOnError('deals · app/admin/funnel/actions.ts:636'))
       revalidatePath(`/admin/funnel/${dealId}`)
       revalidatePath(`/sales/funnel/${dealId}`)
       return { success: true }
@@ -709,7 +710,7 @@ export async function sendDealMessage(formData: FormData) {
         content: text,
         external_id: result.messageId,
         metadata: { channelId, chatId, sentBy: user.id },
-      })
+      }).then(warnOnError('deal_messages · app/admin/funnel/actions.ts:704'))
     }
 
     await supabase.from('deal_activities').insert({
@@ -718,9 +719,9 @@ export async function sendDealMessage(formData: FormData) {
       activity_type: 'message',
       content: `Исходящее ${channel}: ${text.slice(0, 100)}`,
       metadata: { channel, direction: 'outgoing' },
-    })
+    }).then(warnOnError('deal_activities · app/admin/funnel/actions.ts:715'))
 
-    await supabase.from('deals').update({ updated_at: new Date().toISOString() }).eq('id', dealId)
+    await supabase.from('deals').update({ updated_at: new Date().toISOString() }).eq('id', dealId).then(warnOnError('deals · app/admin/funnel/actions.ts:724'))
 
     revalidatePath(`/admin/funnel/${dealId}`)
     revalidatePath(`/sales/funnel/${dealId}`)
@@ -803,7 +804,7 @@ export async function sendDealFile(formData: FormData) {
       uploaded_by: user.id,
     })
     .select('id')
-    .single()
+    .single().then(warnOnError('deal_files · app/admin/funnel/actions.ts:796')).then(warnOnError('deal_files · загрузка файла к сделке'))
 
   try {
     const result = await sendWazzupMessage({
@@ -830,7 +831,7 @@ export async function sendDealFile(formData: FormData) {
         file_id: insertedFile?.id ?? null,
         external_id: result.messageId,
         metadata: { channelId, chatId, sentBy: user.id },
-      })
+      }).then(warnOnError('deal_messages · app/admin/funnel/actions.ts:824'))
     }
 
     await supabase.from('deal_activities').insert({
@@ -839,9 +840,9 @@ export async function sendDealFile(formData: FormData) {
       activity_type: 'file_upload',
       content: `Отправлен файл: ${file.name}`,
       metadata: { channel, direction: 'outgoing', fileName: file.name },
-    })
+    }).then(warnOnError('deal_activities · app/admin/funnel/actions.ts:836'))
 
-    await supabase.from('deals').update({ updated_at: new Date().toISOString() }).eq('id', dealId)
+    await supabase.from('deals').update({ updated_at: new Date().toISOString() }).eq('id', dealId).then(warnOnError('deals · app/admin/funnel/actions.ts:845'))
 
     revalidatePath(`/admin/funnel/${dealId}`)
     revalidatePath(`/sales/funnel/${dealId}`)

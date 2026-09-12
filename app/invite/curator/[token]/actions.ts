@@ -2,6 +2,7 @@
 
 import { createAdminClient, createClient as createSsrClient } from '@/lib/supabase/server'
 import { lookupCuratorInvitation, sendCuratorWelcomeEmail } from '@/lib/curator-invitation'
+import { warnOnError } from '@/lib/supabase/write-guard'
 
 export type ActivateResult = { ok: true } | { ok: false; error: string }
 
@@ -69,23 +70,23 @@ export async function activateCuratorAccount(params: {
     .from('users').select('id').eq('email', inv.email).maybeSingle()
   if (existingPublic) {
     if (existingPublic.id !== authUserId) {
-      await admin.from('users').update({ id: authUserId, role: 'curator', is_active: true }).eq('id', existingPublic.id)
+      await admin.from('users').update({ id: authUserId, role: 'curator', is_active: true }).eq('id', existingPublic.id).then(warnOnError('users · app/invite/curator/[token]/actions.ts:72'))
     } else {
-      await admin.from('users').update({ role: 'curator', is_active: true }).eq('id', authUserId)
+      await admin.from('users').update({ role: 'curator', is_active: true }).eq('id', authUserId).then(warnOnError('users · app/invite/curator/[token]/actions.ts:74'))
     }
   } else {
-    await admin.from('users').insert({ id: authUserId, email: inv.email, role: 'curator', is_active: true })
+    await admin.from('users').insert({ id: authUserId, email: inv.email, role: 'curator', is_active: true }).then(warnOnError('users · app/invite/curator/[token]/actions.ts:77'))
   }
 
   // Привязываем curators.user_id (если ещё не привязан)
   if (!curatorRow?.user_id) {
-    await admin.from('curators').update({ user_id: authUserId }).eq('id', inv.curator_id)
+    await admin.from('curators').update({ user_id: authUserId }).eq('id', inv.curator_id).then(warnOnError('curators · app/invite/curator/[token]/actions.ts:82'))
   }
 
   // 5. Mark invitation used
   await admin.from('curator_invitations')
     .update({ used_at: new Date().toISOString() })
-    .eq('id', inv.id)
+    .eq('id', inv.id).then(warnOnError('curator_invitations · app/invite/curator/[token]/actions.ts:88'))
 
   // 6. Логиним
   const ssr = await createSsrClient()

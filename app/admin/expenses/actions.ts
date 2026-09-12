@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { warnOnError } from '@/lib/supabase/write-guard'
 
 export async function addExpense(formData: FormData): Promise<void> {
   const supabase = await createClient()
@@ -17,7 +18,7 @@ export async function addExpense(formData: FormData): Promise<void> {
     is_paid: false,
     status: 'pending',
     note: formData.get('note') as string || null,
-  })
+  }).then(warnOnError('expenses · app/admin/expenses/actions.ts:11'))
 
   revalidatePath('/admin/expenses')
 }
@@ -32,7 +33,7 @@ export async function markExpensePaid(formData: FormData): Promise<void> {
     status: 'paid',
     fact_date: formData.get('fact_date') as string,
     fact_sum: Number(formData.get('fact_sum')),
-  }).eq('id', formData.get('expense_id') as string)
+  }).eq('id', formData.get('expense_id') as string).then(warnOnError('expenses · app/admin/expenses/actions.ts:30'))
 
   revalidatePath('/admin/expenses')
 }
@@ -47,7 +48,7 @@ export async function markExpenseUnpaid(formData: FormData): Promise<void> {
     status: 'pending',
     fact_date: null,
     fact_sum: null,
-  }).eq('id', formData.get('expense_id') as string)
+  }).eq('id', formData.get('expense_id') as string).then(warnOnError('expenses · app/admin/expenses/actions.ts:45'))
 
   revalidatePath('/admin/expenses')
 }
@@ -62,7 +63,7 @@ export async function updateExpense(formData: FormData): Promise<void> {
     who: formData.get('who') as string || null,
     plan_date: formData.get('plan_date') as string || null,
     note: formData.get('note') as string || null,
-  }).eq('id', formData.get('expense_id') as string)
+  }).eq('id', formData.get('expense_id') as string).then(warnOnError('expenses · app/admin/expenses/actions.ts:60'))
 
   revalidatePath('/admin/expenses')
 }
@@ -78,7 +79,7 @@ export async function addFixedExpenseRecord(formData: FormData): Promise<void> {
     amount: Number(formData.get('amount')),
     is_paid: false,
     note: formData.get('note') as string || null,
-  })
+  }).then(warnOnError('fixed_expense_records · app/admin/expenses/actions.ts:75'))
 
   revalidatePath('/admin/expenses')
 }
@@ -92,7 +93,7 @@ export async function markFixedRecordPaid(formData: FormData): Promise<void> {
     is_paid: true,
     fact_date: formData.get('fact_date') as string,
     fact_amount: Number(formData.get('fact_amount')),
-  }).eq('id', formData.get('record_id') as string)
+  }).eq('id', formData.get('record_id') as string).then(warnOnError('fixed_expense_records · app/admin/expenses/actions.ts:91'))
 
   revalidatePath('/admin/expenses')
 }
@@ -106,7 +107,7 @@ export async function markFixedRecordUnpaid(formData: FormData): Promise<void> {
     is_paid: false,
     fact_date: null,
     fact_amount: null,
-  }).eq('id', formData.get('record_id') as string)
+  }).eq('id', formData.get('record_id') as string).then(warnOnError('fixed_expense_records · app/admin/expenses/actions.ts:105'))
 
   revalidatePath('/admin/expenses')
 }
@@ -118,7 +119,7 @@ export async function deleteFixedExpenseRecord(formData: FormData): Promise<void
 
   await supabase.from('fixed_expense_records')
     .delete()
-    .eq('id', formData.get('record_id') as string)
+    .eq('id', formData.get('record_id') as string).then(warnOnError('fixed_expense_records · app/admin/expenses/actions.ts:120'))
 
   revalidatePath('/admin/expenses')
   
@@ -130,7 +131,7 @@ export async function deleteExpense(formData: FormData): Promise<void> {
 
   await supabase.from('expenses')
     .delete()
-    .eq('id', formData.get('expense_id') as string)
+    .eq('id', formData.get('expense_id') as string).then(warnOnError('expenses · app/admin/expenses/actions.ts:132'))
 
   revalidatePath('/admin/expenses')
 }

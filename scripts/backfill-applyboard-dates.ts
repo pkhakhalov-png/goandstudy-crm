@@ -11,6 +11,7 @@
 import { config } from 'dotenv'
 import path from 'path'
 import { createClient } from '@supabase/supabase-js'
+import { warnOnError } from '../lib/supabase/write-guard'
 config({ path: path.resolve(process.cwd(), '.env.local') })
 
 const sb = createClient(
@@ -71,7 +72,7 @@ async function main() {
       }
       tasks.push(
         (async () => {
-          const r = await sb.from('programs').update(patch).eq('id', p.id)
+          const r = await sb.from('programs').update(patch).eq('id', p.id).then(warnOnError('programs · scripts/backfill-applyboard-dates.ts:74'))
           if (r.error) console.error(`  id=${p.id} update error:`, r.error.message)
           else updated++
         })(),

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createAdminClient, createClient as createSsrClient } from '@/lib/supabase/server'
+import { warnOnError } from '@/lib/supabase/write-guard'
 
 type AccessResult =
   | { ok: false; error: string }
@@ -129,7 +130,7 @@ export async function linkGlobalDocToApplication(opts: {
     content: opts.title || opts.docType,
     payload: { document_type: opts.docType, source: 'global_pool', global_doc_id: opts.globalDocId },
     author_id: ctx.user.id,
-  })
+  }).then(warnOnError('application_events · app/client/applications/[id]/wizard/actions.ts:126'))
 
   revalidatePath(`/client/applications/${opts.applicationId}/wizard`)
   return { ok: true }
@@ -157,7 +158,7 @@ export async function markApplicationReadyForCurator(opts: {
     content: 'Заявка отправлена клиентом — ожидает обработки куратором',
     payload: { from_stage: 'created', to_stage: 'submitted', source: 'client_wizard' },
     author_id: ctx.user.id,
-  })
+  }).then(warnOnError('application_events · app/client/applications/[id]/wizard/actions.ts:154'))
 
   revalidatePath(`/client/applications/${opts.applicationId}/wizard`)
   revalidatePath(`/client/applications/${opts.applicationId}`)

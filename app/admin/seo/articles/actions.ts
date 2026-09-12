@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { enqueueJob } from '@/lib/seo/enqueue'
 import { finalPreflight, checkPublishRate, publishDraft, promoteToPublish, type PublishInput } from '@/lib/seo/publish'
 import { getAuthor } from '@/lib/seo/authors'
+import { warnOnError } from '@/lib/supabase/write-guard'
 
 async function assertAdmin() {
   const supabase = await createClient()
@@ -132,7 +133,7 @@ export async function rejectArticle(articleId: number, reason: string) {
   await seo.from('change_sets').insert({
     article_id: articleId, kind: 'new_article', reason: `отклонено человеком: ${reason || 'без причины'}`,
     idempotency_key: `reject:${articleId}:${Date.now()}`, status: 'rejected', proposed_by: 'human',
-  })
+  }).then(warnOnError('change_sets · app/admin/seo/articles/actions.ts:133'))
   revalidatePath(`/admin/seo/articles/${articleId}`)
   return { ok: true }
 }
@@ -164,7 +165,7 @@ export async function sendDraftToWp(articleId: number) {
     const m: any = v?.meta ?? {}
     await seo.from('article_versions')
       .update({ meta: { ...m, publish: { ...(m.publish ?? {}), post_id: res.postId, post_type: postType, slug: payload.slug } } })
-      .eq('id', payload.versionId)
+      .eq('id', payload.versionId).then(warnOnError('article_versions · app/admin/seo/articles/actions.ts:167'))
 
     revalidatePath(`/admin/seo/articles/${articleId}`)
     return { ok: true, postId: res.postId }
@@ -194,7 +195,7 @@ export async function publishArticle(articleId: number, postId: number) {
       step: 'article_verify', lane: 'production', priority: 20,
       article_id: articleId, payload: { post_id: postId },
       next_run_at: new Date(Date.now() + 70_000).toISOString(),
-    })
+    }).then(warnOnError('jobs · app/admin/seo/articles/actions.ts:194'))
 
     revalidatePath(`/admin/seo/articles/${articleId}`)
     return { ok: true, note: 'опубликовано; через минуту система проверит страницу и вернёт в черновики, если что-то сломалось' }
@@ -315,7 +316,7 @@ export async function insertIncomingLinks(articleId: number, dryRun = true) {
     if (!res.ok) { report.push({ url: donorUrl, ok: false, note: res.reason }); continue }
     if (!dryRun) {
       await applyInsertion(seo, res.plan, res.newHtml, articleId)
-      await seo.from('link_suggestions').update({ status: 'applied' }).eq('id', l.id)
+      await seo.from('link_suggestions').update({ status: 'applied' }).eq('id', l.id).then(warnOnError('link_suggestions · app/admin/seo/articles/actions.ts:318'))
     }
     report.push({ url: donorUrl, ok: true, note: `анкор «${l.anchor}»: …${res.plan.before.slice(-50)}[${l.anchor}]${res.plan.after.slice(0, 50)}…` })
   }
@@ -417,7 +418,7 @@ export async function submitForIndexing(articleId: number) {
 
   await seo.from('article_versions')
     .update({ meta: { ...meta, indexnow: { at: new Date().toISOString(), status: res.status, note: res.note } } })
-    .eq('id', version?.id)
+    .eq('id', version?.id).then(warnOnError('article_versions · app/admin/seo/articles/actions.ts:420'))
 
   revalidatePath(`/admin/seo/articles/${articleId}`)
   return res.ok
@@ -449,7 +450,7 @@ export async function checkIndex(articleId: number) {
 
   await seo.from('article_versions')
     .update({ meta: { ...meta, index_check: { at: new Date().toISOString(), verdict: v.verdict, coverage: v.coverageState, note: v.note, last_crawl: v.lastCrawl } } })
-    .eq('id', version?.id)
+    .eq('id', version?.id).then(warnOnError('article_versions · app/admin/seo/articles/actions.ts:451'))
 
   revalidatePath(`/admin/seo/articles/${articleId}`)
   return { ok: true, note: `Google: ${v.note}${v.lastCrawl ? `, последний обход ${String(v.lastCrawl).slice(0, 10)}` : ''}` }
@@ -480,7 +481,7 @@ export async function saveFlowSettings(next: {
 
   if (windowChanged || justEnabled) {
     const at = firstPublishTime(merged)
-    await seo.from('settings').upsert({ key: 'next_publish_at', value: { at: at.toISOString() } }, { onConflict: 'key' })
+    await seo.from('settings').upsert({ key: 'next_publish_at', value: { at: at.toISOString() } }, { onConflict: 'key' }).then(warnOnError('settings · app/admin/seo/articles/actions.ts:484'))
   }
   revalidatePath('/admin/seo/articles')
   return { ok: true }
@@ -542,7 +543,7 @@ export async function decideTopic(
       dedup_key: `article:topic:${topicId}:forced:${Date.now()}`,
     })
     if (res.error) return { error: res.error }
-    await seo.from('topics').update({ status: 'in_production' }).eq('id', topicId)
+    await seo.from('topics').update({ status: 'in_production' }).eq('id', topicId).then(warnOnError('topics · app/admin/seo/articles/actions.ts:546'))
     revalidatePath('/admin/seo/articles')
     return { ok: true, note: `«${name}» отправлена в работу вашим решением` }
   }
@@ -552,7 +553,7 @@ export async function decideTopic(
     if (!/\/blog\//.test(targetUrl)) {
       // Страницы услуг живут не в теме, а в WordPress — их правка идёт другим
       // путём и отдельным решением
-      await seo.from('topics').update({ status: 'needs_update' }).eq('id', topicId)
+      await seo.from('topics').update({ status: 'needs_update' }).eq('id', topicId).then(warnOnError('topics · app/admin/seo/articles/actions.ts:556'))
       return { ok: true, note: `Записано. ${targetUrl.replace('https://goandstudy.com', '')} — не статья блога, её правку согласуем отдельно.` }
     }
 
@@ -564,18 +565,18 @@ export async function decideTopic(
     })
     if (res.error) return { error: res.error }
 
-    await seo.from('topics').update({ status: 'needs_update' }).eq('id', topicId)
+    await seo.from('topics').update({ status: 'needs_update' }).eq('id', topicId).then(warnOnError('topics · app/admin/seo/articles/actions.ts:568'))
     revalidatePath('/admin/seo/articles')
     return { ok: true, note: `Готовлю правку ${targetUrl.replace('https://goandstudy.com', '')}: снимок, предложение изменений, разница — придёт на вычитку.` }
   }
 
   if (action === 'review') {
-    await seo.from('topics').update({ status: 'in_review' }).eq('id', topicId)
+    await seo.from('topics').update({ status: 'in_review' }).eq('id', topicId).then(warnOnError('topics · app/admin/seo/articles/actions.ts:573'))
     revalidatePath('/admin/seo/articles')
     return { ok: true, note: `«${name}» отложена на рассмотрение` }
   }
 
-  await seo.from('topics').update({ status: 'rejected_duplicate' }).eq('id', topicId)
+  await seo.from('topics').update({ status: 'rejected_duplicate' }).eq('id', topicId).then(warnOnError('topics · app/admin/seo/articles/actions.ts:578'))
   revalidatePath('/admin/seo/articles')
   return { ok: true, note: `«${name}» отклонена как дубль` }
 }
@@ -623,7 +624,7 @@ export async function revertToVersion(articleId: number, versionId: number) {
   await seo.from('articles').update({
     current_version_id: copy.id,
     status: article?.status === 'published' ? 'published' : 'ready_for_review',
-  }).eq('id', articleId)
+  }).eq('id', articleId).then(warnOnError('articles · app/admin/seo/articles/actions.ts:624'))
 
   await seo.from('change_sets').insert({
     article_id: articleId, kind: 'revert',
@@ -631,7 +632,7 @@ export async function revertToVersion(articleId: number, versionId: number) {
     reason: `возврат к версии ${source.version_no} решением человека`,
     idempotency_key: `revert:${articleId}:${copy.id}`,
     status: 'applied', proposed_by: 'human',
-  })
+  }).then(warnOnError('change_sets · app/admin/seo/articles/actions.ts:628'))
 
   revalidatePath(`/admin/seo/articles/${articleId}`)
   return {

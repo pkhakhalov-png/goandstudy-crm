@@ -9,6 +9,7 @@
 import { config } from 'dotenv'; import path from 'path'
 config({ path: path.resolve(process.cwd(), '.env.local') })
 import { createClient } from '@supabase/supabase-js'
+import { warnOnError } from '../lib/supabase/write-guard'
 
 const seo = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!).schema('seo')
 
@@ -33,10 +34,10 @@ async function probe(runner: 'any' | 'vercel' | 'agent', asker: string | null) {
     if (rpcErr) throw new Error(rpcErr.message)
     const got = (claimed ?? []).some((j: any) => j.id === job.id)
     // Возвращаем задачу, чтобы не мешала остальным проверкам
-    await seo.from('jobs').update({ status: 'pending', locked_at: null, locked_by: null }).eq('id', job.id)
+    await seo.from('jobs').update({ status: 'pending', locked_at: null, locked_by: null }).eq('id', job.id).then(warnOnError('jobs · scripts/seo-check-routing.ts:36'))
     return got
   } finally {
-    await seo.from('jobs').delete().eq('id', job.id)
+    await seo.from('jobs').delete().eq('id', job.id).then(warnOnError('jobs · scripts/seo-check-routing.ts:39'))
   }
 }
 
@@ -72,13 +73,13 @@ async function main() {
 
   await check('старые задачи без исполнителя обрабатываются', async () => {
     const { data: job } = await seo.from('jobs')
-      .insert({ step: 'noop', lane: 'test', priority: 1, payload: {} }).select('id, runner').single()
+      .insert({ step: 'noop', lane: 'test', priority: 1, payload: {} }).select('id, runner').single().then(warnOnError('jobs · scripts/seo-check-routing.ts:75'))
     try {
       assert(job!.runner === 'any', `у новой задачи исполнитель «${job!.runner}», ожидали «any»`)
       const { data: claimed } = await seo.rpc('claim_jobs', { p_worker: 'probe-legacy', p_limit: 20, p_runner: 'vercel' })
       assert((claimed ?? []).some((j: any) => j.id === job!.id), 'задача без исполнителя не выдана никому')
       return 'по умолчанию «any», выдаётся как раньше'
-    } finally { await seo.from('jobs').delete().eq('id', job!.id) }
+    } finally { await seo.from('jobs').delete().eq('id', job!.id).then(warnOnError('jobs · scripts/seo-check-routing.ts:81')) }
   })
 
   await check('вызов без указания исполнителя работает', async () => {

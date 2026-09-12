@@ -2,6 +2,7 @@
 
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { warnOnError } from '@/lib/supabase/write-guard'
 
 async function assertRop() {
   const supabase = await createClient()
@@ -33,7 +34,7 @@ async function logAction(ropId: string, actionType: string, dealId?: string, sal
     deal_id: dealId || null,
     salesperson_id: salespersonId || null,
     metadata: metadata || {},
-  })
+  }).then(warnOnError('rop_actions_log · app/rop/actions.ts:30'))
 }
 
 export async function upsertSalesPlan(month: string, salespersonId: string | null, amount: number) {
@@ -70,7 +71,7 @@ export async function reassignDeal(dealId: string, newSalespersonId: string) {
     activity_type: 'system',
     content: 'РОП переназначил сделку',
     metadata: { from: deal.salesperson_id, to: newSalespersonId },
-  })
+  }).then(warnOnError('deal_activities · app/rop/actions.ts:68'))
   await logAction(user.id, 'reassign', dealId, newSalespersonId)
   reval()
   return { success: true }

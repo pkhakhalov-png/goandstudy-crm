@@ -3,6 +3,7 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { logActivity } from '@/lib/client-activity'
+import { warnOnError } from '@/lib/supabase/write-guard'
 
 const BUCKET = 'client-docs'
 const MAX_BYTES = 15 * 1024 * 1024
@@ -108,7 +109,7 @@ export async function createApplication(opts: {
     content: STAGE_LABELS.created,
     payload: { to_stage: 'created' },
     author_id: ctx.user.id,
-  })
+  }).then(warnOnError('application_events · app/curator/applications/actions.ts:105'))
 
   await logActivity(ctx.admin, {
     clientId: ctx.client.id,
@@ -150,7 +151,7 @@ export async function updateApplicationStage(opts: { applicationId: string; stag
     content: STAGE_LABELS[opts.stage],
     payload: { from_stage: prev?.stage, to_stage: opts.stage },
     author_id: ctx.user.id,
-  })
+  }).then(warnOnError('application_events · app/curator/applications/actions.ts:147'))
 
   // Заявку с её именем для лога
   const { data: app } = await ctx.admin
@@ -198,7 +199,7 @@ export async function setApplicationDecision(opts: {
     content: opts.notes ? `${DECISION_LABELS[opts.decision]} — ${opts.notes}` : DECISION_LABELS[opts.decision],
     payload: { decision: opts.decision },
     author_id: ctx.user.id,
-  })
+  }).then(warnOnError('application_events · app/curator/applications/actions.ts:195'))
 
   const { data: app2 } = await ctx.admin
     .from('client_applications')
@@ -396,7 +397,7 @@ export async function uploadApplicationDocument(formData: FormData) {
     content: title || docType,
     payload: { document_id: savedDocId, file_name: file.name, file_size_bytes: file.size },
     author_id: ctx.user.id,
-  })
+  }).then(warnOnError('application_events · app/curator/applications/actions.ts:393'))
 
   revalidateAll(ctx.client.id, applicationId)
   return { success: true as const }

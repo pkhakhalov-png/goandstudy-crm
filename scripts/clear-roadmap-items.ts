@@ -7,6 +7,7 @@
 import { config } from 'dotenv'
 import path from 'path'
 import { createClient } from '@supabase/supabase-js'
+import { warnOnError } from '../lib/supabase/write-guard'
 
 config({ path: path.resolve(process.cwd(), '.env.local') })
 
@@ -27,7 +28,7 @@ async function main() {
   }
   const stages = (raw.stages || []) as any[]
   const cleaned = { stages: stages.map(s => ({ ...s, items: [] })) }
-  await sb.from('clients').update({ roadmap_data: cleaned }).eq('id', CLIENT_ID)
+  await sb.from('clients').update({ roadmap_data: cleaned }).eq('id', CLIENT_ID).then(warnOnError('clients · scripts/clear-roadmap-items.ts:30'))
   console.log(`✓ очищено пунктов в ${stages.length} стадиях для клиента #${CLIENT_ID}`)
 }
 main().catch(e => { console.error(e); process.exit(1) })

@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createAdminClient, createClient as createSsrClient } from '@/lib/supabase/server'
 import { autoLinkGlobalDocs } from '@/app/client/applications/[id]/wizard/auto-link-helper'
+import { warnOnError } from '@/lib/supabase/write-guard'
 
 type ApplyResult =
   | { ok: true; applicationId: string; hasWizard: boolean }
@@ -94,7 +95,7 @@ export async function applyFromShortlist(opts: {
     await admin.from('application_profile_data').insert({
       application_id: app.id,
       data: {},
-    })
+    }).then(warnOnError('application_profile_data · app/client/shortlist/actions.ts:95'))
     await autoLinkGlobalDocs(app.id)
   }
 
@@ -105,7 +106,7 @@ export async function applyFromShortlist(opts: {
     content: 'Клиент инициировал подачу из подборки',
     payload: { source: 'shortlist', from_stage: null, to_stage: 'created' },
     author_id: user.id,
-  })
+  }).then(warnOnError('application_events · app/client/shortlist/actions.ts:102'))
 
   revalidatePath('/client/shortlist')
   revalidatePath('/client')

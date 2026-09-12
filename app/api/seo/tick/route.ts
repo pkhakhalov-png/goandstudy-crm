@@ -102,7 +102,7 @@ export async function POST(req: NextRequest) {
       if (!ap?.length) {
         await seo.from('jobs').insert({ step: 'article_autopublish', lane: 'production', priority: 14, payload: {} }).throwOnError()
       }
-      await seo.from('settings').upsert({ key: 'last_autostart_check', value: { at: new Date().toISOString() } }, { onConflict: 'key' })
+      await seo.from('settings').upsert({ key: 'last_autostart_check', value: { at: new Date().toISOString() } }, { onConflict: 'key' }).throwOnError()
     }
   } catch { /* поток не критичен для обработки очереди */ }
 

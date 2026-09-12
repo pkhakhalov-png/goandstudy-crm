@@ -2,6 +2,7 @@
 
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { warnOnError } from '@/lib/supabase/write-guard'
 
 type EssayType = 'resume' | 'motivation'
 
@@ -56,8 +57,8 @@ export async function saveClientDraft(opts: { clientId?: number; type: EssayType
   if (!existing) payload.status = 'draft'
 
   const { error } = existing
-    ? await admin.from('client_essays').update(payload).eq('id', existing.id)
-    : await admin.from('client_essays').insert(payload)
+    ? await admin.from('client_essays').update(payload).eq('id', existing.id).then(warnOnError('client_essays · app/client/essays/actions.ts:59'))
+    : await admin.from('client_essays').insert(payload).then(warnOnError('client_essays · app/client/essays/actions.ts:60'))
 
   if (error) return { error: error.message }
   revalidatePath('/client', 'layout')
@@ -155,7 +156,7 @@ export async function approveEssay(opts: { clientId: number; type: EssayType }) 
     activity_type: 'essay_approved',
     content: opts.type === 'resume' ? 'Куратор утвердил резюме' : 'Куратор утвердил мотивационное письмо',
     metadata: { essay_type: opts.type },
-  })
+  }).then(warnOnError('client_activities · app/client/essays/actions.ts:152'))
   if (logRes.error) {
     console.error('[approveEssay] activity log failed:', logRes.error.message, { clientId: opts.clientId, type: opts.type })
   }

@@ -2,6 +2,7 @@
 
 import { createAdminClient, createClient as createSsrClient } from '@/lib/supabase/server'
 import { lookupInvitation, sendClientWelcomeEmail } from '@/lib/invitation'
+import { warnOnError } from '@/lib/supabase/write-guard'
 
 export type ActivateResult = { ok: true } | { ok: false; error: string }
 
@@ -49,7 +50,7 @@ export async function activateClientAccount(params: {
     .from('users').select('id').eq('email', inv.email).maybeSingle()
   if (existingPublic) {
     // Уже был row (например seed) — подменяем id на новый authUserId
-    await admin.from('users').update({ id: authUserId, role: 'client' }).eq('id', existingPublic.id)
+    await admin.from('users').update({ id: authUserId, role: 'client' }).eq('id', existingPublic.id).then(warnOnError('users · app/invite/[token]/actions.ts:52'))
   } else {
     const { error: pubErr } = await admin.from('users').insert({
       id: authUserId,
@@ -65,7 +66,7 @@ export async function activateClientAccount(params: {
   // 4. Помечаем invitation как использованный
   await admin.from('client_invitations')
     .update({ used_at: new Date().toISOString() })
-    .eq('id', inv.id)
+    .eq('id', inv.id).then(warnOnError('client_invitations · app/invite/[token]/actions.ts:67'))
 
   // 5. Логиним пользователя через ssr client (cookies)
   const ssr = await createSsrClient()

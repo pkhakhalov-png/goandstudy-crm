@@ -542,13 +542,102 @@ async function workerSteps(): Promise<Step[]> {
   const { loadPageDays } = await import('../lib/seo/gsc-agg')
   const { loadQueryDays } = await import('../lib/seo/positions')
   const { loadQueryRows, loadPageTypes } = await import('../lib/seo/cannibal')
+  const { metaByVersion } = await import('../lib/seo/article-meta')
+  const { fetchAll } = await import('../lib/seo/steps-article')
+  const { loadSiteTargets } = await import('../lib/seo/blog-style')
+  const { loadClaims } = await import('../lib/seo/claims')
+
+  // Образец статьи и версии — их читают почти все шаги статьи
+  const sample = async () => {
+    const { data: a } = await seo.from('articles').select('id, current_version_id, topic_id, status')
+      .not('current_version_id', 'is', null).limit(1).maybeSingle()
+    return a
+  }
+  const readVersion = async (cols: string) => {
+    const a = await sample()
+    if (!a?.current_version_id) return
+    await seo.from('article_versions').select(cols).eq('id', a.current_version_id).maybeSingle()
+  }
 
   return [
-    { name: 'positions_snapshot', source: 'lib/seo/steps-article.ts', run: async () => { await loadQueryDays(seo, 21) } },
-    { name: 'article_autostart', source: 'lib/seo/steps-article.ts', run: async () => { await all(loadQueryRows(seo, 90), loadPageTypes(seo)) } },
+    /* ── Производство статьи ─────────────────────────────────────────────── */
+    { name: 'article_brief', source: 'lib/seo/steps-article.ts', run: async () => {
+      const a = await sample()
+      await seo.from('topics').select('id,title,primary_keyword,cluster').eq('id', a?.topic_id ?? 0).maybeSingle()
+      await seo.from('articles').select('id, primary_keyword').neq('status', 'rejected')
+      // buildContext: запросная статистика целиком плюс страницы с векторами
+      await fetchAll(seo, 'gsc_daily', 'query,clicks,impressions,position')
+      await fetchAll(seo, 'pages', 'id,url,normalized_url,title,page_type,embedding',
+        (q: any) => q.is('removed_at', null).not('embedding', 'is', null))
+    } },
+    { name: 'article_draft', source: 'lib/seo/steps-article.ts', run: async () => {
+      await readVersion('id,version_no,body,meta')
+      await all(loadSiteTargets(seo), loadClaims(seo, ['goandstudy']))
+    } },
+    { name: 'article_qa', source: 'lib/seo/steps-article.ts', run: async () => {
+      await readVersion('id,version_no,body,meta')
+      await loadSiteTargets(seo)
+    } },
+    { name: 'article_cover', source: 'lib/seo/steps-article.ts', run: async () => {
+      await readVersion('id, title, body, meta')
+    } },
+    { name: 'article_linkplan', source: 'lib/seo/steps-article.ts', run: async () => {
+      await fetchAll(seo, 'pages', 'id,url,normalized_url,title,embedding,h1,meta_desc',
+        (q: any) => q.is('removed_at', null).not('embedding', 'is', null))
+    } },
+    { name: 'article_publish_blog', source: 'lib/seo/steps-article.ts', run: async () => {
+      await readVersion('id, title, body, meta')
+    } },
+    { name: 'article_verify', source: 'lib/seo/steps-article.ts', run: async () => {
+      await readVersion('title, body, meta')
+    } },
+    { name: 'article_fix', source: 'lib/seo/steps-article.ts', run: async () => {
+      const a = await sample()
+      await seo.from('article_versions').select('id, title, body, meta, qa_report').eq('id', a?.current_version_id ?? 0).maybeSingle()
+      await seo.from('topics').select('id,title,primary_keyword,cluster').eq('id', a?.topic_id ?? 0).maybeSingle()
+      await loadSiteTargets(seo)
+    } },
+
+    /* ── Наблюдение и самостоятельная работа ─────────────────────────────── */
+    { name: 'article_index_check', source: 'lib/seo/steps-article.ts', run: async () => {
+      const { data: articles } = await seo.from('articles')
+        .select('id, current_version_id, indexed_at').eq('status', 'published').order('id')
+      await metaByVersion(seo, (articles ?? []).map((a: any) => a.current_version_id))
+    } },
     { name: 'index_check_site', source: 'lib/seo/steps-article.ts', run: async () => {
-      await seo.from('pages').select('id, normalized_url').is('removed_at', null).eq('indexable', true).eq('http_status', 200)
-      await seo.from('index_status').select('page_id, checked_at')
+      await all(
+        seo.from('pages').select('id, normalized_url').is('removed_at', null).eq('indexable', true).eq('http_status', 200),
+        seo.from('index_status').select('page_id, checked_at'),
+      )
+    } },
+    { name: 'article_autostart', source: 'lib/seo/steps-article.ts', run: async () => {
+      await all(loadQueryRows(seo, 90), loadPageTypes(seo))
+    } },
+    { name: 'article_autopublish', source: 'lib/seo/steps-article.ts', run: async () => {
+      const { data: cands } = await seo.from('articles')
+        .select('id, current_version_id, status').eq('status', 'ready_for_review')
+      const ids = (cands ?? []).map((c: any) => c.current_version_id).filter(Boolean)
+      if (ids.length) await seo.from('article_versions').select('id, title, body, meta, qa_report').in('id', ids)
+      await loadSiteTargets(seo)
+    } },
+    { name: 'article_update_plan', source: 'lib/seo/steps-article.ts', run: async () => { await loadPageDays(seo) } },
+    { name: 'positions_snapshot', source: 'lib/seo/steps-article.ts', run: async () => {
+      const { data: arts } = await seo.from('articles').select('current_version_id').eq('status', 'published')
+      await metaByVersion(seo, (arts ?? []).map((a: any) => a.current_version_id))
+      await loadQueryDays(seo, 21)
+    } },
+    { name: 'yandex_sync', source: 'lib/seo/steps-article.ts', run: async () => {
+      const { data: arts } = await seo.from('articles')
+        .select('id, primary_keyword, current_version_id, published_at').eq('status', 'published')
+      await metaByVersion(seo, (arts ?? []).map((a: any) => a.current_version_id))
+      await all(
+        seo.from('pages').select('id, normalized_url').is('removed_at', null),
+        seo.from('settings').select('value').eq('key', 'yandex_snapshot').maybeSingle(),
+      )
+    } },
+    { name: 'topics_from_gsc', source: 'lib/seo/steps-article.ts', run: async () => {
+      await fetchAll(seo, 'gsc_daily', 'normalized_url,query,clicks,impressions,position')
+      await fetchAll(seo, 'topics', 'title,primary_keyword')
     } },
     { name: 'attribution_stitch', source: 'lib/seo/attribution.ts', run: async () => {
       const { data: unmatched } = await seo.from('lead_identities')
@@ -563,33 +652,12 @@ async function workerSteps(): Promise<Step[]> {
       )
     } },
     { name: 'gsc_import (чтение)', source: 'lib/seo/steps.ts', run: async () => {
-      await seo.from('gsc_daily').select('date').order('date', { ascending: false }).limit(1)
-      await seo.from('gsc_page_daily').select('date').order('date', { ascending: false }).limit(1)
+      await all(
+        seo.from('gsc_daily').select('date').order('date', { ascending: false }).limit(1),
+        seo.from('gsc_page_daily').select('date').order('date', { ascending: false }).limit(1),
+      )
     } },
-    { name: 'topics_from_gsc', source: 'lib/seo/steps-article.ts', run: async () => { await loadQueryRows(seo, 90) } },
-    { name: 'article_update_plan', source: 'lib/seo/steps-article.ts', run: async () => { await loadPageDays(seo) } },
-    { name: 'article_index_check', source: 'lib/seo/steps-article.ts', run: async () => {
-      const { data: articles } = await seo.from('articles')
-        .select('id, current_version_id, indexed_at').eq('status', 'published').order('id')
-      const { metaByVersion } = await import('../lib/seo/article-meta')
-      await metaByVersion(seo, (articles ?? []).map((a: any) => a.current_version_id))
-    } },
-    { name: 'article_autopublish (отбор)', source: 'lib/seo/steps-article.ts', run: async () => {
-      const { data: cands } = await seo.from('articles')
-        .select('id, current_version_id, status').eq('status', 'ready_for_review')
-      const ids = (cands ?? []).map((c: any) => c.current_version_id).filter(Boolean)
-      if (ids.length) await seo.from('article_versions').select('id, title, body, meta, qa_report').in('id', ids)
-    } },
-    // Остальные шаги статьи (brief, draft, qa, cover, linkplan, publish_blog,
-    // verify, fix) обращаются к базе одинаково: читают одну статью и её версию,
-    // пишут одну версию. Меряем этот общий образец — у каждого из них он свой,
-    // но одинаковый по стоимости.
-    { name: 'шаг статьи: чтение статьи и версии', source: 'lib/seo/steps-article.ts', run: async () => {
-      const { data: a } = await seo.from('articles').select('id, current_version_id, topic_id, status').limit(1).maybeSingle()
-      if (a?.current_version_id) {
-        await seo.from('article_versions').select('id, title, body, meta, qa_report').eq('id', a.current_version_id).maybeSingle()
-      }
-    } },
+    { name: 'traffic_snapshot', source: 'lib/seo/traffic-snapshot.ts', run: async () => { await loadPageDays(seo) } },
   ]
 }
 

@@ -6,6 +6,7 @@ import type { RoadmapData, RoadmapStage, RoadmapItem } from './roadmap-types'
 import { DEFAULT_ROADMAP_TEMPLATE } from './roadmap-types'
 import { logActivity } from './client-activity'
 import { randomUUID } from 'crypto'
+import { warnOnError } from '@/lib/supabase/write-guard'
 
 type ActionResult = { ok: true } | { ok: false; error: string }
 const CURATOR_ROLES = new Set(['curator', 'admin', 'rop'])
@@ -39,7 +40,7 @@ async function readRoadmap(clientId: number, admin: Awaited<ReturnType<typeof cr
 }
 
 async function writeRoadmap(clientId: number, data: RoadmapData, admin: Awaited<ReturnType<typeof createAdminClient>>) {
-  return admin.from('clients').update({ roadmap_data: data }).eq('id', clientId)
+  return admin.from('clients').update({ roadmap_data: data }).eq('id', clientId).then(warnOnError('clients · lib/roadmap-actions.ts:42'))
 }
 
 function revalidate(clientId: number) {

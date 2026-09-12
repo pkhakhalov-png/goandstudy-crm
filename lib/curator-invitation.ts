@@ -5,6 +5,7 @@
 
 import { createAdminClient } from './supabase/server'
 import { randomBytes } from 'crypto'
+import { warnOnError } from '@/lib/supabase/write-guard'
 
 const INVITE_TTL_DAYS = 30
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://crm.goandstudy.com'
@@ -79,7 +80,7 @@ export async function createCuratorInvitation(
 
   await admin.from('curator_invitations')
     .update({ email_sent_at: emailSent ? new Date().toISOString() : null, email_error: emailError || null })
-    .eq('id', invite.id)
+    .eq('id', invite.id).then(warnOnError('curator_invitations · lib/curator-invitation.ts:81'))
 
   return { ok: true, url, emailSent, emailError }
 }

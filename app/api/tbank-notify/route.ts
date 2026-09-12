@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { verifyNotificationToken } from '@/lib/tbank'
+import { warnOnError } from '@/lib/supabase/write-guard'
 
 export async function POST(request: NextRequest) {
   const body = await request.json()
@@ -19,7 +20,7 @@ export async function POST(request: NextRequest) {
   await supabase
     .from('invoices')
     .update({ status: Status, updated_at: new Date().toISOString() })
-    .eq('payment_id', String(PaymentId))
+    .eq('payment_id', String(PaymentId)).then(warnOnError('invoices · app/api/tbank-notify/route.ts:21'))
 
   return NextResponse.json({ ok: true })
 }

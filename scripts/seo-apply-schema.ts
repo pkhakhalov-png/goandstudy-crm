@@ -12,6 +12,7 @@ import { config } from 'dotenv'; import path from 'path'
 import { createClient } from '@supabase/supabase-js'
 config({ path: path.resolve(process.cwd(), '.env.local') })
 import { wp, wpConfigured } from '../lib/seo/wp'
+import { warnOnError } from '../lib/supabase/write-guard'
 
 const seo = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } }).schema('seo')
 
@@ -68,10 +69,10 @@ async function main() {
         const r = await wp.resolve(url)
         if (!r.found || !r.post_id) { console.log(`${head}  → ✗ страница не найдена в WP`); missing++; continue }
         postId = r.post_id
-        await seo.from('pages').update({ wp_post_id: postId }).eq('id', item.page_id)
+        await seo.from('pages').update({ wp_post_id: postId }).eq('id', item.page_id).then(warnOnError('pages · scripts/seo-apply-schema.ts:71'))
       }
       await wp.patchPost(postId, { schema: item.jsonld, idempotency_key: `schema:${item.id}` })
-      await seo.from('page_schema').update({ status: 'applied', applied_at: new Date().toISOString() }).eq('id', item.id)
+      await seo.from('page_schema').update({ status: 'applied', applied_at: new Date().toISOString() }).eq('id', item.id).then(warnOnError('page_schema · scripts/seo-apply-schema.ts:74'))
       console.log(`${head}  → ✓ post_id=${postId}`)
       ok++
     } catch (err: any) {

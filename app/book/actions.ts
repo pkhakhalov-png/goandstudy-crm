@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { normalizePhone } from '@/lib/phone'
 import { timeToMinutes, MIN_GAP_MINUTES } from '@/lib/time'
 import { notifyNewBooking } from '@/lib/telegram'
+import { warnOnError } from '@/lib/supabase/write-guard'
 
 // UTM-метки + страница источника (скрытно собраны на /book). Парсим и приводим к сводке.
 function parseUtm(formData: FormData): Record<string, string> {
@@ -170,7 +171,7 @@ export async function createBooking(formData: FormData) {
   await supabase
     .from('users')
     .update({ round_robin_count: assignedUser.round_robin_count + 1 })
-    .eq('id', assignedUser.id)
+    .eq('id', assignedUser.id).then(warnOnError('users · app/book/actions.ts:172'))
 
   // 7. Auto-create deal in funnel (with dedup via indexed phone_normalized)
   try {
@@ -192,13 +193,13 @@ export async function createBooking(formData: FormData) {
       const updates: Record<string, any> = { updated_at: new Date().toISOString() }
       if (!existingDeal.contact_telegram && clientTelegram) updates.contact_telegram = clientTelegram
       if (!existingDeal.booking_id && insertedBooking?.id) updates.booking_id = insertedBooking.id
-      await supabase.from('deals').update(updates).eq('id', existingDeal.id)
+      await supabase.from('deals').update(updates).eq('id', existingDeal.id).then(warnOnError('deals · app/book/actions.ts:195'))
 
       await supabase.from('deal_activities').insert({
         deal_id: existingDeal.id,
         activity_type: 'system',
         content: `Повторная запись объединена (${clientName}, ${clientPhone})`,
-      })
+      }).then(warnOnError('deal_activities · app/book/actions.ts:197'))
     } else {
       const { data: firstStage } = await supabase
         .from('pipeline_stages')
@@ -233,7 +234,7 @@ export async function createBooking(formData: FormData) {
             quiz_consultation_format: quizData.consultation_format,
             ...utm,
           },
-        })
+        }).then(warnOnError('deals · app/book/actions.ts:212')).then(warnOnError('deals · сделка по заявке с сайта'))
       }
     }
   } catch {}
@@ -345,14 +346,14 @@ export async function createLowBudgetDeal(formData: FormData) {
       low_budget: true,
       ...utm,
     },
-  })
+  }).then(warnOnError('deals · app/book/actions.ts:324'))
 
   // Increment round-robin
   if (assignedId && salespersons?.[0]) {
     await supabase
       .from('users')
       .update({ round_robin_count: salespersons[0].round_robin_count + 1 })
-      .eq('id', assignedId)
+      .eq('id', assignedId).then(warnOnError('users · app/book/actions.ts:354'))
   }
 
   return { success: true }

@@ -1,6 +1,7 @@
 import { config } from 'dotenv'
 import path from 'path'
 import { createClient } from '@supabase/supabase-js'
+import { warnOnError } from '../lib/supabase/write-guard'
 
 config({ path: path.resolve(process.cwd(), '.env.local') })
 
@@ -35,7 +36,7 @@ async function main() {
   delete extras.cover_photo_url
   delete extras.cover_photo_by
   rawData.curator_extras = extras
-  await parser.from('schools').update({ raw_data: rawData }).eq('id', SCHOOL_ID)
+  await parser.from('schools').update({ raw_data: rawData }).eq('id', SCHOOL_ID).then(warnOnError('schools · scripts/test-save-cover.ts:38'))
   console.log('✓ Тест прошёл, состояние откатилось')
 }
 main().catch(e => { console.error(e); process.exit(1) })

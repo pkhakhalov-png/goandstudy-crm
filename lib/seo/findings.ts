@@ -166,7 +166,7 @@ export async function computeTechnicalFindings(seo: any, safeFetch: (u: string) 
   }
 
   // перезаписать открытые незанятые технические находки
-  await seo.from('findings').delete().in('kind', TECH_KINDS).eq('status', 'open').is('change_set_id', null)
+  await seo.from('findings').delete().in('kind', TECH_KINDS).eq('status', 'open').is('change_set_id', null).throwOnError()
   const now = new Date().toISOString()
   const rows = findings.map((f) => ({ ...f, status: 'open', detected_at: now, last_seen_at: now }))
   for (let i = 0; i < rows.length; i += 200) {
@@ -281,9 +281,9 @@ export async function computeInventoryFindings(seo: any): Promise<Record<string,
   }
 
   // перезаписать открытые незанятые находки этих видов
-  await seo.from('findings').delete().in('kind', ['orphan', 'duplicate_title', 'content_gap']).eq('status', 'open').is('change_set_id', null)
+  await seo.from('findings').delete().in('kind', ['orphan', 'duplicate_title', 'content_gap']).eq('status', 'open').is('change_set_id', null).throwOnError()
   // каннибализацию трогаем только «эмбеддинговую» — GSC-версию (signal=gsc) не сносим
-  await seo.from('findings').delete().eq('kind', 'cannibalization').filter('evidence->>signal', 'eq', 'embedding').eq('status', 'open').is('change_set_id', null)
+  await seo.from('findings').delete().eq('kind', 'cannibalization').filter('evidence->>signal', 'eq', 'embedding').eq('status', 'open').is('change_set_id', null).throwOnError()
   const now = new Date().toISOString()
   const rows = findings.map((f) => ({ ...f, status: 'open', detected_at: now, last_seen_at: now }))
   for (let i = 0; i < rows.length; i += 200) {
@@ -450,8 +450,8 @@ export async function computeGscFindings(seo: any): Promise<Record<string, numbe
   findings.push(...cannib.slice(0, 120))
 
   // перезапись: striking/ctr целиком; каннибализацию — только GSC-версию (signal=gsc)
-  await seo.from('findings').delete().in('kind', GSC_KINDS).eq('status', 'open').is('change_set_id', null)
-  await seo.from('findings').delete().eq('kind', 'cannibalization').filter('evidence->>signal', 'eq', 'gsc').eq('status', 'open').is('change_set_id', null)
+  await seo.from('findings').delete().in('kind', GSC_KINDS).eq('status', 'open').is('change_set_id', null).throwOnError()
+  await seo.from('findings').delete().eq('kind', 'cannibalization').filter('evidence->>signal', 'eq', 'gsc').eq('status', 'open').is('change_set_id', null).throwOnError()
   const now = new Date().toISOString()
   const rows = findings.map((f) => ({ ...f, status: 'open', detected_at: now, last_seen_at: now }))
   for (let i = 0; i < rows.length; i += 200) {
@@ -460,7 +460,7 @@ export async function computeGscFindings(seo: any): Promise<Record<string, numbe
   }
 
   // сохранить CTR-модель в settings (для UI и переиспользования)
-  await seo.from('settings').upsert({ key: 'ctr_model', value: { model: ctrModel, window_days: Math.round(windowDays), computed_from: `${dMin}..${dMax}` } as any }, { onConflict: 'key' })
+  await seo.from('settings').upsert({ key: 'ctr_model', value: { model: ctrModel, window_days: Math.round(windowDays), computed_from: `${dMin}..${dMax}` } as any }, { onConflict: 'key' }).throwOnError()
 
   const counts: Record<string, number> = {}
   for (const f of findings) counts[f.kind] = (counts[f.kind] || 0) + 1

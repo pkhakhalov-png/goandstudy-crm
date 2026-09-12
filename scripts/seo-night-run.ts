@@ -1,9 +1,10 @@
 import { config } from 'dotenv'; import path from 'path'; import { createClient } from '@supabase/supabase-js'
+import { warnOnError } from '../lib/supabase/write-guard'
 config({ path: path.resolve(process.cwd(), '.env.local') })
 const seo = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {auth:{persistSession:false}}).schema('seo')
 async function main(){
   if(process.argv[2]==='start'){
-    await seo.from('jobs').insert([{step:'findings_inventory',lane:'findings',priority:40,payload:{}},{step:'check_missing_links',lane:'crawl',priority:45,payload:{}}])
+    await seo.from('jobs').insert([{step:'findings_inventory',lane:'findings',priority:40,payload:{}},{step:'check_missing_links',lane:'crawl',priority:45,payload:{}}]).then(warnOnError('jobs · scripts/seo-night-run.ts:6'))
     console.log('✓ findings_inventory + check_missing_links поставлены')
   }
   const {data}=await seo.from('findings').select('kind,confidence').eq('status','open')

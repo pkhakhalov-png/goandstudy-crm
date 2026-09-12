@@ -17,6 +17,7 @@
 import { config } from 'dotenv'
 import path from 'path'
 import { createClient } from '@supabase/supabase-js'
+import { warnOnError } from '../lib/supabase/write-guard'
 config({ path: path.resolve(process.cwd(), '.env.local') })
 const parser = createClient(process.env.NEXT_PUBLIC_PARSER_SUPABASE_URL!, process.env.PARSER_SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } })
 
@@ -111,7 +112,7 @@ async function main() {
 
   // 1) Shoreline AA-DTA
   if (!existShore?.length) {
-    const r = await parser.from('programs').insert(shorelineAADTA).select('id, name, school_id').single()
+    const r = await parser.from('programs').insert(shorelineAADTA).select('id, name, school_id').single().then(warnOnError('programs · scripts/add-shoreline-elgin-associate.ts:114'))
     if (r.error) { console.error('SHORELINE INSERT ERR:', r.error.message); process.exit(1) }
     console.log('✅ Shoreline AA-DTA вставлен:', JSON.stringify(r.data))
   }
@@ -121,7 +122,7 @@ async function main() {
   if (existElgin?.length) {
     elginId = existElgin[0].id
   } else {
-    const r = await parser.from('schools').insert(elginSchool).select('id, name').single()
+    const r = await parser.from('schools').insert(elginSchool).select('id, name').single().then(warnOnError('schools · scripts/add-shoreline-elgin-associate.ts:124'))
     if (r.error) { console.error('ELGIN SCHOOL INSERT ERR:', r.error.message); process.exit(1) }
     elginId = r.data.id
     console.log('✅ Elgin школа создана:', JSON.stringify(r.data))
@@ -132,7 +133,7 @@ async function main() {
     const prog = build(elginId)
     const { data: exist } = await parser.from('programs').select('id').eq('school_id', elginId).eq('name', prog.name)
     if (exist?.length) { console.log(`⚠️ "${prog.name}" уже есть — пропуск`); continue }
-    const r = await parser.from('programs').insert(prog).select('id, name, school_id').single()
+    const r = await parser.from('programs').insert(prog).select('id, name, school_id').single().then(warnOnError('programs · scripts/add-shoreline-elgin-associate.ts:135'))
     if (r.error) { console.error(`ELGIN "${prog.name}" INSERT ERR:`, r.error.message); process.exit(1) }
     console.log(`✅ ${prog.name} вставлен:`, JSON.stringify(r.data))
   }
