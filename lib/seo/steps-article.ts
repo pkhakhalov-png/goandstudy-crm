@@ -1067,10 +1067,12 @@ registerStep('article_autopublish', async (_job: Job, seo: any): Promise<StepOut
  * когда Google о ней ещё не знал.
  */
 registerStep('yandex_sync', async (_job: Job, seo: any): Promise<StepOutcome> => {
-  const { yandexConfigured, hostId, checkUrls, popularQueries } = await import('./yandex')
+  const { yandexConfigured, hostId, inSearchSamples, inSearchCount, popularQueries, recrawlQuota } = await import('./yandex')
   if (!yandexConfigured()) return { outcome: 'done', result: { skipped: 'нет доступа к Вебмастеру', cost: 0 } }
 
   const host = await hostId()
+  const samples = await inSearchSamples(host)
+  const total = await inSearchCount(host)
 
   // Наши статьи: по ним вопрос «дошло ли» стоит острее всего
   const { data: arts } = await seo.from('articles')
@@ -1082,14 +1084,42 @@ registerStep('yandex_sync', async (_job: Job, seo: any): Promise<StepOutcome> =>
     if (slug) ours.push({ id: a.id, keyword: a.primary_keyword, url: `https://goandstudy.com/blog/${slug}/` })
   }
 
-  const states = ours.length ? await checkUrls(ours.map((o) => o.url), host) : []
+  const norm = (u: string) => u.replace(/\/$/, '')
+  const states = ours.map((o) => {
+    const found = samples.get(norm(o.url))
+    return {
+      url: o.url,
+      inSearch: found ? true : null,
+      lastAccess: found?.lastAccess ?? null,
+      note: found ? 'в поиске Яндекса' : 'среди присланных Яндексом страниц не найдена',
+    }
+  })
+
+  // Весь сайт: сверяем инвентарь с тем, что Яндекс держит в поиске
+  const { data: pages } = await seo.from('pages')
+    .select('normalized_url, page_type').is('removed_at', null).eq('indexable', true).eq('http_status', 200)
+  const site = (pages ?? [])
+    .filter((p: any) => String(p.normalized_url).startsWith('https://goandstudy.com'))
+    .map((p: any) => {
+      const found = samples.get(norm(p.normalized_url))
+      return { url: p.normalized_url, inSearch: !!found, lastAccess: found?.lastAccess ?? null }
+    })
+
   const queries = await popularQueries(host, 500).catch(() => [])
+  const quota = await recrawlQuota(host).catch(() => null)
 
   await seo.from('settings').upsert({
     key: 'yandex_snapshot',
     value: {
       computedAt: new Date().toISOString(),
       articles: ours.map((o, i) => ({ ...o, ...states[i] })),
+      // Число из истории — точное. Выборка адресов может быть меньше: Яндекс
+      // не обязуется прислать всё, и путать одно с другим нельзя.
+      inSearchTotal: total.count,
+      inSearchAsOf: total.date,
+      sampled: samples.size,
+      quota,
+      site,
       queries: queries.slice(0, 200),
       totals: {
         impressions: queries.reduce((s, q) => s + q.impressions, 0),
@@ -1103,6 +1133,9 @@ registerStep('yandex_sync', async (_job: Job, seo: any): Promise<StepOutcome> =>
     result: {
       articles: states.length,
       inSearch: states.filter((s) => s.inSearch).length,
+      site_in_search: site.filter((p: { inSearch: boolean }) => p.inSearch).length,
+      site_total: site.length,
+      yandex_says: total.count,
       queries: queries.length,
       cost: 0,
     },

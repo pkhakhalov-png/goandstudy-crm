@@ -30,8 +30,10 @@ function label(verdict: string | null, coverage: string | null): { text: string;
   return { text: 'не в индексе', color: 'var(--purple)' }
 }
 
-export default async function IndexationPage({ searchParams }: { searchParams: Promise<{ dni?: string }> }) {
-  const days = Math.min(365, Math.max(7, Number((await searchParams).dni ?? 30)))
+export default async function IndexationPage({ searchParams }: { searchParams: Promise<{ dni?: string; poisk?: string }> }) {
+  const params = await searchParams
+  const days = Math.min(365, Math.max(7, Number(params.dni ?? 30)))
+  const poisk = params.poisk === 'yandex' ? 'yandex' : 'google'
   const sb = await createAdminClient()
   const seo = sb.schema('seo')
 
@@ -137,9 +139,28 @@ export default async function IndexationPage({ searchParams }: { searchParams: P
 
   return (
     <div>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+        {[['google', 'Google'], ['yandex', 'Яндекс']].map(([key, label]) => (
+          <Link key={key} href={`/admin/seo/indexation?poisk=${key}`}
+            style={{
+              padding: '6px 16px', borderRadius: 8, fontSize: 13, textDecoration: 'none',
+              border: `1px solid ${poisk === key ? 'var(--purple)' : 'var(--bor2)'}`,
+              background: poisk === key ? 'rgba(177,94,204,.10)' : 'var(--surf2)',
+              color: poisk === key ? 'var(--purple)' : 'var(--text)',
+              fontWeight: poisk === key ? 700 : 400,
+            }}>
+            {label}
+          </Link>
+        ))}
+      </div>
+
+      {poisk === 'yandex' ? (
+        <YandexTab snapshot={yandex} />
+      ) : (
+      <>
       <div style={{ marginBottom: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
         <div>
-          <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 4px' }}>Индексация</h2>
+          <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 4px' }}>Индексация в Google</h2>
           <p style={{ color: 'var(--muted)', fontSize: 13, margin: 0, maxWidth: 720 }}>
             Ответы Search Console по каждой странице — то же, что показывает «Проверка URL» в их
             интерфейсе. Проверка идёт сама раз в сутки: пока страница не в индексе — каждые два дня,
@@ -334,6 +355,121 @@ export default async function IndexationPage({ searchParams }: { searchParams: P
           Инвентарь пуст — сначала обход сайта на вкладке <Link href="/admin/seo/pages" style={{ color: 'var(--purple)' }}>Страницы</Link>.
         </div>
       )}
+      </>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Что показывает Яндекс.
+ *
+ * Отличие от Google принципиальное и его видно в цифрах: Яндекс отдаёт число
+ * страниц в поиске, но список — выборкой. Поэтому «не нашли» и «нет в индексе»
+ * здесь разные вещи, и подменять одно другим нельзя.
+ */
+function YandexTab({ snapshot }: { snapshot: any }) {
+  if (!snapshot) {
+    return (
+      <div style={{ fontSize: 13, color: 'var(--muted)' }}>
+        Данных нет: либо доступ к Вебмастеру не настроен, либо воркер ещё не собирал снимок.
+      </div>
+    )
+  }
+
+  const site: { url: string; inSearch: boolean; lastAccess: string | null }[] = snapshot.site ?? []
+  const found = site.filter((p) => p.inSearch)
+  const missing = site.filter((p) => !p.inSearch)
+  const arts: any[] = snapshot.articles ?? []
+
+  return (
+    <div>
+      <div style={{ marginBottom: 14 }}>
+        <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 4px' }}>Индексация в Яндексе</h2>
+        <p style={{ color: 'var(--muted)', fontSize: 13, margin: 0, maxWidth: 760, lineHeight: 1.55 }}>
+          Данные Вебмастера. В отличие от Google, Яндекс принимает заявку на переобход — после каждой
+          публикации мы её отправляем, поэтому статьи появляются здесь быстрее.
+          {snapshot.computedAt && ` Снимок от ${new Date(snapshot.computedAt).toLocaleString('ru')}.`}
+        </p>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 18 }}>
+        <Card label="Страниц в поиске" value={snapshot.inSearchTotal ?? 0} color="var(--green)"
+          sub={snapshot.inSearchAsOf ? `по данным Яндекса на ${new Date(snapshot.inSearchAsOf).toLocaleDateString('ru')}` : 'по данным Яндекса'} />
+        <Card label="Наших страниц найдено" value={found.length} sub={`из ${site.length} в инвентаре`} />
+        <Card label="Не нашли" value={missing.length} color={missing.length ? 'var(--purple)' : undefined}
+          sub={missing.length ? 'среди присланных' : 'все на месте'} />
+        <Card label="Заявок на переобход" value={snapshot.quota ? snapshot.quota.total - snapshot.quota.used : 0}
+          sub={snapshot.quota ? `осталось сегодня из ${snapshot.quota.total}` : 'квота неизвестна'} />
+      </div>
+
+      {arts.length > 0 && (
+        <div style={{ border: '1px solid var(--bor)', borderRadius: 12, overflow: 'hidden', marginBottom: 16 }}>
+          <div style={{ padding: '10px 14px', background: 'var(--surf2)' }}>
+            <div style={{ fontSize: 13, fontWeight: 700 }}>Наши статьи · {arts.length}</div>
+          </div>
+          <div style={{ padding: '0 6px 6px' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+              <thead>
+                <tr style={{ color: 'var(--muted)', textAlign: 'left' }}>
+                  <th style={th}>Статья</th>
+                  <th style={th}>Состояние</th>
+                  <th style={th}>Яндекс заходил</th>
+                </tr>
+              </thead>
+              <tbody>
+                {arts.map((a: any) => (
+                  <tr key={a.id} style={{ borderTop: '1px solid var(--bor)' }}>
+                    <td style={td}>
+                      <Link href={`/admin/seo/articles/${a.id}`} style={{ color: 'var(--purple)', textDecoration: 'none', fontWeight: 600 }}>
+                        {a.keyword}
+                      </Link>
+                      <div style={{ fontSize: 11, color: 'var(--muted)' }}>{String(a.url).replace('https://goandstudy.com', '')}</div>
+                    </td>
+                    <td style={{ ...td, whiteSpace: 'nowrap' }}>
+                      {a.inSearch
+                        ? <span style={{ color: 'var(--green)', fontWeight: 600 }}>в поиске</span>
+                        : <span style={{ color: 'var(--muted)' }}>не нашли среди присланных</span>}
+                    </td>
+                    <td style={{ ...td, color: 'var(--muted)', whiteSpace: 'nowrap' }}>
+                      {a.lastAccess ? new Date(a.lastAccess).toLocaleDateString('ru') : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {missing.length > 0 && (
+        <div style={{ border: '1px solid var(--bor)', borderRadius: 12, overflow: 'hidden', marginBottom: 16 }}>
+          <div style={{ padding: '10px 14px', background: 'var(--surf2)' }}>
+            <div style={{ fontSize: 13, fontWeight: 700 }}>Не нашли среди присланных · {missing.length}</div>
+            <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3, lineHeight: 1.5, maxWidth: 700 }}>
+              Это не то же самое, что «нет в индексе». Яндекс отдаёт выборку страниц, а не полный
+              список: сейчас он прислал {snapshot.sampled ?? 0} адресов, а в поиске у него
+              держится {snapshot.inSearchTotal ?? '—'}. Разница — те, кого он просто не показал.
+            </div>
+          </div>
+          <div style={{ padding: '8px 14px', fontSize: 12, lineHeight: 1.8 }}>
+            {missing.slice(0, 40).map((p) => (
+              <div key={p.url}>
+                <a href={`${p.url}/`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text)', textDecoration: 'none' }}>
+                  {p.url.replace('https://goandstudy.com', '')}
+                </a>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.6, maxWidth: 760 }}>
+        <b style={{ color: 'var(--text)' }}>Почему две вкладки, а не одна таблица.</b> Google и Яндекс
+        отвечают на разные вопросы разными словами: Google говорит про конкретный адрес («в индексе»,
+        «обнаружен, не проиндексирован»), Яндекс — про сайт целиком и выборку страниц. Свести это в
+        одну колонку значило бы усреднить два разных ответа и потерять смысл обоих.
+      </div>
     </div>
   )
 }

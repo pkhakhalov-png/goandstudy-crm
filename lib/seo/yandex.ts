@@ -75,22 +75,47 @@ export type YandexIndexState = {
  * «не нашли среди присланных», а не «точно не в индексе» — и формулировка
  * должна это отражать.
  */
-export async function checkUrls(urls: string[], host?: string): Promise<YandexIndexState[]> {
-  const hid = host ?? (await hostId())
-  const out: YandexIndexState[] = []
+export type InSearchSample = { lastAccess: string | null; status: string | null }
 
-  // Список страниц в поиске: до 100 за раз, поэтому берём несколько страниц
-  const inSearch = new Map<string, { lastAccess: string | null; status: string | null }>()
-  for (let offset = 0; offset < 1000; offset += 100) {
+/**
+ * Страницы, которые Яндекс отдаёт как присутствующие в поиске.
+ *
+ * Это выборка, а не полный список: Яндекс не обязуется отдать всё. Поэтому
+ * «нет в этом списке» значит «не нашли среди присланного», и называть это
+ * «не в индексе» нельзя — мы бы врали пользователю.
+ */
+export async function inSearchSamples(host?: string, max = 1000): Promise<Map<string, InSearchSample>> {
+  const hid = host ?? (await hostId())
+  const uid = await userId()
+  const out = new Map<string, InSearchSample>()
+
+  for (let offset = 0; offset < max; offset += 100) {
     const r = await call<{ samples: { url: string; last_access?: string; status?: string }[] }>(
-      `/user/${await userId()}/hosts/${encodeURIComponent(hid)}/search-urls/in-search/samples/?limit=100&offset=${offset}`,
+      `/user/${uid}/hosts/${encodeURIComponent(hid)}/search-urls/in-search/samples/?limit=100&offset=${offset}`,
     ).catch(() => null)
     if (!r?.samples?.length) break
     for (const s of r.samples) {
-      inSearch.set(s.url.replace(/\/$/, ''), { lastAccess: s.last_access ?? null, status: s.status ?? null })
+      out.set(s.url.replace(/\/$/, ''), { lastAccess: s.last_access ?? null, status: s.status ?? null })
     }
     if (r.samples.length < 100) break
   }
+  return out
+}
+
+/** Сколько страниц Яндекс держит в поиске — число, а не выборка. */
+export async function inSearchCount(host?: string): Promise<{ count: number | null; date: string | null }> {
+  const hid = host ?? (await hostId())
+  const uid = await userId()
+  const r = await call<{ history: { date: string; value: number }[] }>(
+    `/user/${uid}/hosts/${encodeURIComponent(hid)}/search-urls/in-search/history/`,
+  ).catch(() => null)
+  const last = r?.history?.[r.history.length - 1]
+  return { count: last?.value ?? null, date: last?.date ?? null }
+}
+
+export async function checkUrls(urls: string[], host?: string): Promise<YandexIndexState[]> {
+  const out: YandexIndexState[] = []
+  const inSearch = await inSearchSamples(host)
 
   for (const url of urls) {
     const found = inSearch.get(url.replace(/\/$/, ''))
