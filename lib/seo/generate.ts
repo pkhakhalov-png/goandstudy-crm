@@ -8,6 +8,7 @@ import { embed } from './embeddings'
 import { checkStandard, languageChecks, type Check } from './standard'
 import { checkBlogStandard, BLOG_CATEGORIES } from './blog-style'
 import { claimsBlock, findUnbackedNumbers, type Claim } from './claims'
+import { audienceBlock } from './audience'
 export { summarize } from './standard'
 export type { Check, Level } from './standard'
 
@@ -161,10 +162,14 @@ function contextBlock(ctx: GenContext): string {
       ctx.neighbourTexts!.map((n) => `— ${n.url} «${n.title ?? ''}»\n${n.text.slice(0, 1800)}`).join('\n\n')
     : ''
 
+  // Кому пишем и что этих людей останавливает — из маркетинговой стратегии.
+  // Без этого статья отвечает на запрос, но не разговаривает с человеком.
+  const audience = audienceBlock(`${ctx.topicTitle} ${ctx.primaryKeyword}`)
+
   return `
 ${COMPANY_FACTS}
 
-${facts}${neighbours}
+${audience ? audience + '\n\n' : ''}${facts}${neighbours}
 
 ТЕМА
 ${ctx.topicTitle}

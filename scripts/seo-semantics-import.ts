@@ -95,13 +95,18 @@ async function main() {
     if (r.exact < 30) continue
     if (taken.some((t) => sameFamily(t, r.query))) { skipped++; continue }
 
+    // business_value — число, а не название типа страницы: сюда шёл текст, и
+    // вставка падала молча. Тип страницы кладём в cluster, он для этого и есть.
     const { error } = await seo.from('topics').insert({
       title: r.group || r.query, primary_keyword: r.query,
-      search_volume: r.exact, business_value: r.pageType || null,
+      search_volume: r.exact,
+      business_value: Math.min(100, Math.round(r.exact / 10)),
+      cluster: r.pageType || null,
       origin: 'semantics', status: 'new',
       priority: Math.round(r.exact / 10),
     })
-    if (!error) { saved++; taken.push(r.query) }
+    if (error) { console.log(`  ✗ не сохранилась «${r.query}»: ${error.message.slice(0, 90)}`); continue }
+    saved++; taken.push(r.query)
   }
   console.log(`\nзаведено тем: ${saved}, пропущено как уже занятые: ${skipped}`)
 }
