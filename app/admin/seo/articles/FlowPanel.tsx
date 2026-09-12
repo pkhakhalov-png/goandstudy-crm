@@ -55,6 +55,25 @@ export function FlowPanel({ state }: { state: FlowState & { computedAt?: string 
           </select>
         </Field>
 
+        {s.autoPublish && (
+          <Field label="Окно выпуска, мск"
+            hint={state.nextPublishAt
+              ? `следующая ${new Date(state.nextPublishAt).toLocaleString('ru', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}`
+              : 'время внутри окна выбирается заново каждый день'}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <select value={s.publishFromHour ?? 9} disabled={pending} style={select}
+                onChange={(e) => save({ ...s, publishFromHour: Number(e.target.value) })}>
+                {HOURS.map((h) => <option key={h} value={h}>{h}:00</option>)}
+              </select>
+              <span style={{ color: 'var(--muted)' }}>—</span>
+              <select value={s.publishToHour ?? 21} disabled={pending} style={select}
+                onChange={(e) => save({ ...s, publishToHour: Number(e.target.value) })}>
+                {HOURS.map((h) => <option key={h} value={h}>{h}:00</option>)}
+              </select>
+            </span>
+          </Field>
+        )}
+
         <div style={{ flex: 1, minWidth: 220 }}>
           <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 4 }}>Следующая тема</div>
           <div style={{ fontSize: 13 }}>
@@ -97,11 +116,7 @@ export function FlowPanel({ state }: { state: FlowState & { computedAt?: string 
           </span>
         </label>
 
-        {s.autoPublish && (
-          <span style={{ fontSize: 11, color: 'var(--muted)', alignSelf: 'center' }}>
-            время выпуска — случайное между {s.publishFromHour ?? 9}:00 и {s.publishToHour ?? 21}:00 мск
-          </span>
-        )}
+
 
         <button className="btn-s" disabled={pending || !state.nextTopic}
           onClick={() => start(async () => {
@@ -180,6 +195,10 @@ export function FlowPanel({ state }: { state: FlowState & { computedAt?: string 
     </div>
   )
 }
+
+// Полночь и раннее утро в списке есть намеренно: если кому-то нужны ночные
+// публикации, запрещать это не дело настройки. По умолчанию окно дневное.
+const HOURS = Array.from({ length: 24 }, (_, i) => i)
 
 const VERDICT_RU: Record<string, string> = {
   risky: 'уже дерутся', update: 'обновлять существующую', unclear: 'спорно — решать вам',

@@ -62,6 +62,8 @@ export type FlowState = {
   inReview: number
   /** Когда конвейер возьмётся за следующую статью. */
   nextRunAt: string | null
+  /** Когда выйдет следующая статья, если самостоятельный выпуск включён. */
+  nextPublishAt: string | null
   /** Почему сейчас ничего не запускается; пусто — значит запустится. */
   blocker: string | null
   nextTopic: PickedTopic | null
@@ -175,7 +177,7 @@ export async function flowSnapshot(seo: any): Promise<FlowState & { computedAt: 
 
   if (!snap) {
     return {
-      settings, startedThisWeek: 0, inReview: inReview ?? 0, nextRunAt: null,
+      settings, startedThisWeek: 0, inReview: inReview ?? 0, nextRunAt: null, nextPublishAt: null,
       blocker: 'тема ещё не подобрана — подождите проход воркера',
       nextTopic: null, skipped: [], computedAt: null,
       runway: { safe: 0, unclear: 0, days: 0, dropped: { own: 0, twin: 0, risky: 0, update: 0 } },
@@ -215,6 +217,9 @@ export async function flowState(seo: any): Promise<FlowState> {
   const readyAt = last + intervalMs(settings.perWeek)
   const nextRunAt = settings.enabled ? new Date(Math.max(readyAt, Date.now())).toISOString() : null
 
+  const { data: pub } = await seo.from('settings').select('value').eq('key', 'next_publish_at').maybeSingle()
+  const nextPublishAt = settings.autoPublish ? ((pub?.value as any)?.at ?? null) : null
+
   let blocker: string | null = null
   if (!settings.enabled) blocker = 'поток выключен'
   else if ((inReview ?? 0) >= settings.maxInReview) blocker = `на вычитке ${inReview} — больше не берём, пока не разберёте`
@@ -229,7 +234,7 @@ export async function flowState(seo: any): Promise<FlowState> {
 
   return {
     settings, startedThisWeek: startedThisWeek ?? 0, inReview: inReview ?? 0,
-    nextRunAt, blocker, nextTopic, skipped: picked.skipped, runway,
+    nextRunAt, nextPublishAt, blocker, nextTopic, skipped: picked.skipped, runway,
   }
 }
 

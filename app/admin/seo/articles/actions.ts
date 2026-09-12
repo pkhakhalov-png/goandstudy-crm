@@ -464,10 +464,24 @@ export async function saveFlowSettings(next: {
   const { error: authErr } = await assertAdmin()
   if (authErr) return { error: authErr }
   const seo = (await createAdminClient()).schema('seo')
-  const { saveFlow, loadFlow } = await import('@/lib/seo/flow')
+  const { saveFlow, loadFlow, firstPublishTime } = await import('@/lib/seo/flow')
   // Дописываем к тому, что было: частичное сохранение не должно сбрасывать
   // настройки, которых не было в форме
-  await saveFlow(seo, { ...(await loadFlow(seo)), ...next })
+  const before = await loadFlow(seo)
+  const merged = { ...before, ...next }
+  await saveFlow(seo, merged)
+
+  // Время выпуска уже назначено на конкретную минуту. Если окно поменяли или
+  // выпуск только что включили, старое время может оказаться вне окна —
+  // пересчитываем, иначе настройка подействует только через сутки.
+  const windowChanged = merged.publishFromHour !== before.publishFromHour
+    || merged.publishToHour !== before.publishToHour
+  const justEnabled = merged.autoPublish && !before.autoPublish
+
+  if (windowChanged || justEnabled) {
+    const at = firstPublishTime(merged)
+    await seo.from('settings').upsert({ key: 'next_publish_at', value: { at: at.toISOString() } }, { onConflict: 'key' })
+  }
   revalidatePath('/admin/seo/articles')
   return { ok: true }
 }
