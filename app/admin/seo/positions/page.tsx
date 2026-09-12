@@ -1,16 +1,33 @@
 import { createAdminClient } from '@/lib/supabase/server'
+import Link from 'next/link'
 import type { Movement, PositionsSnapshot } from '@/lib/seo/positions'
 
 export const dynamic = 'force-dynamic'
 
-export default async function PositionsPage() {
+export default async function PositionsPage({ searchParams }: { searchParams: Promise<{ poisk?: string }> }) {
+  const poisk = (await searchParams).poisk === 'yandex' ? 'yandex' : 'google'
   const seo = (await createAdminClient()).schema('seo')
+
+  if (poisk === 'yandex') {
+    const [{ data: cur }, { data: old }] = await Promise.all([
+      seo.from('settings').select('value').eq('key', 'yandex_snapshot').maybeSingle(),
+      seo.from('settings').select('value').eq('key', 'yandex_snapshot_prev').maybeSingle(),
+    ])
+    return (
+      <div>
+        <Tabs active="yandex" />
+        <YandexPositions now={cur?.value as any} before={old?.value as any} />
+      </div>
+    )
+  }
+
   const { data } = await seo.from('settings').select('value').eq('key', 'positions_snapshot').maybeSingle()
   const snap = data?.value as PositionsSnapshot | undefined
 
   if (!snap) {
     return (
       <div>
+        <Tabs active="google" />
         <Title />
         <div style={{ fontSize: 13, color: 'var(--muted)' }}>
           Снимок ещё не посчитан — подождите ночной проход воркера.
@@ -23,6 +40,7 @@ export default async function PositionsPage() {
 
   return (
     <div>
+      <Tabs active="google" />
       <Title window={`${fmt(snap.windowFrom)} — ${fmt(snap.windowTo)}`} prev={fmt(snap.prevFrom)} at={snap.computedAt} />
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 18 }}>
@@ -70,6 +88,148 @@ export default async function PositionsPage() {
         запросов, включая те, где нас нет, нужен отдельный платный сервис.
       </div>
     </div>
+  )
+}
+
+function Tabs({ active }: { active: 'google' | 'yandex' }) {
+  return (
+    <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+      {([['google', 'Google'], ['yandex', 'Яндекс']] as const).map(([key, label]) => (
+        <Link key={key} href={`/admin/seo/positions?poisk=${key}`}
+          style={{
+            padding: '6px 16px', borderRadius: 8, fontSize: 13, textDecoration: 'none',
+            border: `1px solid ${active === key ? 'var(--purple)' : 'var(--bor2)'}`,
+            background: active === key ? 'rgba(177,94,204,.10)' : 'var(--surf2)',
+            color: active === key ? 'var(--purple)' : 'var(--text)',
+            fontWeight: active === key ? 700 : 400,
+          }}>
+          {label}
+        </Link>
+      ))}
+    </div>
+  )
+}
+
+type YaQuery = { query: string; impressions: number; clicks: number; position: number | null }
+
+/**
+ * Позиции в Яндексе.
+ *
+ * Движение считается не так, как у Google, и делать вид, что так же, нельзя.
+ * Яндекс отдаёт только текущую неделю — истории у него не спросишь. Поэтому
+ * сравниваем свой прошлый снимок с нынешним, и пока снимков меньше двух,
+ * честно говорим, что сравнивать не с чем.
+ */
+function YandexPositions({ now, before }: { now: any; before: any }) {
+  if (!now) {
+    return <div style={{ fontSize: 13, color: 'var(--muted)' }}>
+      Снимок ещё не собран — либо нет доступа к Вебмастеру, либо воркер не приходил.
+    </div>
+  }
+
+  const queries: YaQuery[] = now.queries ?? []
+  const prevByQuery = new Map<string, YaQuery>((before?.queries ?? []).map((q: YaQuery) => [q.query, q]))
+  const hasHistory = prevByQuery.size > 0
+
+  const withDelta = queries.map((q) => {
+    const p = prevByQuery.get(q.query)
+    const delta = p?.position != null && q.position != null ? p.position - q.position : null
+    return { ...q, before: p?.position ?? null, delta }
+  })
+
+  const up = withDelta.filter((q) => (q.delta ?? 0) >= 1).sort((a, b) => (b.delta ?? 0) - (a.delta ?? 0))
+  const down = withDelta.filter((q) => (q.delta ?? 0) <= -1).sort((a, b) => (a.delta ?? 0) - (b.delta ?? 0))
+  const striking = withDelta
+    .filter((q) => q.position != null && q.position >= 8 && q.position <= 25 && q.clicks === 0 && q.impressions >= 20)
+    .sort((a, b) => b.impressions - a.impressions)
+  const top10 = withDelta.filter((q) => q.position != null && q.position <= 10)
+
+  return (
+    <div>
+      <div style={{ marginBottom: 14 }}>
+        <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 4px' }}>Позиции в Яндексе</h2>
+        <p style={{ color: 'var(--muted)', fontSize: 13, margin: 0, maxWidth: 760, lineHeight: 1.55 }}>
+          Данные Вебмастера за последнюю неделю.
+          {now.computedAt && ` Снимок от ${new Date(now.computedAt).toLocaleString('ru')}.`}
+          {hasHistory
+            ? ` Сравнение со снимком от ${new Date(before.computedAt).toLocaleDateString('ru')}.`
+            : ' Сравнивать пока не с чем: это первый снимок, движение появится через неделю.'}
+        </p>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 18 }}>
+        <Card label="Запросов" value={queries.length} sub={`${top10.length} в первой десятке`} />
+        <Card label="Показов за неделю" value={now.totals?.impressions ?? 0} />
+        <Card label="Кликов" value={now.totals?.clicks ?? 0}
+          sub={now.totals?.impressions ? `CTR ${((now.totals.clicks / now.totals.impressions) * 100).toFixed(2)}%` : undefined} />
+        <Card label="На подступах" value={striking.length} color={striking.length ? 'var(--purple)' : undefined}
+          sub="8–25 место, кликов нет" />
+      </div>
+
+      {hasHistory && up.length > 0 && (
+        <Panel title={`Поднялись · ${up.length}`} hint="Неделя против предыдущего снимка." collapsed={up.length > 12}>
+          <YaTable rows={up} />
+        </Panel>
+      )}
+
+      {hasHistory && down.length > 0 && (
+        <Panel title={`Опустились · ${down.length}`} hint="Тревожно, когда запрос уходит из первой десятки: там теряются клики, а не показы." collapsed={down.length > 12}>
+          <YaTable rows={down} />
+        </Panel>
+      )}
+
+      <Panel
+        title={`На подступах · ${striking.length}`}
+        hint="Восьмое–двадцать пятое место, показы есть, кликов нет. Дотянуть дешевле, чем писать новое."
+      >
+        {striking.length ? <YaTable rows={striking} /> : <Empty>Таких запросов нет.</Empty>}
+      </Panel>
+
+      <Panel title={`Все запросы · ${queries.length}`} hint="" collapsed>
+        <YaTable rows={withDelta.sort((a, b) => b.impressions - a.impressions)} />
+      </Panel>
+
+      <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.6, maxWidth: 760, marginTop: 16 }}>
+        <b style={{ color: 'var(--text)' }}>Чем это отличается от вкладки Google.</b> Там позиция
+        считается по показам за выбранные дни, и история берётся из Search Console. Здесь истории нет:
+        Яндекс отдаёт только последнюю неделю, поэтому движение мы считаем по собственным снимкам —
+        первый появится через неделю после подключения. Запросы, по которым нас не показывали, сюда
+        не попадают, как и у Google.
+      </div>
+    </div>
+  )
+}
+
+function YaTable({ rows }: { rows: (YaQuery & { before?: number | null; delta?: number | null })[] }) {
+  return (
+    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+      <thead>
+        <tr style={{ color: 'var(--muted)', textAlign: 'left' }}>
+          <th style={th}>Запрос</th>
+          <th style={{ ...th, textAlign: 'right' }}>Позиция</th>
+          <th style={{ ...th, textAlign: 'right' }}>Было</th>
+          <th style={{ ...th, textAlign: 'right' }}>Движение</th>
+          <th style={{ ...th, textAlign: 'right' }}>Показы</th>
+          <th style={{ ...th, textAlign: 'right' }}>Клики</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.slice(0, 120).map((q, i) => (
+          <tr key={i} style={{ borderTop: '1px solid var(--bor)' }}>
+            <td style={td}>{q.query}</td>
+            <td style={{ ...td, textAlign: 'right', fontWeight: 700, color: (q.position ?? 99) <= 10 ? 'var(--green)' : 'var(--text)' }}>
+              {q.position?.toFixed(1) ?? '—'}
+            </td>
+            <td style={{ ...td, textAlign: 'right', color: 'var(--muted)' }}>{q.before?.toFixed(1) ?? '—'}</td>
+            <td style={{ ...td, textAlign: 'right', fontWeight: 600, color: q.delta == null ? 'var(--muted)' : q.delta > 0 ? 'var(--green)' : 'var(--red)' }}>
+              {q.delta == null ? '—' : `${q.delta > 0 ? '↑' : '↓'} ${Math.abs(q.delta).toFixed(1)}`}
+            </td>
+            <td style={{ ...td, textAlign: 'right' }}>{q.impressions}</td>
+            <td style={{ ...td, textAlign: 'right', fontWeight: q.clicks ? 700 : 400 }}>{q.clicks}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   )
 }
 

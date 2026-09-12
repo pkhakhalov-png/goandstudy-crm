@@ -1108,6 +1108,16 @@ registerStep('yandex_sync', async (_job: Job, seo: any): Promise<StepOutcome> =>
   const queries = await popularQueries(host, 500).catch(() => [])
   const quota = await recrawlQuota(host).catch(() => null)
 
+  // Яндекс отдаёт только текущую неделю, истории у него не спросишь. Поэтому
+  // копим сами: прежний снимок становится точкой отсчёта, когда ему исполнится
+  // почти неделя. Сравнивать вчерашнее с сегодняшним бессмысленно — в недельном
+  // окне это одни и те же дни.
+  const { data: prevRow } = await seo.from('settings').select('value').eq('key', 'yandex_snapshot').maybeSingle()
+  const prev: any = prevRow?.value ?? null
+  if (prev?.computedAt && Date.now() - Date.parse(prev.computedAt) > 6 * 864e5) {
+    await seo.from('settings').upsert({ key: 'yandex_snapshot_prev', value: prev }, { onConflict: 'key' })
+  }
+
   await seo.from('settings').upsert({
     key: 'yandex_snapshot',
     value: {
