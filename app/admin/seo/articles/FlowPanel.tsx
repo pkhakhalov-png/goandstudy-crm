@@ -97,6 +97,12 @@ export function FlowPanel({ state }: { state: FlowState & { computedAt?: string 
           </span>
         </label>
 
+        {s.autoPublish && (
+          <span style={{ fontSize: 11, color: 'var(--muted)', alignSelf: 'center' }}>
+            время выпуска — случайное между {s.publishFromHour ?? 9}:00 и {s.publishToHour ?? 21}:00 мск
+          </span>
+        )}
+
         <button className="btn-s" disabled={pending || !state.nextTopic}
           onClick={() => start(async () => {
             const r = await startNextNow()

@@ -16,11 +16,17 @@ export type FlowSettings = {
   autoPublish: boolean
   /** Сколько статей в сутки можно выпустить самостоятельно. */
   publishPerDay: number
+  /** Окно выпуска по Москве: час начала и час конца. */
+  publishFromHour: number
+  publishToHour: number
 }
 
 export const FLOW_DEFAULTS: FlowSettings = {
   enabled: false, perWeek: 3, maxInReview: 5,
   autoFix: false, autoPublish: false, publishPerDay: 1,
+  // Дневное окно по Москве. Ночные публикации выглядят машинными, а ровно
+  // одинаковое время изо дня в день — тем более: живой блог так не пишут.
+  publishFromHour: 9, publishToHour: 21,
 }
 
 export async function loadFlow(seo: any): Promise<FlowSettings> {
@@ -33,6 +39,8 @@ export async function loadFlow(seo: any): Promise<FlowSettings> {
     autoFix: v.autoFix ?? FLOW_DEFAULTS.autoFix,
     autoPublish: v.autoPublish ?? FLOW_DEFAULTS.autoPublish,
     publishPerDay: Math.min(5, Math.max(1, Number(v.publishPerDay ?? FLOW_DEFAULTS.publishPerDay))),
+    publishFromHour: Math.min(23, Math.max(0, Number(v.publishFromHour ?? FLOW_DEFAULTS.publishFromHour))),
+    publishToHour: Math.min(23, Math.max(1, Number(v.publishToHour ?? FLOW_DEFAULTS.publishToHour))),
   }
 }
 
@@ -87,6 +95,63 @@ async function lastAutoRun(seo: any): Promise<number> {
   const { data } = await seo.from('settings').select('value').eq('key', 'last_auto_article').maybeSingle()
   const at = (data?.value as any)?.at
   return at ? Date.parse(at) : 0
+}
+
+/* ── Когда выпускать ──────────────────────────────────────────────────────── */
+
+const MSK_OFFSET_HOURS = 3
+
+/**
+ * Выбрать время следующей публикации — случайное внутри дневного окна.
+ *
+ * Ровно одинаковое время изо дня в день выдаёт машину: живой блог так не
+ * ведут. Разброс по минутам тоже нужен — публикация в 12:00:00 ровно выглядит
+ * не лучше, чем каждый день в полдень.
+ */
+export function planNextPublish(settings: FlowSettings, after = new Date()): Date {
+  const from = Math.min(settings.publishFromHour, settings.publishToHour)
+  const to = Math.max(settings.publishFromHour, settings.publishToHour)
+
+  // Считаем в московских сутках, а живём в UTC
+  const msk = new Date(after.getTime() + MSK_OFFSET_HOURS * 3600 * 1000)
+  const day = new Date(msk)
+  day.setUTCDate(day.getUTCDate() + 1)          // следующий день
+  day.setUTCHours(0, 0, 0, 0)
+
+  const span = Math.max(1, to - from) * 3600 * 1000
+  const at = day.getTime() + from * 3600 * 1000 + Math.floor(Math.random() * span)
+
+  return new Date(at - MSK_OFFSET_HOURS * 3600 * 1000)   // обратно в UTC
+}
+
+/** Ближайшее подходящее время, если выпуск только что включили. */
+export function firstPublishTime(settings: FlowSettings, now = new Date()): Date {
+  const from = Math.min(settings.publishFromHour, settings.publishToHour)
+  const to = Math.max(settings.publishFromHour, settings.publishToHour)
+  const mskHour = (now.getUTCHours() + MSK_OFFSET_HOURS) % 24
+
+  // Уже внутри окна — выпускаем в ближайшие пару часов, но не сию секунду:
+  // так первая публикация не совпадает с моментом включения
+  if (mskHour >= from && mskHour < to) {
+    return new Date(now.getTime() + Math.floor(Math.random() * 2 * 3600 * 1000))
+  }
+  return planNextPublish(settings, now)
+}
+
+export async function nextPublishAt(seo: any, settings: FlowSettings): Promise<Date> {
+  const { data } = await seo.from('settings').select('value').eq('key', 'next_publish_at').maybeSingle()
+  const at = (data?.value as any)?.at
+  if (at) return new Date(at)
+
+  const first = firstPublishTime(settings)
+  await seo.from('settings').upsert({ key: 'next_publish_at', value: { at: first.toISOString() } }, { onConflict: 'key' })
+  return first
+}
+
+export async function scheduleNextPublish(seo: any, settings: FlowSettings): Promise<Date> {
+  const next = planNextPublish(settings)
+  await seo.from('settings').upsert({ key: 'next_publish_at', value: { at: next.toISOString() } }, { onConflict: 'key' })
+  return next
 }
 
 export async function markAutoRun(seo: any): Promise<void> {

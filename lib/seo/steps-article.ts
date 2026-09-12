@@ -948,10 +948,18 @@ registerStep('positions_snapshot', async (_job: Job, seo: any): Promise<StepOutc
  *   — если обложки нет: карточка в блоге будет битой.
  */
 registerStep('article_autopublish', async (_job: Job, seo: any): Promise<StepOutcome> => {
-  const { loadFlow } = await import('./flow')
+  const { loadFlow, nextPublishAt, scheduleNextPublish } = await import('./flow')
   const flow = await loadFlow(seo)
   if (!flow.enabled || !flow.autoPublish) {
     return { outcome: 'done', result: { skipped: 'самостоятельный выпуск выключен', cost: 0 } }
+  }
+
+  // Время выпуска — случайное внутри дневного окна и своё на каждый день:
+  // одинаковый час изо дня в день выдаёт машину
+  const due = await nextPublishAt(seo, flow)
+  if (Date.now() < due.getTime()) {
+    const hours = Math.round((due.getTime() - Date.now()) / 36e5)
+    return { outcome: 'done', result: { skipped: `следующий выпуск ${due.toISOString().slice(11, 16)} UTC, через ${hours} ч`, cost: 0 } }
   }
 
   // Суточный предел считаем по факту публикаций, а не по расписанию: так
@@ -1032,9 +1040,16 @@ registerStep('article_autopublish', async (_job: Job, seo: any): Promise<StepOut
     })
     if (res.error) return { outcome: 'retry', result: { error: res.error } }
 
+    // Следующее время назначаем сразу после постановки в очередь: если не
+    // назначить, шаг будет пытаться выпускать ещё одну каждый час
+    const next = await scheduleNextPublish(seo, flow)
+
     return {
       outcome: 'done',
-      result: { published: a.id, keyword: a.primary_keyword, checked: gate.checked, rejected, cost: 0 },
+      result: {
+        published: a.id, keyword: a.primary_keyword, checked: gate.checked,
+        next_at: next.toISOString(), rejected, cost: 0,
+      },
     }
   }
 
