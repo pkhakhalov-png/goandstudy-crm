@@ -905,3 +905,27 @@ registerStep('alerts_check', async (_job: Job, seo: any): Promise<StepOutcome> =
   const res = await notifyAlerts(seo)
   return { outcome: 'done', result: { ...res, cost: 0 } }
 })
+
+
+/**
+ * Снимок движения позиций. Считается раз в сутки: данные Search Console
+ * обновляются не чаще, а расчёт стоит двадцать секунд — столько экран ждать
+ * не должен.
+ */
+registerStep('positions_snapshot', async (_job: Job, seo: any): Promise<StepOutcome> => {
+  const { buildSnapshot } = await import('./positions')
+
+  // Наши статьи — те, что написал конвейер: по ним движение интереснее всего
+  const { data: arts } = await seo.from('articles').select('current_version_id').eq('status', 'published')
+  const ourUrls = new Set<string>()
+  for (const a of arts ?? []) {
+    const { data: v } = await seo.from('article_versions').select('meta').eq('id', a.current_version_id).maybeSingle()
+    const slug = (v?.meta as any)?.publish?.slug ?? (v?.meta as any)?.slug
+    if (slug) ourUrls.add(`https://goandstudy.com/blog/${slug}`)
+  }
+
+  const snapshot = await buildSnapshot(seo, ourUrls)
+  await seo.from('settings').upsert({ key: 'positions_snapshot', value: snapshot }, { onConflict: 'key' })
+
+  return { outcome: 'done', result: { ...snapshot.summary, window: `${snapshot.windowFrom}…${snapshot.windowTo}`, cost: 0 } }
+})
