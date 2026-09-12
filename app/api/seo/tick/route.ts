@@ -28,7 +28,7 @@ const LONG_STEP_MS = 230_000
 const SERVER_ONLY_STEPS = new Set(['article_publish_blog', 'link_insert_theme'])
 const canRunHere = (step: string) => !(process.env.VERCEL && SERVER_ONLY_STEPS.has(step))
 
-const QUICK_ARTICLE_STEPS = new Set(['article_index_check', 'article_autostart', 'attribution_stitch', 'alerts_check'])
+const QUICK_ARTICLE_STEPS = new Set(['article_index_check', 'article_autostart', 'attribution_stitch', 'alerts_check', 'article_autopublish'])
 const isLongStep = (step: string) => step.startsWith('article_') && !QUICK_ARTICLE_STEPS.has(step)
 
 export async function POST(req: NextRequest) {
@@ -89,6 +89,14 @@ export async function POST(req: NextRequest) {
         .eq('step', 'alerts_check').in('status', ['pending', 'running', 'waiting']).limit(1)
       if (!al?.length) {
         await seo.from('jobs').insert({ step: 'alerts_check', lane: 'findings', priority: 12, payload: {} })
+      }
+
+      // Самостоятельный выпуск. Шаг дешёвый и сам решает, пора ли: суточный
+      // предел он считает по факту публикаций, а не по расписанию
+      const { data: ap } = await seo.from('jobs').select('id')
+        .eq('step', 'article_autopublish').in('status', ['pending', 'running', 'waiting']).limit(1)
+      if (!ap?.length) {
+        await seo.from('jobs').insert({ step: 'article_autopublish', lane: 'production', priority: 14, payload: {} })
       }
       await seo.from('settings').upsert({ key: 'last_autostart_check', value: { at: new Date().toISOString() } }, { onConflict: 'key' })
     }

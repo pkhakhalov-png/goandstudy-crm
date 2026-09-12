@@ -929,3 +929,114 @@ registerStep('positions_snapshot', async (_job: Job, seo: any): Promise<StepOutc
 
   return { outcome: 'done', result: { ...snapshot.summary, window: `${snapshot.windowFrom}…${snapshot.windowTo}`, cost: 0 } }
 })
+
+
+/* ── Самостоятельный выпуск ───────────────────────────────────────────────── */
+
+/**
+ * Машина сама доводит статью до сайта.
+ *
+ * Здесь важнее не то, что делается, а то, чего не делается ни при каких
+ * настройках. Публикация статьи необратима: удаления у агента нет, и снять
+ * плохой текст с сайта можно только руками. Поэтому ворота ниже — не
+ * перестраховка, а единственное, что стоит между машиной и живым сайтом.
+ *
+ * Не выпускаем никогда:
+ *   — при неподтверждённом существенном факте: цена, дедлайн, требования;
+ *   — при непройденной блокирующей проверке стандарта;
+ *   — если тема отбирает запросы у своей же страницы;
+ *   — если обложки нет: карточка в блоге будет битой.
+ */
+registerStep('article_autopublish', async (_job: Job, seo: any): Promise<StepOutcome> => {
+  const { loadFlow } = await import('./flow')
+  const flow = await loadFlow(seo)
+  if (!flow.enabled || !flow.autoPublish) {
+    return { outcome: 'done', result: { skipped: 'самостоятельный выпуск выключен', cost: 0 } }
+  }
+
+  // Суточный предел считаем по факту публикаций, а не по расписанию: так
+  // перезапуск воркера не может выпустить вторую статью сверх нормы
+  const dayAgo = new Date(Date.now() - 24 * 3600 * 1000).toISOString()
+  const { count: today } = await seo.from('articles')
+    .select('*', { count: 'exact', head: true }).eq('status', 'published').gte('published_at', dayAgo)
+  if ((today ?? 0) >= flow.publishPerDay) {
+    return { outcome: 'done', result: { skipped: `за сутки уже выпущено ${today}`, cost: 0 } }
+  }
+
+  const { data: candidates } = await seo.from('articles')
+    .select('id, primary_keyword, current_version_id, topic_id')
+    .in('status', ['ready_for_review', 'approved']).order('id')
+  if (!candidates?.length) return { outcome: 'done', result: { skipped: 'готовых статей нет', cost: 0 } }
+
+  const { checkBlogStandard, loadSiteTargets } = await import('./blog-style')
+  const { factGate } = await import('./fact-gate')
+  const { subjectKeysFor } = await import('./claims')
+  const { enqueueJob } = await import('./enqueue')
+  const targets = await loadSiteTargets(seo).catch(() => ({ knownBlogSlugs: new Set<string>(), knownPagePaths: new Set<string>() }))
+
+  const rejected: string[] = []
+
+  for (const a of candidates) {
+    const { data: v } = await seo.from('article_versions')
+      .select('id, title, body, meta, qa_report').eq('id', a.current_version_id).maybeSingle()
+    if (!v) continue
+    const meta: any = v.meta ?? {}
+    const report: any = v.qa_report ?? {}
+
+    // 1. Обложка. Без неё карточка в блоге выйдет битой
+    if (!meta.cover?.base64 && !meta.images?.cover?.url) { rejected.push(`#${a.id}: нет обложки`); continue }
+
+    // 2. Проверки стандарта — считаем заново по текущему телу, а не по отчёту:
+    // отчёт мог устареть после починки
+    const checks = checkBlogStandard({
+      body: String(v.body ?? ''), title: String(v.title ?? ''),
+      excerpt: String(meta.description ?? ''), slug: meta.slug ?? '',
+      category: meta.brief?.category ?? '',
+      knownBlogSlugs: targets.knownBlogSlugs, knownPagePaths: targets.knownPagePaths,
+    })
+    const blockers = checks.filter((c) => c.level === 'B' && !c.ok)
+    if (blockers.length) {
+      // Чинить или ждать человека — решает настройка, но выпускать нельзя
+      if (flow.autoFix) {
+        const { data: fixing } = await seo.from('jobs').select('id')
+          .eq('step', 'article_fix').eq('article_id', a.id).in('status', ['pending', 'running', 'waiting']).limit(1)
+        if (!fixing?.length) await enqueueJob(seo, { step: 'article_fix', lane: 'production', priority: 40, article_id: a.id, topic_id: a.topic_id, payload: {} })
+      }
+      rejected.push(`#${a.id}: ${blockers.length} блокирующих проверок`)
+      continue
+    }
+
+    // 3. Существенные утверждения. Это то, из-за чего вообще стоит держать
+    // человека в цепочке: ошибка в цене или дедлайне стоит читателю денег
+    const gate = await factGate(seo, `${v.title} ${v.body}`, subjectKeysFor(a.primary_keyword ?? ''))
+    if (gate.blocking.length) { rejected.push(`#${a.id}: ${gate.blocking.length} неподтверждённых существенных утверждений`); continue }
+
+    // 4. Модель могла пометить выдуманные факты и обещания — их тоже не пускаем
+    const invented = (report.issues ?? []).filter((i: any) => (i.kind === 'facts' || i.kind === 'promise') && i.severity !== 'minor')
+    if (invented.length) {
+      if (flow.autoFix) {
+        const { data: fixing } = await seo.from('jobs').select('id')
+          .eq('step', 'article_fix').eq('article_id', a.id).in('status', ['pending', 'running', 'waiting']).limit(1)
+        if (!fixing?.length) await enqueueJob(seo, { step: 'article_fix', lane: 'production', priority: 40, article_id: a.id, topic_id: a.topic_id, payload: {} })
+      }
+      rejected.push(`#${a.id}: ${invented.length} непроверенных фактов`)
+      continue
+    }
+
+    // Ворота пройдены — выпускаем
+    await seo.from('articles').update({ status: 'approved' }).eq('id', a.id)
+    const res = await enqueueJob(seo, {
+      step: 'article_publish_blog', lane: 'production', priority: 60, runner: 'agent',
+      article_id: a.id, topic_id: a.topic_id,
+      payload: { dry_run: false, update: Boolean(meta.update_of), auto: true },
+    })
+    if (res.error) return { outcome: 'retry', result: { error: res.error } }
+
+    return {
+      outcome: 'done',
+      result: { published: a.id, keyword: a.primary_keyword, checked: gate.checked, rejected, cost: 0 },
+    }
+  }
+
+  return { outcome: 'done', result: { published: null, why: 'ни одна статья не прошла ворота', rejected, cost: 0 } }
+})

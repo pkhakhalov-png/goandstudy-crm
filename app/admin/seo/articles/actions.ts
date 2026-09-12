@@ -457,12 +457,17 @@ export async function checkIndex(articleId: number) {
 
 /* ── Поток статей ─────────────────────────────────────────────────────────── */
 
-export async function saveFlowSettings(next: { enabled: boolean; perWeek: number; maxInReview: number }) {
+export async function saveFlowSettings(next: {
+  enabled: boolean; perWeek: number; maxInReview: number
+  autoFix?: boolean; autoPublish?: boolean; publishPerDay?: number
+}) {
   const { error: authErr } = await assertAdmin()
   if (authErr) return { error: authErr }
   const seo = (await createAdminClient()).schema('seo')
-  const { saveFlow } = await import('@/lib/seo/flow')
-  await saveFlow(seo, next)
+  const { saveFlow, loadFlow } = await import('@/lib/seo/flow')
+  // Дописываем к тому, что было: частичное сохранение не должно сбрасывать
+  // настройки, которых не было в форме
+  await saveFlow(seo, { ...(await loadFlow(seo)), ...next })
   revalidatePath('/admin/seo/articles')
   return { ok: true }
 }

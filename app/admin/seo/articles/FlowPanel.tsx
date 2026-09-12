@@ -74,6 +74,29 @@ export function FlowPanel({ state }: { state: FlowState & { computedAt?: string 
           )}
         </div>
 
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'pointer' }}>
+          <input type="checkbox" checked={s.autoFix ?? false} disabled={pending}
+            onChange={(e) => save({ ...s, autoFix: e.target.checked })} />
+          сам чинит замечания
+        </label>
+
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'pointer' }}
+          title="Статья уйдёт на сайт без вашего нажатия, если пройдёт все ворота">
+          <input type="checkbox" checked={s.autoPublish ?? false} disabled={pending}
+            onChange={(e) => {
+              if (e.target.checked && !confirm(
+                'Статьи начнут выходить на сайт без вашего нажатия.\n\n'
+                + 'Не выпустятся: с неподтверждённой ценой, дедлайном или требованиями; '
+                + 'с непройденной проверкой стандарта; без обложки; если тема отбирает запросы у своей же страницы.\n\n'
+                + 'Важно: снять вышедшую статью с сайта машина не умеет — только руками. Включаем?',
+              )) return
+              save({ ...s, autoPublish: e.target.checked })
+            }} />
+          <span style={{ color: s.autoPublish ? 'var(--red)' : 'var(--text)', fontWeight: s.autoPublish ? 700 : 400 }}>
+            сам публикует
+          </span>
+        </label>
+
         <button className="btn-s" disabled={pending || !state.nextTopic}
           onClick={() => start(async () => {
             const r = await startNextNow()

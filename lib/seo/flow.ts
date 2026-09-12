@@ -10,9 +10,18 @@ export type FlowSettings = {
   enabled: boolean
   perWeek: number
   maxInReview: number
+  /** Машина сама чинит замечания, не дожидаясь человека. */
+  autoFix: boolean
+  /** Машина сама выпускает статью, если все ворота пройдены. */
+  autoPublish: boolean
+  /** Сколько статей в сутки можно выпустить самостоятельно. */
+  publishPerDay: number
 }
 
-export const FLOW_DEFAULTS: FlowSettings = { enabled: false, perWeek: 3, maxInReview: 5 }
+export const FLOW_DEFAULTS: FlowSettings = {
+  enabled: false, perWeek: 3, maxInReview: 5,
+  autoFix: false, autoPublish: false, publishPerDay: 1,
+}
 
 export async function loadFlow(seo: any): Promise<FlowSettings> {
   const { data } = await seo.from('settings').select('value').eq('key', 'article_flow').maybeSingle()
@@ -21,6 +30,9 @@ export async function loadFlow(seo: any): Promise<FlowSettings> {
     enabled: v.enabled ?? FLOW_DEFAULTS.enabled,
     perWeek: Math.min(20, Math.max(1, Number(v.perWeek ?? FLOW_DEFAULTS.perWeek))),
     maxInReview: Math.min(30, Math.max(1, Number(v.maxInReview ?? FLOW_DEFAULTS.maxInReview))),
+    autoFix: v.autoFix ?? FLOW_DEFAULTS.autoFix,
+    autoPublish: v.autoPublish ?? FLOW_DEFAULTS.autoPublish,
+    publishPerDay: Math.min(5, Math.max(1, Number(v.publishPerDay ?? FLOW_DEFAULTS.publishPerDay))),
   }
 }
 
