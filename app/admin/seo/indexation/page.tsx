@@ -42,6 +42,13 @@ export default async function IndexationPage({ searchParams }: { searchParams: P
   const pages = (pagesRaw ?? []).filter((p: any) => p.normalized_url.startsWith('https://goandstudy.com'))
 
   const { data: statuses } = await seo.from('index_status').select('*')
+
+  // Яндекс — половина рынка в СНГ, и до сих пор её тут не было вовсе
+  const { data: ya } = await seo.from('settings').select('value').eq('key', 'yandex_snapshot').maybeSingle()
+  const yandex: any = ya?.value ?? null
+  const yandexByUrl = new Map<string, any>(
+    (yandex?.articles ?? []).map((a: any) => [String(a.url).replace(/\/$/, ''), a]),
+  )
   const byPage = new Map<number, any>((statuses ?? []).map((s: any) => [s.page_id, s]))
   const DAY = 864e5
 
@@ -158,8 +165,11 @@ export default async function IndexationPage({ searchParams }: { searchParams: P
             <div style={{ fontSize: 13, fontWeight: 700 }}>Наши статьи · {ourArticles.length}</div>
             <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3, lineHeight: 1.5 }}>
               Написанные конвейером. Здесь известна настоящая дата выхода, поэтому «дней до индекса» —
-              честный срок, а не разница с датой обхода. Для свежей статьи одна-две недели ожидания — норма:
-              Google приходит по sitemap, заявок на индексацию он не принимает.
+              честный срок, а не разница с датой обхода.
+              {' '}Google приходит по sitemap и заявок на индексацию не принимает — для свежей статьи
+              одна-две недели ожидания норма. Яндекс заявки принимает, и после публикации мы его просим:
+              поэтому там статьи появляются быстрее.
+              {yandex?.computedAt && ` Данные Яндекса от ${new Date(yandex.computedAt).toLocaleString('ru')}.`}
             </div>
           </div>
           <div style={{ padding: '0 6px 6px' }}>
@@ -168,7 +178,8 @@ export default async function IndexationPage({ searchParams }: { searchParams: P
                 <tr style={{ color: 'var(--muted)', textAlign: 'left' }}>
                   <th style={th}>Статья</th>
                   <th style={th}>Вышла</th>
-                  <th style={th}>Состояние</th>
+                  <th style={th}>Google</th>
+                  <th style={th}>Яндекс</th>
                   <th style={th}>В индексе с</th>
                   <th style={{ ...th, textAlign: 'right' }}>Дней</th>
                 </tr>
@@ -192,6 +203,16 @@ export default async function IndexationPage({ searchParams }: { searchParams: P
                         {a.publishedAt ? new Date(a.publishedAt).toLocaleDateString('ru') : '—'}
                       </td>
                       <td style={{ ...td, color: l.color, fontWeight: 600, whiteSpace: 'nowrap' }}>{l.text}</td>
+                      <td style={{ ...td, whiteSpace: 'nowrap' }}>
+                        {(() => {
+                          const y = yandexByUrl.get(a.url.replace(/\/$/, ''))
+                          if (!yandex) return <span style={{ color: 'var(--muted)' }}>нет доступа</span>
+                          if (!y) return <span style={{ color: 'var(--muted)' }}>—</span>
+                          return y.inSearch
+                            ? <span style={{ color: 'var(--green)', fontWeight: 600 }}>в поиске</span>
+                            : <span style={{ color: 'var(--muted)' }} title={y.note}>не нашли</span>
+                        })()}
+                      </td>
                       <td style={{ ...td, whiteSpace: 'nowrap', color: 'var(--muted)' }}>
                         {a.firstIndexed ? new Date(a.firstIndexed).toLocaleDateString('ru') : '—'}
                       </td>

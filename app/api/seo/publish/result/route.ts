@@ -69,6 +69,22 @@ export async function POST(req: NextRequest) {
     }).eq('id', version?.id)
   } catch { /* уведомление не критично: статья уже вышла */ }
 
+  // Яндекс, в отличие от Google, принимает заявку на переобход. Квота 700 в
+  // сутки, поэтому тратить её на одну статью не жалко: это разница в дни.
+  try {
+    const { yandexConfigured, requestRecrawl } = await import('@/lib/seo/yandex')
+    if (yandexConfigured()) {
+      const r = await requestRecrawl(`https://goandstudy.com/blog/${slug}/`)
+      const { data: fresh2 } = await seo.from('article_versions').select('meta').eq('id', version?.id).single()
+      await seo.from('article_versions').update({
+        meta: {
+          ...(fresh2?.meta ?? {}),
+          yandex_recrawl: { at: new Date().toISOString(), taskId: r.taskId ?? null, error: r.error ?? null },
+        },
+      }).eq('id', version?.id)
+    }
+  } catch { /* переобход не критичен: статья уже вышла */ }
+
   // И проверку индекса — но не сейчас, а через сутки: раньше Google всё равно
   // ответит «URL неизвестен», и это не будет значить ничего
   await seo.from('jobs').insert({

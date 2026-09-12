@@ -26,6 +26,18 @@ async function main() {
     process.exit(1)
   }
 
+  // Запасной путь: код, выданный на странице Яндекса, передаётся аргументом.
+  // Нужен, когда приложение зарегистрировано без локального адреса возврата —
+  // тогда Яндекс показывает код на экране, а не отправляет его нам.
+  // Код Яндекса — произвольные буквы и цифры, а не шестнадцатеричный: первая
+  // версия проверки искала только 0-9a-f и код с буквой «z» пропускала мимо
+  const manual = process.argv.find((a) => /^[0-9a-z]{8,}$/i.test(a) && a !== id && !a.includes('/'))
+  if (manual) {
+    console.log('Меняю код, выданный Яндексом, на токен…')
+    await exchange(manual, id, secret, null)
+    return
+  }
+
   const url = `https://oauth.yandex.ru/authorize?response_type=code&client_id=${id}&redirect_uri=${encodeURIComponent(REDIRECT)}`
   console.log('\nОткрываю согласие Яндекса. Если не открылось — скопируйте:\n')
   console.log(url + '\n')
@@ -45,9 +57,16 @@ async function main() {
     setTimeout(() => { server.close(); reject(new Error('истекло время ожидания')) }, 300000)
   })
 
+  await exchange(code, id, secret, REDIRECT)
+}
+
+async function exchange(code: string, id: string, secret: string, redirect: string | null) {
+  const body: Record<string, string> = { grant_type: 'authorization_code', code, client_id: id, client_secret: secret }
+  if (redirect) body.redirect_uri = redirect
+
   const res = await fetch('https://oauth.yandex.ru/token', {
     method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ grant_type: 'authorization_code', code, client_id: id, client_secret: secret }),
+    body: new URLSearchParams(body),
   })
   const json: any = await res.json()
   if (!res.ok || !json.access_token) {

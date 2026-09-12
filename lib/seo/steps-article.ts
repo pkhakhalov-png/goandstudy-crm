@@ -1055,3 +1055,56 @@ registerStep('article_autopublish', async (_job: Job, seo: any): Promise<StepOut
 
   return { outcome: 'done', result: { published: null, why: 'ни одна статья не прошла ворота', rejected, cost: 0 } }
 })
+
+
+/* ── Яндекс ───────────────────────────────────────────────────────────────── */
+
+/**
+ * Состояние в Яндексе: что в поиске и по каким запросам показываемся.
+ *
+ * Отдельно от Google не по прихоти: половина поискового рынка в СНГ — Яндекс,
+ * и до сих пор мы её не видели вовсе. Вчерашняя статья уже была в его поиске,
+ * когда Google о ней ещё не знал.
+ */
+registerStep('yandex_sync', async (_job: Job, seo: any): Promise<StepOutcome> => {
+  const { yandexConfigured, hostId, checkUrls, popularQueries } = await import('./yandex')
+  if (!yandexConfigured()) return { outcome: 'done', result: { skipped: 'нет доступа к Вебмастеру', cost: 0 } }
+
+  const host = await hostId()
+
+  // Наши статьи: по ним вопрос «дошло ли» стоит острее всего
+  const { data: arts } = await seo.from('articles')
+    .select('id, primary_keyword, current_version_id, published_at').eq('status', 'published')
+  const ours: { id: number; keyword: string; url: string }[] = []
+  for (const a of arts ?? []) {
+    const { data: v } = await seo.from('article_versions').select('meta').eq('id', a.current_version_id).maybeSingle()
+    const slug = (v?.meta as any)?.publish?.slug ?? (v?.meta as any)?.slug
+    if (slug) ours.push({ id: a.id, keyword: a.primary_keyword, url: `https://goandstudy.com/blog/${slug}/` })
+  }
+
+  const states = ours.length ? await checkUrls(ours.map((o) => o.url), host) : []
+  const queries = await popularQueries(host, 500).catch(() => [])
+
+  await seo.from('settings').upsert({
+    key: 'yandex_snapshot',
+    value: {
+      computedAt: new Date().toISOString(),
+      articles: ours.map((o, i) => ({ ...o, ...states[i] })),
+      queries: queries.slice(0, 200),
+      totals: {
+        impressions: queries.reduce((s, q) => s + q.impressions, 0),
+        clicks: queries.reduce((s, q) => s + q.clicks, 0),
+      },
+    },
+  }, { onConflict: 'key' })
+
+  return {
+    outcome: 'done',
+    result: {
+      articles: states.length,
+      inSearch: states.filter((s) => s.inSearch).length,
+      queries: queries.length,
+      cost: 0,
+    },
+  }
+})
