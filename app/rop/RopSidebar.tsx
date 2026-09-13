@@ -2,10 +2,9 @@
 
 import { useState, Suspense } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { useActiveNav } from '@/components/useActiveNav'
 import { logout } from '@/app/login/actions'
 import { WelcomeOverlay } from '@/components/WelcomeOverlay'
-import { NavPending } from '@/components/NavPending'
 
 interface Props {
   userName: string
@@ -33,15 +32,14 @@ const navItems = [
 ]
 
 /**
- * Пункт меню. Активный определяется по текущему адресу на клиенте, а не пропсом
- * с сервера: иначе подсветка переезжала бы только после отрисовки новой страницы.
+ * Пункт меню. Активность приходит готовой из `useActiveNav`: подсветка
+ * переезжает в момент нажатия, не дожидаясь, пока приедет новая страница.
  */
-function RopNavLink({ item, onNavigate }: { item: typeof navItems[number]; onNavigate: () => void }) {
-  const pathname = usePathname()
-  const active = item.href === '/rop'
-    ? pathname === '/rop'
-    : pathname === item.href || pathname.startsWith(`${item.href}/`)
-
+function RopNavLink({ item, active, onNavigate }: {
+  item: typeof navItems[number]
+  active: boolean
+  onNavigate: () => void
+}) {
   return (
     <Link href={item.href} onClick={onNavigate}
       className={`ni${active ? ' active' : ''}`}
@@ -50,13 +48,13 @@ function RopNavLink({ item, onNavigate }: { item: typeof navItems[number]; onNav
         <path d={item.icon} />
       </svg>
       {item.label}
-      <NavPending accent={accent} />
     </Link>
   )
 }
 
 export function RopSidebar({ userName, userEmail, initials }: Props) {
   const [open, setOpen] = useState(false)
+  const { isActive, press } = useActiveNav()
 
   return (
     <>
@@ -80,15 +78,18 @@ export function RopSidebar({ userName, userEmail, initials }: Props) {
         <nav className="nav">
           <div className="ns">Управление</div>
           {navItems.slice(0, 4).map(item => (
-            <RopNavLink key={item.key} item={item} onNavigate={() => setOpen(false)} />
+            <RopNavLink key={item.key} item={item} active={isActive(item.href, item.href === '/rop')}
+              onNavigate={() => { press(item.href); setOpen(false) }} />
           ))}
           <div className="ns" style={{ marginTop: 12 }}>Контроль</div>
           {navItems.slice(4, 7).map(item => (
-            <RopNavLink key={item.key} item={item} onNavigate={() => setOpen(false)} />
+            <RopNavLink key={item.key} item={item} active={isActive(item.href, item.href === '/rop')}
+              onNavigate={() => { press(item.href); setOpen(false) }} />
           ))}
           <div className="ns" style={{ marginTop: 12 }}>Система</div>
           {navItems.slice(7).map(item => (
-            <RopNavLink key={item.key} item={item} onNavigate={() => setOpen(false)} />
+            <RopNavLink key={item.key} item={item} active={isActive(item.href, item.href === '/rop')}
+              onNavigate={() => { press(item.href); setOpen(false) }} />
           ))}
         </nav>
         <div className="sf">

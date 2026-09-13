@@ -2,10 +2,9 @@
 
 import { useState, Suspense, type ReactNode } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { useActiveNav } from '@/components/useActiveNav'
 import { logout } from '@/app/login/actions'
 import { WelcomeOverlay } from '@/components/WelcomeOverlay'
-import { NavPending } from '@/components/NavPending'
 
 interface Props {
   userName: string
@@ -13,33 +12,25 @@ interface Props {
 }
 
 /**
- * Пункт меню, который становится активным сразу по нажатию.
- *
- * Раньше активный пункт приходил пропсом с сервера: подсветка переезжала только
- * после того, как новая страница отрисовалась, то есть через полсекунды после
- * клика. Теперь текущий адрес берётся на клиенте, а на время перехода пункт
- * подсвечивается как нажатый — ответ на действие человек видит сразу.
+ * Пункт меню. Активность приходит готовой из `useActiveNav`: подсветка
+ * переезжает в момент нажатия, не дожидаясь, пока приедет новая страница.
  */
-function NavLink({ href, exact, children, onNavigate }: {
+function NavLink({ href, active, children, onNavigate }: {
   href: string
-  /** Точное совпадение адреса. Нужно «Главной»: иначе она активна всегда. */
-  exact?: boolean
+  active: boolean
   children: ReactNode
   onNavigate: () => void
 }) {
-  const pathname = usePathname()
-  const active = exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`)
-
   return (
     <Link href={href} onClick={onNavigate} className={`ni${active ? ' active' : ''}`}>
       {children}
-      <NavPending />
     </Link>
   )
 }
 
 export function Sidebar({ userName, userEmail }: Props) {
   const [open, setOpen] = useState(false)
+  const { isActive, press } = useActiveNav()
   const close = () => setOpen(false)
 
   const initials = (userName || userEmail || 'АБ')
@@ -67,13 +58,13 @@ export function Sidebar({ userName, userEmail }: Props) {
         </div>
         <nav className="nav">
           <div className="ns">Основное</div>
-          <NavLink href="/admin/funnel" onNavigate={close}>
+          <NavLink href="/admin/funnel" active={isActive('/admin/funnel')} onNavigate={() => { press('/admin/funnel'); close() }}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
               <path d="M2 3h12l-3 5v4l-2 1.5V8L2 3z"/>
             </svg>
             Воронка
           </NavLink>
-          <NavLink href="/admin/clients" onNavigate={close}>
+          <NavLink href="/admin/clients" active={isActive('/admin/clients')} onNavigate={() => { press('/admin/clients'); close() }}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
               <rect x="2" y="3" width="12" height="10" rx="2"/>
               <line x1="5" y1="7" x2="11" y2="7"/>
@@ -81,21 +72,21 @@ export function Sidebar({ userName, userEmail }: Props) {
             </svg>
             Клиенты
           </NavLink>
-          <NavLink href="/admin/payments" onNavigate={close}>
+          <NavLink href="/admin/payments" active={isActive('/admin/payments')} onNavigate={() => { press('/admin/payments'); close() }}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
               <rect x="1" y="4" width="14" height="9" rx="2"/>
               <line x1="1" y1="8" x2="15" y2="8"/>
             </svg>
             Платежи
           </NavLink>
-          <NavLink href="/admin/expenses" onNavigate={close}>
+          <NavLink href="/admin/expenses" active={isActive('/admin/expenses')} onNavigate={() => { press('/admin/expenses'); close() }}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
               <path d="M8 2v12M4 6l4-4 4 4"/>
               <line x1="3" y1="14" x2="13" y2="14"/>
             </svg>
             Расходы
           </NavLink>
-          <NavLink href="/admin/invoices" onNavigate={close}>
+          <NavLink href="/admin/invoices" active={isActive('/admin/invoices')} onNavigate={() => { press('/admin/invoices'); close() }}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
               <rect x="2" y="1" width="12" height="14" rx="2"/>
               <line x1="5" y1="5" x2="11" y2="5"/>
@@ -104,7 +95,7 @@ export function Sidebar({ userName, userEmail }: Props) {
             </svg>
             Счета
           </NavLink>
-          <NavLink href="/admin/calendar" onNavigate={close}>
+          <NavLink href="/admin/calendar" active={isActive('/admin/calendar')} onNavigate={() => { press('/admin/calendar'); close() }}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
               <rect x="2" y="2" width="12" height="12" rx="2"/>
               <line x1="2" y1="6" x2="14" y2="6"/>
@@ -114,33 +105,33 @@ export function Sidebar({ userName, userEmail }: Props) {
             Календарь
           </NavLink>
           <div className="ns">Аналитика</div>
-          <NavLink href="/admin/analytics" onNavigate={close}>
+          <NavLink href="/admin/analytics" active={isActive('/admin/analytics')} onNavigate={() => { press('/admin/analytics'); close() }}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
               <rect x="2" y="8" width="3" height="6"/><rect x="6.5" y="4" width="3" height="10"/><rect x="11" y="10" width="3" height="4"/>
             </svg>
             Аналитика
           </NavLink>
-          <NavLink href="/admin/seo" onNavigate={close}>
+          <NavLink href="/admin/seo" active={isActive('/admin/seo')} onNavigate={() => { press('/admin/seo'); close() }}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
               <circle cx="7" cy="7" r="4.5"/><line x1="10.5" y1="10.5" x2="14" y2="14"/>
             </svg>
             SEO
           </NavLink>
-          <NavLink href="/admin/sales" onNavigate={close}>
+          <NavLink href="/admin/sales" active={isActive('/admin/sales')} onNavigate={() => { press('/admin/sales'); close() }}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
               <polyline points="2,13 5,8 8,10 11,4 14,6"/>
               <line x1="2" y1="14" x2="14" y2="14"/>
             </svg>
             Продажники
           </NavLink>
-          <NavLink href="/admin/curators" onNavigate={close}>
+          <NavLink href="/admin/curators" active={isActive('/admin/curators')} onNavigate={() => { press('/admin/curators'); close() }}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
               <circle cx="8" cy="5" r="3"/><path d="M2 14c0-3.3 2.7-6 6-6s6 2.7 6 6"/>
             </svg>
             Кураторы
           </NavLink>
           <div className="ns">Система</div>
-          <NavLink href="/admin" exact onNavigate={close}>
+          <NavLink href="/admin" active={isActive('/admin', true)} onNavigate={() => { press('/admin'); close() }}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
               <rect x="1" y="1" width="6" height="6" rx="1.5"/>
               <rect x="9" y="1" width="6" height="6" rx="1.5"/>
@@ -149,7 +140,7 @@ export function Sidebar({ userName, userEmail }: Props) {
             </svg>
             Главная
           </NavLink>
-          <NavLink href="/admin/settings" onNavigate={close}>
+          <NavLink href="/admin/settings" active={isActive('/admin/settings')} onNavigate={() => { press('/admin/settings'); close() }}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
               <circle cx="8" cy="8" r="3"/>
               <path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.42 1.42M11.53 11.53l1.42 1.42M3.05 12.95l1.42-1.42M11.53 4.47l1.42-1.42"/>

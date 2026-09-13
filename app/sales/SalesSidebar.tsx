@@ -2,10 +2,9 @@
 
 import { useState, Suspense, type ReactNode } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { useActiveNav } from '@/components/useActiveNav'
 import { logout } from '@/app/login/actions'
 import { WelcomeOverlay } from '@/components/WelcomeOverlay'
-import { NavPending } from '@/components/NavPending'
 
 interface Props {
   userName: string
@@ -14,32 +13,30 @@ interface Props {
 }
 
 /**
- * Пункт меню. Активный определяется по текущему адресу на клиенте, а не пропсом
- * с сервера: иначе подсветка переезжала бы только после отрисовки новой страницы.
+ * Пункт меню. Активность приходит готовой из `useActiveNav`: подсветка
+ * переезжает в момент нажатия, не дожидаясь, пока приедет новая страница.
  */
 const ACTIVE_STYLE: React.CSSProperties = {
   borderLeftColor: 'var(--green)', color: 'var(--green)', background: 'rgba(22,163,97,.07)',
 }
 
-function NavLink({ href, exact, children, onNavigate }: {
+function NavLink({ href, active, children, onNavigate }: {
   href: string
-  exact?: boolean
+  active: boolean
   children: ReactNode
   onNavigate: () => void
 }) {
-  const pathname = usePathname()
-  const active = exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`)
   return (
     <Link href={href} onClick={onNavigate} className={`ni${active ? ' active' : ''}`}
       style={active ? ACTIVE_STYLE : undefined}>
       {children}
-      <NavPending accent="var(--green)" />
     </Link>
   )
 }
 
 export function SalesSidebar({ userName, userEmail, initials }: Props) {
   const [open, setOpen] = useState(false)
+  const { isActive, press } = useActiveNav()
 
   return (
     <>
@@ -67,13 +64,15 @@ export function SalesSidebar({ userName, userEmail, initials }: Props) {
         </div>
         <nav className="nav">
           <div className="ns">Основное</div>
-          <NavLink href="/sales/funnel" onNavigate={() => setOpen(false)}>
+          <NavLink href="/sales/funnel" active={isActive('/sales/funnel')}
+            onNavigate={() => { press('/sales/funnel'); setOpen(false) }}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
               <path d="M2 3h12l-3 5v4l-2 1.5V8L2 3z"/>
             </svg>
             Воронка
           </NavLink>
-          <NavLink href="/sales" exact onNavigate={() => setOpen(false)}>
+          <NavLink href="/sales" active={isActive('/sales', true)}
+            onNavigate={() => { press('/sales'); setOpen(false) }}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
               <rect x="2" y="3" width="12" height="10" rx="2"/>
               <line x1="5" y1="7" x2="11" y2="7"/>
@@ -81,7 +80,8 @@ export function SalesSidebar({ userName, userEmail, initials }: Props) {
             </svg>
             Мои клиенты
           </NavLink>
-          <NavLink href="/sales/invoices" onNavigate={() => setOpen(false)}>
+          <NavLink href="/sales/invoices" active={isActive('/sales/invoices')}
+            onNavigate={() => { press('/sales/invoices'); setOpen(false) }}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
               <rect x="2" y="1" width="12" height="14" rx="2"/>
               <line x1="5" y1="5" x2="11" y2="5"/>
@@ -90,7 +90,8 @@ export function SalesSidebar({ userName, userEmail, initials }: Props) {
             </svg>
             Счета
           </NavLink>
-          <NavLink href="/sales/calendar" onNavigate={() => setOpen(false)}>
+          <NavLink href="/sales/calendar" active={isActive('/sales/calendar')}
+            onNavigate={() => { press('/sales/calendar'); setOpen(false) }}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
               <rect x="2" y="3" width="12" height="11" rx="2"/>
               <line x1="2" y1="6.5" x2="14" y2="6.5"/>
@@ -100,7 +101,8 @@ export function SalesSidebar({ userName, userEmail, initials }: Props) {
             </svg>
             Календарь оплат
           </NavLink>
-          <NavLink href="/sales/schedule" onNavigate={() => setOpen(false)}>
+          <NavLink href="/sales/schedule" active={isActive('/sales/schedule')}
+            onNavigate={() => { press('/sales/schedule'); setOpen(false) }}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
               <rect x="2" y="2" width="12" height="12" rx="2"/>
               <line x1="2" y1="6" x2="14" y2="6"/>
