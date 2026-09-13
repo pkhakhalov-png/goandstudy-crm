@@ -1,21 +1,16 @@
 'use client'
 
 import { useState, Suspense, type ReactNode } from 'react'
-import Link, { useLinkStatus } from 'next/link'
+import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { logout } from '@/app/login/actions'
 import { WelcomeOverlay } from '@/components/WelcomeOverlay'
+import { NavPending } from '@/components/NavPending'
 
 interface Props {
   userName: string
   userEmail: string
   initials: string
-}
-
-/** Точка на пункте, пока идёт переход: подтверждает нажатие до ответа сервера. */
-function NavPending() {
-  const { pending } = useLinkStatus()
-  return <span aria-hidden className={`ni-dot${pending ? ' is-pending' : ''}`} />
 }
 
 /**
@@ -38,7 +33,7 @@ function NavLink({ href, exact, children, onNavigate }: {
     <Link href={href} onClick={onNavigate} className={`ni${active ? ' active' : ''}`}
       style={active ? ACTIVE_STYLE : undefined}>
       {children}
-      <NavPending />
+      <NavPending accent="var(--green)" />
     </Link>
   )
 }
@@ -56,7 +51,8 @@ export function SalesSidebar({ userName, userEmail, initials }: Props) {
       />
 
       {/* Сайдбар */}
-      <aside className={`sidebar${open ? ' open' : ''}`}>
+      <aside className={`sidebar${open ? ' open' : ''}`}
+        style={{ '--nav-accent': 'var(--green)', '--nav-accent-bg': 'rgba(22,163,97,.07)' } as React.CSSProperties}>
         <div className="lw" style={{ textAlign: 'center', padding: '20px 16px 14px' }}>
           <img
             src="https://i.ibb.co/7tNx07SW/GAS-logo-01.png"

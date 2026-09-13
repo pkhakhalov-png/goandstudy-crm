@@ -898,22 +898,45 @@ tbody tr:hover { background: var(--rh); }
 /* ─────────────────────────────────────────────────────────────────────────────
    Отклик интерфейса на нажатие
 
-   Страницы админки собираются на сервере: между нажатием и появлением нового
-   экрана проходит от десятых долей секунды до секунды. Всё это время раньше не
+   Страницы админки собираются на сервере: между нажатием и новым экраном
+   проходит от десятых долей секунды до секунды. Всё это время раньше не
    происходило ничего — человек не понимал, нажалось ли, и жал ещё раз.
 
-   Здесь три вещи, по возрастанию заметности:
-   1. точка на пункте меню — подтверждает само нажатие;
-   2. полоска вверху содержимого — показывает, что страница едет;
-   3. серые блоки — держат высоту, чтобы содержимое не прыгало.
+   ПОЧЕМУ НЕ ЗАГЛУШКА ВМЕСТО СОДЕРЖИМОГО. Первая попытка была через `loading.tsx`:
+   он подставляет серые блоки на время загрузки. Но Next в этом случае выбрасывает
+   текущую страницу сразу, ещё до ответа сервера, — и экран мигал серым при каждом
+   переходе, даже когда новая страница приезжала за треть секунды. Мелькание
+   раздражает сильнее ожидания. Поэтому заглушки нет: прежняя страница остаётся
+   на месте, приглушается, а поверх идёт полоска.
 
-   У первых двух намеренная задержка: если переход уложился в полторы десятых
-   секунды, показывать индикатор не надо — мелькание раздражает сильнее, чем
-   короткое ожидание.
+   Всё с задержкой в 150 мс: короткий переход проходит вообще без индикаторов.
    ──────────────────────────────────────────────────────────────────────────── */
 
-/* Точка на пункте меню, пока идёт переход. Место под неё занято всегда:
-   иначе текст пункта дёргался бы в момент появления. */
+/* Полоска поверх экрана. Ползёт до трёх четвертей и там замирает: изображать
+   точный процент, которого мы не знаем, — враньё. */
+.nav-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 2px;
+  width: 0;
+  background: var(--nav-accent, var(--purple));
+  border-radius: 0 2px 2px 0;
+  opacity: 0;
+  z-index: 40;
+  pointer-events: none;
+  animation: nav-progress-go 3s cubic-bezier(0.1, 0.75, 0.2, 1) 150ms forwards;
+}
+
+@keyframes nav-progress-go {
+  0%   { width: 0;    opacity: 0; }
+  1%   { width: 0;    opacity: 1; }
+  35%  { width: 45vw; }
+  100% { width: 75vw; opacity: 1; }
+}
+
+/* Точка на пункте: показывает, какой именно раздел едет. Место под неё занято
+   всегда, иначе текст пункта дёргался бы в момент появления. */
 .ni-dot {
   width: 6px;
   height: 6px;
@@ -930,75 +953,44 @@ tbody tr:hover { background: var(--rh); }
   animation: ni-dot-in 180ms ease 150ms forwards, ni-dot-pulse 1s ease-in-out 150ms infinite;
 }
 
-@keyframes ni-dot-in {
-  to { opacity: 0.6; }
+@keyframes ni-dot-in  { to { opacity: 0.6; } }
+@keyframes ni-dot-pulse { 50% { opacity: 0.15; } }
+
+/* Нажатый пункт подсвечивается, не дожидаясь ответа сервера. */
+.ni:active,
+.ni:has(.ni-dot.is-pending) {
+  color: var(--nav-accent, var(--purple));
+  border-left-color: var(--nav-accent, var(--purple));
+  background: var(--nav-accent-bg, var(--pl));
+  font-weight: 600;
 }
 
-@keyframes ni-dot-pulse {
-  50% { opacity: 0.15; }
+/* ...а прежний активный пункт на это время подсветку отдаёт: иначе одновременно
+   горели бы два, и было бы непонятно, где мы. */
+.nav:has(.ni-dot.is-pending) .ni.active:not(:has(.ni-dot.is-pending)) {
+  color: var(--muted);
+  border-left-color: transparent;
+  background: transparent;
+  font-weight: 400;
 }
 
-/* Нажатый пункт подсвечивается, не дожидаясь ответа сервера. Подсветка слабее
-   активной: это ещё не «вы здесь», а «понял, открываю». */
-.ni:active {
-  background: var(--pl);
-  color: var(--purple);
+/* Содержимое приглушается: видно, что оно уже не про текущий запрос. Не
+   скрываем и не блокируем — если переход затянется, с прежней страницей можно
+   продолжать работать. */
+.app:has(.ni-dot.is-pending) .main {
+  opacity: 0.55;
+  transition: opacity 180ms ease 150ms;
 }
 
-/* Полоска загрузки над содержимым. Ползёт быстро до трёх четвертей и там
-   замирает: честнее, чем изображать точный процент, которого мы не знаем.
-
-   Прикреплена к окну, а не к содержимому: так не приходится трогать
-   позиционирование `.main`, внутри которого уже есть свои абсолютные элементы. */
-.nav-bar {
-  position: fixed;
-  top: 0;
-  left: var(--sw);
-  height: 2px;
-  width: 0;
-  background: var(--purple);
-  border-radius: 0 2px 2px 0;
-  opacity: 0;
-  animation: nav-bar-go 2.4s cubic-bezier(0.1, 0.8, 0.2, 1) 150ms forwards;
-  z-index: 30;
+.main {
+  transition: opacity 120ms ease;
 }
 
-@keyframes nav-bar-go {
-  0%   { width: 0;                    opacity: 0; }
-  1%   { width: 0;                    opacity: 1; }
-  40%  { width: calc((100vw - var(--sw)) * 0.45); }
-  100% { width: calc((100vw - var(--sw)) * 0.75); opacity: 1; }
-}
-
-@media (max-width: 768px) {
-  .nav-bar { left: 0; }
-  @keyframes nav-bar-go {
-    0%   { width: 0;     opacity: 0; }
-    1%   { width: 0;     opacity: 1; }
-    40%  { width: 45vw; }
-    100% { width: 75vw;  opacity: 1; }
-  }
-}
-
-/* Серый блок вместо содержимого */
-.skel {
-  background: var(--surf);
-  border: 1px solid var(--bor);
-  border-radius: 8px;
-  animation: skel-pulse 1.5s ease-in-out infinite;
-}
-
-@keyframes skel-pulse {
-  0%, 100% { opacity: 1; }
-  50%      { opacity: 0.45; }
-}
-
-/* Для тех, кто просил систему не анимировать: индикаторы остаются видимыми,
-   но перестают двигаться. */
+/* Для тех, кто просил систему не анимировать: индикаторы видны, но не двигаются. */
 @media (prefers-reduced-motion: reduce) {
   .ni-dot.is-pending { visibility: visible; opacity: 0.6; animation: none; }
-  .nav-bar { opacity: 1; width: 40%; animation: none; }
-  .skel { animation: none; }
+  .nav-progress { opacity: 1; width: 40vw; animation: none; }
+  .app:has(.ni-dot.is-pending) .main { transition: none; }
 }
 
 /* Текст только для программ чтения с экрана */

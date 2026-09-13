@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, Suspense } from 'react'
-import Link, { useLinkStatus } from 'next/link'
+import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { logout } from '@/app/login/actions'
 import { WelcomeOverlay } from '@/components/WelcomeOverlay'
+import { NavPending } from '@/components/NavPending'
 
 interface Props {
   userName: string
@@ -31,12 +32,6 @@ const navItems = [
   { key: 'history', href: '/rop/history', label: 'История', icon: 'M8 4v4l2 2M3 8a5 5 0 1010 0A5 5 0 003 8z' },
 ]
 
-/** Точка на пункте, пока идёт переход: подтверждает нажатие до ответа сервера. */
-function NavPending() {
-  const { pending } = useLinkStatus()
-  return <span aria-hidden className={`ni-dot${pending ? ' is-pending' : ''}`} />
-}
-
 /**
  * Пункт меню. Активный определяется по текущему адресу на клиенте, а не пропсом
  * с сервера: иначе подсветка переезжала бы только после отрисовки новой страницы.
@@ -55,7 +50,7 @@ function RopNavLink({ item, onNavigate }: { item: typeof navItems[number]; onNav
         <path d={item.icon} />
       </svg>
       {item.label}
-      <NavPending />
+      <NavPending accent={accent} />
     </Link>
   )
 }
@@ -68,7 +63,8 @@ export function RopSidebar({ userName, userEmail, initials }: Props) {
       <Suspense><WelcomeOverlay /></Suspense>
       <div className={`sidebar-overlay${open ? ' open' : ''}`} onClick={() => setOpen(false)} />
 
-      <aside className={`sidebar${open ? ' open' : ''}`}>
+      <aside className={`sidebar${open ? ' open' : ''}`}
+        style={{ '--nav-accent': accent, '--nav-accent-bg': accentBg } as React.CSSProperties}>
         <div className="lw" style={{ textAlign: 'center', padding: '20px 16px 14px' }}>
           <img
             src="https://i.ibb.co/7tNx07SW/GAS-logo-01.png"

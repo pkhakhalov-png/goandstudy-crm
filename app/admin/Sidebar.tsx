@@ -1,26 +1,15 @@
 'use client'
 
 import { useState, Suspense, type ReactNode } from 'react'
-import Link, { useLinkStatus } from 'next/link'
+import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { logout } from '@/app/login/actions'
 import { WelcomeOverlay } from '@/components/WelcomeOverlay'
+import { NavPending } from '@/components/NavPending'
 
 interface Props {
   userName: string
   userEmail: string
-}
-
-/**
- * Точка на пункте меню, пока идёт переход.
- *
- * Работает только внутри `<Link>`: хук `useLinkStatus` знает про ту ссылку, в
- * которую вложен. Место под точку занято всегда, поэтому текст не дёргается,
- * когда она появляется.
- */
-function NavPending() {
-  const { pending } = useLinkStatus()
-  return <span aria-hidden className={`ni-dot${pending ? ' is-pending' : ''}`} />
 }
 
 /**
