@@ -7,7 +7,7 @@
 //   article_brief → article_draft → article_qa → article_illustrate → article_linkplan
 import { registerStep, type Job, type StepOutcome } from './steps'
 import { metaByVersion, urlsOfArticles, slugOf } from './article-meta'
-import { readAll } from '@/lib/supabase/read-all'
+import { readAll, readAllByDay } from '@/lib/supabase/read-all'
 import { generateBrief, generateDraft, reviseDraft, qaWithModel, qaDeterministic, GEN_MODEL, PROMPT_VERSION, type GenContext, type Brief, type QaReport } from './generate'
 import { summarize } from './standard'
 import { loadSiteTargets, normalizeBody } from './blog-style'
@@ -37,6 +37,11 @@ const MAX_REVISIONS = 2   // §12.2
  * Стало: общий помощник `readAll` — страницами по тысяче, пачками параллельно,
  * с явной сортировкой по первичному ключу, который уже проиндексирован.
  *
+ * И ещё раз стало: для самых больших таблиц даже это дорого, потому что
+ * `OFFSET` сервер честно прокручивает — страница со смещением сто тысяч шла
+ * 1847 мс против 343 мс у первой. Такие таблицы читаются по дням
+ * (`readAllByDay`), список ниже.
+ *
  * Экспортируется, чтобы замер (`scripts/perf-audit.ts --steps`) вызывал ту же
  * функцию, что и сам воркер, а не её копию.
  */
@@ -45,7 +50,24 @@ const PK_ORDER: Record<string, string[]> = {
   gsc_page_daily: ['normalized_url', 'date'],
 }
 
+/**
+ * Таблицы, которые быстрее читать по дням, чем страницами со смещением.
+ * Условие одно: в дне должно набираться около страницы строк и больше — иначе
+ * запросов станет больше, а времени не меньше. В `gsc_daily` их полторы тысячи
+ * в день, в `gsc_page_daily` — полторы сотни, поэтому здесь только первая.
+ * Почему смещения дороги — в `readAllByDay`.
+ */
+const BY_DAY = new Set(['gsc_daily'])
+
 export async function fetchAll(seo: any, table: string, cols: string, apply?: (q: any) => any): Promise<any[]> {
+  if (BY_DAY.has(table)) {
+    return readAllByDay<any>({
+      client: seo, table, select: cols, apply,
+      // Порядок внутри дня: дату из ключа брать незачем, она у всех строк одна.
+      order: (PK_ORDER[table] ?? []).filter((c) => c !== 'date'),
+      label: table,
+    })
+  }
   return readAll<any>(() => {
     let q = seo.from(table).select(cols)
     if (apply) q = apply(q)

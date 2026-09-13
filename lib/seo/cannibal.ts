@@ -12,6 +12,8 @@
  *   risky  — запросы размазаны между несколькими своими страницами, это уже
  *            каннибализация, и новая статья её усилит.
  */
+import { readAllByDay } from '@/lib/supabase/read-all'
+
 export type Owner = {
   url: string
   impressions: number
@@ -93,52 +95,6 @@ export function geoOf(query: string): string | null {
   return geo.find(([re]) => re.test(q))?.[1] ?? null
 }
 
-/**
- * Читает таблицу целиком. Клиент отдаёт не больше тысячи строк за запрос, а строк
- * под двести тысяч — поэтому страницы тянем пачками параллельно. Последовательно
- * это занимало двадцать секунд: почти двести обращений подряд, каждое по сотне
- * миллисекунд, и всё это время экран стоял пустой.
- */
-async function readAll(seo: any, table: string, cols: string, since?: string): Promise<any[]> {
-  const PAGE = 1000
-  const BATCH = 12   // больше — упираемся в лимит одновременных соединений
-
-  // Считаем строки с тем же условием, с каким читаем. Раньше счёт шёл по всей
-  // таблице: при выборке за 90 дней это давало 192 похода вместо 90, и сотня
-  // из них возвращала пустоту.
-  let countQuery = seo.from(table).select('*', { count: 'exact', head: true })
-  if (since) countQuery = countQuery.gte('date', since)
-  const { count, error: countError } = await countQuery
-  if (countError) throw new Error(`${table}: ${countError.message}`)
-
-  const pages = Math.ceil((count ?? 0) / PAGE)
-  if (!pages) return []
-
-  const out: any[] = []
-  for (let start = 0; start < pages; start += BATCH) {
-    const chunk = await Promise.all(
-      Array.from({ length: Math.min(BATCH, pages - start) }, (_, i) => {
-        const from = (start + i) * PAGE
-        // Порядок обязателен: без него Postgres не обещает одинаковую
-        // последовательность строк между запросами, и соседние страницы выдачи
-        // могут перекрыться или разойтись. Сортируем по первичному ключу.
-        let q = seo.from(table).select(cols)
-          .order('normalized_url', { ascending: true })
-          .order('query', { ascending: true })
-          .order('date', { ascending: true })
-          .range(from, from + PAGE - 1)
-        if (since) q = q.gte('date', since)
-        return q.then((r: any) => {
-          if (r.error) throw new Error(`${table}: ${r.error.message}`)
-          return r.data ?? []
-        })
-      }),
-    )
-    for (const rows of chunk) out.push(...rows)
-  }
-  return out
-}
-
 export type QueryRow = { normalized_url: string; query: string; clicks: number; impressions: number; position: number }
 
 /**
@@ -147,7 +103,14 @@ export type QueryRow = { normalized_url: string; query: string; clicks: number; 
  */
 export async function loadQueryRows(seo: any, days = 90): Promise<QueryRow[]> {
   const since = new Date(Date.now() - days * 864e5).toISOString().slice(0, 10)
-  return readAll(seo, 'gsc_daily', 'normalized_url,query,clicks,impressions,position,date', since)
+  return readAllByDay({
+    client: seo,
+    table: 'gsc_daily',
+    select: 'normalized_url,query,clicks,impressions,position,date',
+    since,
+    // Внутри дня пара «адрес и запрос» уникальна: вместе с датой это первичный ключ.
+    order: ['normalized_url', 'query'],
+  })
 }
 
 export async function checkCannibalization(
