@@ -1,21 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
-import { Sidebar } from './Sidebar'
 import { Dashboard } from './Dashboard'
 
 export default async function AdminPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-
-  const { data: profile } = await supabase
-    .from('users')
-    .select('name, role')
-    .eq('id', user.id)
-    .single()
-
-  if (profile?.role !== 'admin') redirect('/sales')
-
   const [
     { data: clients },
     { data: payments },
@@ -31,21 +18,18 @@ export default async function AdminPage() {
   ])
 
   return (
-    <div className="app">
-      <Sidebar activePage="home" userName={profile?.name || ''} userEmail={user.email || ''} />
-      <div className="main">
-        <div className="topbar">
-          <div className="pt">Главная</div>
-          <span style={{fontSize:12,color:'var(--muted)'}}>{new Date().toLocaleDateString('ru-RU',{day:'numeric',month:'long',year:'numeric'})}</span>
-        </div>
-        <Dashboard
-          clients={clients ?? []}
-          payments={payments ?? []}
-          expenses={expenses ?? []}
-          salespersons={salespersons ?? []}
-          fixedExpenses={fixedExpenses ?? []}
-        />
+    <div className="main">
+      <div className="topbar">
+        <div className="pt">Главная</div>
+        <span style={{fontSize:12,color:'var(--muted)'}}>{new Date().toLocaleDateString('ru-RU',{day:'numeric',month:'long',year:'numeric'})}</span>
       </div>
+      <Dashboard
+        clients={clients ?? []}
+        payments={payments ?? []}
+        expenses={expenses ?? []}
+        salespersons={salespersons ?? []}
+        fixedExpenses={fixedExpenses ?? []}
+      />
     </div>
   )
 }

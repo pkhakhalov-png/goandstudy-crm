@@ -1,22 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
 import { logout } from '@/app/login/actions'
 import { PaymentsClient } from './PaymentsClient'
-import { Sidebar } from '../Sidebar'
 
 export default async function AdminPaymentsPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-
-  const { data: profile } = await supabase
-    .from('users')
-    .select('name, role')
-    .eq('id', user.id)
-    .single()
-
-  if (profile?.role !== 'admin') redirect('/sales')
-
   const [
     { data: rawClients },
     { data: allUsers },
@@ -69,14 +56,11 @@ export default async function AdminPaymentsPage() {
   })
 
   return (
-    <div className="app">
-      <Sidebar activePage="payments" userName={profile?.name || ''} userEmail={user.email || ''} />
-      <PaymentsClient
-        allPayments={payments}
-        allClients={[]}
-        salespersons={salespersons ?? []}
-        curators={curators ?? []}
-      />
-    </div>
+    <PaymentsClient
+      allPayments={payments}
+      allClients={[]}
+      salespersons={salespersons ?? []}
+      curators={curators ?? []}
+    />
   )
 }

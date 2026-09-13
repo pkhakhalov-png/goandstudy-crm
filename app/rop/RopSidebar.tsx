@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, Suspense } from 'react'
-import Link from 'next/link'
+import Link, { useLinkStatus } from 'next/link'
+import { usePathname } from 'next/navigation'
 import { logout } from '@/app/login/actions'
 import { WelcomeOverlay } from '@/components/WelcomeOverlay'
 
@@ -9,7 +10,6 @@ interface Props {
   userName: string
   userEmail: string
   initials: string
-  activePage?: string
 }
 
 const accent = 'var(--gold, #c97d00)'
@@ -31,7 +31,36 @@ const navItems = [
   { key: 'history', href: '/rop/history', label: 'История', icon: 'M8 4v4l2 2M3 8a5 5 0 1010 0A5 5 0 003 8z' },
 ]
 
-export function RopSidebar({ userName, userEmail, initials, activePage = 'home' }: Props) {
+/** Точка на пункте, пока идёт переход: подтверждает нажатие до ответа сервера. */
+function NavPending() {
+  const { pending } = useLinkStatus()
+  return <span aria-hidden className={`ni-dot${pending ? ' is-pending' : ''}`} />
+}
+
+/**
+ * Пункт меню. Активный определяется по текущему адресу на клиенте, а не пропсом
+ * с сервера: иначе подсветка переезжала бы только после отрисовки новой страницы.
+ */
+function RopNavLink({ item, onNavigate }: { item: typeof navItems[number]; onNavigate: () => void }) {
+  const pathname = usePathname()
+  const active = item.href === '/rop'
+    ? pathname === '/rop'
+    : pathname === item.href || pathname.startsWith(`${item.href}/`)
+
+  return (
+    <Link href={item.href} onClick={onNavigate}
+      className={`ni${active ? ' active' : ''}`}
+      style={active ? { borderLeftColor: accent, color: accent, background: accentBg } : undefined}>
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
+        <path d={item.icon} />
+      </svg>
+      {item.label}
+      <NavPending />
+    </Link>
+  )
+}
+
+export function RopSidebar({ userName, userEmail, initials }: Props) {
   const [open, setOpen] = useState(false)
 
   return (
@@ -55,36 +84,15 @@ export function RopSidebar({ userName, userEmail, initials, activePage = 'home' 
         <nav className="nav">
           <div className="ns">Управление</div>
           {navItems.slice(0, 4).map(item => (
-            <Link key={item.key} href={item.href} onClick={() => setOpen(false)}
-              className={`ni${activePage === item.key ? ' active' : ''}`}
-              style={activePage === item.key ? { borderLeftColor: accent, color: accent, background: accentBg } : undefined}>
-              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
-                <path d={item.icon} />
-              </svg>
-              {item.label}
-            </Link>
+            <RopNavLink key={item.key} item={item} onNavigate={() => setOpen(false)} />
           ))}
           <div className="ns" style={{ marginTop: 12 }}>Контроль</div>
           {navItems.slice(4, 7).map(item => (
-            <Link key={item.key} href={item.href} onClick={() => setOpen(false)}
-              className={`ni${activePage === item.key ? ' active' : ''}`}
-              style={activePage === item.key ? { borderLeftColor: accent, color: accent, background: accentBg } : undefined}>
-              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
-                <path d={item.icon} />
-              </svg>
-              {item.label}
-            </Link>
+            <RopNavLink key={item.key} item={item} onNavigate={() => setOpen(false)} />
           ))}
           <div className="ns" style={{ marginTop: 12 }}>Система</div>
           {navItems.slice(7).map(item => (
-            <Link key={item.key} href={item.href} onClick={() => setOpen(false)}
-              className={`ni${activePage === item.key ? ' active' : ''}`}
-              style={activePage === item.key ? { borderLeftColor: accent, color: accent, background: accentBg } : undefined}>
-              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
-                <path d={item.icon} />
-              </svg>
-              {item.label}
-            </Link>
+            <RopNavLink key={item.key} item={item} onNavigate={() => setOpen(false)} />
           ))}
         </nav>
         <div className="sf">

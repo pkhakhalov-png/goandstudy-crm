@@ -1,6 +1,5 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { Sidebar } from '../Sidebar'
 import { FunnelClient } from './FunnelClient'
 import { autoCleanTrash } from './actions'
 import { readAll } from '@/lib/supabase/read-all'
@@ -70,25 +69,22 @@ export default async function AdminFunnelPage() {
   }
 
   return (
-    <div className="app">
-      <Sidebar activePage="funnel" userName={profile?.name || ''} userEmail={user.email || ''} />
-      <div className="main" style={{ display: 'flex', flexDirection: 'column' }}>
-        <div className="topbar">
-          <div className="pt">Воронка</div>
-          <span style={{ fontSize: 12, color: 'var(--muted)' }}>{totalDeals ?? deals.length} сделок</span>
-        </div>
-        <FunnelClient
-          stages={stages ?? []}
-          deals={deals}
-          salespersons={salespersons ?? []}
-          isAdmin={true}
-          userId={user.id}
-          trashedDeals={trashedDeals ?? []}
-          stageCounts={stageCounts}
-          curators={curators ?? []}
-          availableGroups={availableGroups}
-        />
+    <div className="main" style={{ display: 'flex', flexDirection: 'column' }}>
+      <div className="topbar">
+        <div className="pt">Воронка</div>
+        <span style={{ fontSize: 12, color: 'var(--muted)' }}>{totalDeals ?? deals.length} сделок</span>
       </div>
+      <FunnelClient
+        stages={stages ?? []}
+        deals={deals}
+        salespersons={salespersons ?? []}
+        isAdmin={true}
+        userId={user.id}
+        trashedDeals={trashedDeals ?? []}
+        stageCounts={stageCounts}
+        curators={curators ?? []}
+        availableGroups={availableGroups}
+      />
     </div>
   )
 }

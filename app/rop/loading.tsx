@@ -1,8 +1,8 @@
 /**
- * Заглушка на время загрузки страницы продажника.
+ * Заглушка на время загрузки страницы раздела РОПа.
  * Рисует только правую часть: сайдбар живёт в оболочке и не перерисовывается.
  */
-export default function SalesLoading() {
+export default function RopLoading() {
   return (
     <div className="main">
       <div className="nav-bar" aria-hidden />

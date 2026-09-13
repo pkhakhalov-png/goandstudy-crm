@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, Suspense } from 'react'
-import Link from 'next/link'
+import { useState, Suspense, type ReactNode } from 'react'
+import Link, { useLinkStatus } from 'next/link'
+import { usePathname } from 'next/navigation'
 import { logout } from '@/app/login/actions'
 import { WelcomeOverlay } from '@/components/WelcomeOverlay'
 
@@ -9,10 +10,40 @@ interface Props {
   userName: string
   userEmail: string
   initials: string
-  activePage?: 'clients' | 'invoices' | 'schedule' | 'funnel' | 'calendar'
 }
 
-export function SalesSidebar({ userName, userEmail, initials, activePage = 'clients' }: Props) {
+/** Точка на пункте, пока идёт переход: подтверждает нажатие до ответа сервера. */
+function NavPending() {
+  const { pending } = useLinkStatus()
+  return <span aria-hidden className={`ni-dot${pending ? ' is-pending' : ''}`} />
+}
+
+/**
+ * Пункт меню. Активный определяется по текущему адресу на клиенте, а не пропсом
+ * с сервера: иначе подсветка переезжала бы только после отрисовки новой страницы.
+ */
+const ACTIVE_STYLE: React.CSSProperties = {
+  borderLeftColor: 'var(--green)', color: 'var(--green)', background: 'rgba(22,163,97,.07)',
+}
+
+function NavLink({ href, exact, children, onNavigate }: {
+  href: string
+  exact?: boolean
+  children: ReactNode
+  onNavigate: () => void
+}) {
+  const pathname = usePathname()
+  const active = exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`)
+  return (
+    <Link href={href} onClick={onNavigate} className={`ni${active ? ' active' : ''}`}
+      style={active ? ACTIVE_STYLE : undefined}>
+      {children}
+      <NavPending />
+    </Link>
+  )
+}
+
+export function SalesSidebar({ userName, userEmail, initials }: Props) {
   const [open, setOpen] = useState(false)
 
   return (
@@ -40,24 +71,21 @@ export function SalesSidebar({ userName, userEmail, initials, activePage = 'clie
         </div>
         <nav className="nav">
           <div className="ns">Основное</div>
-          <Link href="/sales/funnel" onClick={() => setOpen(false)} className={`ni${activePage==='funnel'?' active':''}`}
-            style={activePage==='funnel' ? { borderLeftColor: 'var(--green)', color: 'var(--green)', background: 'rgba(22,163,97,.07)' } : undefined}>
+          <NavLink href="/sales/funnel" onNavigate={() => setOpen(false)}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
               <path d="M2 3h12l-3 5v4l-2 1.5V8L2 3z"/>
             </svg>
             Воронка
-          </Link>
-          <Link href="/sales" onClick={() => setOpen(false)} className={`ni${activePage==='clients'?' active':''}`}
-            style={activePage==='clients' ? { borderLeftColor: 'var(--green)', color: 'var(--green)', background: 'rgba(22,163,97,.07)' } : undefined}>
+          </NavLink>
+          <NavLink href="/sales" exact onNavigate={() => setOpen(false)}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
               <rect x="2" y="3" width="12" height="10" rx="2"/>
               <line x1="5" y1="7" x2="11" y2="7"/>
               <line x1="5" y1="10" x2="9" y2="10"/>
             </svg>
             Мои клиенты
-          </Link>
-          <Link href="/sales/invoices" onClick={() => setOpen(false)} className={`ni${activePage==='invoices'?' active':''}`}
-            style={activePage==='invoices' ? { borderLeftColor: 'var(--green)', color: 'var(--green)', background: 'rgba(22,163,97,.07)' } : undefined}>
+          </NavLink>
+          <NavLink href="/sales/invoices" onNavigate={() => setOpen(false)}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
               <rect x="2" y="1" width="12" height="14" rx="2"/>
               <line x1="5" y1="5" x2="11" y2="5"/>
@@ -65,9 +93,8 @@ export function SalesSidebar({ userName, userEmail, initials, activePage = 'clie
               <line x1="5" y1="11" x2="8" y2="11"/>
             </svg>
             Счета
-          </Link>
-          <Link href="/sales/calendar" onClick={() => setOpen(false)} className={`ni${activePage==='calendar'?' active':''}`}
-            style={activePage==='calendar' ? { borderLeftColor: 'var(--green)', color: 'var(--green)', background: 'rgba(22,163,97,.07)' } : undefined}>
+          </NavLink>
+          <NavLink href="/sales/calendar" onNavigate={() => setOpen(false)}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
               <rect x="2" y="3" width="12" height="11" rx="2"/>
               <line x1="2" y1="6.5" x2="14" y2="6.5"/>
@@ -76,9 +103,8 @@ export function SalesSidebar({ userName, userEmail, initials, activePage = 'clie
               <circle cx="8" cy="10.2" r="1.2" fill="currentColor" stroke="none"/>
             </svg>
             Календарь оплат
-          </Link>
-          <Link href="/sales/schedule" onClick={() => setOpen(false)} className={`ni${activePage==='schedule'?' active':''}`}
-            style={activePage==='schedule' ? { borderLeftColor: 'var(--green)', color: 'var(--green)', background: 'rgba(22,163,97,.07)' } : undefined}>
+          </NavLink>
+          <NavLink href="/sales/schedule" onNavigate={() => setOpen(false)}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
               <rect x="2" y="2" width="12" height="12" rx="2"/>
               <line x1="2" y1="6" x2="14" y2="6"/>
@@ -86,7 +112,7 @@ export function SalesSidebar({ userName, userEmail, initials, activePage = 'clie
               <line x1="11" y1="1" x2="11" y2="4"/>
             </svg>
             Расписание
-          </Link>
+          </NavLink>
         </nav>
         <div className="sf">
           <div className="ur">

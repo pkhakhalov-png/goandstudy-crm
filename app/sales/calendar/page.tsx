@@ -1,18 +1,14 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { SalesSidebar } from '../SalesSidebar'
 import { CalendarClient } from '../../admin/calendar/CalendarClient'
+import { viewer } from '@/lib/auth/viewer'
 
 export default async function SalesCalendarPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  // Профиль читается общей функцией: оболочка раздела спрашивает то же самое,
+  // и без неё это был бы второй одинаковый поход в базу за тот же запрос
+  const { user, profile } = await viewer()
   if (!user) redirect('/login')
-
-  const { data: profile } = await supabase
-    .from('users')
-    .select('name, role')
-    .eq('id', user.id)
-    .single()
 
   if (profile?.role === 'admin') redirect('/admin/calendar')
   if (profile?.role === 'rop') redirect('/rop')
@@ -63,24 +59,13 @@ export default async function SalesCalendarPage() {
     }
   })
 
-  const initials = (profile?.name || user.email || 'ПП')
-    .split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)
-
   return (
-    <div className="app">
-      <SalesSidebar
-        userName={profile?.name || ''}
-        userEmail={user.email || ''}
-        initials={initials}
-        activePage="calendar"
-      />
-      <div className="main">
-        <div className="topbar">
-          <div className="pt">Календарь платежей</div>
-          <span style={{ fontSize: 12, color: 'var(--muted)' }}>{new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
-        </div>
-        <CalendarClient payments={payments} salespersons={[]} hideSalespersonFilter />
+    <div className="main">
+      <div className="topbar">
+        <div className="pt">Календарь платежей</div>
+        <span style={{ fontSize: 12, color: 'var(--muted)' }}>{new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
       </div>
+      <CalendarClient payments={payments} salespersons={[]} hideSalespersonFilter />
     </div>
   )
 }

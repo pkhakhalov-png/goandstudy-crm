@@ -1,17 +1,14 @@
-import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { RopSidebar } from '../RopSidebar'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { FunnelClient } from '../../admin/funnel/FunnelClient'
 import { readAll } from '@/lib/supabase/read-all'
 
 export default async function RopFunnelPage() {
   const supabase = await createClient()
+  // Роль проверяет оболочка раздела; здесь нужен только идентификатор —
+  // воронка передаёт его в клиентскую часть
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
-
-  const { data: profile } = await supabase.from('users').select('name, role').eq('id', user.id).single()
-  if (profile?.role !== 'rop' && profile?.role !== 'admin') redirect('/sales')
-
   const admin = await createAdminClient()
   const dealsPerStage = 50
 
@@ -52,30 +49,24 @@ export default async function RopFunnelPage() {
     stageCounts[s.id] = perStageResults[i * 2].count ?? 0
     if (perStageResults[i * 2 + 1].data) deals.push(...perStageResults[i * 2 + 1].data)
   })
-
-  const initials = (profile?.name || user.email || 'РП').split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)
-
   return (
-    <div className="app">
-      <RopSidebar userName={profile?.name || ''} userEmail={user.email || ''} initials={initials} activePage="funnel" />
-      <div className="main" style={{ display: 'flex', flexDirection: 'column' }}>
-        <div className="topbar">
-          <div className="pt">Воронка</div>
-          <span style={{ fontSize: 12, color: 'var(--muted)' }}>{totalDeals ?? deals.length} сделок</span>
-        </div>
-        <FunnelClient
-          stages={stages ?? []}
-          deals={deals}
-          salespersons={salespersons ?? []}
-          isAdmin={true}
-          userId={user.id}
-          trashedDeals={trashedDeals ?? []}
-          stageCounts={stageCounts}
-          curators={curators ?? []}
-          availableGroups={availableGroups}
-          basePath="/rop/funnel"
-        />
+    <div className="main" style={{ display: 'flex', flexDirection: 'column' }}>
+      <div className="topbar">
+        <div className="pt">Воронка</div>
+        <span style={{ fontSize: 12, color: 'var(--muted)' }}>{totalDeals ?? deals.length} сделок</span>
       </div>
+      <FunnelClient
+        stages={stages ?? []}
+        deals={deals}
+        salespersons={salespersons ?? []}
+        isAdmin={true}
+        userId={user.id}
+        trashedDeals={trashedDeals ?? []}
+        stageCounts={stageCounts}
+        curators={curators ?? []}
+        availableGroups={availableGroups}
+        basePath="/rop/funnel"
+      />
     </div>
   )
 }

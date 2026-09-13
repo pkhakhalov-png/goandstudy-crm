@@ -1,6 +1,5 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { RopSidebar } from '../../RopSidebar'
 import { DealCard } from '../../../admin/funnel/[id]/DealCard'
 import { readAll } from '@/lib/supabase/read-all'
 
@@ -60,27 +59,21 @@ export default async function RopDealPage({ params }: { params: Promise<{ id: st
       ? supabase.from('bookings').select('id, booking_date, start_time, end_time, status').eq('id', deal.booking_id).single().then(r => r.data)
       : null,
   ])
-
-  const initials = (profile?.name || user.email || 'РП').split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)
-
   return (
-    <div className="app">
-      <RopSidebar activePage="funnel" userName={profile?.name || ''} userEmail={user.email || ''} initials={initials} />
-      <DealCard
-        deal={deal}
-        stages={stages ?? []}
-        activities={enrichedActivities}
-        salespersons={salespersons ?? []}
-        clientData={clientData}
-        bookingData={bookingData}
-        files={files ?? []}
-        messages={messages ?? []}
-        tasks={tasks ?? []}
-        userId={user.id}
-        curators={curators ?? []}
-        availableGroups={availableGroups}
-        backUrl="/rop/funnel"
-      />
-    </div>
+    <DealCard
+      deal={deal}
+      stages={stages ?? []}
+      activities={enrichedActivities}
+      salespersons={salespersons ?? []}
+      clientData={clientData}
+      bookingData={bookingData}
+      files={files ?? []}
+      messages={messages ?? []}
+      tasks={tasks ?? []}
+      userId={user.id}
+      curators={curators ?? []}
+      availableGroups={availableGroups}
+      backUrl="/rop/funnel"
+    />
   )
 }

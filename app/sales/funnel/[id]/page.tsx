@@ -1,6 +1,5 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { SalesSidebar } from '../../SalesSidebar'
 import { DealCard } from '../../../admin/funnel/[id]/DealCard'
 import { readAll } from '@/lib/supabase/read-all'
 
@@ -34,9 +33,6 @@ export default async function SalesDealPage({ params }: { params: Promise<{ id: 
   if (profile?.role === 'rop') redirect('/rop')
   if (!deal || deal.salesperson_id !== user.id) redirect('/sales/funnel')
 
-  const initials = (profile?.name || user.email || 'ПП')
-    .split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)
-
   const userMap = new Map((allUsers ?? []).map(u => [u.id, u.name]))
   const enrichedActivities = (activities ?? []).map(a => ({ ...a, user_name: userMap.get(a.user_id) ?? 'Система' }))
 
@@ -65,22 +61,19 @@ export default async function SalesDealPage({ params }: { params: Promise<{ id: 
   ])
 
   return (
-    <div className="app">
-      <SalesSidebar userName={profile?.name || ''} userEmail={user.email || ''} initials={initials} activePage="funnel" />
-      <DealCard
-        deal={deal}
-        stages={stages ?? []}
-        activities={enrichedActivities}
-        salespersons={allSalespersons ?? [{ id: user.id, name: profile?.name || '' }]}
-        clientData={clientData}
-        bookingData={bookingData}
-        files={files ?? []}
-        messages={messages ?? []}
-        tasks={tasks ?? []}
-        userId={user.id}
-        curators={curators ?? []}
-        availableGroups={availableGroups}
-      />
-    </div>
+    <DealCard
+      deal={deal}
+      stages={stages ?? []}
+      activities={enrichedActivities}
+      salespersons={allSalespersons ?? [{ id: user.id, name: profile?.name || '' }]}
+      clientData={clientData}
+      bookingData={bookingData}
+      files={files ?? []}
+      messages={messages ?? []}
+      tasks={tasks ?? []}
+      userId={user.id}
+      curators={curators ?? []}
+      availableGroups={availableGroups}
+    />
   )
 }

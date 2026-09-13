@@ -895,3 +895,121 @@ tbody tr:hover { background: var(--rh); }
     font-size: 11px;
   }
 }
+/* ─────────────────────────────────────────────────────────────────────────────
+   Отклик интерфейса на нажатие
+
+   Страницы админки собираются на сервере: между нажатием и появлением нового
+   экрана проходит от десятых долей секунды до секунды. Всё это время раньше не
+   происходило ничего — человек не понимал, нажалось ли, и жал ещё раз.
+
+   Здесь три вещи, по возрастанию заметности:
+   1. точка на пункте меню — подтверждает само нажатие;
+   2. полоска вверху содержимого — показывает, что страница едет;
+   3. серые блоки — держат высоту, чтобы содержимое не прыгало.
+
+   У первых двух намеренная задержка: если переход уложился в полторы десятых
+   секунды, показывать индикатор не надо — мелькание раздражает сильнее, чем
+   короткое ожидание.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+/* Точка на пункте меню, пока идёт переход. Место под неё занято всегда:
+   иначе текст пункта дёргался бы в момент появления. */
+.ni-dot {
+  width: 6px;
+  height: 6px;
+  margin-left: auto;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0;
+  flex-shrink: 0;
+  visibility: hidden;
+}
+
+.ni-dot.is-pending {
+  visibility: visible;
+  animation: ni-dot-in 180ms ease 150ms forwards, ni-dot-pulse 1s ease-in-out 150ms infinite;
+}
+
+@keyframes ni-dot-in {
+  to { opacity: 0.6; }
+}
+
+@keyframes ni-dot-pulse {
+  50% { opacity: 0.15; }
+}
+
+/* Нажатый пункт подсвечивается, не дожидаясь ответа сервера. Подсветка слабее
+   активной: это ещё не «вы здесь», а «понял, открываю». */
+.ni:active {
+  background: var(--pl);
+  color: var(--purple);
+}
+
+/* Полоска загрузки над содержимым. Ползёт быстро до трёх четвертей и там
+   замирает: честнее, чем изображать точный процент, которого мы не знаем.
+
+   Прикреплена к окну, а не к содержимому: так не приходится трогать
+   позиционирование `.main`, внутри которого уже есть свои абсолютные элементы. */
+.nav-bar {
+  position: fixed;
+  top: 0;
+  left: var(--sw);
+  height: 2px;
+  width: 0;
+  background: var(--purple);
+  border-radius: 0 2px 2px 0;
+  opacity: 0;
+  animation: nav-bar-go 2.4s cubic-bezier(0.1, 0.8, 0.2, 1) 150ms forwards;
+  z-index: 30;
+}
+
+@keyframes nav-bar-go {
+  0%   { width: 0;                    opacity: 0; }
+  1%   { width: 0;                    opacity: 1; }
+  40%  { width: calc((100vw - var(--sw)) * 0.45); }
+  100% { width: calc((100vw - var(--sw)) * 0.75); opacity: 1; }
+}
+
+@media (max-width: 768px) {
+  .nav-bar { left: 0; }
+  @keyframes nav-bar-go {
+    0%   { width: 0;     opacity: 0; }
+    1%   { width: 0;     opacity: 1; }
+    40%  { width: 45vw; }
+    100% { width: 75vw;  opacity: 1; }
+  }
+}
+
+/* Серый блок вместо содержимого */
+.skel {
+  background: var(--surf);
+  border: 1px solid var(--bor);
+  border-radius: 8px;
+  animation: skel-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes skel-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.45; }
+}
+
+/* Для тех, кто просил систему не анимировать: индикаторы остаются видимыми,
+   но перестают двигаться. */
+@media (prefers-reduced-motion: reduce) {
+  .ni-dot.is-pending { visibility: visible; opacity: 0.6; animation: none; }
+  .nav-bar { opacity: 1; width: 40%; animation: none; }
+  .skel { animation: none; }
+}
+
+/* Текст только для программ чтения с экрана */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

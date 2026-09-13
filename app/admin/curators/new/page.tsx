@@ -54,7 +54,9 @@ export default function NewCuratorPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)', padding: '40px 20px' }}>
+    /* className="main" даёт отступ под сайдбар: он закреплён у левого края окна,
+       а эта страница раньше рисовалась без него и теперь оказалась бы под ним */
+    <div className="main" style={{ background: 'var(--bg)', padding: '40px 20px' }}>
       <div style={{ maxWidth: 600, margin: '0 auto' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24 }}>
           <Link href="/admin/curators" style={{ color: 'var(--muted)', display: 'flex', alignItems: 'center', textDecoration: 'none' }}>

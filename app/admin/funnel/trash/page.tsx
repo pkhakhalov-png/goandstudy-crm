@@ -1,6 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { Sidebar } from '../../Sidebar'
 import { TrashClient } from './TrashClient'
 import { readAll } from '@/lib/supabase/read-all'
 
@@ -22,15 +21,12 @@ export default async function TrashPage() {
   const { data: stages } = await supabase.from('pipeline_stages').select('id, name, color')
 
   return (
-    <div className="app">
-      <Sidebar activePage="funnel" userName={profile?.name || ''} userEmail={user.email || ''} />
-      <div className="main">
-        <div className="topbar">
-          <div className="pt">Корзина</div>
-          <a href="/admin/funnel" style={{ fontSize: 12, color: 'var(--purple)', textDecoration: 'none' }}>← Воронка</a>
-        </div>
-        <TrashClient deals={deals ?? []} stages={stages ?? []} />
+    <div className="main">
+      <div className="topbar">
+        <div className="pt">Корзина</div>
+        <a href="/admin/funnel" style={{ fontSize: 12, color: 'var(--purple)', textDecoration: 'none' }}>← Воронка</a>
       </div>
+      <TrashClient deals={deals ?? []} stages={stages ?? []} />
     </div>
   )
 }

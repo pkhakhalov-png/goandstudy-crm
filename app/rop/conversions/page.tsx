@@ -1,17 +1,9 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
-import { RopSidebar } from '../RopSidebar'
 import { ConversionDashboard } from './ConversionDashboard'
 import { readAll } from '@/lib/supabase/read-all'
 
 export default async function ConversionsPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-
-  const { data: profile } = await supabase.from('users').select('name, role').eq('id', user.id).single()
-  if (profile?.role !== 'rop' && profile?.role !== 'admin') redirect('/sales')
-
   const admin = await createAdminClient()
   const [
     { data: salespersons },
@@ -31,24 +23,18 @@ export default async function ConversionsPage() {
     readAll(() => admin.from('deal_activities').select('id, deal_id, activity_type, content, metadata, created_at').eq('activity_type', 'stage_change').order('id')).then(data => ({ data })),
     admin.from('rop_settings').select('key, value'),
   ])
-
-  const initials = (profile?.name || user.email || 'РП').split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)
-
   return (
-    <div className="app">
-      <RopSidebar userName={profile?.name || ''} userEmail={user.email || ''} initials={initials} activePage="conversions" />
-      <div className="main">
-        <div className="topbar"><div className="pt">Конверсии</div></div>
-        <div style={{ padding: '20px 24px' }}>
-          <ConversionDashboard
-            salespersons={salespersons ?? []}
-            deals={deals ?? []}
-            stages={stages ?? []}
-            messages={messages ?? []}
-            activities={activities ?? []}
-            settings={settings ?? []}
-          />
-        </div>
+    <div className="main">
+      <div className="topbar"><div className="pt">Конверсии</div></div>
+      <div style={{ padding: '20px 24px' }}>
+        <ConversionDashboard
+          salespersons={salespersons ?? []}
+          deals={deals ?? []}
+          stages={stages ?? []}
+          messages={messages ?? []}
+          activities={activities ?? []}
+          settings={settings ?? []}
+        />
       </div>
     </div>
   )

@@ -1,18 +1,57 @@
 'use client'
 
-import { useState, Suspense } from 'react'
-import Link from 'next/link'
+import { useState, Suspense, type ReactNode } from 'react'
+import Link, { useLinkStatus } from 'next/link'
+import { usePathname } from 'next/navigation'
 import { logout } from '@/app/login/actions'
 import { WelcomeOverlay } from '@/components/WelcomeOverlay'
 
 interface Props {
-  activePage: 'clients' | 'payments' | 'expenses' | 'invoices' | 'calendar' | 'funnel' | 'home' | 'sales' | 'curators' | 'settings' | 'analytics' | 'seo'
   userName: string
   userEmail: string
 }
 
-export function Sidebar({ activePage, userName, userEmail }: Props) {
+/**
+ * Точка на пункте меню, пока идёт переход.
+ *
+ * Работает только внутри `<Link>`: хук `useLinkStatus` знает про ту ссылку, в
+ * которую вложен. Место под точку занято всегда, поэтому текст не дёргается,
+ * когда она появляется.
+ */
+function NavPending() {
+  const { pending } = useLinkStatus()
+  return <span aria-hidden className={`ni-dot${pending ? ' is-pending' : ''}`} />
+}
+
+/**
+ * Пункт меню, который становится активным сразу по нажатию.
+ *
+ * Раньше активный пункт приходил пропсом с сервера: подсветка переезжала только
+ * после того, как новая страница отрисовалась, то есть через полсекунды после
+ * клика. Теперь текущий адрес берётся на клиенте, а на время перехода пункт
+ * подсвечивается как нажатый — ответ на действие человек видит сразу.
+ */
+function NavLink({ href, exact, children, onNavigate }: {
+  href: string
+  /** Точное совпадение адреса. Нужно «Главной»: иначе она активна всегда. */
+  exact?: boolean
+  children: ReactNode
+  onNavigate: () => void
+}) {
+  const pathname = usePathname()
+  const active = exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`)
+
+  return (
+    <Link href={href} onClick={onNavigate} className={`ni${active ? ' active' : ''}`}>
+      {children}
+      <NavPending />
+    </Link>
+  )
+}
+
+export function Sidebar({ userName, userEmail }: Props) {
   const [open, setOpen] = useState(false)
+  const close = () => setOpen(false)
 
   const initials = (userName || userEmail || 'АБ')
     .split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)
@@ -21,10 +60,10 @@ export function Sidebar({ activePage, userName, userEmail }: Props) {
     <>
       <Suspense><WelcomeOverlay /></Suspense>
       {/* Оверлей */}
-      <div className={`sidebar-overlay${open?' open':''}`} onClick={()=>setOpen(false)}/>
+      <div className={`sidebar-overlay${open ? ' open' : ''}`} onClick={close} />
 
       {/* Сайдбар */}
-      <aside className={`sidebar${open?' open':''}`}>
+      <aside className={`sidebar${open ? ' open' : ''}`}>
         <div className="lw" style={{ textAlign: 'center', padding: '20px 16px 14px' }}>
           <img
             src="https://i.ibb.co/7tNx07SW/GAS-logo-01.png"
@@ -39,35 +78,35 @@ export function Sidebar({ activePage, userName, userEmail }: Props) {
         </div>
         <nav className="nav">
           <div className="ns">Основное</div>
-          <Link href="/admin/funnel" onClick={()=>setOpen(false)} className={`ni${activePage==='funnel'?' active':''}`}>
+          <NavLink href="/admin/funnel" onNavigate={close}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
               <path d="M2 3h12l-3 5v4l-2 1.5V8L2 3z"/>
             </svg>
             Воронка
-          </Link>
-          <Link href="/admin/clients" onClick={()=>setOpen(false)} className={`ni${activePage==='clients'?' active':''}`}>
+          </NavLink>
+          <NavLink href="/admin/clients" onNavigate={close}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
               <rect x="2" y="3" width="12" height="10" rx="2"/>
               <line x1="5" y1="7" x2="11" y2="7"/>
               <line x1="5" y1="10" x2="9" y2="10"/>
             </svg>
             Клиенты
-          </Link>
-          <Link href="/admin/payments" onClick={()=>setOpen(false)} className={`ni${activePage==='payments'?' active':''}`}>
+          </NavLink>
+          <NavLink href="/admin/payments" onNavigate={close}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
               <rect x="1" y="4" width="14" height="9" rx="2"/>
               <line x1="1" y1="8" x2="15" y2="8"/>
             </svg>
             Платежи
-          </Link>
-          <Link href="/admin/expenses" onClick={()=>setOpen(false)} className={`ni${activePage==='expenses'?' active':''}`}>
+          </NavLink>
+          <NavLink href="/admin/expenses" onNavigate={close}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
               <path d="M8 2v12M4 6l4-4 4 4"/>
               <line x1="3" y1="14" x2="13" y2="14"/>
             </svg>
             Расходы
-          </Link>
-          <Link href="/admin/invoices" onClick={()=>setOpen(false)} className={`ni${activePage==='invoices'?' active':''}`}>
+          </NavLink>
+          <NavLink href="/admin/invoices" onNavigate={close}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
               <rect x="2" y="1" width="12" height="14" rx="2"/>
               <line x1="5" y1="5" x2="11" y2="5"/>
@@ -75,8 +114,8 @@ export function Sidebar({ activePage, userName, userEmail }: Props) {
               <line x1="5" y1="11" x2="8" y2="11"/>
             </svg>
             Счета
-          </Link>
-          <Link href="/admin/calendar" onClick={()=>setOpen(false)} className={`ni${activePage==='calendar'?' active':''}`}>
+          </NavLink>
+          <NavLink href="/admin/calendar" onNavigate={close}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
               <rect x="2" y="2" width="12" height="12" rx="2"/>
               <line x1="2" y1="6" x2="14" y2="6"/>
@@ -84,35 +123,35 @@ export function Sidebar({ activePage, userName, userEmail }: Props) {
               <line x1="11" y1="1" x2="11" y2="4"/>
             </svg>
             Календарь
-          </Link>
+          </NavLink>
           <div className="ns">Аналитика</div>
-          <Link href="/admin/analytics" onClick={()=>setOpen(false)} className={`ni${activePage==='analytics'?' active':''}`}>
+          <NavLink href="/admin/analytics" onNavigate={close}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
               <rect x="2" y="8" width="3" height="6"/><rect x="6.5" y="4" width="3" height="10"/><rect x="11" y="10" width="3" height="4"/>
             </svg>
             Аналитика
-          </Link>
-          <Link href="/admin/seo" onClick={()=>setOpen(false)} className={`ni${activePage==='seo'?' active':''}`}>
+          </NavLink>
+          <NavLink href="/admin/seo" onNavigate={close}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
               <circle cx="7" cy="7" r="4.5"/><line x1="10.5" y1="10.5" x2="14" y2="14"/>
             </svg>
             SEO
-          </Link>
-          <Link href="/admin/sales" onClick={()=>setOpen(false)} className={`ni${activePage==='sales'?' active':''}`}>
+          </NavLink>
+          <NavLink href="/admin/sales" onNavigate={close}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
               <polyline points="2,13 5,8 8,10 11,4 14,6"/>
               <line x1="2" y1="14" x2="14" y2="14"/>
             </svg>
             Продажники
-          </Link>
-          <Link href="/admin/curators" onClick={()=>setOpen(false)} className={`ni${activePage==='curators'?' active':''}`}>
+          </NavLink>
+          <NavLink href="/admin/curators" onNavigate={close}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
               <circle cx="8" cy="5" r="3"/><path d="M2 14c0-3.3 2.7-6 6-6s6 2.7 6 6"/>
             </svg>
             Кураторы
-          </Link>
+          </NavLink>
           <div className="ns">Система</div>
-          <Link href="/admin" onClick={()=>setOpen(false)} className={`ni${activePage==='home'?' active':''}`}>
+          <NavLink href="/admin" exact onNavigate={close}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
               <rect x="1" y="1" width="6" height="6" rx="1.5"/>
               <rect x="9" y="1" width="6" height="6" rx="1.5"/>
@@ -120,14 +159,14 @@ export function Sidebar({ activePage, userName, userEmail }: Props) {
               <rect x="9" y="9" width="6" height="6" rx="1.5"/>
             </svg>
             Главная
-          </Link>
-          <Link href="/admin/settings" onClick={()=>setOpen(false)} className={`ni${activePage==='settings'?' active':''}`}>
+          </NavLink>
+          <NavLink href="/admin/settings" onNavigate={close}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
               <circle cx="8" cy="8" r="3"/>
               <path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.42 1.42M11.53 11.53l1.42 1.42M3.05 12.95l1.42-1.42M11.53 4.47l1.42-1.42"/>
             </svg>
             Настройки
-          </Link>
+          </NavLink>
         </nav>
         <div className="sf">
           <div className="ur">
@@ -156,12 +195,12 @@ export function Sidebar({ activePage, userName, userEmail }: Props) {
       `}</style>
       <button
         className="burger-btn-portal"
-        onClick={()=>setOpen(true)}
+        onClick={() => setOpen(true)}
         style={{
-          position:'fixed',top:12,left:12,zIndex:18,
-          width:36,height:36,border:'1px solid var(--bor2)',
-          borderRadius:9,background:'var(--surf)',cursor:'pointer',
-          alignItems:'center',justifyContent:'center'
+          position: 'fixed', top: 12, left: 12, zIndex: 18,
+          width: 36, height: 36, border: '1px solid var(--bor2)',
+          borderRadius: 9, background: 'var(--surf)', cursor: 'pointer',
+          alignItems: 'center', justifyContent: 'center'
         }}>
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" width="16" height="16">
           <line x1="2" y1="4" x2="14" y2="4"/>

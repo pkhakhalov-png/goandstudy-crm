@@ -1,24 +1,17 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { SalesSidebar } from '../SalesSidebar'
 import { InvoicesClient } from '../../admin/invoices/InvoicesClient'
+import { viewer } from '@/lib/auth/viewer'
 
 export default async function SalesInvoicesPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  // Профиль читается общей функцией: оболочка раздела спрашивает то же самое,
+  // и без неё это был бы второй одинаковый поход в базу за тот же запрос
+  const { user, profile } = await viewer()
   if (!user) redirect('/login')
-
-  const { data: profile } = await supabase
-    .from('users')
-    .select('name, role')
-    .eq('id', user.id)
-    .single()
 
   if (profile?.role === 'admin') redirect('/admin/invoices')
   if (profile?.role === 'rop') redirect('/rop')
-
-  const initials = (profile?.name || user.email || 'ПП')
-    .split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)
 
   const [
     { data: invoices },
@@ -38,18 +31,15 @@ export default async function SalesInvoicesPage() {
   ])
 
   return (
-    <div className="app">
-      <SalesSidebar userName={profile?.name || ''} userEmail={user.email || ''} initials={initials} activePage="invoices" />
-      <div className="main">
-        <div className="topbar">
-          <div className="pt">Счета</div>
-          <span style={{ fontSize: 12, color: 'var(--muted)' }}>СБП · T-Bank</span>
-        </div>
-        <InvoicesClient
-          invoices={invoices ?? []}
-          clients={clients ?? []}
-        />
+    <div className="main">
+      <div className="topbar">
+        <div className="pt">Счета</div>
+        <span style={{ fontSize: 12, color: 'var(--muted)' }}>СБП · T-Bank</span>
       </div>
+      <InvoicesClient
+        invoices={invoices ?? []}
+        clients={clients ?? []}
+      />
     </div>
   )
 }

@@ -1,6 +1,5 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { Sidebar } from '../../Sidebar'
 import { DealCard } from './DealCard'
 import { readAll } from '@/lib/supabase/read-all'
 
@@ -68,22 +67,19 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
   ])
 
   return (
-    <div className="app">
-      <Sidebar activePage="funnel" userName={profile?.name || ''} userEmail={user.email || ''} />
-      <DealCard
-        deal={deal}
-        stages={stages ?? []}
-        activities={enrichedActivities}
-        salespersons={salespersons ?? []}
-        clientData={clientData}
-        bookingData={bookingData}
-        files={files ?? []}
-        messages={messages ?? []}
-        tasks={tasks ?? []}
-        userId={user.id}
-        curators={curators ?? []}
-        availableGroups={availableGroups}
-      />
-    </div>
+    <DealCard
+      deal={deal}
+      stages={stages ?? []}
+      activities={enrichedActivities}
+      salespersons={salespersons ?? []}
+      clientData={clientData}
+      bookingData={bookingData}
+      files={files ?? []}
+      messages={messages ?? []}
+      tasks={tasks ?? []}
+      userId={user.id}
+      curators={curators ?? []}
+      availableGroups={availableGroups}
+    />
   )
 }

@@ -1,6 +1,5 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { Sidebar } from '../../Sidebar'
 import { CuratorDetail } from './CuratorDetail'
 
 export default async function CuratorDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -32,13 +31,10 @@ export default async function CuratorDetailPage({ params }: { params: Promise<{ 
   }
 
   return (
-    <div className="app">
-      <Sidebar activePage="curators" userName={profile?.name || ''} userEmail={user.email || ''} />
-      <div className="main">
-        <div className="topbar"><div className="pt">Куратор: {curator.name}</div></div>
-        <div style={{ padding: '20px 24px' }}>
-          <CuratorDetail curator={{ ...curator, email }} clients={clients ?? []} />
-        </div>
+    <div className="main">
+      <div className="topbar"><div className="pt">Куратор: {curator.name}</div></div>
+      <div style={{ padding: '20px 24px' }}>
+        <CuratorDetail curator={{ ...curator, email }} clients={clients ?? []} />
       </div>
     </div>
   )

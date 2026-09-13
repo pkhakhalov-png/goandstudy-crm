@@ -1,6 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { Sidebar } from '../Sidebar'
 import { AnalyticsShell } from './AnalyticsShell'
 import { resolvePeriod, type Tab } from './lib/period'
 import { MoneyTab } from './tabs/MoneyTab'
@@ -80,19 +79,16 @@ export default async function AdminAnalyticsPage({ searchParams }: { searchParam
   }
 
   return (
-    <div className="app">
-      <Sidebar activePage="analytics" userName={profile?.name || ''} userEmail={user.email || ''} />
-      <div className="main" style={{ padding: 0 }}>
-        <AnalyticsShell tab={tab} period={period}>
-          {error ? <DbNotice message={error.message} /> : (
-            tab === 'money' ? <MoneyTab data={data} period={period} />
-            : tab === 'sales' ? <SalesTab data={data} period={period} />
-            : tab === 'curators' ? <CuratorsTab data={data} period={period} />
-            : tab === 'payouts' ? <CuratorPayoutsTab data={data} />
-            : <ForecastTab data={data} />
-          )}
-        </AnalyticsShell>
-      </div>
+    <div className="main" style={{ padding: 0 }}>
+      <AnalyticsShell tab={tab} period={period}>
+        {error ? <DbNotice message={error.message} /> : (
+          tab === 'money' ? <MoneyTab data={data} period={period} />
+          : tab === 'sales' ? <SalesTab data={data} period={period} />
+          : tab === 'curators' ? <CuratorsTab data={data} period={period} />
+          : tab === 'payouts' ? <CuratorPayoutsTab data={data} />
+          : <ForecastTab data={data} />
+        )}
+      </AnalyticsShell>
     </div>
   )
 }

@@ -1,6 +1,5 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { RopSidebar } from './RopSidebar'
 import { RopDashboard } from './RopDashboard'
 import { readAll } from '@/lib/supabase/read-all'
 
@@ -47,39 +46,28 @@ export default async function RopPage() {
 
   const payments = paymentsRes.data
 
-  const initials = (profile?.name || user.email || 'РП')
-    .split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)
-
   return (
-    <div className="app">
-      <RopSidebar
-        userName={profile?.name || ''}
-        userEmail={user.email || ''}
-        initials={initials}
-        activePage="home"
-      />
-      <div className="main">
-        <div className="topbar">
-          <div className="pt">Кабинет РОП</div>
-          <div className="tbr">
-            <span style={{ fontSize: 12, color: 'var(--muted)' }}>{currentMonth}</span>
-          </div>
+    <div className="main">
+      <div className="topbar">
+        <div className="pt">Кабинет РОП</div>
+        <div className="tbr">
+          <span style={{ fontSize: 12, color: 'var(--muted)' }}>{currentMonth}</span>
         </div>
-        <div style={{ padding: '20px 24px' }}>
-          <RopDashboard
-            salespersons={salespersons ?? []}
-            salesPlans={salesPlans ?? []}
-            clients={clients ?? []}
-            payments={payments ?? []}
-            deals={deals ?? []}
-            stages={stages ?? []}
-            messages={messages ?? []}
-            tasks={tasks ?? []}
-            settings={settings ?? []}
-            currentMonth={currentMonth}
-            paymentsError={paymentsError}
-          />
-        </div>
+      </div>
+      <div style={{ padding: '20px 24px' }}>
+        <RopDashboard
+          salespersons={salespersons ?? []}
+          salesPlans={salesPlans ?? []}
+          clients={clients ?? []}
+          payments={payments ?? []}
+          deals={deals ?? []}
+          stages={stages ?? []}
+          messages={messages ?? []}
+          tasks={tasks ?? []}
+          settings={settings ?? []}
+          currentMonth={currentMonth}
+          paymentsError={paymentsError}
+        />
       </div>
     </div>
   )

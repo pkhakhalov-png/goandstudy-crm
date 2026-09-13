@@ -1,22 +1,9 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
 import { logout } from '@/app/login/actions'
-import { Sidebar } from '../Sidebar'
 import { CuratorsPage } from './CuratorsPage'
 
 export default async function AdminCuratorsPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-
-  const { data: profile } = await supabase
-    .from('users')
-    .select('name, role')
-    .eq('id', user.id)
-    .single()
-
-  if (profile?.role !== 'admin') redirect('/sales')
-
   const admin = await createAdminClient()
 
   const [
@@ -39,20 +26,17 @@ export default async function AdminCuratorsPage() {
   })
 
   return (
-    <div className="app">
-      <Sidebar activePage="curators" userName={profile?.name || ''} userEmail={user.email || ''} />
-      <div className="main">
-        <div className="topbar">
-          <div className="pt">Кураторы</div>
-          <div className="tbr">
-            <span style={{ fontSize: 12, color: 'var(--muted)' }}>{enriched.length} кураторов</span>
-            <form action={logout}>
-              <button className="btn-s">Выйти</button>
-            </form>
-          </div>
+    <div className="main">
+      <div className="topbar">
+        <div className="pt">Кураторы</div>
+        <div className="tbr">
+          <span style={{ fontSize: 12, color: 'var(--muted)' }}>{enriched.length} кураторов</span>
+          <form action={logout}>
+            <button className="btn-s">Выйти</button>
+          </form>
         </div>
-        <CuratorsPage curators={enriched} />
       </div>
+      <CuratorsPage curators={enriched} />
     </div>
   )
 }

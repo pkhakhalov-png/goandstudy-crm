@@ -1,25 +1,18 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { SalesSidebar } from '../SalesSidebar'
 import { FunnelClient } from '../../admin/funnel/FunnelClient'
 import { readAll } from '@/lib/supabase/read-all'
+import { viewer } from '@/lib/auth/viewer'
 
 export default async function SalesFunnelPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  // Профиль читается общей функцией: оболочка раздела спрашивает то же самое,
+  // и без неё это был бы второй одинаковый поход в базу за тот же запрос
+  const { user, profile } = await viewer()
   if (!user) redirect('/login')
-
-  const { data: profile } = await supabase
-    .from('users')
-    .select('name, role')
-    .eq('id', user.id)
-    .single()
 
   if (profile?.role === 'admin') redirect('/admin/funnel')
   if (profile?.role === 'rop') redirect('/rop')
-
-  const initials = (profile?.name || user.email || 'ПП')
-    .split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)
 
   const dealsPerStage = 50
   const admin = await createAdminClient()
@@ -68,26 +61,23 @@ export default async function SalesFunnelPage() {
   })
 
   return (
-    <div className="app">
-      <SalesSidebar userName={profile?.name || ''} userEmail={user.email || ''} initials={initials} activePage="funnel" />
-      <div className="main" style={{ display: 'flex', flexDirection: 'column' }}>
-        <div className="topbar">
-          <div className="pt">Мои сделки</div>
-          <span style={{ fontSize: 12, color: 'var(--muted)' }}>{totalDeals ?? deals.length} сделок</span>
-        </div>
-        <FunnelClient
-          stages={stages ?? []}
-          deals={deals}
-          salespersons={[{ id: user.id, name: profile?.name || '' }]}
-          isAdmin={false}
-          userId={user.id}
-          trashedDeals={trashedDeals ?? []}
-          stageCounts={stageCounts}
-          curators={curators ?? []}
-          availableGroups={availableGroups}
-          basePath="/sales/funnel"
-        />
+    <div className="main" style={{ display: 'flex', flexDirection: 'column' }}>
+      <div className="topbar">
+        <div className="pt">Мои сделки</div>
+        <span style={{ fontSize: 12, color: 'var(--muted)' }}>{totalDeals ?? deals.length} сделок</span>
       </div>
+      <FunnelClient
+        stages={stages ?? []}
+        deals={deals}
+        salespersons={[{ id: user.id, name: profile?.name || '' }]}
+        isAdmin={false}
+        userId={user.id}
+        trashedDeals={trashedDeals ?? []}
+        stageCounts={stageCounts}
+        curators={curators ?? []}
+        availableGroups={availableGroups}
+        basePath="/sales/funnel"
+      />
     </div>
   )
 }
