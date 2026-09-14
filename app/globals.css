@@ -919,41 +919,53 @@ tbody tr:hover { background: var(--rh); }
 }
 
 /* ── Заглушка на время загрузки страницы ──────────────────────────────────
-   Задача — не «показать загрузку», а не соврать: если экран приехал быстро,
-   человек вообще ничего не должен заметить. Поэтому первые 400 мс заглушка
-   невидима, а потом проявляется за треть секунды и не до конца — кружок
-   остаётся приглушённым. Подписи нет: слово «Загружается» рядом с кружком
-   ничего не добавляет глазу, но добавляет шума. Программам чтения с экрана
-   оно по-прежнему уходит, скрытым текстом.
+   Две вещи, которые тянут в разные стороны, и обе нужны.
+
+   Первая: короткий переход не должен ничем мигать. Поэтому первые 250 мс
+   заглушки не видно вовсе — быстрый экран успевает приехать раньше.
+
+   Вторая: если экран всё-таки читает базу долго, ожидание должно быть видно
+   отчётливо, а не угадываться. Поэтому дальше — кружок в 28 px с заметной
+   обводкой и подпись словом. Промежуточный вариант с еле различимым кружком
+   без подписи оказался слишком деликатным: непонятно, идёт загрузка или экран
+   замер.
 
    Задержка здесь, а не в React: заглушку монтирует Next в момент нажатия, и
    своего состояния под таймер у неё нет. */
 .load {
   flex: 1;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 14px;
   opacity: 0;
-  animation: loadIn 0.35s ease 0.4s forwards;
+  animation: loadIn 0.2s ease 0.25s forwards;
 }
 
 .load-spin {
-  width: 16px;
-  height: 16px;
-  border: 1.5px solid var(--bor);
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--bor2);
   border-top-color: var(--load-accent, var(--purple));
   border-radius: 50%;
-  animation: spin 0.9s linear infinite;
+  animation: spin 0.8s linear infinite;
+}
+
+.load-text {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
 }
 
 @keyframes loadIn {
-  to { opacity: 0.55; }
+  to { opacity: 1; }
 }
 
 /* Тем, кто просил систему не анимировать: ожидание должно быть видно, но
    крутиться оно не обязано. */
 @media (prefers-reduced-motion: reduce) {
-  .load { opacity: 0.55; animation: none; }
+  .load { opacity: 1; animation: none; }
   .load-spin { animation: none; }
 }
 

@@ -7,6 +7,7 @@ export default function RopLoading() {
     <div className="main">
       <div className="load" style={{ '--load-accent': 'var(--gold, #c97d00)' } as React.CSSProperties}>
         <span className="load-spin" aria-hidden />
+        <span className="load-text">Загрузка</span>
       </div>
       <span className="sr-only" role="status">Загружается</span>
     </div>
