@@ -919,45 +919,41 @@ tbody tr:hover { background: var(--rh); }
 }
 
 /* ── Заглушка на время загрузки страницы ──────────────────────────────────
-   Появляется не сразу. Next подставляет loading.tsx мгновенно, как только
-   нажали, — и на быстрой странице человек видел бы вспышку. Поэтому первые
-   250 мс заглушка невидима: короткий переход проходит целиком и незаметно,
-   а если страница задерживается, появляется кружок и слово «Загружается».
-   Задержка здесь, а не в React: заглушку монтирует Next, и у неё нет своего
-   состояния, куда можно было бы положить таймер. */
+   Задача — не «показать загрузку», а не соврать: если экран приехал быстро,
+   человек вообще ничего не должен заметить. Поэтому первые 400 мс заглушка
+   невидима, а потом проявляется за треть секунды и не до конца — кружок
+   остаётся приглушённым. Подписи нет: слово «Загружается» рядом с кружком
+   ничего не добавляет глазу, но добавляет шума. Программам чтения с экрана
+   оно по-прежнему уходит, скрытым текстом.
+
+   Задержка здесь, а не в React: заглушку монтирует Next в момент нажатия, и
+   своего состояния под таймер у неё нет. */
 .load {
   flex: 1;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 10px;
   opacity: 0;
-  animation: loadIn 0.2s ease 0.25s forwards;
+  animation: loadIn 0.35s ease 0.4s forwards;
 }
 
 .load-spin {
-  width: 22px;
-  height: 22px;
-  border: 2px solid var(--bor);
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid var(--bor);
   border-top-color: var(--load-accent, var(--purple));
   border-radius: 50%;
-  animation: spin 0.7s linear infinite;
-}
-
-.load-text {
-  font-size: 12px;
-  color: var(--muted);
+  animation: spin 0.9s linear infinite;
 }
 
 @keyframes loadIn {
-  to { opacity: 1; }
+  to { opacity: 0.55; }
 }
 
-/* Тем, кто просил систему не анимировать: заглушку показываем сразу и
-   неподвижной — ожидание должно быть видно, крутиться оно не обязано. */
+/* Тем, кто просил систему не анимировать: ожидание должно быть видно, но
+   крутиться оно не обязано. */
 @media (prefers-reduced-motion: reduce) {
-  .load { opacity: 1; animation: none; }
+  .load { opacity: 0.55; animation: none; }
   .load-spin { animation: none; }
 }
 

@@ -7,7 +7,6 @@ export default function SalesLoading() {
     <div className="main">
       <div className="load" style={{ '--load-accent': 'var(--green)' } as React.CSSProperties}>
         <span className="load-spin" aria-hidden />
-        <span className="load-text">Загружается</span>
       </div>
       <span className="sr-only" role="status">Загружается</span>
     </div>
