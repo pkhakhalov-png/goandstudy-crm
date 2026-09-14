@@ -110,7 +110,7 @@ function goandstudy_render_blog_index(): string {
 					<h2 class="final-cta__title">Записывайтесь на консультацию</h2>
 					<p class="final-cta__sub">и делайте первый шаг к своей мечте</p>
 				</div>
-				<a href="https://crm.goandstudy.com/book" target="_blank" rel="noopener noreferrer" class="final-cta__btn">Записаться на консультацию</a>
+				<a href="https://crm.goandstudy.com/book?utm_source=goandstudy&amp;utm_medium=blog_index&amp;utm_campaign=blog&amp;utm_content=final-cta-button&amp;from=%2Fblog%2F" target="_blank" rel="noopener" class="final-cta__btn">Записаться на консультацию</a>
 			</div>
 		</div>
 	</section>

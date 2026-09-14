@@ -9,8 +9,11 @@
 // Сид-функция на первом хите страницы проходит по реестру и создаёт или обновляет
 // страницы. Поэтому «опубликовать» здесь значит положить файлы и бампнуть флаг.
 import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import { execFile } from 'node:child_process'
 import { sanitizeBody } from './blog-style'
+import { stampBookLinks } from '@/lib/booking-link'
 import { promisify } from 'node:util'
 
 const run = promisify(execFile)
@@ -109,9 +112,20 @@ export async function publishToTheme(
   // надёжнее трёх одинаковых проверок в разных.
   const raw = fs.readFileSync(files.bodyPath, 'utf8')
   const clean = sanitizeBody(raw)
-  if (clean.removed.length) {
-    fs.writeFileSync(files.bodyPath, clean.body)
-    steps.push(`вырезано перед записью: ${clean.removed.join(', ')}`)
+
+  // Метки источника ставятся здесь, потому что здесь впервые известны сразу и
+  // текст, и слаг. Без них уведомление о записи показывало адрес самой формы —
+  // верно и бесполезно. Подробности в lib/booking-link.ts.
+  const marked = stampBookLinks(clean.body, {
+    medium: 'blog_article',
+    campaign: entry.slug,
+    path: `/blog/${entry.slug}/`,
+  })
+  if (marked.stamped) steps.push(`метки источника на ссылках записи: ${marked.stamped}`)
+
+  if (clean.removed.length || marked.stamped) {
+    fs.writeFileSync(files.bodyPath, marked.html)
+    if (clean.removed.length) steps.push(`вырезано перед записью: ${clean.removed.join(', ')}`)
   }
 
   if (dry) {
@@ -213,4 +227,50 @@ export async function verifyPublished(slug: string): Promise<{ ok: boolean; resu
   else results.push('адрес есть в sitemap.xml')
 
   return { ok, results }
+}
+
+/**
+ * Дометить ссылки записи в уже опубликованных статьях.
+ *
+ * Новые статьи получают метки при публикации, но на сайте лежит восемь десятков
+ * старых, и весь трафик идёт как раз на них. Без этого прохода уведомление о
+ * записи будет честно сообщать «метки не переданы» ещё год.
+ *
+ * Правится только то, что относится к записи: адрес ссылки на форму и `rel`,
+ * где `noreferrer` стирал переход. Текст статьи не трогается.
+ *
+ * По умолчанию холостой прогон: показывает, что изменилось бы, и ничего не
+ * пишет. Перед записью на сервере остаётся копия `<слаг>.html.bak` — она не
+ * попадёт в список статей, потому что тот считает только `.html`.
+ */
+export async function stampPublishedBookLinks(
+  opts: { dryRun?: boolean; only?: string[] } = {},
+): Promise<{ slug: string; links: number; changed: boolean }[]> {
+  const dry = opts.dryRun !== false
+  const slugs = opts.only?.length ? opts.only : await listPublishedSlugs()
+  const out: { slug: string; links: number; changed: boolean }[] = []
+
+  for (const slug of slugs) {
+    const body = await readThemeArticle(slug)
+    if (body === null) { out.push({ slug, links: 0, changed: false }); continue }
+
+    const marked = stampBookLinks(body, {
+      medium: 'blog_article',
+      campaign: slug,
+      path: `/blog/${slug}/`,
+    })
+    const changed = marked.html !== body
+    out.push({ slug, links: marked.stamped, changed })
+    if (!changed || dry) continue
+
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gs-stamp-'))
+    const local = path.join(dir, `${slug}.html`)
+    fs.writeFileSync(local, marked.html)
+    const remote = `${THEME}/inc/blog-articles/${slug}.html`
+    await ssh(`cp ${remote} ${remote}.bak`)
+    await scp(local, remote)
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+
+  return out
 }

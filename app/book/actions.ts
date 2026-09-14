@@ -5,17 +5,13 @@ import { normalizePhone } from '@/lib/phone'
 import { timeToMinutes, MIN_GAP_MINUTES } from '@/lib/time'
 import { notifyNewBooking } from '@/lib/telegram'
 import { warnOnError } from '@/lib/supabase/write-guard'
+import { describeBookSource } from '@/lib/booking-link'
 
-// UTM-метки + страница источника (скрытно собраны на /book). Парсим и приводим к сводке.
+// Метки источника (скрытно собраны на /book). Разбор и человеческое описание —
+// в lib/booking-link.ts: там же объяснено, почему адрес самой формы источником
+// не считается.
 function parseUtm(formData: FormData): Record<string, string> {
   try { return JSON.parse((formData.get('utm_data') as string) || '{}') || {} } catch { return {} }
-}
-function utmSummary(u: Record<string, string>): string | null {
-  const parts = [u.utm_source, u.utm_medium, u.utm_campaign].filter(Boolean)
-  return parts.length ? parts.join(' / ') : null
-}
-function utmPage(u: Record<string, string>): string | null {
-  return u.landing_url || u.referrer || null
 }
 
 export async function createBooking(formData: FormData) {
@@ -250,6 +246,8 @@ export async function createBooking(formData: FormData) {
     if (quizData.year) quizParts.push(`Год: ${quizData.year}`)
     const quizSummary = quizParts.length > 0 ? quizParts.join(' · ') : null
 
+    const origin = describeBookSource(utm)
+
     console.log('[BOOK] TG notify start:', { salesperson: assignedUser.name, tg: assignedUser.telegram_username, date, time: st })
     await notifyNewBooking({
       salespersonName: assignedUser.name || `User ${assignedUser.id.slice(0, 8)}`,
@@ -261,8 +259,8 @@ export async function createBooking(formData: FormData) {
       clientPhone,
       clientTelegram,
       quizSummary,
-      source: utmSummary(utm),
-      page: utmPage(utm),
+      source: origin.where,
+      page: origin.url,
     })
     console.log('[BOOK] TG notify done')
   } catch (e) {

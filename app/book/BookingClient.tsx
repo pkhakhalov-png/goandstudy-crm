@@ -3,18 +3,19 @@
 import { useState } from 'react'
 import { createBooking, createLowBudgetDeal } from './actions'
 import { mskTodayStr } from '@/lib/time'
+import { BOOK_SOURCE_KEYS } from '@/lib/booking-link'
 
 const MONTHS = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь']
 const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
 
-// Невидимый сбор UTM-меток + страницы источника из URL (клиент ничего не видит).
-const UTM_KEYS = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term']
+// Невидимый сбор меток источника из адреса (клиент ничего не видит).
+// Ключ `from` несёт путь страницы, с которой нажали, — см. lib/booking-link.ts.
 function collectUtm(): string {
   if (typeof window === 'undefined') return '{}'
   try {
     const sp = new URLSearchParams(window.location.search)
     const out: Record<string, string> = {}
-    for (const k of UTM_KEYS) { const v = sp.get(k); if (v) out[k] = v }
+    for (const k of BOOK_SOURCE_KEYS) { const v = sp.get(k); if (v) out[k] = v }
     out.landing_url = window.location.href
     if (document.referrer) out.referrer = document.referrer
     return JSON.stringify(out)
