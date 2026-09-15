@@ -12,7 +12,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { readAll } from '@/lib/supabase/read-all'
 import type { Currency } from './money'
-import { INBOUND, KIND_NAMES, signedAmount, type TxKind } from './kinds'
+import { KIND_NAMES, signedAmount, type TxKind } from './kinds'
 
 // Названия и знак суммы переэкспортируются, чтобы серверный код брал их
 // отсюда, а браузер — напрямую из './kinds', не утаскивая ядро в бандл.

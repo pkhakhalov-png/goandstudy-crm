@@ -43,8 +43,6 @@ export function AddOperation({ accounts, categories, counterparties }: {
     )
   }
 
-  const nowLocal = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)
-
   return (
     <form
       action={action}
@@ -100,8 +98,12 @@ export function AddOperation({ accounts, categories, counterparties }: {
         )}
 
         <label style={label}>
-          Когда
-          <input name="occurred_at" type="datetime-local" className="si" defaultValue={nowLocal} />
+          {/* Пустое поле означает «сейчас»: время проставит сервер в момент
+              записи. Подставлять его при отрисовке нельзя — на сервере и в
+              браузере получаются разные значения, и React ругается на
+              расхождение. */}
+          Когда <span style={{ textTransform: 'none', fontWeight: 400 }}>— пусто значит сейчас</span>
+          <input name="occurred_at" type="datetime-local" className="si" />
         </label>
 
         {kind !== 'transfer' && (

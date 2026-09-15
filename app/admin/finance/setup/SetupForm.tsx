@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState, useState } from 'react'
+import { useActionState, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { startAccounting } from '../actions'
 
@@ -34,7 +34,15 @@ export function SetupForm({ users, defaultOwnerId }: {
     null,
   )
 
-  const nowLocal = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+  // Момент старта подставляется после появления формы, а не при отрисовке: на
+  // сервере и в браузере «сейчас» разное, и значения в разметке разъехались бы.
+  const openingRef = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    if (openingRef.current && !openingRef.current.value) {
+      openingRef.current.value = new Date(Date.now() - new Date().getTimezoneOffset() * 60000)
+        .toISOString().slice(0, 16)
+    }
+  }, [])
 
   const update = (i: number, patch: Partial<Row>) =>
     setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, ...patch } : r)))
@@ -43,7 +51,7 @@ export function SetupForm({ users, defaultOwnerId }: {
     <form action={action} style={{ display: 'grid', gap: 22, maxWidth: 720 }}>
       <section>
         <H>Момент начала учёта</H>
-        <input name="opening_at" type="datetime-local" className="si" defaultValue={nowLocal} required
+        <input ref={openingRef} name="opening_at" type="datetime-local" className="si" required
           style={{ maxWidth: 260 }} />
         <P>
           Остатки ниже берутся на этот момент. Всё, что было раньше, уже сидит внутри
