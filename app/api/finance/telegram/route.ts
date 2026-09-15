@@ -90,6 +90,19 @@ export async function GET() {
   return NextResponse.json({ ok: true, hint: 'вебхук финансового бота' })
 }
 
+const HELP = `Записываю деньги goandstudy.
+
+<b>Операция</b> — обычным текстом:
+· расход реклама 15 000
+· доход от Чикиной 22 170
+· оплатил подписку 49$
+· вчера офис 35 000
+Несколько штук — каждая с новой строки.
+
+<b>Остатки</b> — напишите «остаток» или /balance.
+
+Если что-то неоднозначно, спрошу и ничего не запишу, пока не ответите.`
+
 /* ── Обработка ────────────────────────────────────────────────────────────── */
 
 async function handle(sb: any, fin: any, update: TgUpdate, eventId: string) {
@@ -173,8 +186,18 @@ async function handle(sb: any, fin: any, update: TgUpdate, eventId: string) {
     return
   }
 
-  if (/^\/(balance|balans|ostatki|start)\b/.test(text) || /^остат(ок|ки)\b/i.test(text)) {
+  // Границы слова здесь не через `\b`: в JavaScript он считает словом только
+  // латиницу, поэтому «остаток» не совпадал, и бот молчал в ответ на прямой
+  // вопрос. Тот же подвох уже ловили в правилах разбора.
+  if (/^\/(balance|balans|ostatki|start)\b/i.test(text)
+      || /^\s*(остат(ок|ки)|баланс|сколько\s+денег|скольконаснется)/iu.test(text)) {
     return sendBalances(fin, msg)
+  }
+
+  if (/^\/help\b/i.test(text) || /^\s*(что\s+умеешь|помощь|справка)/iu.test(text)) {
+    await tgSend(msg.chat.id, HELP)
+    await fin.from('source_events').update({ state: 'posted' }).eq('id', eventId)
+    return
   }
 
   await postFromText(sb, fin, msg, text, binding.user_id, update.update_id, eventId)
@@ -251,8 +274,11 @@ async function postFromText(
   })
 
   if (!candidates.length) {
-    // Обычный разговор в группе операцией не становится.
+    // Обычный разговор операцией не становится. В группе на такое молчим — она
+    // живая, и бот не должен вклиниваться в каждую фразу. А в личном диалоге
+    // молчание выглядит поломкой, поэтому коротко отвечаем.
     await fin.from('source_events').update({ state: 'ignored' }).eq('id', eventId)
+    if (msg.chat.type === 'private') await tgSend(msg.chat.id, HELP)
     return
   }
 
