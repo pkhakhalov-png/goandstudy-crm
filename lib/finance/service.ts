@@ -176,16 +176,18 @@ export async function periodTotals(from: string, to: string): Promise<PeriodTota
   return out
 }
 
-/** Текущий справочный курс: последний введённый вручную. */
-export async function currentRate(): Promise<{ rub_per_usd: number; rate_date: string } | null> {
+/**
+ * Текущий справочный курс.
+ *
+ * Нужен только для строки «всего», где два остатка сводятся в одно число: для
+ * самого учёта курс не требуется, долларовые расходы идут по долларовому счёту,
+ * рублёвые — по рублёвому. Если курса на сегодня нет, спрашиваем ЦБ и
+ * запоминаем; ручной курс на ту же дату главнее автоматического.
+ */
+export async function currentRate(): Promise<{ rub_per_usd: number; rate_date: string; source?: string } | null> {
   const db = await financeDb()
-  const { data } = await db.from('exchange_rates')
-    .select('rub_per_usd, rate_date')
-    .eq('source', 'manual')
-    .order('rate_date', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-  return data ? { rub_per_usd: Number(data.rub_per_usd), rate_date: data.rate_date } : null
+  const { ensureTodayRate } = await import('./rate')
+  return ensureTodayRate(db)
 }
 
 /* ── Запись ───────────────────────────────────────────────────────────────── */

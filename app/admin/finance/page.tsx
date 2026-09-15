@@ -85,9 +85,13 @@ export default async function FinancePage() {
         <div className="pt">Финансы</div>
         <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
           <span style={{ fontSize: 12, color: 'var(--muted)' }}>
+            {/* Это оценка, а не деньги: от движения курса на счетах ничего не
+                прибавляется и не убывает. Поэтому «≈» и видимая дата курса. */}
             {totalIncomplete
-              ? 'общий итог неполон: нет курса'
-              : `всего ${formatMinor(rubTotal, 'RUB')}${hasUsd ? ' по курсу' : ''}`}
+              ? 'общий итог неполон: курс неизвестен'
+              : hasUsd && rate
+                ? `≈ ${formatMinor(rubTotal, 'RUB')} · курс ${rate.rub_per_usd} от ${new Date(rate.rate_date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}`
+                : `всего ${formatMinor(rubTotal, 'RUB')}`}
           </span>
           <Link href="/admin/finance/setup" className="btn-s" style={{ padding: '7px 12px', fontSize: 12 }}>
             Настройки

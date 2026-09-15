@@ -192,3 +192,85 @@ export async function reverseOperation(formData: FormData): Promise<{ error?: st
   revalidatePath('/admin/finance')
   return {}
 }
+
+/**
+ * Справочный курс рубля к доллару.
+ *
+ * Курс вводится руками и только на дату: автоматического источника в первой
+ * версии нет. Прошлые снимки не переписываются — изменение сегодняшнего курса
+ * не должно задним числом менять уже посчитанные оценки (PRD §10.2).
+ */
+export async function setRate(formData: FormData): Promise<{ error?: string }> {
+  let user
+  try { user = await requireOwner() } catch (e) { return { error: (e as Error).message } }
+
+  const raw = String(formData.get('rate') || '').replace(',', '.').trim()
+  const value = Number(raw)
+  if (!Number.isFinite(value) || value <= 0) return { error: `«${raw}» не похоже на курс` }
+
+  const date = String(formData.get('rate_date') || '') || new Date().toISOString().slice(0, 10)
+  const db = await financeDb()
+  const { error } = await db.from('exchange_rates').upsert(
+    { rate_date: date, rub_per_usd: value, source: 'manual', created_by: user.id },
+    { onConflict: 'rate_date,source' },
+  )
+  if (error) return { error: `курс: ${error.message}` }
+
+  revalidatePath('/admin/finance')
+  revalidatePath('/admin/finance/setup')
+  return {}
+}
+
+/**
+ * Выдать доступ к финансам.
+ *
+ * Отдельно от ролей CRM: администратор ведёт клиентов, но деньги компании — это
+ * другое право, и раздаётся оно поимённо (PRD §5).
+ */
+export async function grantAccess(formData: FormData): Promise<{ error?: string }> {
+  let user
+  try { user = await requireOwner() } catch (e) { return { error: (e as Error).message } }
+
+  const userId = String(formData.get('user_id') || '')
+  const level = String(formData.get('level') || 'owner')
+  if (!userId) return { error: 'выберите человека' }
+  if (!['owner', 'operator', 'viewer'].includes(level)) return { error: 'неизвестный уровень доступа' }
+
+  const db = await financeDb()
+  const { error } = await db.from('access').upsert(
+    { user_id: userId, level, granted_by: user.id, revoked_at: null },
+    { onConflict: 'user_id' },
+  )
+  if (error) return { error: `доступ: ${error.message}` }
+
+  await db.from('audit_events').insert({
+    actor_id: user.id, action: 'grant_access', entity: 'access', entity_id: userId, after: { level },
+  })
+
+  revalidatePath('/admin/finance/setup')
+  return {}
+}
+
+/** Отозвать доступ. Себя последним владельцем отозвать нельзя. */
+export async function revokeAccess(formData: FormData): Promise<{ error?: string }> {
+  let user
+  try { user = await requireOwner() } catch (e) { return { error: (e as Error).message } }
+
+  const userId = String(formData.get('user_id') || '')
+  const db = await financeDb()
+
+  const { data: owners } = await db.from('access').select('user_id').eq('level', 'owner').is('revoked_at', null)
+  if ((owners ?? []).length <= 1 && owners?.[0]?.user_id === userId) {
+    return { error: 'это последний владелец — без него модуль станет никому не доступен' }
+  }
+
+  const { error } = await db.from('access').update({ revoked_at: new Date().toISOString() }).eq('user_id', userId)
+  if (error) return { error: `доступ: ${error.message}` }
+
+  await db.from('audit_events').insert({
+    actor_id: user.id, action: 'revoke_access', entity: 'access', entity_id: userId,
+  })
+
+  revalidatePath('/admin/finance/setup')
+  return {}
+}

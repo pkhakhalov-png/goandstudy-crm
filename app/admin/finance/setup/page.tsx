@@ -2,7 +2,8 @@ import Link from 'next/link'
 import { createAdminClient } from '@/lib/supabase/server'
 import { viewer } from '@/lib/auth/viewer'
 import { formatMinor } from '@/lib/finance/money'
-import { balances, financeAccess, listAccounts } from '@/lib/finance/service'
+import { balances, currentRate, financeAccess, financeDb, listAccounts } from '@/lib/finance/service'
+import { Settings } from './Settings'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,7 +36,22 @@ export default async function FinanceSetupPage() {
   // Учёт уже начат — показываем, что есть, и не даём завести второй набор
   // счетов поверх первого: начальные остатки нельзя незаметно перезаписать.
   if (accounts.length) {
-    const bal = await balances()
+    const db = await financeDb()
+    const sbUsers = await createAdminClient()
+    const [bal, rate, { data: access }, { data: allUsers }] = await Promise.all([
+      balances(),
+      currentRate(),
+      db.from('access').select('user_id, level').is('revoked_at', null),
+      sbUsers.from('users').select('id, name, email, role').eq('is_active', true)
+        .in('role', ['admin', 'rop', 'salesperson']).order('role'),
+    ])
+
+    // Имена к доступам подставляем здесь: в схеме finance их нет, и join через
+    // PostgREST между схемами не сделать.
+    const accessRows = (access ?? []).map((a: any) => {
+      const u = (allUsers ?? []).find((x: any) => x.id === a.user_id)
+      return { user_id: a.user_id, level: a.level, name: u?.name ?? 'неизвестный пользователь', email: u?.email ?? null }
+    })
     return (
       <div className="main">
         <div className="topbar">
@@ -68,6 +84,8 @@ export default async function FinanceSetupPage() {
             неверным, это оформляется отдельной операцией-корректировкой с причиной,
             чтобы в истории осталось видно, что и почему поменялось.
           </p>
+
+          <Settings rate={rate} access={accessRows} users={allUsers ?? []} />
         </div>
       </div>
     )
