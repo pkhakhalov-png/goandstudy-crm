@@ -108,10 +108,15 @@ async function handle(sb: any, fin: any, update: TgUpdate, eventId: string) {
   const { data: binding } = await fin.from('telegram_bindings')
     .select('user_id, status').eq('telegram_id', msg.from!.id).maybeSingle()
 
-  // Привязка по одноразовой ссылке: /start <токен>
-  const startMatch = text.match(/^\/start\s+(\S+)/)
-  if (startMatch && isPrivate) {
-    return bind(fin, msg, startMatch[1], eventId)
+  // Привязка по одноразовой ссылке.
+  //
+  // Правильный путь — открыть ссылку: Telegram сам пришлёт «/start токен».
+  // Но человек с равным успехом скопирует её и отправит текстом — так и
+  // случилось на первом же запуске. Отказывать в этом месте глупо: код тот же,
+  // просто приехал иначе. Принимаем и ссылку, и голый токен.
+  const startToken = extractStartToken(text)
+  if (startToken && isPrivate) {
+    return bind(fin, msg, startToken, eventId)
   }
 
   if (!binding || binding.status !== 'active') {
@@ -155,6 +160,12 @@ async function handle(sb: any, fin: any, update: TgUpdate, eventId: string) {
 
   if (!text) {
     await fin.from('source_events').update({ state: 'ignored' }).eq('id', eventId)
+    return
+  }
+
+  if (/^\/allow\b/.test(text) && isPrivate) {
+    await tgSend(msg.chat.id, 'Эта команда работает в группе: добавьте меня в вашу закрытую группу и напишите /allow там.')
+    await fin.from('source_events').update({ state: 'posted' }).eq('id', eventId)
     return
   }
 
@@ -354,6 +365,24 @@ async function handleCallback(fin: any, update: TgUpdate, eventId: string) {
   }
 
   await fin.from('source_events').update({ state: 'posted' }).eq('id', eventId)
+}
+
+/**
+ * Достать код привязки из сообщения: «/start код», ссылка «t.me/бот?start=код»
+ * или сам код, отправленный отдельно.
+ */
+function extractStartToken(text: string): string | null {
+  const command = text.match(/^\/start(?:@\w+)?\s+(\S+)/)
+  if (command) return command[1]
+
+  const link = text.match(/t\.me\/\S*[?&]start=([A-Za-z0-9_-]+)/i)
+  if (link) return link[1]
+
+  // Голый код: тридцать два знака без пробелов — так мы их и выдаём.
+  const bare = text.trim()
+  if (/^[a-f0-9]{32}$/i.test(bare)) return bare
+
+  return null
 }
 
 function short(s: string): string {
