@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
-import { KIND_NAMES, signedAmount, type TxKind } from '@/lib/finance/kinds'
+import { KIND_NAMES, signedAmount } from '@/lib/finance/kinds'
 import { formatMinor, type Currency } from '@/lib/finance/money'
 import { parseMessage, type Candidate } from '@/lib/finance/parse'
 import {
