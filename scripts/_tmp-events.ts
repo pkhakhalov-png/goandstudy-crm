@@ -16,5 +16,9 @@ async function main() {
   console.log(`\nссылок выдано: ${tokens?.length ?? 0}`, (tokens ?? []).map((t: any) => t.used_at ? 'использована' : (new Date(t.expires_at) < new Date() ? 'протухла' : 'ждёт')).join(', '))
   const { data: b } = await fin.from('telegram_bindings').select('telegram_id, telegram_name, status')
   console.log('привязок:', JSON.stringify(b))
+  const { data: chats } = await fin.from('telegram_chats').select('chat_id, title, kind, is_allowed')
+  console.log('чаты:', JSON.stringify(chats))
+  const { data: audit } = await fin.from('audit_events').select('action, at').order('at', { ascending: false }).limit(5)
+  console.log('журнал:', (audit ?? []).map((a: any) => `${a.action} в ${new Date(a.at).toLocaleTimeString('ru-RU')}`).join(', '))
 }
 main()

@@ -143,6 +143,10 @@ async function handle(sb: any, fin: any, update: TgUpdate, eventId: string) {
           actor_id: binding.user_id, action: 'allow_chat', entity: 'telegram_chats', entity_id: String(msg.chat.id),
         })
         await tgSend(msg.chat.id, 'Группа разрешена. Пишите операции сюда — например «расход реклама 15 000».')
+        // Команда сработала — так и пишем. Помечать её «проигнорировано» значит
+        // потом искать причину там, где всё было в порядке.
+        await fin.from('source_events').update({ state: 'posted' }).eq('id', eventId)
+        return
       }
       await fin.from('source_events').update({ state: 'ignored' }).eq('id', eventId)
       return
