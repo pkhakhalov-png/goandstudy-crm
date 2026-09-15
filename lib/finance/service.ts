@@ -112,12 +112,14 @@ export async function listTransactions(filter: TxFilter = {}): Promise<TxRow[]> 
   const db = await financeDb()
   const limit = filter.limit ?? 200
 
+  // Клиент не подтягивается связью: PostgREST не умеет связывать таблицы из
+  // разных схем, а `clients` живёт в public. Имена берём вторым запросом ниже —
+  // это один поход до базы, а не по одному на строку.
   let q = db.from('transactions')
     .select(`
-      id, kind, occurred_at, note, origin, status,
+      id, kind, occurred_at, note, origin, status, client_id,
       category:categories(name),
       counterparty:counterparties(name),
-      client:clients(name),
       movements(account_id, amount_minor, currency)
     `)
     .neq('status', 'superseded')
@@ -132,7 +134,18 @@ export async function listTransactions(filter: TxFilter = {}): Promise<TxRow[]> 
   const { data, error } = await q
   if (error) throw new Error(`transactions: ${error.message}`)
 
-  const rows = (data ?? []) as TxRow[]
+  const rows = (data ?? []) as (TxRow & { client_id: number | null })[]
+
+  const clientIds = [...new Set(rows.map((r) => r.client_id).filter(Boolean))] as number[]
+  if (clientIds.length) {
+    const sb = await createAdminClient()
+    const { data: clients } = await sb.from('clients').select('id, name').in('id', clientIds)
+    for (const r of rows) {
+      const c = (clients ?? []).find((x: any) => x.id === r.client_id)
+      r.client = c ? { name: c.name } : null
+    }
+  }
+
   // Фильтр по счёту — по движениям, а не по операции: у перевода их два, и он
   // обязан попадать в выписку обоих счетов.
   return filter.accountId

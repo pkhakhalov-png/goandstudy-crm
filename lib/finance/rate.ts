@@ -59,9 +59,14 @@ export async function ensureTodayRate(db: any): Promise<Rate | null> {
   const fresh = await fetchCbrRate()
   if (!fresh) return rows[0] ?? null
 
-  await db.from('exchange_rates').upsert(
+  const { error } = await db.from('exchange_rates').upsert(
     { rate_date: fresh.rate_date, rub_per_usd: fresh.rub_per_usd, source: 'cbr' },
     { onConflict: 'rate_date,source' },
   )
+  // Ошибку записи не проглатываем. Она уже случалась: пока миграция с
+  // источником «cbr» не применена, курс не сохранялся, а экран выглядел как
+  // будто всё хорошо — и лез в ЦБ при каждом открытии.
+  if (error) console.error('[finance] курс не сохранился:', error.message)
+
   return { ...fresh, source: 'cbr' }
 }
