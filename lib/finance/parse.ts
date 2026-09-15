@@ -159,20 +159,91 @@ function shiftDays(d: Date, days: number): Date {
 /* ── Разбор ───────────────────────────────────────────────────────────────── */
 
 /**
- * Одно сообщение может содержать несколько операций. Режем по переводам строк и
- * точкам с запятой — это единственные разделители, в которых можно быть
- * уверенным. «Ольге зарплата 30 тысяч, реклама 15» через запятую разбирается
- * как одна операция с уточнением, а не угадывается: цена ошибки выше цены
- * лишнего вопроса.
+ * Одно сообщение — несколько операций.
+ *
+ * В набранном тексте операции разделяют переводом строки, а в голосовом всё
+ * приходит одной фразой: «расход реклама 15 тысяч, зарплата Оле 30 тысяч и
+ * доход от Чикиной 100 тысяч». Поэтому режем ещё по запятым и союзу «и» — но
+ * только там, где по обе стороны есть числа. «Оплатил 6000 за Иванову, она
+ * наш клиент» так не развалится: во второй части чисел нет.
+ *
+ * Тип операции наследуется от предыдущей части, если в текущей его не назвали.
+ * «Доход от Чикиной 100 тысяч, от Кудинова 50 тысяч» — это два поступления, а
+ * не поступление и расход.
  */
 export function parseMessage(text: string, ctx: ParseContext): Candidate[] {
-  const parts = text
+  const parts = splitParts(text)
+  if (!parts.length) return []
+
+  const out: Candidate[] = []
+  let lastExplicitKind: TxKind | null = null
+
+  for (const part of parts) {
+    const c = parseOne(part, ctx)
+    if (c.kindFrom === 'explicit') lastExplicitKind = c.kind
+    else if (lastExplicitKind) c.kind = lastExplicitKind
+    out.push(c)
+  }
+
+  // Последняя проверка: сумм в сообщении не должно оказаться больше, чем
+  // разобранных операций. Если оказалось — часть денег потерялась бы молча, а
+  // это худшее, что может сделать такая система. Лучше спросить.
+  const amountsInText = countAmounts(text)
+  if (amountsInText > out.length) {
+    for (const c of out) {
+      c.unresolved.push('split')
+      c.question = `Насчитал ${amountsInText} ${plural(amountsInText, 'сумму', 'суммы', 'сумм')}, `
+        + `а разобрал ${out.length}. Напишите операции по одной в строке — так ничего не потеряется.`
+    }
+  }
+
+  return out
+}
+
+/** Куски, в каждом из которых есть число. Пустые и бессуммовые отбрасываем. */
+function splitParts(text: string): string[] {
+  const rough = text
     .split(/[\n;]+/)
+    .flatMap((line) => splitInline(line))
     .map((p) => p.trim())
     .filter((p) => p && /\d/.test(p))
+  return rough
+}
 
-  if (!parts.length) return []
-  return parts.map((p) => parseOne(p, ctx))
+/**
+ * Разрез внутри строки по запятым и «и». Склеиваем обратно куски без чисел:
+ * запятая внутри одной операции («оплатил, как договаривались, 6000») не должна
+ * превращать её в две.
+ */
+function splitInline(line: string): string[] {
+  const pieces = line.split(/\s*,\s*|\s+и\s+|\s+плюс\s+/iu)
+  const out: string[] = []
+  for (const piece of pieces) {
+    if (/\d/.test(piece) || !out.length) out.push(piece)
+    else out[out.length - 1] += `, ${piece}`
+  }
+  return out
+}
+
+/** Сколько сумм названо в сообщении — для проверки, что ничего не потеряли. */
+function countAmounts(text: string): number {
+  let count = 0
+  const re = /(\d[\d\s ]*(?:[.,]\d{1,2})?)\s*([a-zA-Zа-яёА-ЯЁ.]+)?/g
+  let m: RegExpExecArray | null
+  while ((m = re.exec(text)) !== null) {
+    const word = (m[2] ?? '').replace(/\.$/, '')
+    if (MONTHS.some((mon) => new RegExp(`^${mon}`, 'i').test(word))) continue
+    count++
+  }
+  return count
+}
+
+function plural(n: number, one: string, few: string, many: string): string {
+  const mod10 = n % 10
+  const mod100 = n % 100
+  if (mod10 === 1 && mod100 !== 11) return one
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return few
+  return many
 }
 
 export function parseOne(text: string, ctx: ParseContext): Candidate {

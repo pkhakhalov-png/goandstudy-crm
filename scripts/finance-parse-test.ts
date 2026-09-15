@@ -88,9 +88,36 @@ for (const [text, want] of CASES) {
 
 // Несколько операций одним сообщением
 const many = parseMessage('Зарплата Оле 30 тысяч\nРеклама 15 000\nСервисы 20 долларов', ctx)
-check('три операции в одном сообщении разобраны как три', many.length === 3, `получилось ${many.length}`)
+check('три операции с новой строки разобраны как три', many.length === 3, `получилось ${many.length}`)
 check('все три однозначны', many.every((c) => c.unresolved.length === 0),
   many.filter((c) => c.unresolved.length).map((c) => c.note).join(' | '))
+
+// Голосовое приходит одной фразой — режем по запятым и «и»
+const voice = parseMessage('Расход реклама 15 000, зарплата Оле 30 000 и доход от Чикиной 100 000', ctx)
+check('голосом три операции одной фразой', voice.length === 3, `получилось ${voice.length}: ${voice.map((c) => c.note).join(' | ')}`)
+check('первая — расход 15 000', voice[0]?.kind === 'expense' && voice[0]?.amountMinor === 1_500_000,
+  `${voice[0]?.kind} ${voice[0]?.amountMinor}`)
+check('вторая — расход 30 000 Ольге', voice[1]?.kind === 'expense' && voice[1]?.amountMinor === 3_000_000 && voice[1]?.counterpartyHint === 'Ольга Петрова',
+  `${voice[1]?.kind} ${voice[1]?.amountMinor} ${voice[1]?.counterpartyHint}`)
+check('третья — доход 100 000 от Чикиной', voice[2]?.kind === 'income' && voice[2]?.amountMinor === 10_000_000,
+  `${voice[2]?.kind} ${voice[2]?.amountMinor}`)
+
+// Тип наследуется, пока не назван новый
+const inherited = parseMessage('Доход от Чикиной 100 000, от Кудинова 50 000', ctx)
+check('второе поступление не стало расходом',
+  inherited.length === 2 && inherited.every((c) => c.kind === 'income'),
+  inherited.map((c) => `${c.kind} ${c.amountMinor}`).join(' | '))
+
+// Запятая внутри одной операции не делит её надвое
+const oneOp = parseMessage('Оплатил, как договаривались, 6000', ctx)
+check('запятая внутри фразы не создаёт лишних операций', oneOp.length === 1,
+  oneOp.map((c) => c.note).join(' | '))
+
+// Ничего не теряем молча
+const lost = parseMessage('Потратил 15 000 на рекламу 30 000 на зарплату 20 000 на сервисы', ctx)
+check('когда сумм больше, чем операций, — спрашиваем, а не теряем',
+  lost.every((c) => c.unresolved.includes('split')) || lost.length === 3,
+  `разобрал ${lost.length}, вопросов: ${lost.filter((c) => c.question).length}`)
 
 // Дата
 const yesterday = parseOne('вчера реклама 15 000', ctx)
