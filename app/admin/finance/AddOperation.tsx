@@ -25,6 +25,11 @@ export function AddOperation({ accounts, categories, counterparties }: {
   const [kind, setKind] = useState<TxKind>('expense')
   const [state, action, pending] = useActionState(
     async (_prev: { error?: string } | null, formData: FormData) => {
+      // Время из поля — местное и без пояса. Пояс знает только браузер, поэтому
+      // абсолютный момент считаем здесь (см. тот же приём в мастере запуска).
+      const local = String(formData.get('occurred_at') || '')
+      if (local) formData.set('occurred_at', new Date(local).toISOString())
+
       const res = await addOperation(formData)
       if (!res.error) setOpen(false)
       return res

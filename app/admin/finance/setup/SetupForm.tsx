@@ -27,6 +27,13 @@ export function SetupForm({ users, defaultOwnerId }: {
 
   const [state, action, pending] = useActionState(
     async (_prev: { error?: string } | null, formData: FormData) => {
+      // Поле datetime-local отдаёт время без пояса: «2026-09-15T14:18». Сервер
+      // на Vercel живёт по UTC и прочтёт это как своё время — и начало учёта
+      // уедет на разницу поясов. Здесь, в браузере, пояс известен, поэтому
+      // превращаем в абсолютный момент до отправки.
+      const local = String(formData.get('opening_at') || '')
+      if (local) formData.set('opening_at', new Date(local).toISOString())
+
       const res = await startAccounting(formData)
       if (!res.error) router.push('/admin/finance')
       return res
