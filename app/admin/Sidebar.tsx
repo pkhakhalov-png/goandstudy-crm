@@ -86,6 +86,14 @@ export function Sidebar({ userName, userEmail }: Props) {
             </svg>
             Расходы
           </NavLink>
+          <NavLink href="/admin/finance" active={isActive('/admin/finance')} onNavigate={() => { press('/admin/finance'); close() }}>
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
+              <path d="M2 5.5h12v7a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 12.5v-7z"/>
+              <path d="M2 5.5 4.5 2h7L14 5.5"/>
+              <circle cx="8" cy="9.5" r="1.6"/>
+            </svg>
+            Финансы
+          </NavLink>
           <NavLink href="/admin/invoices" active={isActive('/admin/invoices')} onNavigate={() => { press('/admin/invoices'); close() }}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
               <rect x="2" y="1" width="12" height="14" rx="2"/>
