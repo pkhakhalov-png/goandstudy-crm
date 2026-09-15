@@ -171,13 +171,36 @@ async function handle(sb: any, fin: any, update: TgUpdate, eventId: string) {
   if (msg.voice) {
     const spoken = await transcribeVoice(fin, msg, eventId)
     if (!spoken) return
-    return postFromText(sb, fin, msg, spoken, binding.user_id, update.update_id, eventId, spoken)
+    // Дальше — ровно тот же путь, что и у набранного текста. Голосовая команда
+    // «баланс» однажды уже улетела мимо: проверка команд стояла только на ветке
+    // текста, и расшифровка шла сразу в разбор операций.
+    return handleUserText(sb, fin, msg, spoken, binding.user_id, update.update_id, eventId, spoken)
   }
 
   if (!text) {
     await fin.from('source_events').update({ state: 'ignored' }).eq('id', eventId)
     return
   }
+
+  await handleUserText(sb, fin, msg, text, binding.user_id, update.update_id, eventId)
+}
+
+/**
+ * Что делать с тем, что человек сказал или написал.
+ *
+ * Голос и текст различаются только способом доставки, поэтому дальше этой
+ * точки они не различаются вовсе: команды, операции, уточнения — всё одно и то
+ * же. Разводить два пути значило бы чинить каждую мелочь дважды.
+ */
+async function handleUserText(
+  sb: any, fin: any, msg: TgMessage, text: string,
+  userId: string, updateId: number, eventId: string,
+  /** Расшифровка голосового: показываем, что именно бот услышал. */
+  spoken?: string,
+) {
+  if (spoken) await tgSend(msg.chat.id, `🎧 Услышал: «${spoken}»`)
+
+  const isPrivate = msg.chat.type === 'private'
 
   if (/^\/allow\b/.test(text) && isPrivate) {
     await tgSend(msg.chat.id, 'Эта команда работает в группе: добавьте меня в вашу закрытую группу и напишите /allow там.')
@@ -189,7 +212,8 @@ async function handle(sb: any, fin: any, update: TgUpdate, eventId: string) {
   // латиницу, поэтому «остаток» не совпадал, и бот молчал в ответ на прямой
   // вопрос. Тот же подвох уже ловили в правилах разбора.
   if (/^\/(balance|balans|ostatki|start)\b/i.test(text)
-      || /^\s*(остат(ок|ки)|баланс|сколько\s+денег|скольконаснется)/iu.test(text)) {
+      || /^\s*(остат(ок|ки)|баланс|сколько\s+денег)/iu.test(text)) {
+    await fin.from('source_events').update({ state: 'posted' }).eq('id', eventId)
     return sendBalances(fin, msg)
   }
 
@@ -199,7 +223,7 @@ async function handle(sb: any, fin: any, update: TgUpdate, eventId: string) {
     return
   }
 
-  await postFromText(sb, fin, msg, text, binding.user_id, update.update_id, eventId)
+  await postFromText(sb, fin, msg, text, userId, updateId, eventId)
 }
 
 /**
@@ -300,9 +324,6 @@ async function sendBalances(fin: any, msg: TgMessage) {
 async function postFromText(
   sb: any, fin: any, msg: TgMessage, text: string,
   userId: string, updateId: number, eventId: string,
-  /** Расшифровка голосового: её показываем в ответе, чтобы было видно, что
-      именно бот услышал — иначе ошибка распознавания останется незамеченной. */
-  spoken?: string,
 ) {
   const [{ data: cats }, { data: aliasRows }, accounts] = await Promise.all([
     fin.from('categories').select('id, name').is('archived_at', null),
@@ -317,8 +338,6 @@ async function postFromText(
     categories: (cats ?? []).map((c: any) => c.name),
     aliases,
   })
-
-  if (spoken) await tgSend(msg.chat.id, `🎧 Услышал: «${spoken}»`)
 
   if (!candidates.length) {
     // Обычный разговор операцией не становится. В группе на такое молчим — она

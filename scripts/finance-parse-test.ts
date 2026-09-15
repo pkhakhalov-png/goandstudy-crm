@@ -102,6 +102,24 @@ check('вторая — расход 30 000 Ольге', voice[1]?.kind === 'exp
 check('третья — доход 100 000 от Чикиной', voice[2]?.kind === 'income' && voice[2]?.amountMinor === 10_000_000,
   `${voice[2]?.kind} ${voice[2]?.amountMinor}`)
 
+// Расшифровка голосового приходит без знаков препинания — режем по словам-типам
+const dictated = parseMessage('Доход 8000 новый клиент Расход 8000 тестовый Доход 1000 долларов', ctx)
+check('слитная фраза без запятых разобрана на три операции', dictated.length === 3,
+  `получилось ${dictated.length}: ${dictated.map((c) => c.note).join(' | ')}`)
+check('слитная фраза: доход 8000, расход 8000, доход 1000 долларов',
+  dictated[0]?.kind === 'income' && dictated[0]?.amountMinor === 800_000
+  && dictated[1]?.kind === 'expense' && dictated[1]?.amountMinor === 800_000
+  && dictated[2]?.kind === 'income' && dictated[2]?.amountMinor === 100_000 && dictated[2]?.currency === 'USD',
+  dictated.map((c) => `${c.kind} ${c.amountMinor} ${c.currency ?? ''}`).join(' | '))
+check('по слитной фразе больше не переспрашиваем',
+  dictated.every((c) => !c.unresolved.includes('split')),
+  dictated.map((c) => c.question ?? '').filter(Boolean).join(' | '))
+
+// Назначение платежа не отрывается от операции: справа от слова-типа суммы нет
+const purpose = parseMessage('Перевод 5000 на зарплату', ctx)
+check('«перевод 5000 на зарплату» остаётся одной операцией', purpose.length === 1,
+  purpose.map((c) => c.note).join(' | '))
+
 // Тип наследуется, пока не назван новый
 const inherited = parseMessage('Доход от Чикиной 100 000, от Кудинова 50 000', ctx)
 check('второе поступление не стало расходом',

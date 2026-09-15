@@ -60,21 +60,34 @@ function word(...variants: string[]): RegExp {
   return new RegExp(`(^|[^\\p{L}])(${variants.join('|')})(?![\\p{L}])`, 'iu')
 }
 
-const KIND_RULES: { kind: TxKind; words: RegExp }[] = [
-  { kind: 'transfer', words: word('перев(ёл|ел|ели|од|ода)') },
-  { kind: 'fee', words: word('комисси(я|ю|и|ей)') },
-  { kind: 'refund_out', words: word('верн(ул|ули)\\s+(клиент\\p{L}*|ему|ей)', 'возврат\\s+клиент\\p{L}*') },
-  { kind: 'refund_in', words: word('верн(ули|ул)\\s+(нам|мне|деньги|за)', 'возврат\\s+(нам|за)') },
-  { kind: 'founder_contribution', words: word('вн(ёс|ес|если)\\s+(свои|своих|своими)', 'пополнил\\s+из\\s+личн\\p{L}*') },
-  { kind: 'founder_withdrawal', words: word('забрал\\s+себе', 'вывел\\s+себе', 'снял\\s+себе') },
-  { kind: 'income', words: word(
-      'доход(ы|а)?', 'выручк(а|и|у)', 'пришл(о|а|и)', 'поступил(о|а|и)?', 'поступлени(е|я)', 'приход',
-      'зачислил(и|а)?', 'получил(и|а)?\\s+(от|на\\s+счёт|деньги)', 'оплат(а|ы|у)\\s+клиент\\p{L}*',
-      'заплатил(и|а)?\\s+(нам|клиент\\p{L}*)', 'перевели\\s+нам') },
-  { kind: 'expense', words: word(
-      'расход(ы)?', 'оплатил(а|и)?', 'потратил(а|и)?', 'купил(а|и)?', 'заплатил(а|и)?',
-      'зарплат(а|ы|у|е)', 'выплатил(а|и)?', 'списал(и|а)?', 'затрат(а|ы)') },
+type KindRule = { kind: TxKind; variants: string[]; words: RegExp }
+
+/** Правило типа. Варианты храним отдельно: по ним же режем слитную фразу. */
+function rule(kind: TxKind, ...variants: string[]): KindRule {
+  return { kind, variants, words: word(...variants) }
+}
+
+const KIND_RULES: KindRule[] = [
+  rule('transfer', 'перев(ёл|ел|ели|од|ода)'),
+  rule('fee', 'комисси(я|ю|и|ей)'),
+  rule('refund_out', 'верн(ул|ули)\\s+(клиент\\p{L}*|ему|ей)', 'возврат\\s+клиент\\p{L}*'),
+  rule('refund_in', 'верн(ули|ул)\\s+(нам|мне|деньги|за)', 'возврат\\s+(нам|за)'),
+  rule('founder_contribution', 'вн(ёс|ес|если)\\s+(свои|своих|своими)', 'пополнил\\s+из\\s+личн\\p{L}*'),
+  rule('founder_withdrawal', 'забрал\\s+себе', 'вывел\\s+себе', 'снял\\s+себе'),
+  rule('income',
+    'доход(ы|а)?', 'выручк(а|и|у)', 'пришл(о|а|и)', 'поступил(о|а|и)?', 'поступлени(е|я)', 'приход',
+    'зачислил(и|а)?', 'получил(и|а)?\\s+(от|на\\s+счёт|деньги)', 'оплат(а|ы|у)\\s+клиент\\p{L}*',
+    'заплатил(и|а)?\\s+(нам|клиент\\p{L}*)', 'перевели\\s+нам'),
+  rule('expense',
+    'расход(ы)?', 'оплатил(а|и)?', 'потратил(а|и)?', 'купил(а|и)?', 'заплатил(а|и)?',
+    'зарплат(а|ы|у|е)', 'выплатил(а|и)?', 'списал(и|а)?', 'затрат(а|ы)'),
 ]
+
+/**
+ * Все слова-типы одним выражением — для разреза слитной фразы. Форма та же,
+ * что у word(): группа 1 — символ перед словом, по её длине считаем позицию.
+ */
+const KIND_WORD_SOURCE = `(^|[^\\p{L}])(${KIND_RULES.flatMap((r) => r.variants).join('|')})(?![\\p{L}])`
 
 /* ── Числа ────────────────────────────────────────────────────────────────── */
 
@@ -204,10 +217,44 @@ export function parseMessage(text: string, ctx: ParseContext): Candidate[] {
 function splitParts(text: string): string[] {
   const rough = text
     .split(/[\n;]+/)
+    .flatMap((line) => splitByKindWords(line))
     .flatMap((line) => splitInline(line))
     .map((p) => p.trim())
     .filter((p) => p && /\d/.test(p))
   return rough
+}
+
+/**
+ * Разрез по словам-типам. Расшифровка голосового приходит без знаков препинания
+ * — «доход 8000 новый клиент расход 8000 тестовый доход 1000 долларов» — и
+ * резать по запятым там нечего. Зато новое слово-тип и есть начало новой
+ * операции.
+ *
+ * Условие то же, что у разреза по запятым: режем, только если числа есть по обе
+ * стороны. «Перевод 5000 на зарплату» одной операцией и остаётся, потому что
+ * справа от «зарплату» суммы нет, — иначе бы потеряли назначение платежа.
+ */
+function splitByKindWords(line: string): string[] {
+  const re = new RegExp(KIND_WORD_SOURCE, 'giu')
+  const hasDigit = (s: string) => /\d/.test(s)
+  const cuts: number[] = []
+
+  let m: RegExpExecArray | null
+  while ((m = re.exec(line)) !== null) {
+    const at = m.index + m[1].length
+    const from = cuts.length ? cuts[cuts.length - 1] : 0
+    if (at > from && hasDigit(line.slice(from, at)) && hasDigit(line.slice(at))) cuts.push(at)
+  }
+  if (!cuts.length) return [line]
+
+  const out: string[] = []
+  let prev = 0
+  for (const at of cuts) {
+    out.push(line.slice(prev, at))
+    prev = at
+  }
+  out.push(line.slice(prev))
+  return out
 }
 
 /**
