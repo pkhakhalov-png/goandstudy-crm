@@ -298,10 +298,19 @@ async function postFromText(
       posted++
 
       const after = res.balances.find((b) => b.account_id === account.id)
+      // Если тип операции не назван словом, а взят по умолчанию, говорим об
+      // этом прямо. «Доход машина 101000» однажды уже записался расходом — не
+      // потому, что правило ошиблось, а потому, что слова «доход» в словаре не
+      // было, и сообщение молча ушло в значение по умолчанию.
+      const guessed = c.kindFrom !== 'explicit'
+        ? '\nПринял как расход — если это поступление, напишите «доход …» и отмените это.'
+        : ''
+
       results.push(
         `✅ ${KIND_NAMES[c.kind]}: <b>${formatMinor(c.amountMinor!, account.currency as Currency)}</b>`
         + `${c.categoryHint ? ` · ${c.categoryHint}` : ''}`
-        + `\n${account.name}${after ? ` · остаток ${formatMinor(after.balance_minor, account.currency as Currency)}` : ''}`,
+        + `\n${account.name}${after ? ` · остаток ${formatMinor(after.balance_minor, account.currency as Currency)}` : ''}`
+        + guessed,
       )
 
       await tgSend(msg.chat.id, results[results.length - 1], [[
