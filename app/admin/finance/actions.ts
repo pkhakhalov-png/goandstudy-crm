@@ -274,3 +274,40 @@ export async function revokeAccess(formData: FormData): Promise<{ error?: string
   revalidatePath('/admin/finance/setup')
   return {}
 }
+
+/**
+ * Одноразовая ссылка для привязки телеграма.
+ *
+ * Токен живёт пятнадцать минут и гасится при использовании. В базе хранится
+ * только его хэш: утечка таблицы не должна давать возможность привязаться
+ * чужим телеграмом.
+ *
+ * Привязка идёт к числовому id телеграма, а не к username: username меняется, и
+ * тогда доступ к деньгам уехал бы вместе с ним.
+ */
+export async function createTelegramLink(): Promise<{ url?: string; error?: string }> {
+  let user
+  try { user = await requireOwner() } catch (e) { return { error: (e as Error).message } }
+
+  const { tgGetMe } = await import('@/lib/finance/telegram')
+  const me = await tgGetMe()
+  if (!me?.username) return { error: 'бот не отвечает — проверьте TELEGRAM_FINANCE_BOT_TOKEN' }
+
+  const token = crypto.randomUUID().replace(/-/g, '')
+  const hash = await sha256(token)
+
+  const db = await financeDb()
+  const { error } = await db.from('link_tokens').insert({
+    token_hash: hash,
+    user_id: user.id,
+    expires_at: new Date(Date.now() + 15 * 60_000).toISOString(),
+  })
+  if (error) return { error: `ссылка: ${error.message}` }
+
+  return { url: `https://t.me/${me.username}?start=${token}` }
+}
+
+async function sha256(value: string): Promise<string> {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('')
+}

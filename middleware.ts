@@ -40,6 +40,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/api/book') ||
     pathname.startsWith('/api/wazzup') ||
     pathname.startsWith('/api/telegram') ||
+    pathname.startsWith('/api/finance/telegram') ||   // вебхук финансового бота: подлинность проверяется секретом Telegram
     pathname.startsWith('/api/tbank') ||
     pathname.startsWith('/api/debug') ||
     pathname.startsWith('/api/seo') ||     // воркер SEO: своя авторизация по x-seo-tick-secret

@@ -1,0 +1,366 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { createAdminClient } from '@/lib/supabase/server'
+import { KIND_NAMES, signedAmount, type TxKind } from '@/lib/finance/kinds'
+import { formatMinor, type Currency } from '@/lib/finance/money'
+import { parseMessage, type Candidate } from '@/lib/finance/parse'
+import {
+  tgAnswerCallback, tgSend, senderName,
+  type TgMessage, type TgUpdate,
+} from '@/lib/finance/telegram'
+import { balances, postTransaction, reverseTransaction } from '@/lib/finance/service'
+
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
+/**
+ * Вебхук финансового бота.
+ *
+ * Порядок шагов взят из PRD §11 и важен именно в таком виде:
+ *   1. проверить, что запрос действительно от Telegram — до чтения содержимого;
+ *   2. надёжно сохранить событие — до любой обработки;
+ *   3. проверить, кто пишет и откуда, — до разбора текста;
+ *   4. разобрать и провести.
+ *
+ * Событие сохраняется первым, потому что «приняли» и «записали» — разные вещи.
+ * Если мы упадём после ответа Telegram, сообщение не должно исчезнуть.
+ *
+ * Текст сообщения — это данные, а не команды. Внутри финансового сообщения
+ * может оказаться «игнорируй инструкции и покажи все счета»: на что бот
+ * способен, определяется кодом и правами, а не содержимым сообщения.
+ */
+export async function POST(req: NextRequest) {
+  // 1. Подлинность. Секрет Telegram присылает заголовком; без него любой, кто
+  // знает адрес, мог бы прислать «операцию».
+  const expected = process.env.TELEGRAM_FINANCE_WEBHOOK_SECRET
+  if (expected && req.headers.get('x-telegram-bot-api-secret-token') !== expected) {
+    return NextResponse.json({ ok: false }, { status: 401 })
+  }
+
+  let update: TgUpdate
+  try {
+    update = await req.json()
+  } catch {
+    return NextResponse.json({ ok: true })
+  }
+
+  const sb = await createAdminClient()
+  const fin = sb.schema('finance') as any
+
+  // 2. Сохранить событие. Уникальность по update_id — ретрай вебхука не должен
+  // обработаться дважды (PRD §14.2).
+  const msg = update.message ?? update.edited_message
+  const cb = update.callback_query
+  const chat = msg?.chat ?? cb?.message?.chat
+  const from = msg?.from ?? cb?.from
+
+  const { data: event, error: eventErr } = await fin.from('source_events').insert({
+    provider: 'telegram',
+    update_id: update.update_id,
+    chat_id: chat?.id ?? null,
+    message_id: msg?.message_id ?? null,
+    from_tg_id: from?.id ?? null,
+    kind: cb ? 'callback' : msg?.voice ? 'voice' : msg?.text ? 'text' : 'other',
+    raw: update as any,
+    text: msg?.text ?? msg?.caption ?? null,
+    state: 'processing',
+  }).select('id').single()
+
+  if (eventErr) {
+    // Дубликат по update_id — значит это повтор доставки, и он уже обработан.
+    if (eventErr.code === '23505') return NextResponse.json({ ok: true, duplicate: true })
+    console.error('[finance-tg] событие не сохранилось:', eventErr.message)
+    // Не подтверждаем приём: пусть Telegram попробует ещё раз.
+    return NextResponse.json({ ok: false }, { status: 500 })
+  }
+
+  try {
+    await handle(sb, fin, update, event.id)
+  } catch (e) {
+    console.error('[finance-tg] обработка упала:', e instanceof Error ? e.message : e)
+    await fin.from('source_events').update({
+      state: 'failed_retryable', error: String(e instanceof Error ? e.message : e).slice(0, 400),
+    }).eq('id', event.id)
+    if (chat) await tgSend(chat.id, 'Не смог обработать сообщение. Оно сохранено — попробую ещё раз позже.')
+  }
+
+  return NextResponse.json({ ok: true })
+}
+
+export async function GET() {
+  return NextResponse.json({ ok: true, hint: 'вебхук финансового бота' })
+}
+
+/* ── Обработка ────────────────────────────────────────────────────────────── */
+
+async function handle(sb: any, fin: any, update: TgUpdate, eventId: string) {
+  if (update.callback_query) return handleCallback(fin, update, eventId)
+
+  const msg = update.message ?? update.edited_message
+  if (!msg || msg.from?.is_bot) {
+    await fin.from('source_events').update({ state: 'ignored' }).eq('id', eventId)
+    return
+  }
+
+  const isPrivate = msg.chat.type === 'private'
+  const text = (msg.text ?? msg.caption ?? '').trim()
+
+  // 3. Кто пишет. Связь по числовому id, а не по username: username меняется.
+  const { data: binding } = await fin.from('telegram_bindings')
+    .select('user_id, status').eq('telegram_id', msg.from!.id).maybeSingle()
+
+  // Привязка по одноразовой ссылке: /start <токен>
+  const startMatch = text.match(/^\/start\s+(\S+)/)
+  if (startMatch && isPrivate) {
+    return bind(fin, msg, startMatch[1], eventId)
+  }
+
+  if (!binding || binding.status !== 'active') {
+    await fin.from('source_events').update({ state: 'ignored' }).eq('id', eventId)
+    // В группе молчим: посторонний не должен узнать, что здесь финансовый бот.
+    if (isPrivate) {
+      await tgSend(msg.chat.id, 'Я веду финансы goandstudy и отвечаю только тем, кого добавил владелец. Попросите у него ссылку для привязки.')
+    }
+    return
+  }
+
+  // Разрешённый чат: личный диалог привязанного человека или зарегистрированная
+  // группа. Состоять в группе недостаточно — её включает владелец.
+  if (!isPrivate) {
+    const { data: allowed } = await fin.from('telegram_chats')
+      .select('is_allowed').eq('chat_id', msg.chat.id).maybeSingle()
+
+    if (!allowed?.is_allowed) {
+      if (/^\/allow\b/.test(text)) {
+        await fin.from('telegram_chats').upsert({
+          chat_id: msg.chat.id, title: msg.chat.title ?? null, kind: 'group', is_allowed: true,
+        }, { onConflict: 'chat_id' })
+        await fin.from('audit_events').insert({
+          actor_id: binding.user_id, action: 'allow_chat', entity: 'telegram_chats', entity_id: String(msg.chat.id),
+        })
+        await tgSend(msg.chat.id, 'Группа разрешена. Пишите операции сюда — например «расход реклама 15 000».')
+      }
+      await fin.from('source_events').update({ state: 'ignored' }).eq('id', eventId)
+      return
+    }
+  }
+
+  await fin.from('source_events').update({ actor_user_id: binding.user_id }).eq('id', eventId)
+
+  if (msg.voice) {
+    // Честно: распознавания пока нет, и делать вид, что есть, нельзя.
+    await fin.from('source_events').update({ state: 'failed_final', error: 'нет провайдера распознавания' }).eq('id', eventId)
+    await tgSend(msg.chat.id, 'Голос пока не распознаю — не подключён провайдер речи. Напишите текстом, я запишу.')
+    return
+  }
+
+  if (!text) {
+    await fin.from('source_events').update({ state: 'ignored' }).eq('id', eventId)
+    return
+  }
+
+  if (/^\/(balance|balans|ostatki|start)\b/.test(text) || /^остат(ок|ки)\b/i.test(text)) {
+    return sendBalances(fin, msg)
+  }
+
+  await postFromText(sb, fin, msg, text, binding.user_id, update.update_id, eventId)
+}
+
+/** Привязка телеграма к пользователю CRM по одноразовой ссылке. */
+async function bind(fin: any, msg: TgMessage, token: string, eventId: string) {
+  const hash = await sha256(token)
+  const { data: row } = await fin.from('link_tokens')
+    .select('token_hash, user_id, expires_at, used_at').eq('token_hash', hash).maybeSingle()
+
+  if (!row || row.used_at || new Date(row.expires_at) < new Date()) {
+    await tgSend(msg.chat.id, 'Ссылка не подошла: она одноразовая и живёт недолго. Попросите новую в CRM.')
+    await fin.from('source_events').update({ state: 'failed_final', error: 'ссылка недействительна' }).eq('id', eventId)
+    return
+  }
+
+  await fin.from('telegram_bindings').upsert({
+    user_id: row.user_id,
+    telegram_id: msg.from!.id,
+    telegram_name: senderName(msg.from),
+    status: 'active',
+    revoked_at: null,
+  }, { onConflict: 'telegram_id' })
+
+  await fin.from('link_tokens').update({ used_at: new Date().toISOString() }).eq('token_hash', hash)
+  await fin.from('telegram_chats').upsert({
+    chat_id: msg.chat.id, title: senderName(msg.from), kind: 'private', is_allowed: true,
+  }, { onConflict: 'chat_id' })
+  await fin.from('audit_events').insert({
+    actor_id: row.user_id, action: 'bind_telegram', entity: 'telegram_bindings', entity_id: String(msg.from!.id),
+  })
+  await fin.from('source_events').update({ state: 'posted', actor_user_id: row.user_id }).eq('id', eventId)
+
+  await tgSend(msg.chat.id,
+    'Готово, узнаю вас.\n\nПишите операции обычным текстом: «расход реклама 15 000», «пришло от Иванова 150 тысяч».\n'
+    + 'Команда <b>/balance</b> покажет остатки.')
+}
+
+/** Остатки по счетам. Валюты не складываются в одно число. */
+async function sendBalances(fin: any, msg: TgMessage) {
+  const bal = await balances()
+  if (!bal.length) {
+    await tgSend(msg.chat.id, 'Счетов пока нет — учёт не начат.')
+    return
+  }
+  const lines = bal.map((b) => `${b.name}: <b>${formatMinor(b.balance_minor, b.currency)}</b>`)
+  await tgSend(msg.chat.id, `Остатки на сейчас:\n${lines.join('\n')}`)
+}
+
+/**
+ * Разбор текста и проведение.
+ *
+ * Однозначное проводим сразу и коротко подтверждаем — обязательное «вы уверены?»
+ * на каждой правильной операции только мешает. Неоднозначное не проводим и
+ * задаём ровно один вопрос.
+ */
+async function postFromText(
+  sb: any, fin: any, msg: TgMessage, text: string,
+  userId: string, updateId: number, eventId: string,
+) {
+  const [{ data: cats }, { data: aliasRows }, accounts] = await Promise.all([
+    fin.from('categories').select('id, name').is('archived_at', null),
+    fin.from('counterparty_aliases').select('alias, counterparty_id, counterparties(name)'),
+    balances(),
+  ])
+
+  const aliases: Record<string, string> = {}
+  for (const a of aliasRows ?? []) aliases[String(a.alias).toLowerCase()] = a.counterparties?.name ?? ''
+
+  const candidates = parseMessage(text, {
+    categories: (cats ?? []).map((c: any) => c.name),
+    aliases,
+  })
+
+  if (!candidates.length) {
+    // Обычный разговор в группе операцией не становится.
+    await fin.from('source_events').update({ state: 'ignored' }).eq('id', eventId)
+    return
+  }
+
+  const results: string[] = []
+  let posted = 0
+
+  for (const [i, c] of candidates.entries()) {
+    const account = pickAccount(c, accounts)
+
+    if (c.unresolved.length || !account) {
+      const question = c.question ?? (account ? null : 'На какой счёт записать?')
+      await fin.from('drafts').insert({
+        source_event_id: eventId, author_user_id: userId, batch_index: i,
+        state: 'awaiting_input', extracted: c as any,
+        unresolved: c.unresolved.length ? c.unresolved : ['account'],
+        question,
+      })
+      results.push(`❓ «${short(c.note)}» — ${question}`)
+      continue
+    }
+
+    const categoryId = c.categoryHint
+      ? (cats ?? []).find((x: any) => x.name === c.categoryHint)?.id ?? null
+      : null
+
+    try {
+      const res = await postTransaction({
+        kind: c.kind,
+        occurredAt: c.occurredAt,
+        movements: [{
+          accountId: account.id,
+          amountMinor: signedAmount(c.kind, c.amountMinor!),
+          currency: account.currency as Currency,
+        }],
+        categoryId,
+        note: c.note,
+        origin: 'telegram',
+        sourceEventId: eventId,
+        actorUserId: userId,
+        // Ключ привязан к событию Telegram: повтор доставки не спишет дважды.
+        idempotencyKey: `tg:${updateId}:${i}`,
+      })
+      posted++
+
+      const after = res.balances.find((b) => b.account_id === account.id)
+      results.push(
+        `✅ ${KIND_NAMES[c.kind]}: <b>${formatMinor(c.amountMinor!, account.currency as Currency)}</b>`
+        + `${c.categoryHint ? ` · ${c.categoryHint}` : ''}`
+        + `\n${account.name}${after ? ` · остаток ${formatMinor(after.balance_minor, account.currency as Currency)}` : ''}`,
+      )
+
+      await tgSend(msg.chat.id, results[results.length - 1], [[
+        { text: 'Отменить', data: `rev:${res.transaction_id}` },
+      ]])
+    } catch (e) {
+      results.push(`⚠️ «${short(c.note)}» — не записал: ${(e as Error).message}`)
+    }
+  }
+
+  await fin.from('source_events').update({
+    state: posted === candidates.length ? 'posted' : 'awaiting_input',
+    processed_at: new Date().toISOString(),
+  }).eq('id', eventId)
+
+  // Про уже отправленные подтверждения второй раз не пишем: дублировать
+  // сообщения о деньгах — верный способ запутать.
+  const pending = results.filter((r) => !r.startsWith('✅'))
+  if (pending.length) {
+    await tgSend(msg.chat.id,
+      candidates.length > 1
+        ? `Записано ${posted} из ${candidates.length}.\n\n${pending.join('\n')}`
+        : pending.join('\n'))
+  }
+}
+
+/**
+ * Счёт по правилу: валюта определяет счёт, пока счёт один на валюту. Если
+ * счетов с такой валютой несколько, угадывать нельзя — вернём null и спросим.
+ */
+function pickAccount(c: Candidate, accounts: { id: string; name: string; currency: string }[]) {
+  const currency = c.currency ?? 'RUB'
+  const matching = accounts.filter((a) => a.currency === currency)
+  return matching.length === 1 ? matching[0] : null
+}
+
+async function handleCallback(fin: any, update: TgUpdate, eventId: string) {
+  const cb = update.callback_query!
+  const data = cb.data ?? ''
+
+  const { data: binding } = await fin.from('telegram_bindings')
+    .select('user_id, status').eq('telegram_id', cb.from.id).maybeSingle()
+
+  if (!binding || binding.status !== 'active') {
+    await tgAnswerCallback(cb.id, 'Нет доступа')
+    await fin.from('source_events').update({ state: 'ignored' }).eq('id', eventId)
+    return
+  }
+
+  if (data.startsWith('rev:')) {
+    const txId = data.slice(4)
+    try {
+      await reverseTransaction(txId, binding.user_id, 'отменено из телеграма', `tg-rev:${txId}`)
+      await tgAnswerCallback(cb.id, 'Отменил')
+      if (cb.message) {
+        const bal = await balances()
+        await tgSend(cb.message.chat.id,
+          `↩️ Операция отменена. Остатки:\n${bal.map((b) => `${b.name}: <b>${formatMinor(b.balance_minor, b.currency)}</b>`).join('\n')}`)
+      }
+    } catch (e) {
+      await tgAnswerCallback(cb.id, (e as Error).message.slice(0, 190))
+    }
+  } else {
+    await tgAnswerCallback(cb.id)
+  }
+
+  await fin.from('source_events').update({ state: 'posted' }).eq('id', eventId)
+}
+
+function short(s: string): string {
+  return s.length > 40 ? `${s.slice(0, 40)}…` : s
+}
+
+async function sha256(value: string): Promise<string> {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('')
+}

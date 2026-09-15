@@ -1,7 +1,7 @@
 'use client'
 
-import { useActionState } from 'react'
-import { grantAccess, revokeAccess, setRate } from '../actions'
+import { useActionState, useState } from 'react'
+import { createTelegramLink, grantAccess, revokeAccess, setRate } from '../actions'
 
 type User = { id: string; name: string; email: string | null; role: string }
 type AccessRow = { user_id: string; level: string; name: string; email: string | null }
@@ -12,11 +12,14 @@ type AccessRow = { user_id: string; level: string; name: string; email: string |
  * Оба поля были только в мастере первого запуска — и это была ошибка: курс
  * меняется каждую неделю, а второго основателя надо пускать уже после старта.
  */
-export function Settings({ rate, access, users }: {
+export function Settings({ rate, access, users, bindings }: {
   rate: { rub_per_usd: number; rate_date: string } | null
   access: AccessRow[]
   users: User[]
+  bindings: { telegram_name: string | null; telegram_id: number; user_id: string }[]
 }) {
+  const [link, setLink] = useState<{ url?: string; error?: string } | null>(null)
+  const [linking, setLinking] = useState(false)
   const [rateState, rateAction, ratePending] = useActionState(
     async (_p: { error?: string } | null, fd: FormData) => setRate(fd), null,
   )
@@ -47,6 +50,49 @@ export function Settings({ rate, access, users }: {
             ? `Сейчас ${rate.rub_per_usd} ₽ за доллар, задан на ${new Date(rate.rate_date).toLocaleDateString('ru-RU')}.`
             : 'Курс не задан: доллары учитываются, но общий рублёвый итог помечен неполным.'}
           {' '}Новый курс не переписывает прошлые оценки — он действует с указанной даты.
+        </P>
+      </section>
+
+      <section>
+        <H>Телеграм</H>
+        {bindings.length > 0 && (
+          <div style={{ display: 'grid', gap: 6, marginBottom: 10 }}>
+            {bindings.map((b) => {
+              const u = users.find((x) => x.id === b.user_id)
+              return (
+                <div key={b.telegram_id} style={{ fontSize: 13 }}>
+                  {b.telegram_name ?? b.telegram_id}
+                  <span style={{ color: 'var(--muted)', fontSize: 11, marginLeft: 8 }}>
+                    привязан к {u?.name ?? 'пользователю CRM'}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        )}
+        <button
+          type="button" className="btn-s" disabled={linking}
+          style={{ padding: '8px 14px', fontSize: 13 }}
+          onClick={async () => {
+            setLinking(true)
+            setLink(await createTelegramLink())
+            setLinking(false)
+          }}
+        >
+          {linking ? 'Готовлю…' : 'Получить ссылку для привязки'}
+        </button>
+        {link?.url && (
+          <div style={{ marginTop: 10 }}>
+            <a href={link.url} target="_blank" rel="noopener"
+              style={{ fontSize: 13, color: 'var(--purple)', wordBreak: 'break-all' }}>{link.url}</a>
+            <P>Откройте её в том телеграме, который нужно привязать. Ссылка одноразовая и живёт 15 минут.</P>
+          </div>
+        )}
+        {link?.error && <Err>{link.error}</Err>}
+        <P>
+          Привязка идёт к числовому идентификатору телеграма, а не к @имени: имя
+          можно поменять, и доступ к деньгам уехал бы вместе с ним. В общей группе
+          бот начинает работать после команды <b>/allow</b> от привязанного владельца.
         </P>
       </section>
 

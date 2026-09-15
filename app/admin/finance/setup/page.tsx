@@ -38,10 +38,11 @@ export default async function FinanceSetupPage() {
   if (accounts.length) {
     const db = await financeDb()
     const sbUsers = await createAdminClient()
-    const [bal, rate, { data: access }, { data: allUsers }] = await Promise.all([
+    const [bal, rate, { data: access }, { data: bindings }, { data: allUsers }] = await Promise.all([
       balances(),
       currentRate(),
       db.from('access').select('user_id, level').is('revoked_at', null),
+      db.from('telegram_bindings').select('telegram_id, telegram_name, user_id').eq('status', 'active'),
       sbUsers.from('users').select('id, name, email, role').eq('is_active', true)
         .in('role', ['admin', 'rop', 'salesperson']).order('role'),
     ])
@@ -85,7 +86,7 @@ export default async function FinanceSetupPage() {
             чтобы в истории осталось видно, что и почему поменялось.
           </p>
 
-          <Settings rate={rate} access={accessRows} users={allUsers ?? []} />
+          <Settings rate={rate} access={accessRows} users={allUsers ?? []} bindings={bindings ?? []} />
         </div>
       </div>
     )
