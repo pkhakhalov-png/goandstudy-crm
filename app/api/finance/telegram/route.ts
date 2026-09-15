@@ -4,7 +4,7 @@ import { KIND_NAMES, signedAmount } from '@/lib/finance/kinds'
 import { formatMinor, type Currency } from '@/lib/finance/money'
 import { parseMessage, type Candidate } from '@/lib/finance/parse'
 import {
-  tgAnswerCallback, tgSend, senderName,
+  tgAnswerCallback, tgSend, tgGetFileUrl, senderName,
   type TgMessage, type TgUpdate,
 } from '@/lib/finance/telegram'
 import { balances, postTransaction, reverseTransaction } from '@/lib/finance/service'
@@ -169,10 +169,9 @@ async function handle(sb: any, fin: any, update: TgUpdate, eventId: string) {
   await fin.from('source_events').update({ actor_user_id: binding.user_id }).eq('id', eventId)
 
   if (msg.voice) {
-    // Честно: распознавания пока нет, и делать вид, что есть, нельзя.
-    await fin.from('source_events').update({ state: 'failed_final', error: 'нет провайдера распознавания' }).eq('id', eventId)
-    await tgSend(msg.chat.id, 'Голос пока не распознаю — не подключён провайдер речи. Напишите текстом, я запишу.')
-    return
+    const spoken = await transcribeVoice(fin, msg, eventId)
+    if (!spoken) return
+    return postFromText(sb, fin, msg, spoken, binding.user_id, update.update_id, eventId, spoken)
   }
 
   if (!text) {
@@ -201,6 +200,49 @@ async function handle(sb: any, fin: any, update: TgUpdate, eventId: string) {
   }
 
   await postFromText(sb, fin, msg, text, binding.user_id, update.update_id, eventId)
+}
+
+/**
+ * Расшифровать голосовое сообщение.
+ *
+ * Возвращает текст или null, если расшифровать не вышло — и в этом случае сам
+ * объясняет человеку, что произошло. Молчать здесь нельзя: человек сказал в
+ * микрофон сумму и считает, что она записана.
+ */
+async function transcribeVoice(fin: any, msg: TgMessage, eventId: string): Promise<string | null> {
+  const { speechConfigured, transcribe, MAX_VOICE_SECONDS } = await import('@/lib/finance/speech')
+
+  if (!speechConfigured()) {
+    await fin.from('source_events').update({ state: 'failed_final', error: 'нет ключа распознавателя' }).eq('id', eventId)
+    await tgSend(msg.chat.id, 'Голос не распознаю: не настроен распознаватель речи. Напишите текстом, я запишу.')
+    return null
+  }
+
+  const voice = msg.voice!
+  if (voice.duration > MAX_VOICE_SECONDS) {
+    await fin.from('source_events').update({ state: 'failed_final', error: 'запись длиннее лимита' }).eq('id', eventId)
+    await tgSend(msg.chat.id, `Запись длиннее ${Math.round(MAX_VOICE_SECONDS / 60)} минут — разделите её на части. Обрезать молча не стану: так теряются операции.`)
+    return null
+  }
+
+  try {
+    const url = await tgGetFileUrl(voice.file_id)
+    if (!url) throw new Error('файл не отдался из Telegram')
+
+    const res = await fetch(url, { signal: AbortSignal.timeout(30_000) })
+    if (!res.ok) throw new Error(`файл не скачался (${res.status})`)
+    const audio = Buffer.from(await res.arrayBuffer())
+
+    const { text, model, ms } = await transcribe(audio, 'audio/ogg')
+    await fin.from('source_events').update({ transcript: text }).eq('id', eventId)
+    console.log(`[finance-tg] расшифровка ${voice.duration}с за ${ms} мс моделью ${model}`)
+    return text
+  } catch (e) {
+    const reason = e instanceof Error ? e.message : String(e)
+    await fin.from('source_events').update({ state: 'failed_retryable', error: reason.slice(0, 400) }).eq('id', eventId)
+    await tgSend(msg.chat.id, `Не разобрал голосовое: ${reason}. Запись сохранена — можно повторить или написать текстом.`)
+    return null
+  }
 }
 
 /** Привязка телеграма к пользователю CRM по одноразовой ссылке. */
@@ -258,6 +300,9 @@ async function sendBalances(fin: any, msg: TgMessage) {
 async function postFromText(
   sb: any, fin: any, msg: TgMessage, text: string,
   userId: string, updateId: number, eventId: string,
+  /** Расшифровка голосового: её показываем в ответе, чтобы было видно, что
+      именно бот услышал — иначе ошибка распознавания останется незамеченной. */
+  spoken?: string,
 ) {
   const [{ data: cats }, { data: aliasRows }, accounts] = await Promise.all([
     fin.from('categories').select('id, name').is('archived_at', null),
@@ -272,6 +317,8 @@ async function postFromText(
     categories: (cats ?? []).map((c: any) => c.name),
     aliases,
   })
+
+  if (spoken) await tgSend(msg.chat.id, `🎧 Услышал: «${spoken}»`)
 
   if (!candidates.length) {
     // Обычный разговор операцией не становится. В группе на такое молчим — она
