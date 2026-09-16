@@ -132,27 +132,19 @@ async function handle(sb: any, fin: any, update: TgUpdate, eventId: string) {
     return bind(fin, msg, startToken, eventId)
   }
 
-  if (!binding || binding.status !== 'active') {
+  // Кого слушаем.
+  //
+  // В личном диалоге — только привязанных: бота может найти кто угодно, и
+  // отвечать незнакомцу про деньги компании нельзя.
+  //
+  // В разрешённой группе — всех, кто в ней есть. Так решил владелец: группа
+  // закрытая, в ней только основатели, и требовать отдельной привязки от
+  // каждого значит ломать живую работу ради проверки, которую уже выполняет
+  // состав группы. Цена решения: тот, кого добавят в группу потом, тоже сможет
+  // вносить операции.
+  if ((!binding || binding.status !== 'active') && isPrivate) {
     await fin.from('source_events').update({ state: 'ignored' }).eq('id', eventId)
-
-    if (isPrivate) {
-      await tgSend(msg.chat.id, 'Я веду финансы goandstudy и отвечаю только тем, кого добавил владелец. Попросите у него ссылку для привязки.')
-      return
-    }
-
-    // В разрешённой группе молчать нельзя: человек написал расход и уверен, что
-    // он записан. Молчание тут читается как поломка — так и вышло на второй
-    // день работы. Но отвечаем только на сообщения с суммой: в живой переписке
-    // бот не должен встревать в каждую фразу.
-    const { data: allowedChat } = await fin.from('telegram_chats')
-      .select('is_allowed').eq('chat_id', msg.chat.id).maybeSingle()
-
-    if (allowedChat?.is_allowed && /\d/.test(text)) {
-      await tgSend(msg.chat.id,
-        `${senderName(msg.from)}, я вас пока не знаю и записать это не могу.\n\n`
-        + 'Доступ к деньгам выдаётся поимённо: владелец открывает в CRM «Финансы → Настройки», '
-        + 'жмёт «Получить ссылку для привязки» и присылает её вам. Ссылка одноразовая и живёт 15 минут.')
-    }
+    await tgSend(msg.chat.id, 'Я веду финансы goandstudy и отвечаю только тем, кого добавил владелец. Попросите у него ссылку для привязки.')
     return
   }
 
@@ -163,7 +155,9 @@ async function handle(sb: any, fin: any, update: TgUpdate, eventId: string) {
       .select('is_allowed').eq('chat_id', msg.chat.id).maybeSingle()
 
     if (!allowed?.is_allowed) {
-      if (/^\/allow\b/.test(text)) {
+      // Включить группу может только привязанный владелец: иначе любой чат, куда
+      // затащили бота, сам себя и разрешил бы.
+      if (/^\/allow\b/.test(text) && binding?.status === 'active') {
         await fin.from('telegram_chats').upsert({
           chat_id: msg.chat.id, title: msg.chat.title ?? null, kind: 'group', is_allowed: true,
         }, { onConflict: 'chat_id' })
@@ -181,7 +175,11 @@ async function handle(sb: any, fin: any, update: TgUpdate, eventId: string) {
     }
   }
 
-  await fin.from('source_events').update({ actor_user_id: binding.user_id }).eq('id', eventId)
+  // Автор операции — привязанный человек. Если писал незнакомый участник
+  // группы, автора не выдумываем: в журнале останется его телеграм, а поле
+  // автора будет пустым, и это честнее, чем приписать операцию другому.
+  const actorUserId: string | null = binding?.user_id ?? null
+  if (actorUserId) await fin.from('source_events').update({ actor_user_id: actorUserId }).eq('id', eventId)
 
   if (msg.voice) {
     const spoken = await transcribeVoice(fin, msg, eventId)
@@ -189,7 +187,7 @@ async function handle(sb: any, fin: any, update: TgUpdate, eventId: string) {
     // Дальше — ровно тот же путь, что и у набранного текста. Голосовая команда
     // «баланс» однажды уже улетела мимо: проверка команд стояла только на ветке
     // текста, и расшифровка шла сразу в разбор операций.
-    return handleUserText(sb, fin, msg, spoken, binding.user_id, update.update_id, eventId, spoken)
+    return handleUserText(sb, fin, msg, spoken, actorUserId, update.update_id, eventId, spoken)
   }
 
   if (!text) {
@@ -197,7 +195,7 @@ async function handle(sb: any, fin: any, update: TgUpdate, eventId: string) {
     return
   }
 
-  await handleUserText(sb, fin, msg, text, binding.user_id, update.update_id, eventId)
+  await handleUserText(sb, fin, msg, text, actorUserId, update.update_id, eventId)
 }
 
 /**
@@ -209,7 +207,7 @@ async function handle(sb: any, fin: any, update: TgUpdate, eventId: string) {
  */
 async function handleUserText(
   sb: any, fin: any, msg: TgMessage, text: string,
-  userId: string, updateId: number, eventId: string,
+  userId: string | null, updateId: number, eventId: string,
   /** Расшифровка голосового: показываем, что именно бот услышал. */
   spoken?: string,
 ) {
@@ -338,7 +336,7 @@ async function sendBalances(fin: any, msg: TgMessage) {
  */
 async function postFromText(
   sb: any, fin: any, msg: TgMessage, text: string,
-  userId: string, updateId: number, eventId: string,
+  userId: string | null, updateId: number, eventId: string,
 ) {
   const [{ data: cats }, { data: aliasRows }, accounts] = await Promise.all([
     fin.from('categories').select('id, name').is('archived_at', null),
@@ -468,7 +466,15 @@ async function handleCallback(fin: any, update: TgUpdate, eventId: string) {
   const { data: binding } = await fin.from('telegram_bindings')
     .select('user_id, status').eq('telegram_id', cb.from.id).maybeSingle()
 
-  if (!binding || binding.status !== 'active') {
+  const chat = cb.message?.chat
+  const { data: allowedChat } = chat && chat.type !== 'private'
+    ? await fin.from('telegram_chats').select('is_allowed').eq('chat_id', chat.id).maybeSingle()
+    : { data: null }
+
+  // Отменять может тот же круг, что и вносить: привязанный человек или любой
+  // участник разрешённой группы. Иначе половина основателей видела бы кнопку,
+  // которая им не отвечает.
+  if ((!binding || binding.status !== 'active') && !allowedChat?.is_allowed) {
     await tgAnswerCallback(cb.id, 'Нет доступа')
     await fin.from('source_events').update({ state: 'ignored' }).eq('id', eventId)
     return
@@ -477,7 +483,7 @@ async function handleCallback(fin: any, update: TgUpdate, eventId: string) {
   if (data.startsWith('rev:')) {
     const txId = data.slice(4)
     try {
-      await reverseTransaction(txId, binding.user_id, 'отменено из телеграма', `tg-rev:${txId}`)
+      await reverseTransaction(txId, binding?.user_id ?? null, 'отменено из телеграма', `tg-rev:${txId}`)
       await tgAnswerCallback(cb.id, 'Отменил')
       if (cb.message) {
         const bal = await balances()

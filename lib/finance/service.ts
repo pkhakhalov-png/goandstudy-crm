@@ -218,7 +218,12 @@ export type PostInput = {
   note?: string | null
   origin?: 'crm' | 'telegram' | 'import'
   sourceEventId?: string | null
-  actorUserId: string
+  /**
+   * Кто внёс операцию. Может быть null: в общей группе пишут и те, у кого нет
+   * учётной записи в CRM, и приписывать их операции другому человеку нельзя.
+   * Кто именно писал, остаётся в журнале событий телеграма.
+   */
+  actorUserId: string | null
   crmPaymentId?: number | null
   crmExpenseId?: string | null
   rateRubPerUsd?: number | null
@@ -287,7 +292,7 @@ export async function postTransaction(input: PostInput): Promise<PostResult> {
  * дают ноль — так остаток объясним в любой момент времени.
  */
 export async function reverseTransaction(
-  transactionId: string, actorUserId: string, reason?: string, idempotencyKey?: string,
+  transactionId: string, actorUserId: string | null, reason?: string, idempotencyKey?: string,
 ): Promise<{ reversal_id: string }> {
   const db = await financeDb()
   const { data, error } = await db.rpc('reverse_transaction', {
