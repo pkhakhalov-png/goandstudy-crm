@@ -122,6 +122,7 @@ export function subjectKeysFor(topic: string): string[] {
     'кита': 'cn', 'австри': 'at', 'герман': 'de', 'итал': 'it', 'испан': 'es',
     'франц': 'fr', 'венгр': 'hu', 'коре': 'kr', 'сша': 'us', 'америк': 'us',
     'англ': 'gb', 'британ': 'gb', 'оаэ': 'ae', 'дуба': 'ae', 'чех': 'cz', 'польш': 'pl',
+    'таил': 'th', 'тайла': 'th', 'бангкок': 'th', 'чулалонгкорн': 'th',
   }
   const keys = new Set<string>(['global'])
   for (const [stem, code] of Object.entries(countries)) if (t.includes(stem)) keys.add(code)
