@@ -134,9 +134,24 @@ async function handle(sb: any, fin: any, update: TgUpdate, eventId: string) {
 
   if (!binding || binding.status !== 'active') {
     await fin.from('source_events').update({ state: 'ignored' }).eq('id', eventId)
-    // В группе молчим: посторонний не должен узнать, что здесь финансовый бот.
+
     if (isPrivate) {
       await tgSend(msg.chat.id, 'Я веду финансы goandstudy и отвечаю только тем, кого добавил владелец. Попросите у него ссылку для привязки.')
+      return
+    }
+
+    // В разрешённой группе молчать нельзя: человек написал расход и уверен, что
+    // он записан. Молчание тут читается как поломка — так и вышло на второй
+    // день работы. Но отвечаем только на сообщения с суммой: в живой переписке
+    // бот не должен встревать в каждую фразу.
+    const { data: allowedChat } = await fin.from('telegram_chats')
+      .select('is_allowed').eq('chat_id', msg.chat.id).maybeSingle()
+
+    if (allowedChat?.is_allowed && /\d/.test(text)) {
+      await tgSend(msg.chat.id,
+        `${senderName(msg.from)}, я вас пока не знаю и записать это не могу.\n\n`
+        + 'Доступ к деньгам выдаётся поимённо: владелец открывает в CRM «Финансы → Настройки», '
+        + 'жмёт «Получить ссылку для привязки» и присылает её вам. Ссылка одноразовая и живёт 15 минут.')
     }
     return
   }
