@@ -207,8 +207,10 @@ function Row({ tx }: { tx: TxRow }) {
       <div style={{ textAlign: 'right', flexShrink: 0 }}>
         {tx.movements.map((m, i) => (
           <div key={i} style={{
+            // Приход зелёным, расход красным — как в подтверждениях бота.
+            // Одинаковый цвет у всех сумм заставлял вчитываться в подпись.
             fontSize: 14, fontWeight: 700,
-            color: m.amount_minor > 0 ? 'var(--green)' : 'var(--text)',
+            color: m.amount_minor > 0 ? 'var(--green)' : 'var(--red)',
           }}>
             {formatMinor(m.amount_minor, m.currency, { sign: m.amount_minor > 0 })}
           </div>

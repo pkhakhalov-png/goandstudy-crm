@@ -311,3 +311,42 @@ async function sha256(value: string): Promise<string> {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('')
 }
+
+/**
+ * Добавить счёт после начала учёта.
+ *
+ * Новый счёт начинает жить с этого момента: остаток на него вводится тот, что
+ * есть сейчас, а прошлые движения по нему в систему не попадают — их некуда
+ * отнести, и повторный ввод удвоил бы деньги. Ровно то же правило, что и при
+ * первом запуске.
+ */
+export async function addAccount(formData: FormData): Promise<{ error?: string }> {
+  let user
+  try { user = await requireOwner() } catch (e) { return { error: (e as Error).message } }
+
+  const name = String(formData.get('name') || '').trim()
+  if (!name) return { error: 'у счёта должно быть название' }
+
+  const currency = (String(formData.get('currency') || 'RUB')) as Currency
+  const openingRaw = String(formData.get('opening') || '').trim()
+  const openingMinor = openingRaw ? parseAmountToMinor(openingRaw) : 0
+  if (openingMinor === null) return { error: `остаток «${openingRaw}» не похож на сумму` }
+
+  const db = await financeDb()
+  const { error } = await db.from('accounts').insert({
+    name, currency,
+    opening_at: new Date().toISOString(),
+    opening_minor: openingMinor,
+    created_by: user.id,
+  })
+  if (error) return { error: `счёт: ${error.message}` }
+
+  await db.from('audit_events').insert({
+    actor_id: user.id, action: 'add_account', entity: 'accounts',
+    after: { name, currency, opening_minor: openingMinor },
+  })
+
+  revalidatePath('/admin/finance')
+  revalidatePath('/admin/finance/setup')
+  return {}
+}

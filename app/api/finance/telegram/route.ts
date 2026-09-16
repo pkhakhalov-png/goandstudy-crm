@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
-import { KIND_NAMES, signedAmount } from '@/lib/finance/kinds'
+import { KIND_NAMES, kindIcon, signedAmount } from '@/lib/finance/kinds'
 import { formatMinor, type Currency } from '@/lib/finance/money'
 import { parseMessage, type Candidate } from '@/lib/finance/parse'
 import {
@@ -401,8 +401,12 @@ async function postFromText(
         ? `\nТип не назван — принял как «${KIND_NAMES[c.kind].toLowerCase()}». Если не так, отмените и напишите тип словом.`
         : ''
 
+      // Сумма со знаком: «−7 500 ₽» и «+75 000 ₽» читаются с одного взгляда,
+      // даже если человек не вчитывается в слово «расход».
+      const signed = signedAmount(c.kind, c.amountMinor!)
+
       results.push(
-        `✅ ${KIND_NAMES[c.kind]}: <b>${formatMinor(c.amountMinor!, account.currency as Currency)}</b>`
+        `${kindIcon(c.kind)} ${KIND_NAMES[c.kind]}: <b>${formatMinor(signed, account.currency as Currency, { sign: true })}</b>`
         + `${c.categoryHint ? ` · ${c.categoryHint}` : ''}`
         + `\n${account.name}${after ? ` · остаток ${formatMinor(after.balance_minor, account.currency as Currency)}` : ''}`
         + guessed,

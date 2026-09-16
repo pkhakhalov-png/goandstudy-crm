@@ -36,3 +36,17 @@ export const INBOUND: TxKind[] = ['income', 'refund_in', 'founder_contribution']
 export function signedAmount(kind: TxKind, amountMinor: number): number {
   return INBOUND.includes(kind) ? Math.abs(amountMinor) : -Math.abs(amountMinor)
 }
+
+/**
+ * Метка операции для телеграма.
+ *
+ * Цветного текста в сообщениях Telegram нет, поэтому направление денег
+ * показываем кружком: красный — ушли, зелёный — пришли. Одинаковая галочка на
+ * всём подряд не различала приход и расход, и в ленте они сливались.
+ */
+export function kindIcon(kind: TxKind): string {
+  if (INBOUND.includes(kind)) return '🟢'
+  if (kind === 'transfer') return '🔄'
+  if (kind === 'adjustment') return '⚙️'
+  return '🔴'
+}

@@ -1,7 +1,7 @@
 'use client'
 
 import { useActionState, useState } from 'react'
-import { createTelegramLink, grantAccess, revokeAccess, setRate } from '../actions'
+import { addAccount, createTelegramLink, grantAccess, revokeAccess, setRate } from '../actions'
 
 type User = { id: string; name: string; email: string | null; role: string }
 type AccessRow = { user_id: string; level: string; name: string; email: string | null }
@@ -20,6 +20,9 @@ export function Settings({ rate, access, users, bindings }: {
 }) {
   const [link, setLink] = useState<{ url?: string; error?: string } | null>(null)
   const [linking, setLinking] = useState(false)
+  const [accountState, accountAction, accountPending] = useActionState(
+    async (_p: { error?: string } | null, fd: FormData) => addAccount(fd), null,
+  )
   const [rateState, rateAction, ratePending] = useActionState(
     async (_p: { error?: string } | null, fd: FormData) => setRate(fd), null,
   )
@@ -35,6 +38,27 @@ export function Settings({ rate, access, users, bindings }: {
 
   return (
     <div style={{ display: 'grid', gap: 26, maxWidth: 720, marginTop: 26 }}>
+      <section>
+        <H>Добавить счёт</H>
+        <form action={accountAction} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <input name="name" className="si" placeholder="Например, Копилка" style={{ minWidth: 200 }} required />
+          <select name="currency" className="si" defaultValue="RUB" style={{ width: 110 }}>
+            <option value="RUB">RUB</option>
+            <option value="USD">USD</option>
+          </select>
+          <input name="opening" className="si" placeholder="остаток сейчас" inputMode="decimal" style={{ width: 180 }} />
+          <button className="btn-s" disabled={accountPending} style={{ padding: '8px 14px', fontSize: 13 }}>
+            {accountPending ? '…' : 'Добавить'}
+          </button>
+        </form>
+        {accountState?.error && <Err>{accountState.error}</Err>}
+        <P>
+          Новый счёт начинает жить с этой минуты: указанный остаток считается тем, что
+          на нём есть сейчас. Прошлые движения по нему в систему не попадут — отнести
+          их некуда, а повторный ввод удвоил бы деньги.
+        </P>
+      </section>
+
       <section>
         <H>Курс, рублей за доллар</H>
         <form action={rateAction} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
