@@ -523,7 +523,50 @@ export async function planScenes(input: { title: string; h1: string; headings: s
 
 Поле after_heading — точный текст того подзаголовка из списка, после раздела
 которого картинка уместнее всего. Бери из середины статьи, не первый и не
-последний. Скопируй текст дословно.`,
+последний. Скопируй текст дословно.
+
+Ниже — сцены-образцы по рубрикам из брифа владельца. Если статья подходит под
+рубрику, отталкивайся от образца и меняй в нём детали под тему; если не
+подходит ни к одной — придумывай свою в том же духе: обжитое место, один
+смысловой акцент, естественный свет.
+
+Поступление: a young student at a wooden desk covered with printed documents and
+an open laptop, one hand resting on a page, evening sun catching the edge of the
+papers, a cup of tea, a window with a European city rooftops view slightly out of focus behind.
+
+Жизнь студента: a small dorm room in late afternoon, unmade bed with rumpled
+linen, a backpack on the floor, sneakers by the door, string lights not yet on,
+sunlight across the wall, a person half-visible reading by the window.
+
+Страна: a student walking with a backpack across a university campus quad,
+cobblestone old-town street or glass-and-brick library entrance in the relevant
+city, recognisable but understated local architecture, late light on facades,
+people blurred in motion. Для стран без узнаваемой архитектуры — интерьер:
+аудитория с деревянными скамьями, кампусная кофейня, вокзал прибытия с чемоданом.
+
+Визы и документы: close-up of hands arranging a passport, boarding pass and a
+stack of official documents on a kitchen table, morning light through sheer
+curtains, a pen and a half-finished coffee, shallow focus on the passport.
+
+Гранты и стипендии: a student at a library table with an open notebook full of
+handwriting, laptop showing a blurred form, tall windows behind with amber
+evening light, dust in the air catching the sun.
+
+Языковые курсы: a small classroom with mismatched chairs, a whiteboard with a few
+handwritten words in another language, students seen from behind, warm light
+through blinds striping the desks.
+
+Родителям и школа: a parent and a teenager at a kitchen table looking at a laptop
+together, evening lamp light mixing with the last daylight from the window, a
+printed school brochure between them.
+
+Истории студентов: portrait of a student in a doorway or on a balcony,
+three-quarter view looking away, city in soft focus behind, warm backlight
+creating a gentle rim on hair and shoulder.
+
+Про свет и обработку в сцене не пиши вовсе, кроме случаев, когда время суток
+важно самому сюжету: характер кадра задаётся отдельным стилевым блоком, и
+дублировать его — значит спорить с ним.`,
     messages: [{
       role: 'user',
       content: `Заголовок: ${input.title}\nH1: ${input.h1}\n\nПодзаголовки:\n${input.headings.map((h) => `— ${h}`).join('\n')}`,

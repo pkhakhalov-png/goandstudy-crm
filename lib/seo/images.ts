@@ -12,9 +12,12 @@ import sharp from 'sharp'
 
 const OPENAI_API = 'https://api.openai.com/v1/images/generations'
 const OPENAI_MODEL = process.env.OPENAI_IMAGE_MODEL || 'gpt-image-1'
-// Самая дешёвая из пригодных: около трёх десятых цента за картинку против
-// двух с половиной центов у flux/dev. При статье в день это доллар в год.
-const FAL_MODEL = process.env.FAL_IMAGE_MODEL || 'fal-ai/flux/schnell'
+// Nano Banana 2 — это Gemini 3.1 Flash Image, только через fal. Напрямую у
+// Google не выходит: ключ проекта на бесплатном тарифе, и картинки там под
+// нулевой квотой (ответ 429 с пометкой free_tier). Прежняя flux/schnell стоила
+// три десятых цента и рисовала сумрачные кадры, которые владелец забраковал;
+// разница в деньгах при статье в день — единицы долларов в месяц.
+const FAL_MODEL = process.env.FAL_IMAGE_MODEL || 'fal-ai/nano-banana-2'
 
 function usable(key: string | undefined): boolean {
   // Заготовка в файле настроек — это ещё не ключ: иначе шаг полез бы в API
@@ -70,10 +73,18 @@ async function viaOpenAI(prompt: string, quality: 'low' | 'medium' | 'high'): Pr
 }
 
 async function viaFal(prompt: string): Promise<Buffer> {
+  // Модели просят размер по-разному: flux ждёт image_size с пикселями, а
+  // nano-banana — пропорцию строкой. Отправлять обе пары полей нельзя: лишнее
+  // поле у fal это ошибка, а не игнор.
+  const isBanana = /nano-banana/.test(FAL_MODEL)
+  const size = isBanana
+    ? { aspect_ratio: '3:2', output_format: 'jpeg' }
+    : { image_size: { width: 1536, height: 1024 } }
+
   const res = await fetch(`https://fal.run/${FAL_MODEL}`, {
     method: 'POST',
     headers: { authorization: `Key ${String(process.env.FAL_KEY).trim()}`, 'content-type': 'application/json' },
-    body: JSON.stringify({ prompt, image_size: { width: 1536, height: 1024 }, num_images: 1, enable_safety_checker: true }),
+    body: JSON.stringify({ prompt, num_images: 1, enable_safety_checker: true, ...size }),
     signal: AbortSignal.timeout(180000),
   })
   if (!res.ok) throw new Error(`fal ${res.status}: ${(await res.text().catch(() => '')).slice(0, 300)}`)
@@ -95,9 +106,19 @@ async function fit(raw: Buffer, width: number, height: number): Promise<Generate
   return { buffer, width, height, bytes: buffer.length, prompt: '' }
 }
 
+/**
+ * Размер обложки — 1200×800.
+ *
+ * Бриф просит 1600×1067 и до 250 КБ. Взял на треть меньше по стороне
+ * осознанно: на странице блога 82 карточки, и каждая тянет этот самый файл.
+ * При 250 КБ это двадцать мегабайт на страницу — ровно та цена, которую мы
+ * недавно выжимали из скорости. 1200 px хватает и для карточки на экране с
+ * удвоенной плотностью, и для превью в соцсетях (og:image ведёт на тот же
+ * файл), а весит около 130 КБ. Поменять — одна цифра здесь.
+ */
 export async function generateCover(prompt: string, quality?: 'low' | 'medium' | 'high'): Promise<GeneratedImage> {
   const raw = await generateRaw(prompt, quality)
-  return { ...(await fit(raw, 480, 320)), prompt }
+  return { ...(await fit(raw, 1200, 800)), prompt }
 }
 
 export async function generateInline(prompt: string, quality?: 'low' | 'medium' | 'high'): Promise<GeneratedImage> {
@@ -126,20 +147,55 @@ export async function generateBoth(prompt: string, quality?: 'low' | 'medium' | 
  * исправить картинку нельзя — она приходит целиком.
  */
 export const STYLE = [
-  'Photorealistic editorial photograph, natural daylight, soft shadows.',
-  'One clear subject, uncluttered composition, shallow depth of field.',
-  'Muted natural colours, no oversaturation, no HDR look.',
-  'Absolutely no text, no lettering, no signage with readable words, no logos, no watermarks.',
-  'No collage, no montage, no picture-in-picture, no borders or frames.',
-  'Documentary feel, not stock-photo staging. No posed smiling models looking at camera.',
+  'Editorial lifestyle photograph, quiet intimate atmosphere, understated magazine aesthetic,',
+  'muted warm-neutral colors, charcoal blacks, espresso brown, taupe and ivory,',
+  'restrained amber accents only where motivated by the scene,',
+  'natural directional light or believable practical lamp light,',
+  'deep dimensional shadows with preserved texture, controlled highlights,',
+  'realistic white balance and skin tones, tactile paper wood fabric and metal,',
+  'subtle fine film grain, candid observational framing, slightly off-center composition,',
+  'authentic lived-in details, selective focus only where appropriate,',
+  'photographic realism, visually clear at thumbnail size.',
 ].join(' ')
 
+/**
+ * Чего быть не должно.
+ *
+ * Держится отдельной строкой, а не растворено в стиле: у fal нет поля для
+ * нежелательных признаков, поэтому список уходит обычным текстом — и его видно,
+ * когда нужно поправить.
+ */
+export const AVOID = [
+  'Avoid: generic corporate stock photography, staged advertising poses, exaggerated smiles,',
+  'glossy commercial lighting, uniform orange or sepia cast, oversaturated colors, HDR halos,',
+  'crushed shadow detail, blown highlights, plastic skin, excessive blur, artificial heavy grain,',
+  'decorative clutter, CGI, 3D render, illustration, added headline, quote overlay, watermark,',
+  'prominent brand logos.',
+].join(' ')
+
+/**
+ * Кадрирование. Верхняя треть держится спокойной под плашку рубрики, а лица,
+ * руки и ключевые предметы не жмутся к краю: карточка блога обрезает края, и
+ * потерять там главное — значит потерять обложку.
+ */
+const FRAMING = [
+  'Horizontal 3:2 framing. Keep the upper third visually calm for a category label;',
+  'do not place faces, hands or key objects near the crop edges.',
+  'No text, headlines or interface elements inside the image;',
+  'small incidental lettering on objects may stay out of focus and must not carry meaning.',
+].join(' ')
+
+/**
+ * Порядок частей задан брифом владельца: сцена, стиль, ограничения, формат.
+ * Стиль не переопределяет тему, место, героев и время суток — они уже описаны
+ * сценой, и спорить с ней он не должен.
+ */
 export function coverPrompt(scene: string): string {
-  return `${scene}\n\n${STYLE} Horizontal 3:2 framing, subject placed slightly off-centre so the image reads well when cropped.`
+  return `${scene}\n\n${STYLE}\n\n${AVOID}\n\n${FRAMING}`
 }
 
 export function inlinePrompt(scene: string): string {
-  return `${scene}\n\n${STYLE} Horizontal 3:2 framing, calmer and more specific than a title image — a detail rather than a panorama.`
+  return `${scene}\n\n${STYLE}\n\n${AVOID}\n\n${FRAMING} Calmer and more specific than the title image — a detail rather than a panorama.`
 }
 
 /** Разметка Гутенберга под картинку внутри статьи. */
