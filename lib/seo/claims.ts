@@ -79,7 +79,7 @@ export function claimsBlock(claims: Claim[]): string {
  * кандидат в выдумку. Ложные срабатывания тут дешевле пропущенной выдуманной суммы,
  * поэтому список идёт человеку как предупреждение, а не как приговор.
  */
-export function findUnbackedNumbers(text: string, claims: Claim[]): { value: string; context: string }[] {
+export function findUnbackedNumbers(text: string, claims: Claim[]): { value: string; raw: string; context: string; offset: number }[] {
   const known = new Set<string>()
 
   // Собственные цены и показатели компании подтверждать реестром не нужно —
@@ -93,7 +93,7 @@ export function findUnbackedNumbers(text: string, claims: Claim[]): { value: str
     for (const m of String(c.statement).matchAll(/\d[\d\s  ,.]*/g)) known.add(normalizeNum(m[0]))
   }
 
-  const out: { value: string; context: string }[] = []
+  const out: { value: string; raw: string; context: string; offset: number }[] = []
   const seen = new Set<string>()
   for (const m of text.matchAll(/(?<![\w])(\d[\d\s  ]{2,}|\d+)\s*(₽|руб|€|\$|¥|%|балл|лет|год|дней|месяц)/gi)) {
     const norm = normalizeNum(m[1])
@@ -102,7 +102,13 @@ export function findUnbackedNumbers(text: string, claims: Claim[]): { value: str
     if (/^(19|20)\d\d$/.test(norm) || Number(norm) < 3) continue
     seen.add(norm + m[2])
     const at = m.index ?? 0
-    out.push({ value: `${m[1].trim()} ${m[2]}`, context: text.slice(Math.max(0, at - 60), at + 80).replace(/\s+/g, ' ').trim() })
+    // Смещение и дословный кусок нужны ревизии архива (E3): без них находку не
+    // показать в тексте, а «где-то в статье» — это не место, а направление.
+    // value собрано из частей и годится для чтения, raw — ровно то, что в тексте.
+    out.push({
+      value: `${m[1].trim()} ${m[2]}`, raw: m[0], offset: at,
+      context: text.slice(Math.max(0, at - 60), at + 80).replace(/\s+/g, ' ').trim(),
+    })
   }
   return out
 }
