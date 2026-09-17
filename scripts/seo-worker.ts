@@ -10,6 +10,7 @@ import { createClient } from '@supabase/supabase-js'
 config({ path: path.resolve(process.cwd(), '.env.local') })
 import { runStep, hasStep } from '../lib/seo/steps'
 import { outcomeFor } from '../lib/seo/failure'
+import { withHeartbeat } from '../lib/seo/lease'
 import '../lib/seo/steps-article'   // регистрация шагов производства статьи
 
 const seo = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } }).schema('seo')
@@ -32,9 +33,27 @@ async function claim(limit = 1): Promise<any[]> {
   return data ?? []
 }
 
-async function complete(id: number, outcome: string, result: any) {
-  const { error } = await seo.rpc('complete_job', { p_job_id: id, p_outcome: outcome, p_result: result ?? {} })
-  if (error) console.error(`  complete_job: ${error.message}`)
+/** Версия обработчика — по ней в расследовании видно, что именно выполняло задачу. */
+const HANDLER_VERSION = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? 'local'
+
+async function complete(job: any, outcome: string, result: any) {
+  const { data, error } = await seo.rpc('complete_job', {
+    p_job_id: job.id, p_outcome: outcome, p_result: result ?? {},
+    p_fencing_token: job.fencing_token ?? null,
+  })
+  if (error) {
+    // Четвёртого аргумента нет — миграция аренды ещё не применена. Пробуем
+    // по-старому, иначе воркер встанет из-за неприменённой миграции.
+    if (/complete_job|function|schema cache/i.test(error.message)) {
+      const { error: legacy } = await seo.rpc('complete_job', { p_job_id: job.id, p_outcome: outcome, p_result: result ?? {} })
+      if (legacy) console.error(`  complete_job: ${legacy.message}`)
+      return
+    }
+    console.error(`  complete_job: ${error.message}`)
+    return
+  }
+  // false означает, что аренду отобрали и задачу ведёт кто-то другой
+  if (data === false) console.error(`  ⚠ результат #${job.id} отклонён: аренда просрочена`)
 }
 
 async function main() {
@@ -54,13 +73,13 @@ async function main() {
       const started = Date.now()
       console.log(`→ ${job.step} #${job.id}${job.article_id ? ` (статья ${job.article_id})` : ''}`)
       if (!hasStep(job.step)) {
-        await complete(job.id, 'released', { skipped: 'нет обработчика у этого воркера' })
+        await complete(job, 'released', { skipped: 'нет обработчика у этого воркера' })
         console.log(`  ↩ ${job.step} не мой шаг — вернул в очередь`)
         continue
       }
       try {
-        const res = await runStep(job as any, seo as any)
-        await complete(job.id, res.outcome, res.result)
+        const { value: res } = await withHeartbeat(seo, job, HANDLER_VERSION, () => runStep(job as any, seo as any))
+        await complete(job, res.outcome, res.result)
         const secs = ((Date.now() - started) / 1000).toFixed(0)
         console.log(`  ${res.outcome === 'done' ? '✓' : '✗'} ${res.outcome} за ${secs} c ${JSON.stringify(res.result ?? {})}`)
       } catch (e: any) {
@@ -69,7 +88,7 @@ async function main() {
         // ошибка признавалась окончательной всегда, и временная беда при ручном
         // прогоне убивала задачу насовсем.
         const { outcome, result } = outcomeFor(e)
-        await complete(job.id, outcome, result)
+        await complete(job, outcome, result)
         console.error(`  ✗ ${outcome === 'retry' ? 'повторим: ' : ''}${e?.message ?? e}`)
       }
     }

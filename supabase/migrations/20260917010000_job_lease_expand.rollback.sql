@@ -1,0 +1,16 @@
+-- Откат фазы expand.
+--
+-- Колонки НЕ удаляются: в них уже могут лежать данные текущих выдач, а PRD §14
+-- требует откат без удаления. Возвращается только поведение функций.
+--
+-- 1. Выключить новое правило возврата, если фаза enable применялась:
+--      update seo.settings set value = to_jsonb(false) where key='lease_recovery';
+--
+-- 2. Вернуть прежние claim_jobs и complete_job. Тексты целиком:
+--      claim_jobs   → 20260917000000_claim_jobs_no_double.sql
+--      complete_job → 20260908000002_seo_functions.sql, строки 115–194
+--    complete_job придётся снять явно перед восстановлением: тип результата
+--    менялся с void на boolean и обратно, CREATE OR REPLACE этого не умеет.
+--      drop function if exists seo.complete_job(bigint, text, jsonb, bigint);
+--
+-- 3. Последовательность и индекс можно оставить: они ничему не мешают.

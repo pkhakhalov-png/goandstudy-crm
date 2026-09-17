@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { runStep, hasStep, registeredSteps } from '@/lib/seo/steps'
 import { outcomeFor } from '@/lib/seo/failure'
+import { withHeartbeat } from '@/lib/seo/lease'
 import '@/lib/seo/steps-article'   // регистрация шагов производства статьи
 
 // Воркер SEO-очереди (PRD 10.3). Вызывается pg_cron через pg_net раз в минуту.
@@ -11,6 +12,26 @@ export const maxDuration = 300
 
 const TIME_BUDGET_MS = 240_000   // ≤240 c, остаток возвращаем в pending
 const BATCH = 5
+
+/** Версия обработчика — по ней в расследовании видно, что именно выполняло задачу. */
+const HANDLER_VERSION = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? 'dev'
+
+/**
+ * Завершение задачи с предъявлением номера выдачи.
+ *
+ * Номер отсекает воскресшего исполнителя: если аренду успели отобрать и задачу
+ * ведёт другой, база отклонит запись. Пока миграция аренды не применена,
+ * четвёртого аргумента у функции нет — тогда работаем по-старому, а не встаём.
+ */
+async function finish(seo: any, job: any, outcome: string, result: any) {
+  const { error } = await seo.rpc('complete_job', {
+    p_job_id: job.id, p_outcome: outcome, p_result: result ?? {},
+    p_fencing_token: job.fencing_token ?? null,
+  })
+  if (error && /complete_job|function|schema cache/i.test(error.message)) {
+    await seo.rpc('complete_job', { p_job_id: job.id, p_outcome: outcome, p_result: result ?? {} })
+  }
+}
 
 // Шаги производства статьи долгие: замерено на живом прогоне — бриф 122 c,
 // черновик 189 c, проверки с починкой 209 c. Начинать такой шаг под конец бюджета
@@ -124,7 +145,7 @@ export async function POST(req: NextRequest) {
       // начнётся и будет убит на середине.
       const need = isLongStep(job.step) ? LONG_STEP_MS : 0
       if (Date.now() - started >= TIME_BUDGET_MS - need) {
-        await seo.rpc('complete_job', { p_job_id: job.id, p_outcome: 'released', p_result: {} })
+        await finish(seo, job, 'released', {})
         released++
         continue
       }
@@ -132,19 +153,21 @@ export async function POST(req: NextRequest) {
       // и её делает воркер с ключом, а не Vercel. Возвращаем задачу в очередь,
       // а не убиваем — иначе один воркер ломает работу другого.
       if (!hasStep(job.step) || !canRunHere(job.step)) {
-        await seo.rpc('complete_job', { p_job_id: job.id, p_outcome: 'released', p_result: { skipped: 'этот воркер такую работу не делает' } })
+        await finish(seo, job, 'released', { skipped: 'этот воркер такую работу не делает' })
         released++
         continue
       }
       try {
-        const outcome = await runStep(job, seo)   // { outcome, result }
-        await seo.rpc('complete_job', { p_job_id: job.id, p_outcome: outcome.outcome, p_result: outcome.result ?? {} })
+        // Пока шаг идёт, подтверждаем, что живы: иначе долгий шаг выглядит
+        // для очереди неотличимо от умершего воркера и будет перезапущен.
+        const { value: outcome } = await withHeartbeat(seo, job, HANDLER_VERSION, () => runStep(job, seo))
+        await finish(seo, job, outcome.outcome, outcome.result ?? {})
       } catch (e: any) {
         // Повторять имеет смысл перегрузку и обрыв связи. Нехватку денег,
         // неверный ключ и занятый слаг повторять бессмысленно — это только
         // сожжёт попытки и спрячет причину за общим «retry».
         const { outcome, result } = outcomeFor(e)
-        await seo.rpc('complete_job', { p_job_id: job.id, p_outcome: outcome, p_result: result })
+        await finish(seo, job, outcome, result)
       }
       processed++
     }
