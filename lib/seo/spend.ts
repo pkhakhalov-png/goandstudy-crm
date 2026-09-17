@@ -49,6 +49,26 @@ export class BudgetExhausted extends Error {
 }
 
 /**
+ * Роли, которым учёт НИКОГДА не мешает работать.
+ *
+ * Действующий конвейер статей настроен и работает, и остановить его учётом
+ * расходов — не то, ради чего учёт заводился. Он здесь, чтобы отвечать на
+ * вопрос «сколько это стоит», а не чтобы решать, писать ли статью.
+ *
+ * Для этих ролей исчерпанный бюджет — повод сказать вслух, а не встать.
+ * Перерасход всё равно будет виден: он попадёт в runs и в отчёт, и на экране
+ * «Конвейер» остаток уйдёт в минус. Это честнее, чем молчаливая остановка
+ * производства в три часа ночи.
+ *
+ * Новые дорожки — производство постов, публикация в соцсети — сюда НЕ входят
+ * намеренно: там остановка по бюджету правильна, потому что их ещё нет и
+ * вводить их сразу без предела не стоит.
+ */
+const NEVER_BLOCK: ReadonlySet<SpendRole> = new Set<SpendRole>([
+  'writer', 'fact_reviewer', 'context_reviewer', 'embeddings', 'image',
+])
+
+/**
  * Выполнить платный вызов с учётом.
  *
  * Возвращает результат вызова. Если бюджет исчерпан, бросает BudgetExhausted
@@ -77,7 +97,19 @@ export async function withSpend<T>(
       if (!/reserve_budget|function|schema cache/i.test(error.message)) throw new Error(error.message)
     } else {
       reservationId = data as number | null
-      if (reservationId == null) throw new BudgetExhausted(ctx.estimate)
+      if (reservationId == null) {
+        if (NEVER_BLOCK.has(ctx.role)) {
+          // Денег по лимиту нет, но работу не останавливаем. Резерва тоже нет,
+          // поэтому фактическая стоимость ляжет в runs без резерва — и именно
+          // так перерасход станет виден в отчёте.
+          console.error(
+            `[учёт] бюджет исчерпан (нужно ${ctx.estimate.toFixed(2)} $), ` +
+            `но роль «${ctx.role}» не останавливаем: конвейер статей важнее учёта`,
+          )
+        } else {
+          throw new BudgetExhausted(ctx.estimate)
+        }
+      }
     }
   } catch (e) {
     if (e instanceof BudgetExhausted) throw e
