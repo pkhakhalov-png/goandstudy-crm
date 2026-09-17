@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { ru, ago } from '@/lib/content/overview'
 import { Пусто, Таблица } from '../Bits'
+import { НовыйКанал, РежимКанала, Рубильник } from './Controls'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,6 +30,7 @@ export default async function ChannelsPage() {
     return (
       <>
         <h2 style={{ margin: '0 0 12px' }}>Каналы</h2>
+        <div style={{ marginBottom: 14 }}><НовыйКанал /></div>
         <Пусто
           что="Каналов нет"
           почему={
@@ -47,8 +49,12 @@ export default async function ChannelsPage() {
   return (
     <>
       <h2 style={{ margin: '0 0 12px' }}>Каналы</h2>
+      <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+        <НовыйКанал />
+        <Рубильник активных={(chans as any[]).filter((c) => c.mode === 'active').length} />
+      </div>
       <Таблица
-        columns={['Канал', 'Площадка', 'Режим', 'Зона', 'Темп', 'Догон', 'Возможности']}
+        columns={['Канал', 'Площадка', 'Режим', 'Зона', 'Темп', 'Догон', 'Возможности', '']}
         rows={(chans as any[]).map((c) => {
           const cap = capOf(c)
           const проверено = cap?.proof_ref ? 'проверено вызовом' : cap ? 'записано, но не проверено' : 'не проверяли'
@@ -62,6 +68,7 @@ export default async function ChannelsPage() {
             <span key="c" style={{ color: cap?.proof_ref ? 'var(--green)' : 'var(--muted)' }}>
               {проверено}{cap?.checked_at ? ` · ${ago(cap.checked_at)}` : ''}
             </span>,
+            <РежимКанала key="r" id={c.id} mode={c.mode} />,
           ]
         })}
       />

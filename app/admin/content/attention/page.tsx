@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { ru, ago } from '@/lib/content/overview'
 import { Пусто, Таблица } from '../Bits'
+import { Закрыть } from './Resolve'
 
 export const dynamic = 'force-dynamic'
 
@@ -57,7 +58,7 @@ export default async function AttentionPage() {
         Открыто {items.length}, закрыто за всё время {resolved ?? 0}.
       </div>
       <Таблица
-        columns={['Важность', 'Что случилось', 'К чему относится', 'Что решить', 'Открыт']}
+        columns={['Важность', 'Что случилось', 'К чему относится', 'Что решить', 'Открыт', '']}
         rows={(items as any[]).map((a) => [
           <span key="s" style={{ color: a.severity === 'high' ? 'var(--red)' : a.severity === 'medium' ? 'var(--purple)' : 'var(--muted)' }}>
             {ru(a.severity)}
@@ -66,6 +67,7 @@ export default async function AttentionPage() {
           a.entity_type ? `${a.entity_type} #${a.entity_id}${a.entity_version ? ` в. ${a.entity_version}` : ''}` : '—',
           <span key="a" style={{ lineHeight: 1.5 }}>{a.suggested_action ?? '—'}</span>,
           ago(a.opened_at) ?? '—',
+          <Закрыть key="z" id={a.id} />,
         ])}
       />
     </>
