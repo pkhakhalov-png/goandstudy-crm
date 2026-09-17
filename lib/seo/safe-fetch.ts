@@ -62,7 +62,19 @@ async function hostResolvesSafe(host: string): Promise<{ safe: boolean; ips: str
   return { safe: ips.length > 0 && ips.every((ip) => !isPrivateIp(ip)), ips }
 }
 
-export async function safeFetch(rawUrl: string, userAgent = 'goandstudy-seo-bot'): Promise<SafeFetchResult> {
+/**
+ * `extraHeaders` добавлен для условных запросов (E6.5): с `If-None-Match` и
+ * `If-Modified-Since` источник отвечает 304 вместо тела, и мы узнаём «не
+ * изменилось», не скачивая страницу целиком.
+ *
+ * Необязательный и по умолчанию пустой: все существующие вызовы работают ровно
+ * как работали, 304 им прийти неоткуда — условных заголовков они не шлют.
+ */
+export async function safeFetch(
+  rawUrl: string,
+  userAgent = 'goandstudy-seo-bot',
+  extraHeaders: Record<string, string> = {},
+): Promise<SafeFetchResult> {
   let current = rawUrl
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
     let u: URL
@@ -82,13 +94,20 @@ export async function safeFetch(rawUrl: string, userAgent = 'goandstudy-seo-bot'
         method: 'GET',
         redirect: 'manual',
         signal: ctrl.signal,
-        headers: { 'User-Agent': userAgent, Accept: ALLOWED_MIME.join(',') },
+        headers: { 'User-Agent': userAgent, Accept: ALLOWED_MIME.join(','), ...extraHeaders },
       })
     } catch (e: any) {
       clearTimeout(timer)
       return { ok: false, reason: `fetch failed: ${e?.message ?? 'error'}` }
     }
     clearTimeout(timer)
+
+    // 304 — это ответ по существу: «у вас уже есть актуальная версия».
+    // Он попадает в диапазон 3xx, но редиректом не является, и разбирать его
+    // как редирект значит искать Location, которого нет.
+    if (res.status === 304) {
+      return { ok: false, reason: 'not modified', status: 304 }
+    }
 
     // редирект — проверяем следующий хоп заново
     if (res.status >= 300 && res.status < 400) {
