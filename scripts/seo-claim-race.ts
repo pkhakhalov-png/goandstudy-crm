@@ -21,12 +21,12 @@ async function main() {
   let doubles = 0, singles = 0, zeros = 0
   for (let i = 0; i < ROUNDS; i++) {
     const { data: job, error } = await seo.from('jobs')
-      .insert({ step: 'noop', lane: 'test', priority: 1, payload: {} }).select('id').single()
+      .insert({ step: 'noop', lane: 'test', priority: 1, payload: {}, runner: 'agent' }).select('id').single()
     if (error) throw new Error(`постановка задачи: ${error.message}`)
     try {
       const [a, b] = await Promise.all([
-        seo.rpc('claim_jobs', { p_worker: 'race-a', p_limit: 5, p_runner: 'vercel' }),
-        seo.rpc('claim_jobs', { p_worker: 'race-b', p_limit: 5, p_runner: 'vercel' }),
+        seo.rpc('claim_jobs', { p_worker: 'race-a', p_limit: 5, p_runner: 'agent' }),
+        seo.rpc('claim_jobs', { p_worker: 'race-b', p_limit: 5, p_runner: 'agent' }),
       ])
       const mine = [...(a.data ?? []), ...(b.data ?? [])].filter((j: any) => j.id === job.id)
       if (mine.length > 1) { doubles++; console.log(`  прогон ${i + 1}: выдана ${mine.length} раз — дубль`) }

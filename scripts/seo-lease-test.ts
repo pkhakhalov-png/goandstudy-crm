@@ -22,9 +22,17 @@ async function test(name: string, fn: () => Promise<string>) {
 }
 function assert(cond: any, msg: string) { if (!cond) throw new Error(msg) }
 
+/**
+ * Тестовая задача, невидимая для боевых исполнителей.
+ *
+ * Помечаем её исполнителем `agent`: тик на Vercel просит задачи для `vercel` и
+ * такую не увидит, а настоящий агент публикации ходит не через claim_jobs и
+ * берёт только два своих шага. Без этого тесты гонялись с живой очередью и
+ * падали с «задача не выдана» — тик успевал забрать её первым.
+ */
 async function addJob(fields: Record<string, any> = {}) {
   const { data, error } = await seo.from('jobs')
-    .insert({ step: 'noop', lane: 'test', priority: 1, payload: {}, ...fields })
+    .insert({ step: 'noop', lane: 'test', priority: 1, payload: {}, runner: 'agent', ...fields })
     .select('id').single()
   if (error) throw new Error(`постановка задачи: ${error.message}`)
   return data.id as number
@@ -40,7 +48,7 @@ async function main() {
   const probe = await addJob()
   let stop: string[] | null = null
   try {
-    const { data: rows } = await seo.rpc('claim_jobs', { p_worker: 'lease-probe', p_limit: 5, p_runner: 'vercel' })
+    const { data: rows } = await seo.rpc('claim_jobs', { p_worker: 'lease-probe', p_limit: 5, p_runner: 'agent' })
     const mine = (rows ?? []).find((j: any) => j.id === probe)
     if (!mine) {
       stop = ['! задача не выдана — дорожка занята, повтори прогон']
@@ -58,7 +66,7 @@ async function main() {
   await test('подтверждение жизни продлевает аренду', async () => {
     const id = await addJob()
     try {
-      const { data: rows } = await seo.rpc('claim_jobs', { p_worker: 'lease-a', p_limit: 5, p_runner: 'vercel' })
+      const { data: rows } = await seo.rpc('claim_jobs', { p_worker: 'lease-a', p_limit: 5, p_runner: 'agent' })
       const job = (rows ?? []).find((j: any) => j.id === id)
       assert(job, 'задача не выдана')
       const was = job.lease_expires_at
@@ -75,7 +83,7 @@ async function main() {
   await test('старый номер выдачи не продлевает аренду', async () => {
     const id = await addJob()
     try {
-      const { data: rows } = await seo.rpc('claim_jobs', { p_worker: 'lease-b', p_limit: 5, p_runner: 'vercel' })
+      const { data: rows } = await seo.rpc('claim_jobs', { p_worker: 'lease-b', p_limit: 5, p_runner: 'agent' })
       const job = (rows ?? []).find((j: any) => j.id === id)
       assert(job, 'задача не выдана')
       const { data: ok } = await seo.rpc('heartbeat_job', { p_job_id: id, p_fencing_token: job.fencing_token - 1, p_handler_version: 'старый' })
@@ -87,7 +95,7 @@ async function main() {
   await test('воскресший исполнитель не запишет результат', async () => {
     const id = await addJob()
     try {
-      const { data: first } = await seo.rpc('claim_jobs', { p_worker: 'умерший', p_limit: 5, p_runner: 'vercel' })
+      const { data: first } = await seo.rpc('claim_jobs', { p_worker: 'умерший', p_limit: 5, p_runner: 'agent' })
       const job = (first ?? []).find((j: any) => j.id === id)
       assert(job, 'задача не выдана')
       const staleToken = job.fencing_token
@@ -99,7 +107,7 @@ async function main() {
       }).eq('id', id)
 
       // Кто-то другой забирает задачу — номер выдачи меняется
-      const { data: second } = await seo.rpc('claim_jobs', { p_worker: 'живой', p_limit: 5, p_runner: 'vercel' })
+      const { data: second } = await seo.rpc('claim_jobs', { p_worker: 'живой', p_limit: 5, p_runner: 'agent' })
       const retaken = (second ?? []).find((j: any) => j.id === id)
       assert(retaken, 'задача не вернулась в очередь после истечения аренды — правило возврата не переключено (миграция 20260917020000)')
       assert(retaken.fencing_token > staleToken, 'номер выдачи не вырос')
@@ -120,14 +128,14 @@ async function main() {
   await test('задача с живым сердцем не возвращается в очередь', async () => {
     const id = await addJob()
     try {
-      const { data: rows } = await seo.rpc('claim_jobs', { p_worker: 'долгий', p_limit: 5, p_runner: 'vercel' })
+      const { data: rows } = await seo.rpc('claim_jobs', { p_worker: 'долгий', p_limit: 5, p_runner: 'agent' })
       const job = (rows ?? []).find((j: any) => j.id === id)
       assert(job, 'задача не выдана')
 
       // Старое правило вернуло бы её: locked_at двадцатиминутной давности
       await seo.from('jobs').update({ locked_at: new Date(Date.now() - 20 * 60_000).toISOString() }).eq('id', id)
 
-      await seo.rpc('claim_jobs', { p_worker: 'чужой', p_limit: 5, p_runner: 'vercel' })
+      await seo.rpc('claim_jobs', { p_worker: 'чужой', p_limit: 5, p_runner: 'agent' })
       const { data: after } = await seo.from('jobs').select('status, locked_by, fencing_token').eq('id', id).single()
       assert(after!.status === 'running', `задачу отняли: статус ${after!.status}`)
       assert(after!.fencing_token === job.fencing_token, 'задачу перевыдали — номер изменился')
@@ -141,7 +149,7 @@ async function main() {
     // только за выполняемую, у остальных сердце молчит всё время ожидания.
     const ids = [await addJob(), await addJob(), await addJob()]
     try {
-      const { data: rows } = await seo.rpc('claim_jobs', { p_worker: 'пачка', p_limit: 5, p_runner: 'vercel' })
+      const { data: rows } = await seo.rpc('claim_jobs', { p_worker: 'пачка', p_limit: 5, p_runner: 'agent' })
       const mine = (rows ?? []).filter((j: any) => ids.includes(j.id))
       assert(mine.length === ids.length, `выдано ${mine.length} из ${ids.length} — дорожка занята, повтори прогон`)
 
