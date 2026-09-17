@@ -656,6 +656,14 @@ registerStep('article_publish_blog', async (job: Job, seo: any): Promise<StepOut
       applied_at: new Date().toISOString(),
     }).throwOnError()
 
+    // Страница — в инвентарь, сразу после выпуска. Без строки в `pages` ответ
+    // Google о статье некуда записать, и её история индексации не ведётся.
+    // Апсерт по адресу: повторная публикация обновит ту же строку.
+    try {
+      const { ensureArticlePage } = await import('./crawl')
+      await ensureArticlePage(seo, slug)
+    } catch { /* инвентарь подождёт: статья уже вышла */ }
+
     // Ссылки на статью теперь ведут на существующую страницу
     if (job.topic_id) {
       await seo.from('link_suggestions').update({ status: 'proposed' })
@@ -763,9 +771,15 @@ registerStep('article_fix', async (job: Job, seo: any): Promise<StepOutcome> => 
  * Ставится раз в сутки, поэтому момент попадания в индекс ловится сам —
  * нажимать кнопку каждый день не нужно. Квота метода 2000 адресов в сутки,
  * до неё нам далеко, но перепроверяем только те, чей срок подошёл.
+ *
+ * `payload.force` — проверить всё сейчас, не глядя на сроки. Под этим живёт
+ * кнопка на экране индексации: человек нажимает её как раз тогда, когда ждать
+ * очередного срока не хочет.
  */
 registerStep('article_index_check', async (job: Job, seo: any): Promise<StepOutcome> => {
   const { inspectPage, saveIndexStatus } = await import('./index-status')
+  const { ensureArticlePage } = await import('./crawl')
+  const force = job.payload?.force === true
 
   const { data: articles } = await seo.from('articles')
     .select('id, current_version_id, indexed_at').eq('status', 'published').order('id')
@@ -783,25 +797,40 @@ registerStep('article_index_check', async (job: Job, seo: any): Promise<StepOutc
     const slug = slugOf(meta)
     if (!slug) continue
 
-    // Уже в индексе и проверено недавно — не тратим квоту
+    // Уже в индексе и проверено недавно — не тратим квоту.
+    //
+    // Непроиндексированную статью спрашиваем раз в сутки, а не раз в двое:
+    // двухдневный шаг систематически промахивался мимо дня попадания в индекс.
+    // 16 сентября Google обошёл три статьи вечером, а проверка была днём — и
+    // следующая пришлась бы только через двое суток, так что экран двое суток
+    // показывал бы «не в индексе» про уже проиндексированные страницы.
     const last = meta.index_check?.at ? Date.parse(meta.index_check.at) : 0
-    const wait = meta.index_check?.verdict === 'PASS' ? 14 * 864e5 : 2 * 864e5
-    if (Date.now() - last < wait) continue
+    const wait = meta.index_check?.verdict === 'PASS' ? 14 * 864e5 : 864e5
+    if (!force && Date.now() - last < wait) continue
 
     const url = `https://goandstudy.com/blog/${slug}/`
     const res = await inspectPage(url)
     if (!res.checked) break // нет доступа или кончилась квота — остальные тем более не пройдут
     checked++
 
-    const { data: page } = await seo.from('pages').select('id').eq('normalized_url', url.replace(/\/$/, '')).maybeSingle()
-    if (page?.id) await saveIndexStatus(seo, page.id, res)
+    // Страницы может не быть в инвентаре: до сентября её заводил только ручной
+    // обход. Заводим сами, иначе ответ Google опять некуда записать.
+    const normalized = url.replace(/\/$/, '')
+    let { data: page } = await seo.from('pages').select('id').eq('normalized_url', normalized).maybeSingle()
+    if (!page?.id) {
+      const made = await ensureArticlePage(seo, slug).catch(() => ({ ok: false, pageId: undefined }))
+      if (made.pageId) page = { id: made.pageId }
+    }
+    if (page?.id) await saveIndexStatus(seo, page.id, res, { retryDays: 1 })
 
     await seo.from('article_versions').update({
       meta: { ...meta, index_check: { at: new Date().toISOString(), verdict: res.verdict, coverage: res.coverageState, note: res.note, last_crawl: res.lastCrawl } },
     }).eq('id', a.current_version_id).throwOnError()
 
     if (res.verdict === 'PASS' && !a.indexed_at) {
-      await seo.from('articles').update({ indexed_at: new Date().toISOString() }).eq('id', a.id).throwOnError()
+      // Дата попадания в индекс — это дата обхода Google, а не минута, в которую
+      // мы про него узнали. Иначе «дней до индекса» растёт от нашей нерасторопности.
+      await seo.from('articles').update({ indexed_at: res.lastCrawl ?? new Date().toISOString() }).eq('id', a.id).throwOnError()
       indexed.push(a.id)
     }
   }
