@@ -12,6 +12,17 @@
 
 begin;
 
+-- Повторный прогон не должен плодить дубли. Уникальный индекс здесь не помощник:
+-- effective_from по умолчанию now(), поэтому у второго прогона он всегда другой,
+-- конфликта не возникает и on conflict do nothing молчит. Поэтому проверяем явно:
+-- есть ли уже тариф на эту модель.
+do $seed$
+begin
+if exists (select 1 from seo.model_pricing where provider='anthropic' and model='claude-opus-5') then
+  raise notice 'тарифы уже посеяны — пропускаем';
+  return;
+end if;
+
 insert into seo.model_pricing
   (provider, model, input_per_mtok, output_per_mtok, cache_write_mult, cache_read_mult, unit, note)
 values
@@ -30,5 +41,7 @@ values
 on conflict do nothing;
 
 update seo.model_pricing set per_unit = 0 where unit = 'image' and per_unit is null;
+end
+$seed$;
 
 commit;

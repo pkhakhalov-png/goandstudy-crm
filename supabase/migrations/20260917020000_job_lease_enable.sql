@@ -30,10 +30,15 @@ declare
   v_grace   int;
   v_by_lease boolean;
 begin
-  select coalesce((value #>> '{}')::boolean, false) into v_by_lease
-    from seo.settings where key='lease_recovery';
-  select coalesce((value #>> '{}')::int, 900) into v_lease from seo.settings where key='lease_seconds';
-  select coalesce((value #>> '{}')::int, 120) into v_grace from seo.settings where key='heartbeat_grace_seconds';
+  -- Каждое значение может отсутствовать строкой, а не значением: coalesce внутри
+  -- запроса ловит только второе. Без подстраховки ниже правило возврата с NULL
+  -- в запасе не вернуло бы ни одной задачи и молча перестало бы работать.
+  select (value #>> '{}')::boolean into v_by_lease from seo.settings where key='lease_recovery';
+  select (value #>> '{}')::int     into v_lease    from seo.settings where key='lease_seconds';
+  select (value #>> '{}')::int     into v_grace    from seo.settings where key='heartbeat_grace_seconds';
+  v_by_lease := coalesce(v_by_lease, false);
+  v_lease    := coalesce(v_lease, 900);
+  v_grace    := coalesce(v_grace, 120);
 
   if v_by_lease then
     -- Возвращаем только тех, у кого аренда кончилась И сердце молчит дольше

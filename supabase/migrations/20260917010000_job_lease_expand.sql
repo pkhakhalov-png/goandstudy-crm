@@ -71,7 +71,12 @@ begin
    where status='running' and locked_at < now() - interval '10 minutes';
 
   select value into v_conc from seo.settings where key='worker_concurrency_by_lane';
-  select coalesce((value #>> '{}')::int, 900) into v_lease from seo.settings where key='lease_seconds';
+  select (value #>> '{}')::int into v_lease from seo.settings where key='lease_seconds';
+  -- SELECT INTO без строки оставляет переменную NULL, и coalesce ВНУТРИ запроса
+  -- этого не ловит: он применяется к значению, а не к отсутствию строки. Дальше
+  -- make_interval(secs => NULL) дал бы аренду NULL — то есть задачу без срока,
+  -- которую новое правило возврата никогда не тронет.
+  v_lease := coalesce(v_lease, 900);
 
   with running_by_lane as (
     select lane, count(*)::int c from seo.jobs where status='running' group by lane
@@ -131,7 +136,8 @@ declare
   v_lease int;
   v_rows  int;
 begin
-  select coalesce((value #>> '{}')::int, 900) into v_lease from seo.settings where key='lease_seconds';
+  select (value #>> '{}')::int into v_lease from seo.settings where key='lease_seconds';
+  v_lease := coalesce(v_lease, 900);
 
   update seo.jobs
      set heartbeat_at = now(),
