@@ -106,7 +106,7 @@ async function main() {
 
   for (const p of people.sort((x, y) => x.name.localeCompare(y.name, 'ru'))) {
     const mine = (slots ?? []).filter((s: Slot) => s.user_id === p.id)
-    const booked = new Set(
+    const booked = new Set<string>(
       (bookings ?? [])
         .filter((b: any) => b.salesperson_id === p.id)
         .map((b: any) => `${b.booking_date} ${String(b.start_time).slice(0, 5)}`),
