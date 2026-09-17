@@ -23,6 +23,7 @@ const GROUPS: { title: string; tabs: { href: string; label: string }[] }[] = [
     title: 'Наблюдение',
     tabs: [
       { href: '/admin/seo', label: 'Обзор' },
+      { href: '/admin/seo/pipeline', label: 'Конвейер' },
       { href: '/admin/seo/positions', label: 'Позиции' },
       { href: '/admin/seo/indexation', label: 'Индексация' },
       { href: '/admin/seo/effect', label: 'Эффект' },
