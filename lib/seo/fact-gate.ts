@@ -11,19 +11,34 @@
  * предупреждениями — из-за них статья не стоит.
  */
 import type { Claim } from './claims'
+import { findSemanticClaims } from './semantic-claims'
 
-/** Виды утверждений, ошибка в которых стоит читателю денег или года жизни. */
+/**
+ * Виды утверждений, ошибка в которых стоит читателю денег или года жизни.
+ *
+ * `promise` и `work_rights` пришли из проверки формулировок без чисел (E2.9):
+ * обещание результата и утверждение о праве на работу стоят читателю ровно
+ * столько же, сколько выдуманная цена, а сверять в них нечего — числа там нет.
+ */
 export const CRITICAL_KINDS = new Set([
   'tuition_fee', 'deadline', 'language_req', 'visa_requirement',
   'eligibility', 'document_req', 'scholarship',
+  'promise', 'work_rights',
 ])
 
 export type FactIssue = {
   level: 'blocking' | 'warning'
   kind: string
+  /** Что именно утверждается. Для находки без числа — предложение целиком. */
   statement: string
   why: string
   claimId?: number
+  /** Дословная цитата из текста — только у находок без числа. */
+  quote?: string
+  /** Смещение сработавшей фразы в теле статьи. */
+  offset?: number
+  /** Категория формулировки: visa | guarantee | work_rights | recognition | about_us. */
+  category?: string
 }
 
 export type ClaimWithSources = Claim & {
@@ -81,11 +96,36 @@ export async function factGate(
   const blocking: FactIssue[] = []
   const warnings: FactIssue[] = []
 
+  // Утверждения без чисел идут первыми и независимо от реестра. Сверять в них
+  // нечего: в «визу дают всем» нет цифры, которую можно сопоставить с
+  // источником. Но именно такая фраза стоит читателю отказа в визе, поэтому она
+  // проходит те же ворота — критичный вид не даёт согласовать выпуск.
+  //
+  // Считаем их проверенными: если этого не делать, статья без единого факта в
+  // реестре вернёт checked = 0, и экран сочтёт, что проверять было нечего.
+  let checked = 0
+  for (const f of findSemanticClaims(text)) {
+    const issue: FactIssue = {
+      level: CRITICAL_KINDS.has(f.kind) ? 'blocking' : 'warning',
+      kind: f.kind,
+      // Человеку нужно место, а не вердикт: в статусе показывается statement,
+      // поэтому туда идёт само предложение, а не сработавший оборот.
+      statement: f.quote,
+      why: `${f.why} (сработало: «${f.trigger}»)`,
+      quote: f.quote,
+      offset: f.offset,
+      category: f.category,
+    }
+    checked++
+    if (issue.level === 'blocking') blocking.push(issue)
+    else warnings.push(issue)
+  }
+
   const { data: claims } = await seo.from('claims')
     .select('id, kind, subject, statement, value, value_num, value_date, unit, qualifiers, confidence, status, expires_at')
     .in('subject_key', subjectKeys.length ? subjectKeys : ['—'])
 
-  if (!claims?.length) return { blocking, warnings, checked: 0 }
+  if (!claims?.length) return { blocking, warnings, checked }
 
   // Сколько источников у каждого утверждения — одним запросом, а не по одному
   const ids = claims.map((c: any) => c.id)
@@ -96,7 +136,6 @@ export async function factGate(
     if (l.agreement === 'supports') backing.set(l.claim_id, (backing.get(l.claim_id) ?? 0) + 1)
   }
 
-  let checked = 0
   for (const raw of claims) {
     const c: ClaimWithSources = { ...raw, sources: backing.get(raw.id) ?? 0 }
     if (!isUsedInText(c, text)) continue

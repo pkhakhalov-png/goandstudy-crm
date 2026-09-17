@@ -164,6 +164,73 @@ async function main() {
     return `${g.blocking.length} блокирующих, ${g.warnings.length} предупреждений`
   })
 
+  await test('рискованная формулировка без числа ловится', async () => {
+    const { findSemanticClaims } = await import('../lib/seo/semantic-claims')
+    const must: [string, string][] = [
+      ['<p>Для этой поездки виза не нужна, достаточно паспорта.</p>', 'visa'],
+      ['<p>Мы гарантируем поступление в выбранный вуз.</p>', 'guarantee'],
+      ['<p>Студенты могут работать без ограничений по часам.</p>', 'work_rights'],
+      ['<p>Диплом признаётся автоматически во всех странах ЕС.</p>', 'recognition'],
+      ['<p>Нострификация не нужна, документы примут как есть.</p>', 'recognition'],
+      ['<p>По нашему опыту, подавать лучше в ноябре.</p>', 'about_us'],
+    ]
+    for (const [body, category] of must) {
+      const found = findSemanticClaims(body)
+      assert(found.length > 0, `пропущено: ${body}`)
+      assert(found[0].category === category, `${body} — определено как ${found[0].category}, ожидалось ${category}`)
+    }
+    return `${must.length} формулировок распознаны верно`
+  })
+
+  await test('правильная формулировка не считается нарушением', async () => {
+    const { findSemanticClaims } = await import('../lib/seo/semantic-claims')
+    // Ложное срабатывание здесь дороже пропуска: редактор, которому дважды
+    // показали верную фразу как ошибку, перестанет читать замечания вовсе.
+    const quiet = [
+      '<p>Для поездки виза нужна, её оформляют заранее.</p>',
+      '<p>Мы не гарантируем поступление: решение принимает вуз.</p>',
+      '<p>Гарантий никто не даёт, и обещать результат нечестно.</p>',
+      '<p>Нужна ли виза — зависит от гражданства и срока поездки.</p>',
+      '<p>Работать можно не более 20 часов в неделю.</p>',
+      '<p>Нужна нострификация: без неё диплом не примут.</p>',
+      '<p>Виза может не понадобиться, но это стоит уточнить в консульстве.</p>',
+      // Живой случай из статьи про выбор консультанта: обещание стоит в списке
+      // признаков недобросовестного агентства, то есть статья здесь права
+      '<h2>Красные флаги в разговоре с агентством</h2><p>Гарантия зачисления, визы или стипендии — решение принимают вуз и консульство.</p>',
+    ]
+    for (const body of quiet) {
+      const found = findSemanticClaims(body)
+      assert(found.length === 0, `ложное срабатывание (${found[0]?.category}, «${found[0]?.trigger}»): ${body}`)
+    }
+    return `${quiet.length} верных формулировок пропущены молча`
+  })
+
+  await test('находка несёт цитату и место в тексте', async () => {
+    const { findSemanticClaims } = await import('../lib/seo/semantic-claims')
+    const body = '<!-- wp:paragraph -->\n<p>Учиться можно где угодно. Мы гарантируем зачисление в срок.</p>\n<!-- /wp:paragraph -->'
+    const [found, ...rest] = findSemanticClaims(body)
+    assert(found, 'обещание не найдено')
+    assert(rest.length === 0, `на одно обещание ${rest.length + 1} находок`)
+    assert(found.quote.includes('гарантируем зачисление'), `цитата не из текста: ${found.quote}`)
+    assert(body.slice(found.offset, found.offset + found.trigger.length) === found.trigger,
+      `смещение ${found.offset} указывает не на фразу: ${JSON.stringify(body.slice(found.offset, found.offset + 24))}`)
+    return `цитата и смещение ${found.offset} совпадают с телом статьи`
+  })
+
+  await test('формулировка без числа блокирует выпуск так же, как неподтверждённое число', async () => {
+    const { factGate } = await import('../lib/seo/fact-gate')
+    const body = '<p>Для белорусов виза не нужна, въезд безвизовый.</p><p>По нашему опыту, подавать лучше в ноябре.</p>'
+    // Ключ предмета заведомо пустой: проверка формулировок не должна зависеть
+    // от того, есть ли в реестре факты по теме статьи
+    const g = await factGate(seo, body, ['—'])
+    assert(g.blocking.some((b) => b.kind === 'visa_requirement'), 'визовое утверждение не заблокировало выпуск')
+    assert(g.warnings.some((w) => w.kind === 'internal_stat'), 'рассказ о себе не попал в предупреждения')
+    assert(g.checked > 0, 'проверка отчиталась нулём — экран сочтёт, что проверять было нечего')
+    const issue = g.blocking.find((b) => b.kind === 'visa_requirement')!
+    assert(typeof issue.offset === 'number' && issue.quote, 'находка пришла без цитаты или места')
+    return `${g.blocking.length} блокирующих, ${g.warnings.length} предупреждений`
+  })
+
   await test('страна разводит похожие темы', async () => {
     const { sameFamily } = await import('../lib/seo/cannibal')
     assert(!sameFamily('поступление в вузы великобритании', 'поступление в вузы китая'), 'склеили разные страны')
