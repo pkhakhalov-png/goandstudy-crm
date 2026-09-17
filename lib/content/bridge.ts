@@ -50,7 +50,9 @@ export async function recordVerified(seo: any, input: VerifiedInput): Promise<{ 
   })
   if (error) throw new Error(`событие не записалось: ${error.message}`)
   const row = Array.isArray(data) ? data[0] : data
-  return { eventId: row.event_id, emitted: !!row.emitted }
+  // Имена с приставкой out_ — не украшение: без неё Postgres не отличает
+  // выходную колонку функции от столбца таблицы в `on conflict (event_id)`.
+  return { eventId: row.out_event_id, emitted: !!row.out_emitted }
 }
 
 /** Разобрать накопившиеся события: создать пакеты. Повтор ничего не удваивает. */
@@ -61,7 +63,7 @@ export async function consumeVerified(
 ): Promise<{ eventId: string; packageId: number; created: boolean }[]> {
   const { data, error } = await content(seo).rpc('consume_verified', { p_consumer: consumer, p_limit: limit })
   if (error) throw new Error(`события не разобрались: ${error.message}`)
-  return (data ?? []).map((r: any) => ({ eventId: r.event_id, packageId: r.package_id, created: !!r.created }))
+  return (data ?? []).map((r: any) => ({ eventId: r.out_event_id, packageId: r.out_package_id, created: !!r.out_created }))
 }
 
 /**
@@ -73,5 +75,5 @@ export async function consumeVerified(
 export async function reconcileVerified(seo: any): Promise<{ articleId: number; version: number; restored: boolean }[]> {
   const { data, error } = await content(seo).rpc('reconcile_verified', {})
   if (error) throw new Error(`сверка не прошла: ${error.message}`)
-  return (data ?? []).map((r: any) => ({ articleId: r.article_id, version: r.article_version, restored: !!r.restored }))
+  return (data ?? []).map((r: any) => ({ articleId: r.out_article_id, version: r.out_article_version, restored: !!r.out_restored }))
 }

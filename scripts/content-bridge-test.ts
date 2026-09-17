@@ -31,12 +31,19 @@ const HASH_LOST = 'тест-моста-потерянное-событие'
 
 async function cleanup() {
   const hashes = [HASH, HASH_FAILED, HASH_LOST]
+  const { data: evs } = await content.from('outbox_events').select('event_id').in('payload->>content_hash', hashes)
+  const ids = (evs ?? []).map((e: any) => e.event_id)
+  if (ids.length) await content.from('event_receipts').delete().in('event_id', ids)
+
+  // Версию пакета не удалить напрямую: триггер неизменяемости пропускает
+  // удаление только внутри purge_package, и та пишет в журнал. Тест удаляет
+  // так же, как это делал бы человек, — другого пути нет и быть не должно.
   const { data: pkgs } = await content.from('packages').select('id').eq('seo_article_id', ART)
   for (const p of (pkgs ?? []) as any[]) {
-    await content.from('event_receipts').delete().in('event_id',
-      ((await content.from('outbox_events').select('event_id').in('payload->>content_hash', hashes)).data ?? []).map((e: any) => e.event_id))
-    await content.from('package_versions').delete().eq('package_id', p.id)
-    await content.from('packages').delete().eq('id', p.id)
+    const r = await content.rpc('purge_package', {
+      p_package_id: p.id, p_reason: 'уборка после проверки событийного моста', p_actor: 'тест',
+    })
+    if (r.error) console.log(`  не удалось прибрать пакет ${p.id}: ${r.error.message}`)
   }
   await content.from('outbox_events').delete().in('payload->>content_hash', hashes)
   await content.from('reviews').delete().in('target_hash', hashes)
@@ -104,6 +111,9 @@ async function main() {
     // ── Версия пакета неизменяема.
     const upd = await content.from('package_versions').update({ content_hash: 'подмена' }).eq('package_id', pkg?.id)
     ok('версию пакета нельзя переписать', !!upd.error, upd.error ? 'база не дала' : 'ПЕРЕПИСАЛОСЬ — это дыра')
+    const del = await content.from('package_versions').delete().eq('package_id', pkg?.id)
+    ok('и нельзя удалить мимоходом', !!del.error,
+      del.error ? 'нужна purge_package с причиной' : 'УДАЛИЛОСЬ — это дыра')
 
     // ── Сверщик: проверка есть, события нет.
     await content.from('reviews').insert({
