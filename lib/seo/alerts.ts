@@ -54,9 +54,23 @@ export type Alert = {
 export async function collectAlerts(seo: any): Promise<Alert[]> {
   const alerts: Alert[] = []
 
+  // Только свежие падения.
+  //
+  // Раньше брались все, и это ломало сторожа изнутри: упавшая задача остаётся
+  // упавшей навсегда, ключ `failed:<id>` протухает через шесть часов, и одно и
+  // то же падение уходило в чат каждые шесть часов до скончания века. Чистка
+  // хвостов через неделю делала только хуже — на восьмой день старая беда
+  // приходила как новая. Семнадцать давних падений в очереди означали бы
+  // семнадцать сообщений четыре раза в сутки, и к третьему дню их перестали бы
+  // читать — ровно то, чего этот модуль пытается избежать.
+  //
+  // Старые падения никуда не деваются: они видны на экране «Конвейер» и в
+  // доле ошибок по дорожке. Сторож говорит о новостях, а не об архиве.
+  const failedSince = new Date(Date.now() - 24 * 3600 * 1000).toISOString()
   const { data: failed } = await seo.from('jobs')
-    .select('id, step, attempts, max_attempts, last_error, article_id')
-    .eq('status', 'failed').order('id', { ascending: false }).limit(20)
+    .select('id, step, attempts, max_attempts, last_error, article_id, created_at')
+    .eq('status', 'failed').gte('created_at', failedSince)
+    .order('id', { ascending: false }).limit(20)
 
   for (const j of failed ?? []) {
     alerts.push({
@@ -97,6 +111,50 @@ export async function collectAlerts(seo: any): Promise<Alert[]> {
       key: 'silence',
       title: 'Конвейер молчит сутки',
       detail: 'поток включён, но ни одна задача не завершилась. Похоже, воркер не приходит.',
+    })
+  }
+
+  // ── Голодание дорожек и бюджет ──────────────────────────────────────────
+  //
+  // Считаются тем же модулем, что и экран «Конвейер». Это важнее, чем экономия
+  // кода: сторож и экран, которые считают здоровье по-своему, рано или поздно
+  // разойдутся, и тогда человек будет видеть на экране «в норме» при пришедшем
+  // тревожном сообщении — и перестанет верить обоим.
+  try {
+    const { queueHealth, laneIsStale } = await import('./health')
+    const health = await queueHealth(seo)
+
+    for (const l of health.lanes) {
+      if (!laneIsStale(l)) continue
+      alerts.push({
+        // Ключ без возраста: иначе каждая минута ожидания выглядела бы новой
+        // бедой и сообщения шли бы потоком до самой починки.
+        key: `lane-stale:${l.lane}`,
+        title: `Дорожка «${l.lane}» стоит`,
+        detail: `старейшая ждущая задача не берётся уже ${l.oldestPendingMin} минут; ждут ${l.pendingDue} по сроку`,
+      })
+    }
+
+    for (const b of health.budget ?? []) {
+      if (b.left > b.limit * 0.1) continue
+      const spent = b.left <= 0
+      alerts.push({
+        // Область содержит дату, поэтому назавтра сообщение придёт заново —
+        // и это правильно: новый день, новый лимит, новая беда.
+        key: `budget:${b.scope}`,
+        title: spent ? `Бюджет исчерпан (${b.scope})` : `Бюджет на исходе (${b.scope})`,
+        detail: spent
+          ? `лимит ${b.limit.toFixed(2)} $ выбран полностью. Платные шаги встанут, пока лимит не поднимут.`
+          : `осталось ${b.left.toFixed(2)} $ из ${b.limit.toFixed(2)} $`,
+      })
+    }
+  } catch (e: any) {
+    // Здоровье не посчиталось — это само по себе повод сказать, а не повод
+    // промолчать: сторож, который тихо не проверил, хуже отсутствующего.
+    alerts.push({
+      key: 'health-unavailable',
+      title: 'Не удалось оценить состояние конвейера',
+      detail: String(e?.message ?? e).slice(0, 200),
     })
   }
 
