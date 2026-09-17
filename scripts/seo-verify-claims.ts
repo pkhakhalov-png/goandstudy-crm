@@ -38,7 +38,9 @@ async function main() {
 
     let snap
     try {
-      snap = await snapshotSource(seo, src.id)
+      // Десять минут — чтобы прогон подряд не качал одну и ту же страницу заново.
+      // Осмысленная проверка «а не изменилось ли» этим сроком не ломается.
+      snap = await snapshotSource(seo, src.id, { maxAgeMin: 10 })
     } catch (e: any) {
       console.log(`   ✗ снимок не снялся: ${e?.message ?? e}\n`)
       continue

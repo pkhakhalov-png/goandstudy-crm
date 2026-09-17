@@ -56,6 +56,22 @@ export function extractText(html: string): string {
 }
 
 /**
+ * Какой снимок считается версией источника.
+ *
+ * Каждое обращение к странице создаёт новый снимок — это наблюдение, и их
+ * честно хранить все. Но версия источника — это содержание, а не обращение:
+ * три снимка с одним хешем суть одна версия. Доказательство ссылается на
+ * первый снимок этой версии, иначе каждая повторная проверка плодила бы новую
+ * связь утверждения с источником, ничего к ней не добавляя.
+ */
+export async function canonicalSnapshotId(seo: any, sourceId: number, contentHash: string): Promise<number | null> {
+  const { data } = await seo.from('source_snapshots')
+    .select('id').eq('source_id', sourceId).eq('content_hash', contentHash)
+    .order('fetched_at', { ascending: true }).limit(1)
+  return data?.[0]?.id ?? null
+}
+
+/**
  * Текст снимка по версии источника.
  *
  * Текст хранится только у той строки, где он впервые отличился от предыдущего:
@@ -287,12 +303,16 @@ export async function verifyClaimAgainst(
   if (!src?.subject_key || src.subject_key !== claim.subject_key) return null
 
   // Пара «версия утверждения × версия источника» проверяется один раз (E2.6).
+  const versionId = snapshot.contentHash
+    ? (await canonicalSnapshotId(seo, snapshot.sourceId, snapshot.contentHash)) ?? snapshot.id
+    : snapshot.id
+
   const res = await cachedVerify(seo, {
     claimId,
     claimVersion: claim.version ?? 1,
     sourceId: snapshot.sourceId,
     contentHash: snapshot.contentHash,
-    snapshotId: snapshot.id,
+    snapshotId: versionId,
     checker: CODE_CHECKER,
   }, async () => {
     const hit = findEvidence(snapshot.text, claim)
@@ -304,7 +324,7 @@ export async function verifyClaimAgainst(
 
   await seo.from('claim_sources').upsert({
     claim_id: claimId,
-    snapshot_id: snapshot.id,
+    snapshot_id: versionId,
     claim_version: claim.version ?? 1,
     quote: found.quote,
     agreement: 'supports',
