@@ -23,20 +23,63 @@ export function countable(leadAt: string | null | undefined): boolean {
   return !!leadAt && String(leadAt).slice(0, 10) >= TRACKING_SINCE
 }
 
-/** Из адреса, с которого пришли, вытаскиваем страницу нашего сайта. */
-export function landingPathOf(utm: Record<string, string>): string | null {
-  const raw = utm.landing_url || utm.referrer || ''
+/**
+ * Найти страницу реестра по пути.
+ *
+ * Тонкость, на которой уже споткнулись: главная лежит как
+ * `https://goandstudy.com/` — со слэшем, потому что нормализатор не может
+ * ужать путь «/» до пустой строки. У всех остальных страниц слэша нет.
+ * Поиск, который срезает слэш всегда, главную не находит никогда.
+ *
+ * Поэтому пробуем обе формы. Дешевле, чем помнить про исключение в каждом
+ * месте, где ищут страницу.
+ */
+export async function pageIdForPath(seo: any, path: string): Promise<number | null> {
+  const base = 'https://goandstudy.com'
+  const forms = path === '/' || path === ''
+    ? [`${base}/`, base]
+    : [`${base}${path}`, `${base}${path}/`]
+
+  const { data } = await seo.from('pages').select('id, normalized_url').in('normalized_url', forms).limit(1)
+  return data?.[0]?.id ?? null
+}
+
+/** Одна попытка: наша ли это страница и какая именно. */
+function ownPagePath(raw: string | undefined | null): string | null {
   if (!raw) return null
   try {
     const u = new URL(raw)
     if (!/(^|\.)goandstudy\.com$/i.test(u.hostname)) return null   // чужой сайт — не наша посадочная
     if (u.hostname.startsWith('crm.')) return null                 // сама форма записи посадочной не является
     const p = u.pathname.replace(/\/+$/, '')
-    // Форма записи теперь отдаётся с основного домена, поэтому отсекаем её ещё
-    // и по пути: иначе посадочной страницей у всех заявок станет сама форма.
+    // Форма записи отдаётся с основного домена, поэтому отсекаем её ещё и по
+    // пути: иначе посадочной страницей у всех заявок станет сама форма.
     if (p === '/book' || p.startsWith('/book/')) return null
     return p || '/'
   } catch { return null }
+}
+
+/**
+ * Из адреса, с которого пришли, вытаскиваем страницу нашего сайта.
+ *
+ * Порядок попыток важнее, чем кажется, и прежняя версия на нём и споткнулась.
+ * Было: `utm.landing_url || utm.referrer`. Оператор берёт первое непустое —
+ * а `landing_url` заполняется всегда, это адрес страницы, где стоит форма.
+ * Форма живёт на `/book`, `/book` отсекается как посадочная, и функция
+ * возвращала null, ни разу не заглянув в `referrer`, где и лежала статья.
+ *
+ * Итог: одиннадцать заявок в базе, у всех одиннадцати посадочная пустая.
+ * Атрибуция не работала ни дня, при том что тест на неё был зелёный: он
+ * проверял каждое поле по отдельности и ни разу — вместе.
+ *
+ * Стало: пробуем по очереди и берём первое, что оказалось нашей страницей.
+ */
+export function landingPathOf(utm: Record<string, string>): string | null {
+  for (const raw of [utm.landing_url, utm.referrer]) {
+    const p = ownPagePath(raw)
+    if (p) return p
+  }
+  return null
 }
 
 /**
@@ -53,13 +96,7 @@ export async function recordBookingTouch(
     const path = landingPathOf(input.utm)
     let pageId: number | null = null
 
-    if (path) {
-      const url = `https://goandstudy.com${path === '/' ? '/' : path}`
-      const { data: page } = await seo.from('pages').select('id')
-        .eq('normalized_url', url.replace(/\/$/, '') || 'https://goandstudy.com')
-        .maybeSingle()
-      pageId = page?.id ?? null
-    }
+    if (path) pageId = await pageIdForPath(seo, path)
 
     const { error } = await seo.from('lead_identities').upsert({
       lead_source: 'book',

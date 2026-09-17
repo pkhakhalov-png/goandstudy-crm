@@ -180,7 +180,26 @@ async function main() {
     assert(landingPathOf({ landing_url: 'https://crm.goandstudy.com/book' }) === null, 'форма записи принята за посадочную')
     assert(landingPathOf({ landing_url: 'https://goandstudy.com/book' }) === null, 'форма записи на домене сайта принята за посадочную')
     assert(landingPathOf({ landing_url: 'https://goandstudy.com/blog/postuplenie-v-ssha/' }) === '/blog/postuplenie-v-ssha', 'статья не распозналась как посадочная')
-    return 'три случая разобраны верно'
+
+    // Боевой случай, которого здесь не было и из-за которого атрибуция молчала:
+    // адрес формы приходит ВСЕГДА, а статья лежит в referrer. Проверять поля по
+    // отдельности мало — ломается именно сочетание.
+    assert(
+      landingPathOf({
+        landing_url: 'https://goandstudy.com/book?utm_source=tg',
+        referrer: 'https://goandstudy.com/blog/postuplenie-v-ssha/',
+      }) === '/blog/postuplenie-v-ssha',
+      'форма заслонила статью: посадочная не определилась',
+    )
+    // И наоборот: пришли на форму из поиска — посадочной нет, и выдумывать её нельзя
+    assert(
+      landingPathOf({
+        landing_url: 'https://goandstudy.com/book',
+        referrer: 'https://www.google.com/',
+      }) === null,
+      'чужой referrer принят за посадочную',
+    )
+    return 'семь случаев разобраны верно, включая сочетание формы и статьи'
   })
 
   console.log(`\n${passed} пройдено, ${failed} провалено`)
