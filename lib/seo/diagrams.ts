@@ -169,9 +169,13 @@ export type DiagramPlan = { spec: DiagramSpec; afterHeading: string }
  */
 export async function proposeDiagrams(html: string, articleTitle: string): Promise<DiagramPlan[]> {
   const { getAnthropic } = await import('../ai')
+  const { withSpend } = await import('./spend')
+  const { currentSpendContext } = await import('./spend-context')
   const client = getAnthropic()
-  const res = await client.messages.create({
-    model: 'claude-opus-5',
+  const MODEL = 'claude-opus-5'
+
+  const ask = () => client.messages.create({
+    model: MODEL,
     max_tokens: 8000,
     output_config: { effort: 'high', format: { type: 'json_schema', schema: DIAGRAM_SCHEMA as any } },
     system: `Ты выбираешь, какие схемы нарисовать к статье. Рисует их код, ты только решаешь содержание.
@@ -195,6 +199,35 @@ after_heading — точный текст заголовка H2 или H3 из �
 Незадействованные для выбранного типа поля возвращай пустыми массивами.`,
     messages: [{ role: 'user', content: `Статья «${articleTitle}»\n\n${html}` }],
   })
+
+  // Схемы выбирает та же дорогая модель, что пишет статью: вызов стоит денег и
+  // должен попадать в учёт наравне с писателем. Раньше он тратил молча, и
+  // месячная сумма в отчёте была занижена ровно на него.
+  //
+  // Оценка — верхняя граница для резерва, а не цена: статья в 6 тысяч токенов
+  // на входе и 8 тысяч на выходе по тарифу opus даёт около 23 центов.
+  const spend = currentSpendContext()
+  const res = spend
+    ? await withSpend(
+        { ...spend, role: 'diagrams', provider: 'anthropic', model: MODEL, estimate: 0.30 },
+        async () => {
+          const r = await ask()
+          // Кэш считается отдельно: по одному input_tokens расход вышел бы
+          // завышенным на всё, что модель прочитала из кэша по десятой цене
+          const u = r.usage
+          return {
+            value: r,
+            usage: {
+              input_tokens: u?.input_tokens ?? 0,
+              output_tokens: u?.output_tokens ?? 0,
+              cache_creation_input_tokens: u?.cache_creation_input_tokens ?? 0,
+              cache_read_input_tokens: u?.cache_read_input_tokens ?? 0,
+            },
+          }
+        },
+      )
+    : await ask()   // вне задачи (скрипт, ручной прогон) учитывать не к чему
+
   const text = res.content.filter((b) => b.type === 'text').map((b: any) => b.text).join('').trim()
   const parsed = JSON.parse(text.replace(/^```(?:json)?\s*|\s*```$/g, '')) as { diagrams: any[] }
 

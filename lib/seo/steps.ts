@@ -3,6 +3,7 @@
 import { safeFetch } from './safe-fetch'
 import { normalizeUrl } from './normalize'
 import { crawlPage } from './crawl'
+import { runWithSpendContext } from './spend-context'
 import { computeInventoryFindings, computeTechnicalFindings, computeGscFindings } from './findings'
 import { computeClusters } from './cluster'
 import { reclusterTopics, topicsFromContentGaps } from './topics'
@@ -325,5 +326,9 @@ export function registeredSteps(): string[] {
 export async function runStep(job: Job, seo: any): Promise<StepOutcome> {
   const handler = registry[job.step]
   if (!handler) return { outcome: 'failed', result: { error: `no handler for step "${job.step}"` } }
-  return handler(job, seo)
+  // Объявляем контекст задачи один раз здесь: платные вызовы внутри шага —
+  // схемы, эмбеддинги, картинки — заберут его сами и лягут в учёт с правильной
+  // задачей и статьёй. Без этого они тратили бы деньги молча, и месячная сумма
+  // в отчёте была бы занижена ровно на них.
+  return runWithSpendContext({ seo, jobId: job.id, articleId: job.article_id ?? null }, () => handler(job, seo))
 }

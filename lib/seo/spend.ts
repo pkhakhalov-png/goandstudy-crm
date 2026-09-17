@@ -16,7 +16,7 @@
  * пришёл бы за обе. PRD E1.9 требует именно этого поведения.
  */
 
-export type SpendRole = 'writer' | 'fact_reviewer' | 'context_reviewer' | 'embeddings' | 'image'
+export type SpendRole = 'writer' | 'fact_reviewer' | 'context_reviewer' | 'embeddings' | 'image' | 'diagrams'
 
 /** Что вернул провайдер. Поля соответствуют usage в ответе Anthropic. */
 export type Usage = {
@@ -65,7 +65,7 @@ export class BudgetExhausted extends Error {
  * вводить их сразу без предела не стоит.
  */
 const NEVER_BLOCK: ReadonlySet<SpendRole> = new Set<SpendRole>([
-  'writer', 'fact_reviewer', 'context_reviewer', 'embeddings', 'image',
+  'writer', 'fact_reviewer', 'context_reviewer', 'embeddings', 'image', 'diagrams',
 ])
 
 /**
@@ -176,11 +176,21 @@ async function recordRun(
       cache_read_tokens: usage.cache_read_input_tokens ?? 0,
       output_tokens: usage.output_tokens ?? 0,
       units: usage.units ?? null,
+      // run_cost отдаёт null, когда тарифа нет: ноль в базе выглядел бы как
+      // «бесплатно» и занижал бы сумму. В колонке ноль неизбежен — она not null,
+      // — поэтому пробел проговариваем в логе, чтобы он не растворился в отчёте.
       cost: cost ?? 0,
       status, error,
       latency_ms: latencyMs,
       finished_at: new Date().toISOString(),
     }).select('id').single()
+
+    if (cost == null) {
+      console.error(
+        `[учёт] нет тарифа для ${ctx.provider}/${ctx.model}: вызов записан нулём. ` +
+        'Пока тариф не заведён в seo.model_pricing, расход по этой роли занижен.',
+      )
+    }
 
     if (runErr) {
       // Таблицы ещё нет — миграция не применена. Молчать нельзя: без учёта мы

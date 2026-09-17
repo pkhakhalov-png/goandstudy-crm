@@ -51,11 +51,34 @@ export type GeneratedImage = {
   prompt: string
 }
 
-/** Один запрос к модели. Возвращает исходник 1536×1024, без обрезки. */
+/**
+ * Один запрос к модели. Возвращает исходник 1536×1024, без обрезки.
+ *
+ * Картинка — платный вызов, и до сих пор он шёл мимо учёта: в отчёте видно
+ * писателя и проверяющих, а рисование не видно вовсе, хотя статья в день — это
+ * статья в день и картинок к ней. Считаем поштучно: тариф у обоих поставщиков
+ * за изображение, а не за токены.
+ *
+ * Оценка — верхняя граница резерва, не цена. Настоящий тариф заведёт Павел:
+ * в seo.model_pricing строка fal стоит с пометкой «ТАРИФ НЕ ПОДСТАВЛЕН», и
+ * пока её нет, стоимость запишется нулём, а в лог уйдёт предупреждение.
+ */
 async function generateRaw(prompt: string, quality: 'low' | 'medium' | 'high' = 'medium'): Promise<Buffer> {
   const who = imageProvider()
   if (!who) throw new Error('нет ключа ни у одного поставщика картинок')
-  return who === 'fal' ? viaFal(prompt) : viaOpenAI(prompt, quality)
+
+  const model = who === 'fal' ? FAL_MODEL : OPENAI_MODEL
+  const ask = () => (who === 'fal' ? viaFal(prompt) : viaOpenAI(prompt, quality))
+
+  const { withSpend } = await import('./spend')
+  const { currentSpendContext } = await import('./spend-context')
+  const spend = currentSpendContext()
+  if (!spend) return ask()   // вне задачи (скрипт, ручной прогон) относить расход не к чему
+
+  return withSpend(
+    { ...spend, role: 'image', provider: who, model, estimate: 0.20 },
+    async () => ({ value: await ask(), usage: { units: 1 } }),
+  )
 }
 
 async function viaOpenAI(prompt: string, quality: 'low' | 'medium' | 'high'): Promise<Buffer> {
