@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { BookingClient } from './BookingClient'
+import { Metrika } from './Metrika'
 import { mskTodayStr, mskTimeStr, mskAddDays, mskDayOfWeek, timeToMinutes, MIN_GAP_MINUTES } from '@/lib/time'
 
 export const dynamic = 'force-dynamic'
@@ -87,5 +88,12 @@ export default async function BookPage() {
     return true
   })
 
-  return <BookingClient availableSlots={filtered} />
+  return (
+    <>
+      {/* Счётчик здесь, а не в общей оболочке CRM: считаем путь посетителя, а
+          не работу сотрудников в админке. */}
+      <Metrika />
+      <BookingClient availableSlots={filtered} />
+    </>
+  )
 }

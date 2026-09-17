@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { createBooking, createLowBudgetDeal } from './actions'
 import { mskTodayStr } from '@/lib/time'
+import { reachGoal } from './Metrika'
 import { BOOK_SOURCE_KEYS } from '@/lib/booking-link'
 
 const MONTHS = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь']
@@ -174,8 +175,15 @@ export function BookingClient({ availableSlots, managerId, managerName }: Props)
     if (managerId) fd.append('manager_id', managerId)
     const res = await createBooking(fd)
     setLoading(false)
-    if (res.error) setError(res.error)
-    else setBookingId(res.bookingId || 'ok')
+    if (res.error) {
+      setError(res.error)
+      reachGoal('booking_form_error', { reason: res.error })
+      return
+    }
+    setBookingId(res.bookingId || 'ok')
+    // Цель считается здесь, а не по переходу на страницу: запись — это
+    // подтверждённый ответ сервера, а не факт нажатия кнопки.
+    reachGoal('booking_submit')
   }
 
   // ═══ TG Redirect screen ═══
