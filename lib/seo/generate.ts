@@ -2,6 +2,7 @@
 // Нарочно короткий: PRD-этапы 3–4 (реестр фактов, экспертный слой, 19 шагов) сюда
 // не входят. Задача — довести одну тему до черновика, который человек читает и судит.
 import type Anthropic from '@anthropic-ai/sdk'
+import { withSpend, type SpendRole } from './spend'
 import { getAnthropic } from '../ai'
 import { COMPANY_FACTS } from './facts'
 import { embed } from './embeddings'
@@ -30,6 +31,33 @@ export type GenContext = {
   related: PageRef[]
   /** Реальные запросы из Search Console по этой теме. */
   queries: QueryRef[]
+  /**
+   * Куда записывать расходы. Необязательна намеренно: генерацию зовут и из
+   * тестов, и из разовых скриптов, где базы под рукой нет. Без привязки вызов
+   * работает как раньше и просто не учитывается — но в конвейере она есть
+   * всегда, и там пропуск учёта был бы дырой в отчёте о стоимости.
+   */
+  spend?: {
+    seo: any
+    jobId?: number | null
+    articleId?: number | null
+    traceId?: string | null
+  }
+}
+
+/**
+ * Верхняя оценка стоимости шага в долларах — сколько занять до вызова.
+ *
+ * Оценка, а не цена: занимаем с запасом, после ответа резерв закрывается
+ * фактической суммой из usage. Завышение стоит только того, что параллельный
+ * шаг подождёт лишнюю секунду; занижение позволило бы перешагнуть лимит.
+ */
+const SPEND_ESTIMATE: Record<string, number> = {
+  writer: 0.60,           // бриф и черновик — самые длинные ответы
+  fact_reviewer: 0.40,
+  context_reviewer: 0.40,
+  embeddings: 0.02,
+  image: 0.10,
 }
 
 export type Brief = {
@@ -221,10 +249,90 @@ const BRIEF_SCHEMA = {
   additionalProperties: false,
 } as const
 
-export async function generateBrief(ctx: GenContext): Promise<Brief> {
+/**
+ * Один вызов модели с учётом расходов.
+ *
+ * Все обращения к провайдеру идут через него — иначе учёт неполон, а неполный
+ * учёт хуже отсутствующего: он выглядит как правда и занижает расходы.
+ */
+async function askModel(ctx: GenContext, role: SpendRole, params: any) {
   const client = getAnthropic()
-  const res = await client.messages.create({
-    model: GEN_MODEL,
+  const run = () => client.messages.create({ model: GEN_MODEL, ...params })
+
+  if (!ctx.spend) return run()
+
+  return withSpend(
+    {
+      seo: ctx.spend.seo,
+      jobId: ctx.spend.jobId,
+      articleId: ctx.spend.articleId,
+      traceId: ctx.spend.traceId,
+      role,
+      provider: 'anthropic',
+      model: GEN_MODEL,
+      promptVersion: PROMPT_VERSION,
+      estimate: SPEND_ESTIMATE[role] ?? 0.50,
+    },
+    async () => {
+      const res = await run()
+      // usage приезжает от провайдера: сколько токенов ушло мимо кэша, сколько
+      // записано в кэш, сколько прочитано из него и сколько сгенерировано.
+      // Считать стоимость по одному input_tokens значило бы не заметить кэш.
+      return {
+        value: res,
+        usage: {
+          input_tokens: (res as any).usage?.input_tokens ?? 0,
+          output_tokens: (res as any).usage?.output_tokens ?? 0,
+          cache_creation_input_tokens: (res as any).usage?.cache_creation_input_tokens ?? 0,
+          cache_read_input_tokens: (res as any).usage?.cache_read_input_tokens ?? 0,
+        },
+      }
+    },
+  )
+}
+
+/**
+ * То же для потоковых вызовов.
+ *
+ * Черновик и починка идут потоком: ответ длинный, и без потока запрос упёрся бы
+ * в таймаут. Расход при этом известен только в конце — usage приезжает вместе с
+ * финальным сообщением, поэтому учёт вешается на него, а не на начало потока.
+ */
+async function askModelStream(ctx: GenContext, role: SpendRole, params: any) {
+  const client = getAnthropic()
+  const open = () => client.messages.stream({ model: GEN_MODEL, ...params })
+
+  if (!ctx.spend) return open().finalMessage()
+
+  return withSpend(
+    {
+      seo: ctx.spend.seo,
+      jobId: ctx.spend.jobId,
+      articleId: ctx.spend.articleId,
+      traceId: ctx.spend.traceId,
+      role,
+      provider: 'anthropic',
+      model: GEN_MODEL,
+      promptVersion: PROMPT_VERSION,
+      estimate: SPEND_ESTIMATE[role] ?? 0.50,
+    },
+    async () => {
+      const msg = await open().finalMessage()
+      return {
+        value: msg,
+        usage: {
+          input_tokens: (msg as any).usage?.input_tokens ?? 0,
+          output_tokens: (msg as any).usage?.output_tokens ?? 0,
+          cache_creation_input_tokens: (msg as any).usage?.cache_creation_input_tokens ?? 0,
+          cache_read_input_tokens: (msg as any).usage?.cache_read_input_tokens ?? 0,
+        },
+      }
+    },
+  )
+}
+
+export async function generateBrief(ctx: GenContext): Promise<Brief> {
+  const res = await askModel(ctx, 'writer', {
     max_tokens: 8000,
     output_config: { effort: 'high', format: { type: 'json_schema', schema: BRIEF_SCHEMA as any } },
     system: `Ты редактор блога goandstudy. Составляешь бриф на статью: что писать, для кого,
@@ -265,9 +373,7 @@ ${WRITING_RULES}`,
 /* ── Шаг 2: черновик ──────────────────────────────────────────────────────── */
 
 export async function generateDraft(ctx: GenContext, brief: Brief): Promise<string> {
-  const client = getAnthropic()
-  const stream = client.messages.stream({
-    model: GEN_MODEL,
+  const msg = await askModelStream(ctx, 'writer', {
     max_tokens: 32000,
     output_config: { effort: 'high' },
     system: `Ты пишешь статью для блога goandstudy по готовому брифу.
@@ -281,8 +387,7 @@ ${WRITING_RULES}`,
       content: `${contextBlock(ctx)}\n\nБРИФ\n${JSON.stringify(brief, null, 2)}\n\nНапиши статью.`,
     }],
   })
-  const msg = await stream.finalMessage()
-  const html = msg.content.filter((b) => b.type === 'text').map((b: any) => b.text).join('').trim()
+  const html = msg.content.filter((b: any) => b.type === 'text').map((b: any) => b.text).join('').trim()
   return stripFence(html)
 }
 
@@ -297,14 +402,12 @@ export async function reviseDraft(
   ctx: GenContext, brief: Brief, html: string,
   failures: { id: string; detail: string }[], modelIssues: QaIssue[],
 ): Promise<string> {
-  const client = getAnthropic()
   const list = [
     ...failures.map((f) => `- [проверка ${f.id}] ${f.detail}`),
     ...modelIssues.filter((i) => i.severity !== 'minor').map((i) => `- [${i.kind}] ${i.why}\n  цитата: «${i.quote}»`),
   ].join('\n')
 
-  const stream = client.messages.stream({
-    model: GEN_MODEL,
+  const msg = await askModelStream(ctx, 'writer', {
     max_tokens: 32000,
     output_config: { effort: 'high' },
     system: `Ты правишь готовый черновик под замечания проверок. Не переписываешь статью заново.
@@ -330,8 +433,7 @@ ${WRITING_RULES}`,
       content: `${contextBlock(ctx)}\n\nБРИФ\n${JSON.stringify(brief, null, 2)}\n\nЧЕРНОВИК\n${html}\n\nЗАМЕЧАНИЯ, КОТОРЫЕ НАДО ЗАКРЫТЬ\n${list}`,
     }],
   })
-  const msg = await stream.finalMessage()
-  const out = msg.content.filter((b) => b.type === 'text').map((b: any) => b.text).join('').trim()
+  const out = msg.content.filter((b: any) => b.type === 'text').map((b: any) => b.text).join('').trim()
   return stripFence(out)
 }
 
@@ -359,9 +461,7 @@ const QA_SCHEMA = {
 
 /** Проверка фактов и обещаний свежим контекстом — отдельным вызовом, не самокритикой автора. */
 export async function qaWithModel(ctx: GenContext, brief: Brief, html: string): Promise<QaIssue[]> {
-  const client = getAnthropic()
-  const res = await client.messages.create({
-    model: GEN_MODEL,
+  const res = await askModel(ctx, 'fact_reviewer', {
     max_tokens: 8000,
     output_config: { effort: 'high', format: { type: 'json_schema', schema: QA_SCHEMA as any } },
     system: `Ты редактор-проверяющий. Тебе дают факты компании и черновик статьи.
@@ -501,10 +601,16 @@ export type Scenes = { cover: string; inline: string; inline_alt: string; after_
  * Что именно изобразить. Решает модель, а не шаблон: «Австрия» шаблонно даёт
  * флаг и башню, а нужна сцена, отвечающая теме статьи.
  */
-export async function planScenes(input: { title: string; h1: string; headings: string[] }): Promise<Scenes> {
-  const client = getAnthropic()
-  const res = await client.messages.create({
-    model: GEN_MODEL,
+export async function planScenes(
+  input: { title: string; h1: string; headings: string[] },
+  /** Привязка учёта. Подбор сцен — тоже платный вызов, и в отчёте он виден. */
+  spend?: GenContext['spend'],
+): Promise<Scenes> {
+  // Своего GenContext у подбора сцен нет: ему не нужны ни соседние страницы,
+  // ни запросы, ни факты. Собираем пустой — только ради привязки учёта.
+  const ctx = { topicTitle: input.title, primaryKeyword: input.h1, cluster: null,
+                related: [], queries: [], spend } as GenContext
+  const res = await askModel(ctx, 'context_reviewer', {
     max_tokens: 2000,
     output_config: { effort: 'low', format: { type: 'json_schema', schema: SCENES_SCHEMA as any } },
     system: `Ты подбираешь фотографии к статье образовательного блога.

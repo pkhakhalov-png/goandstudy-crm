@@ -84,7 +84,12 @@ function cosine(a: number[], b: number[]): number {
   return dot / (Math.sqrt(na) * Math.sqrt(nb) || 1)
 }
 
-async function buildContext(seo: any, topic: any): Promise<GenContext> {
+async function buildContext(
+  seo: any,
+  topic: any,
+  /** Задача, в рамках которой идёт генерация: по ней расход привязывается к статье. */
+  job?: { id?: number; article_id?: number | null },
+): Promise<GenContext> {
   const kw = String(topic.primary_keyword || topic.title).toLowerCase()
   const stems = kw.split(/[^\p{L}\d]+/u).filter((w) => w.length >= 4).map((w) => w.slice(0, 5))
 
@@ -155,7 +160,12 @@ async function buildContext(seo: any, topic: any): Promise<GenContext> {
     if (text) neighbourTexts.push({ url: p.url, title: p.title, text })
   }
 
+  // Привязка учёта расходов. Без неё вызовы моделей не попадут в runs, и отчёт
+  // о стоимости пакета будет занижен ровно на производство статьи.
+  const spend = { seo, jobId: job?.id ?? null, articleId: job?.article_id ?? null, traceId: job?.id ? `job:${job.id}` : null }
+
   return {
+    spend,
     topicTitle: topic.title,
     primaryKeyword: topic.primary_keyword || topic.title,
     cluster: topic.cluster ?? null,
@@ -286,7 +296,7 @@ registerStep('article_brief', async (job: Job, seo: any): Promise<StepOutcome> =
     }
   }
 
-  const ctx = await buildContext(seo, topic)
+  const ctx = await buildContext(seo, topic, job)
   const brief: Brief = await generateBrief(ctx)
 
   const { data: article, error: aerr } = await seo.from('articles')
@@ -418,7 +428,7 @@ registerStep('article_cover', async (job: Job, seo: any): Promise<StepOutcome> =
       title: version.title ?? slug,
       h1: job.payload?.brief?.h1 ?? version.title ?? slug,
       headings,
-    })
+    }, { seo, jobId: job.id, articleId, traceId: `job:${job.id}` })
     cover = await generateCover(coverPrompt(scenes.cover))
     inline = await generateInline(inlinePrompt(scenes.inline))
   } catch (e: any) {
@@ -691,7 +701,7 @@ registerStep('article_fix', async (job: Job, seo: any): Promise<StepOutcome> => 
   const fallbackName = version.title || meta.slug || `статья #${articleId}`
   const ctx = await buildContext(seo, topic ?? {
     id: null, title: fallbackName, primary_keyword: brief.primary_keyword ?? fallbackName, cluster: null,
-  })
+  }, { id: job.id, article_id: articleId })
 
   const html = String(version.body)
   const det = await qaDeterministic(ctx, brief, html, {
@@ -956,7 +966,7 @@ registerStep('article_update_plan', async (job: Job, seo: any): Promise<StepOutc
   // тому, что уже есть на сайте.
   const ctx = await buildContext(seo, {
     id: job.topic_id ?? null, title, primary_keyword: job.payload?.query ?? slug, cluster: null,
-  })
+  }, { id: job.id, article_id: articleId })
   const revised = normalizeBody(await reviseDraft(ctx, brief, current, issues, []))
 
   // Обложка и описание берутся у вышедшей статьи: при обновлении рисовать
