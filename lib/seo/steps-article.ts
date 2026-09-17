@@ -174,6 +174,44 @@ function next(seo: any, step: string, articleId: number, topicId: number, payloa
   return seo.from('jobs').insert({ step, lane: 'production', priority: 50, article_id: articleId, topic_id: topicId, payload }).throwOnError()
 }
 
+/**
+ * Вставка новой версии статьи.
+ *
+ * Номер берётся от последней существующей версии, а не от той, на которую
+ * указывает `articles.current_version_id`. Разница неочевидна, но стоила девяти
+ * упавших задач: починка считала номер от текущей версии, и если более поздняя
+ * уже была создана — ручной правкой или второй починкой, — вставка падала на
+ * `unique (article_id, version_no)`, а ошибка признавалась окончательной.
+ *
+ * Максимум тоже не спасает от гонки: два исполнителя могут прочитать один и тот
+ * же максимум. Поэтому при столкновении пересчитываем и пробуем снова —
+ * уникальный индекс здесь работает как арбитр, а не как приговор.
+ */
+async function insertVersion(
+  seo: any,
+  articleId: number,
+  fields: Record<string, any>,
+): Promise<{ id: number; version_no: number }> {
+  let lastError = 'номер версии подобрать не удалось'
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const { data: last } = await seo.from('article_versions')
+      .select('version_no').eq('article_id', articleId)
+      .order('version_no', { ascending: false }).limit(1)
+    const versionNo = (last?.[0]?.version_no ?? 0) + 1
+
+    const { data, error } = await seo.from('article_versions')
+      .insert({ article_id: articleId, version_no: versionNo, ...fields })
+      .select('id, version_no').single()
+    if (!error) return data as { id: number; version_no: number }
+
+    lastError = error.message
+    // 23505 — уникальный индекс: кто-то занял номер между чтением и записью.
+    // Любая другая ошибка повтором не лечится.
+    if (error.code !== '23505') break
+  }
+  throw new Error(`article_versions: ${lastError}`)
+}
+
 /* ── Шаг 1: тема → бриф → черновик статьи в БД ────────────────────────────── */
 
 registerStep('article_brief', async (job: Job, seo: any): Promise<StepOutcome> => {
@@ -299,12 +337,10 @@ registerStep('article_qa', async (job: Job, seo: any): Promise<StepOutcome> => {
   }
 
   const fixed = await reviseDraft(ctx, brief, html, failedB.map((c) => ({ id: c.id, detail: c.detail })), modelIssues)
-  const { data: nv, error } = await seo.from('article_versions').insert({
-    article_id: articleId, version_no: (version.version_no ?? 1) + 1, origin: 'qa_fixed',
-    title: brief.title, body: fixed, meta: version.meta,
+  const nv = await insertVersion(seo, articleId, {
+    origin: 'qa_fixed', title: brief.title, body: fixed, meta: version.meta,
     prompt_version: PROMPT_VERSION, model: GEN_MODEL,
-  }).select('id').single()
-  if (error) return { outcome: 'failed', result: { error: `article_versions: ${error.message}` } }
+  })
   await seo.from('articles').update({ current_version_id: nv.id }).eq('id', articleId).throwOnError()
 
   await next(seo, 'article_qa', articleId, job.topic_id!, { brief, ctx, attempt: attempt + 1 })
@@ -623,8 +659,17 @@ registerStep('article_fix', async (job: Job, seo: any): Promise<StepOutcome> => 
   const brief: Brief = meta.brief
   if (!brief) return { outcome: 'failed', result: { error: 'у версии нет брифа' } }
 
-  const { data: topic } = await seo.from('topics').select('id,title,primary_keyword,cluster').eq('id', article.topic_id).single()
-  const ctx = await buildContext(seo, topic)
+  // Тема может отсутствовать: статьи из ручного пути создаются с topic_id = null.
+  // Раньше сюда прилетал null, и починка падала на чтении primary_keyword —
+  // пять задач из шестнадцати. Тема нужна только как контекст, поэтому при её
+  // отсутствии собираем подставную из того, что известно о самой статье.
+  const { data: topic } = article.topic_id
+    ? await seo.from('topics').select('id,title,primary_keyword,cluster').eq('id', article.topic_id).single()
+    : { data: null }
+  const fallbackName = version.title || meta.slug || `статья #${articleId}`
+  const ctx = await buildContext(seo, topic ?? {
+    id: null, title: fallbackName, primary_keyword: brief.primary_keyword ?? fallbackName, cluster: null,
+  })
 
   const html = String(version.body)
   const det = await qaDeterministic(ctx, brief, html, {
@@ -643,12 +688,10 @@ registerStep('article_fix', async (job: Job, seo: any): Promise<StepOutcome> => 
 
   const fixed = normalizeBody(await reviseDraft(ctx, brief, html, failedB.map((c) => ({ id: c.id, detail: c.detail })), modelIssues))
 
-  const { data: nv, error } = await seo.from('article_versions').insert({
-    article_id: articleId, version_no: (version.version_no ?? 1) + 1, origin: 'qa_fixed',
-    title: version.title, body: fixed, meta,
+  const nv = await insertVersion(seo, articleId, {
+    origin: 'qa_fixed', title: version.title, body: fixed, meta,
     prompt_version: PROMPT_VERSION, model: GEN_MODEL,
-  }).select('id').single()
-  if (error) return { outcome: 'failed', result: { error: `article_versions: ${error.message}` } }
+  })
 
   // Перепроверяем уже исправленный текст, чтобы отчёт относился к нему, а не к прошлому
   const det2 = await qaDeterministic(ctx, brief, fixed, {
@@ -837,21 +880,23 @@ registerStep('article_update_plan', async (job: Job, seo: any): Promise<StepOutc
     if (error) return { outcome: 'failed', result: { error: `создание записи статьи: ${error.message}` } }
     articleId = created.id
   }
+  // После двух попыток выше идентификатор обязан быть. Проверка нужна не логике,
+  // а типам: клиент Supabase отдаёт ответ без типа, и сужения не происходит.
+  if (!articleId) return { outcome: 'failed', result: { error: 'не удалось определить статью для правки' } }
 
   // Снимок: что было до правки. Без него нельзя ни сравнить, ни вернуть
   const title = current.match(/<h2[^>]*>([\s\S]*?)<\/h2>/i)?.[1]?.replace(/<[^>]+>/g, '').trim() ?? slug
 
-  // Номер версии обязателен и уникален в рамках статьи
-  const { data: last } = await seo.from('article_versions')
-    .select('version_no').eq('article_id', articleId).order('version_no', { ascending: false }).limit(1)
-  let versionNo = (last?.[0]?.version_no ?? 0) + 1
-
-  const { data: snapshot, error: snapErr } = await seo.from('article_versions').insert({
-    article_id: articleId, version_no: versionNo++, origin: 'human_edited', title, body: current,
-    meta: { slug, snapshot: true, taken_at: new Date().toISOString(), reason: 'состояние до обновления' },
-  }).select('id').single()
   // Снимок — основа отката. Без него продолжать нельзя: сравнивать будет не с чем
-  if (snapErr) return { outcome: 'failed', result: { error: `снимок статьи: ${snapErr.message}` } }
+  let snapshot: { id: number; version_no: number } | null = null
+  try {
+    snapshot = await insertVersion(seo, articleId, {
+      origin: 'human_edited', title, body: current,
+      meta: { slug, snapshot: true, taken_at: new Date().toISOString(), reason: 'состояние до обновления' },
+    })
+  } catch (e: any) {
+    return { outcome: 'failed', result: { error: `снимок статьи: ${e?.message ?? e}` } }
+  }
 
   // Что чинить: проверки стандарта и ворота достоверности по текущему тексту
   const { checkBlogStandard, loadSiteTargets } = await import('./blog-style')
@@ -898,21 +943,25 @@ registerStep('article_update_plan', async (job: Job, seo: any): Promise<StepOutc
   const { data: registry } = await seo.from('pages')
     .select('meta_desc').eq('normalized_url', `https://goandstudy.com/blog/${slug}`).maybeSingle()
 
-  const { data: version, error: verErr } = await seo.from('article_versions').insert({
-    article_id: articleId, version_no: versionNo, origin: 'qa_fixed', title, body: revised,
-    meta: {
-      slug,
-      // По этой пометке экран понимает: это правка живой статьи, а не выпуск
-      // новой. Обложку и входящие ссылки требовать заново не надо.
-      update_of: slug,
-      updated_from: snapshot?.id,
-      description: registry?.meta_desc ?? '',
-      brief: { category: '', h1: title },
-      ...(cover ? { cover: { format: 'jpeg', width: 480, height: 320, base64: cover, from_site: true } } : {}),
-      reason: 'предложение правок',
-    },
-  }).select('id').single()
-  if (verErr) return { outcome: 'failed', result: { error: `версия с правками: ${verErr.message}`, snapshot_id: snapshot?.id } }
+  let version: { id: number } | null = null
+  try {
+    version = await insertVersion(seo, articleId, {
+      origin: 'qa_fixed', title, body: revised,
+      meta: {
+        slug,
+        // По этой пометке экран понимает: это правка живой статьи, а не выпуск
+        // новой. Обложку и входящие ссылки требовать заново не надо.
+        update_of: slug,
+        updated_from: snapshot?.id,
+        description: registry?.meta_desc ?? '',
+        brief: { category: '', h1: title },
+        ...(cover ? { cover: { format: 'jpeg', width: 480, height: 320, base64: cover, from_site: true } } : {}),
+        reason: 'предложение правок',
+      },
+    })
+  } catch (e: any) {
+    return { outcome: 'failed', result: { error: `версия с правками: ${e?.message ?? e}`, snapshot_id: snapshot?.id } }
+  }
 
   await seo.from('articles').update({ current_version_id: version?.id, status: 'ready_for_review' }).eq('id', articleId).throwOnError()
 

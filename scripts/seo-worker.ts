@@ -9,14 +9,25 @@ import { config } from 'dotenv'; import path from 'path'; import os from 'os'
 import { createClient } from '@supabase/supabase-js'
 config({ path: path.resolve(process.cwd(), '.env.local') })
 import { runStep, hasStep } from '../lib/seo/steps'
+import { outcomeFor } from '../lib/seo/failure'
 import '../lib/seo/steps-article'   // регистрация шагов производства статьи
 
 const seo = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } }).schema('seo')
 const ONCE = process.argv.includes('--once')
 const WORKER = `${os.hostname()}:${process.pid}`
 
+/**
+ * Исполнитель, которым представляется этот воркер.
+ *
+ * Без третьего аргумента `claim_jobs` отключает отбор по исполнителю целиком, и
+ * локальная машина может забрать задачу, предназначенную агенту на сервере сайта:
+ * записать файлы темы отсюда нельзя, и задача зря сожжёт попытку. По умолчанию
+ * берём только то, что помечено `any` или `vercel` — ровно то же, что умеет тик.
+ */
+const RUNNER = process.env.SEO_WORKER_RUNNER || 'vercel'
+
 async function claim(limit = 1): Promise<any[]> {
-  const { data, error } = await seo.rpc('claim_jobs', { p_worker: WORKER, p_limit: limit })
+  const { data, error } = await seo.rpc('claim_jobs', { p_worker: WORKER, p_limit: limit, p_runner: RUNNER })
   if (error) throw new Error(`claim_jobs: ${error.message}`)
   return data ?? []
 }
@@ -27,7 +38,7 @@ async function complete(id: number, outcome: string, result: any) {
 }
 
 async function main() {
-  console.log(`Воркер ${WORKER}${ONCE ? ' (разовый прогон)' : ''}. Ctrl+C — остановить.`)
+  console.log(`Воркер ${WORKER} как «${RUNNER}»${ONCE ? ' (разовый прогон)' : ''}. Ctrl+C — остановить.`)
   let idle = 0
   for (;;) {
     const jobs = await claim(1)
@@ -53,8 +64,13 @@ async function main() {
         const secs = ((Date.now() - started) / 1000).toFixed(0)
         console.log(`  ${res.outcome === 'done' ? '✓' : '✗'} ${res.outcome} за ${secs} c ${JSON.stringify(res.result ?? {})}`)
       } catch (e: any) {
-        await complete(job.id, 'failed', { error: e?.message ?? String(e) })
-        console.error(`  ✗ ${e?.message ?? e}`)
+        // Перегрузку модели и обрыв связи имеет смысл повторить, нехватку денег
+        // и неверный ключ — нет. Тик на Vercel разбирает это давно; здесь
+        // ошибка признавалась окончательной всегда, и временная беда при ручном
+        // прогоне убивала задачу насовсем.
+        const { outcome, result } = outcomeFor(e)
+        await complete(job.id, outcome, result)
+        console.error(`  ✗ ${outcome === 'retry' ? 'повторим: ' : ''}${e?.message ?? e}`)
       }
     }
   }

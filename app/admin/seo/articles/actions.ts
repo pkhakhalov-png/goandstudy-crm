@@ -128,12 +128,19 @@ export async function rejectArticle(articleId: number, reason: string) {
   if (authErr) return { error: authErr }
   const admin = await createAdminClient()
   const seo = admin.schema('seo')
-  const { error } = await seo.from('articles').update({ status: 'rejected' }).eq('id', articleId)
-  if (error) return { error: error.message }
-  await seo.from('change_sets').insert({
+  // Причина пишется ПЕРЕД сменой статуса, и её неудача отменяет отклонение.
+  // Раньше было наоборот: статус менялся, запись причины шла через warnOnError,
+  // и если она не проходила — отклонение оставалось, а причина исчезала в логе.
+  // Пять отклонённых статей в базе не имеют причины именно поэтому: восстановить
+  // её неоткуда. Статус без причины — это решение, которое нельзя пересмотреть.
+  const { error: reasonErr } = await seo.from('change_sets').insert({
     article_id: articleId, kind: 'new_article', reason: `отклонено человеком: ${reason || 'без причины'}`,
     idempotency_key: `reject:${articleId}:${Date.now()}`, status: 'rejected', proposed_by: 'human',
-  }).then(warnOnError('change_sets · app/admin/seo/articles/actions.ts:133'))
+  })
+  if (reasonErr) return { error: `причина отклонения не записалась, статья не тронута: ${reasonErr.message}` }
+
+  const { error } = await seo.from('articles').update({ status: 'rejected' }).eq('id', articleId)
+  if (error) return { error: error.message }
   revalidatePath(`/admin/seo/articles/${articleId}`)
   return { ok: true }
 }
