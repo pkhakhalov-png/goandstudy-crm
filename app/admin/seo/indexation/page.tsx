@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { CheckSiteButton } from './CheckSiteButton'
+import { CheckArticlesButton } from './CheckArticlesButton'
 import { trafficByPage } from '@/lib/seo/gsc-agg'
 
 export const dynamic = 'force-dynamic'
@@ -110,7 +111,7 @@ export default async function IndexationPage({ searchParams }: { searchParams: P
   const versionIds = (articles ?? []).map((a: any) => a.current_version_id).filter(Boolean)
   const { data: versions } = versionIds.length
     ? await seo.from('article_versions')
-        .select('id, slug_pub:meta->publish->>slug, slug_flat:meta->>slug, verdict:meta->index_check->>verdict, coverage:meta->index_check->>coverage')
+        .select('id, slug_pub:meta->publish->>slug, slug_flat:meta->>slug, verdict:meta->index_check->>verdict, coverage:meta->index_check->>coverage, checked:meta->index_check->>at')
         .in('id', versionIds)
     : { data: [] as any[] }
   const verById = new Map<number, any>((versions ?? []).map((v: any) => [v.id, v]))
@@ -118,8 +119,14 @@ export default async function IndexationPage({ searchParams }: { searchParams: P
   const ourArticles: {
     id: number; keyword: string; url: string; publishedAt: string | null
     verdict: string | null; coverage: string | null; firstIndexed: string | null; days: number | null
+    checkedAt: string | null; nextCheckAt: string | null; inInventory: boolean
   }[] = []
 
+  // Единый источник — `index_status`: из него же считается сводка по сайту.
+  // Снимок в мете версии остаётся запасным и нужен ровно до первой проверки
+  // после публикации: пока страницы нет в инвентаре, записывать ответ некуда.
+  // Раньше запасной источник был основным для всех статей сразу, поэтому экран
+  // и сводка расходились — и статья, стоящая в индексе, числилась невидимой.
   for (const a of articles ?? []) {
     const m = verById.get(a.current_version_id)
     const slug = m?.slug_pub ?? m?.slug_flat
@@ -133,6 +140,9 @@ export default async function IndexationPage({ searchParams }: { searchParams: P
       verdict: st?.verdict ?? (m?.verdict ?? null),
       coverage: st?.coverage_state ?? (m?.coverage ?? null),
       firstIndexed,
+      checkedAt: st?.checked_at ?? (m?.checked ?? null),
+      nextCheckAt: st?.next_check_at ?? null,
+      inInventory: Boolean(st),
       days: a.published_at
         ? Math.max(0, Math.round(((firstIndexed ? Date.parse(firstIndexed) : Date.now()) - Date.parse(a.published_at)) / DAY))
         : null,
@@ -197,8 +207,8 @@ export default async function IndexationPage({ searchParams }: { searchParams: P
           <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 4px' }}>Индексация в Google</h2>
           <p style={{ color: 'var(--muted)', fontSize: 13, margin: 0, maxWidth: 720 }}>
             Ответы Search Console по каждой странице — то же, что показывает «Проверка URL» в их
-            интерфейсе. Проверка идёт сама раз в сутки: пока страница не в индексе — каждые два дня,
-            после попадания — раз в две недели.
+            интерфейсе. Проверка идёт сама раз в сутки: страницы сайта, пока не в индексе, —
+            каждые два дня, наши статьи — каждый день, после попадания в индекс — раз в две недели.
             {lastCheck && <> Последняя проверка {new Date(lastCheck).toLocaleString('ru')}.</>}
           </p>
         </div>
@@ -216,16 +226,19 @@ export default async function IndexationPage({ searchParams }: { searchParams: P
 
       {ourArticles.length > 0 && (
         <div style={{ border: '1px solid var(--bor)', borderRadius: 12, overflow: 'hidden', marginBottom: 16 }}>
-          <div style={{ padding: '10px 14px', background: 'var(--surf2)' }}>
-            <div style={{ fontSize: 13, fontWeight: 700 }}>Наши статьи · {ourArticles.length}</div>
-            <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3, lineHeight: 1.5 }}>
-              Написанные конвейером. Здесь известна настоящая дата выхода, поэтому «дней до индекса» —
-              честный срок, а не разница с датой обхода.
-              {' '}Google приходит по sitemap и заявок на индексацию не принимает — для свежей статьи
-              одна-две недели ожидания норма. Яндекс заявки принимает, и после публикации мы его просим:
-              поэтому там статьи появляются быстрее.
-              {yandex?.computedAt && ` Данные Яндекса от ${new Date(yandex.computedAt).toLocaleString('ru')}.`}
+          <div style={{ padding: '10px 14px', background: 'var(--surf2)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700 }}>Наши статьи · {ourArticles.length}</div>
+              <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3, lineHeight: 1.5, maxWidth: 720 }}>
+                Написанные конвейером. Здесь известна настоящая дата выхода, поэтому «дней до индекса» —
+                честный срок, а не разница с датой обхода.
+                {' '}Google приходит по sitemap и заявок на индексацию не принимает; пока статья не в
+                индексе, спрашиваем про неё раз в сутки, после попадания — раз в две недели.
+                {' '}Яндекс заявки принимает, и после публикации мы его просим.
+                {yandex?.computedAt && ` Данные Яндекса от ${new Date(yandex.computedAt).toLocaleString('ru')}.`}
+              </div>
             </div>
+            <CheckArticlesButton />
           </div>
           <div style={{ padding: '0 6px 6px' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
@@ -234,6 +247,7 @@ export default async function IndexationPage({ searchParams }: { searchParams: P
                   <th style={th}>Статья</th>
                   <th style={th}>Вышла</th>
                   <th style={th}>Google</th>
+                  <th style={th}>Проверено</th>
                   <th style={th}>Яндекс</th>
                   <th style={th}>В индексе с</th>
                   <th style={{ ...th, textAlign: 'right' }}>Дней</th>
@@ -258,6 +272,18 @@ export default async function IndexationPage({ searchParams }: { searchParams: P
                         {a.publishedAt ? new Date(a.publishedAt).toLocaleDateString('ru') : '—'}
                       </td>
                       <td style={{ ...td, color: l.color, fontWeight: 600, whiteSpace: 'nowrap' }}>{l.text}</td>
+                      <td style={{ ...td, whiteSpace: 'nowrap', color: 'var(--muted)', fontSize: 11 }}>
+                        {a.checkedAt
+                          ? <>
+                              {new Date(a.checkedAt).toLocaleString('ru', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                              <div>
+                                {a.nextCheckAt
+                                  ? `след. ${new Date(a.nextCheckAt).toLocaleString('ru', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}`
+                                  : 'нет в инвентаре'}
+                              </div>
+                            </>
+                          : 'ещё не спрашивали'}
+                      </td>
                       <td style={{ ...td, whiteSpace: 'nowrap' }}>
                         {(() => {
                           const y = yandexByUrl.get(a.url.replace(/\/$/, ''))
