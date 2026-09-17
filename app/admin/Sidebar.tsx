@@ -119,12 +119,6 @@ export function Sidebar({ userName, userEmail }: Props) {
             </svg>
             Аналитика
           </NavLink>
-          <NavLink href="/admin/seo" active={isActive('/admin/seo')} onNavigate={() => { press('/admin/seo'); close() }}>
-            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
-              <circle cx="7" cy="7" r="4.5"/><line x1="10.5" y1="10.5" x2="14" y2="14"/>
-            </svg>
-            SEO
-          </NavLink>
           <NavLink href="/admin/sales" active={isActive('/admin/sales')} onNavigate={() => { press('/admin/sales'); close() }}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
               <polyline points="2,13 5,8 8,10 11,4 14,6"/>
@@ -137,6 +131,15 @@ export function Sidebar({ userName, userEmail }: Props) {
               <circle cx="8" cy="5" r="3"/><path d="M2 14c0-3.3 2.7-6 6-6s6 2.7 6 6"/>
             </svg>
             Кураторы
+          </NavLink>
+          {/* Контент-система: отдельный раздел, отчёркнутый линией. Сюда
+              добавляются экраны конвейера — пакеты, публикации, каналы. */}
+          <div className="ns ns-sep">Цифровой след</div>
+          <NavLink href="/admin/seo" active={isActive('/admin/seo')} onNavigate={() => { press('/admin/seo'); close() }}>
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
+              <circle cx="7" cy="7" r="4.5"/><line x1="10.5" y1="10.5" x2="14" y2="14"/>
+            </svg>
+            SEO
           </NavLink>
           <div className="ns">Система</div>
           <NavLink href="/admin" active={isActive('/admin', true)} onNavigate={() => { press('/admin'); close() }}>
