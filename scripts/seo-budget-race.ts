@@ -35,8 +35,25 @@ async function getLimit(key: string): Promise<number> {
   const { data } = await seo.from('settings').select('value').eq('key', key).single()
   return Number(data?.value)
 }
+/**
+ * Прибрать за собой — обе строки, а не одну.
+ *
+ * Резерв заводит ДВЕ записи: суточную со своей причиной и месячное зеркало с
+ * причиной «зеркало суточного резерва #N». Первая версия уборки удаляла только
+ * по своей метке, и семьдесят зеркал остались висеть в боевой базе, завышая
+ * месячный расход на семьдесят долларов. Обнаружилось при проверке, что
+ * конвейер жив: суточный расход $1.42, месячный $71.
+ */
 async function cleanup() {
-  await seo.from('budget_reservations').delete().like('reason', `%${MARK}%`)
+  const { data: mine } = await seo.from('budget_reservations')
+    .select('id').like('reason', `%${MARK}%`)
+  const ids = (mine ?? []).map((r: any) => r.id)
+  if (!ids.length) return
+
+  // Зеркала ссылаются на родителя в тексте причины — удаляем их по этой ссылке
+  const mirrors = ids.map((id: number) => `зеркало суточного резерва #${id}`)
+  await seo.from('budget_reservations').delete().in('reason', mirrors)
+  await seo.from('budget_reservations').delete().in('id', ids)
 }
 
 async function main() {
