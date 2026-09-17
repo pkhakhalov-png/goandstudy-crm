@@ -51,18 +51,18 @@ async function cleanup() {
 
 /** Пост на канал по версии пакета: вариант, его версия и сама публикация. */
 async function makePublication(packageVersionId: number, channelId: number, status: string, key: string) {
-  const { data: pkgVer } = await content.from('package_versions').select('package_id').eq('id', packageVersionId).single()
+  const { data: pkgVer } = await content.from('package_versions').select('package_id').eq('id', packageVersionId).single() as any
   const { data: variant } = await content.from('variants')
-    .insert({ package_id: pkgVer.package_id, format: 'social_post', editorial_angle: `угол ${key}` }).select('id').single()
+    .insert({ package_id: pkgVer.package_id, format: 'social_post', editorial_angle: `угол ${key}` }).select('id').single() as any
   const { data: vv } = await content.from('variant_versions').insert({
     variant_id: variant.id, version: 1, package_version_id: packageVersionId,
     body_json: { text: `пост ${key}` }, content_hash: `хеш-${key}`,
-  }).select('id').single()
+  }).select('id').single() as any
   const { data: pub } = await content.from('publications').insert({
     channel_id: channelId, variant_version_id: vv.id,
     scheduled_at: new Date(Date.now() + 3600_000).toISOString(),
     status, idempotency_key: key,
-  }).select('id, status').single()
+  }).select('id, status').single() as any
   return pub
 }
 
@@ -78,12 +78,12 @@ async function main() {
   try {
     const { data: chan } = await content.from('channels')
       .insert({ platform: 'telegram', account_external_id: CHAN, title: 'канал для проверки', mode: 'paused' })
-      .select('id').single()
+      .select('id').single() as any
 
     // Первая версия пакета.
     await recordVerified(seo, { articleId: ART, version: 1, contentHash: H1, verdict: 'passed' })
     await consumeVerified(seo, 'тест-снятие')
-    const { data: pkg } = await content.from('packages').select('id, current_version_id').eq('seo_article_id', ART).single()
+    const { data: pkg } = await content.from('packages').select('id, current_version_id').eq('seo_article_id', ART).single() as any
     const v1 = pkg.current_version_id
 
     // Три поста по первой версии — в трёх разных состояниях.

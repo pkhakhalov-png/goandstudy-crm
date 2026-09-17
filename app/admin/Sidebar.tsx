@@ -141,6 +141,12 @@ export function Sidebar({ userName, userEmail }: Props) {
             </svg>
             SEO
           </NavLink>
+          <NavLink href="/admin/content" active={isActive('/admin/content')} onNavigate={() => { press('/admin/content'); close() }}>
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
+              <rect x="2" y="2.5" width="12" height="11" rx="2"/><line x1="5" y1="6" x2="11" y2="6"/><line x1="5" y1="9" x2="9" y2="9"/>
+            </svg>
+            Контент
+          </NavLink>
           <div className="ns">Система</div>
           <NavLink href="/admin" active={isActive('/admin', true)} onNavigate={() => { press('/admin'); close() }}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">

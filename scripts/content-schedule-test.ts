@@ -61,13 +61,13 @@ async function cleanup() {
 }
 
 async function makeVariantVersion(packageVersionId: number, tag: string) {
-  const { data: pv } = await content.from('package_versions').select('package_id').eq('id', packageVersionId).single()
+  const { data: pv } = await content.from('package_versions').select('package_id').eq('id', packageVersionId).single() as any
   const { data: variant } = await content.from('variants')
-    .insert({ package_id: pv.package_id, format: 'social_post', editorial_angle: tag }).select('id').single()
+    .insert({ package_id: pv.package_id, format: 'social_post', editorial_angle: tag }).select('id').single() as any
   const { data: vv } = await content.from('variant_versions').insert({
     variant_id: variant.id, version: 1, package_version_id: packageVersionId,
     body_json: { text: tag }, content_hash: `хеш-${tag}`,
-  }).select('id').single()
+  }).select('id').single() as any
   return vv.id as number
 }
 
@@ -86,11 +86,11 @@ async function main() {
     const { data: chan } = await content.from('channels').insert({
       platform: 'telegram', account_external_id: CHAN, title: 'канал для проверки плана',
       timezone: 'Europe/Moscow', mode: 'active', daily_cap: 1, max_catch_up: 1,
-    }).select('id').single()
+    }).select('id').single() as any
 
     await recordVerified(seo, { articleId: ART, version: 1, contentHash: H1, verdict: 'passed' })
     await consumeVerified(seo, 'тест-план')
-    const { data: pkg } = await content.from('packages').select('id, current_version_id').eq('seo_article_id', ART).single()
+    const { data: pkg } = await content.from('packages').select('id, current_version_id').eq('seo_article_id', ART).single() as any
     const v1 = pkg.current_version_id
 
     const vvA = await makeVariantVersion(v1, 'первый')
@@ -128,7 +128,7 @@ async function main() {
 
     // Приостановленный канал.
     await content.from('channels').update({ mode: 'paused' }).eq('id', chan.id)
-    const { data: pkg2 } = await content.from('packages').select('current_version_id').eq('seo_article_id', ART).single()
+    const { data: pkg2 } = await content.from('packages').select('current_version_id').eq('seo_article_id', ART).single() as any
     const vvC = await makeVariantVersion(pkg2.current_version_id, 'третий')
     const paused = await schedule(chan.id, vvC, new Date('2026-10-04T09:00:00Z'), 'пятый-пост', 'отпечаток-Г')
     ok('на приостановленный канал не ставится', !paused.publicationId && /paused/.test(paused.skipped ?? ''),
@@ -142,7 +142,7 @@ async function main() {
     // не встанут: уникальный индекс не даёт двум активным публикациям одной
     // версии на одном канале, и это правильно — в первом прогоне на этом
     // тихо терялись две строки, отчего проверка считала не то, что думала.
-    const { data: pkgNow } = await content.from('packages').select('current_version_id').eq('seo_article_id', ART).single()
+    const { data: pkgNow } = await content.from('packages').select('current_version_id').eq('seo_article_id', ART).single() as any
     const vvs: number[] = []
     for (let i = 0; i < past.length; i++) vvs.push(await makeVariantVersion(pkgNow.current_version_id, `просрочен-${i}`))
     for (let i = 0; i < past.length; i++) {
