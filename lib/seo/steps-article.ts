@@ -225,21 +225,30 @@ async function insertVersion(
   fields: Record<string, any>,
 ): Promise<{ id: number; version_no: number }> {
   let lastError = 'номер версии подобрать не удалось'
+  // Номер, который уже оказался занят. Повтор обязан брать строго больший:
+  // раньше каждая попытка заново читала максимум и, если чтение отдавало то же
+  // самое, все пять попыток били в один и тот же занятый номер и задача умирала
+  // («duplicate key ... article_versions_article_id_version_no_key», статья 7,
+  // 15 и 17 сентября). Теперь попытки гарантированно расходятся.
+  let taken = 0
   for (let attempt = 0; attempt < 5; attempt++) {
     const { data: last } = await seo.from('article_versions')
       .select('version_no').eq('article_id', articleId)
       .order('version_no', { ascending: false }).limit(1)
-    const versionNo = (last?.[0]?.version_no ?? 0) + 1
+    const versionNo = Math.max((last?.[0]?.version_no ?? 0) + 1, taken + 1)
 
     const { data, error } = await seo.from('article_versions')
       .insert({ article_id: articleId, version_no: versionNo, ...fields })
       .select('id, version_no').single()
     if (!error) return data as { id: number; version_no: number }
 
-    lastError = error.message
+    // details у PostgREST содержит сам ключ — «Key (article_id, version_no)=(7, 5)
+    // already exists». Без него из журнала задач не понять, какой номер не зашёл.
+    lastError = [error.message, error.details].filter(Boolean).join(' · ')
     // 23505 — уникальный индекс: кто-то занял номер между чтением и записью.
     // Любая другая ошибка повтором не лечится.
     if (error.code !== '23505') break
+    taken = versionNo
   }
   throw new Error(`article_versions: ${lastError}`)
 }
