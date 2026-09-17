@@ -1089,10 +1089,51 @@ registerStep('article_autopublish', async (_job: Job, seo: any): Promise<StepOut
     return { outcome: 'done', result: { skipped: `за сутки уже выпущено ${today}`, cost: 0 } }
   }
 
+  // Порядок разбора кандидатов.
+  //
+  // Было: .order('id') — то есть выходила просто самая старая по номеру. Ни
+  // ценности темы, ни того, как давно статья готова, это не учитывало: тема,
+  // придуманная в понедельник, обгоняла вдвое более важную, придуманную во
+  // вторник, навсегда.
+  //
+  // Стало: сначала бизнес-приоритет темы, при равном — кто раньше стал готов.
+  // Приоритет тем растёт вверх (больше = раньше) — это существующий контракт
+  // очереди, и менять его здесь нельзя.
+  //
+  // Плановой даты у статей пока нет как поля, поэтому третьей ступени из PRD
+  // тут нет и подделывать её нечем. Появится вместе с календарём выпуска в E4.
+  const { data: orderMode } = await seo.from('settings').select('value').eq('key', 'autopublish_order').maybeSingle()
+  const byPriority = ((orderMode?.value as any) ?? 'priority') !== 'legacy'
+
   const { data: candidates } = await seo.from('articles')
-    .select('id, primary_keyword, current_version_id, topic_id')
+    .select('id, primary_keyword, current_version_id, topic_id, created_at, status')
     .in('status', ['ready_for_review', 'approved']).order('id')
   if (!candidates?.length) return { outcome: 'done', result: { skipped: 'готовых статей нет', cost: 0 } }
+
+  if (byPriority) {
+    const topicIds = candidates.map((c: any) => c.topic_id).filter(Boolean)
+    const { data: topics } = topicIds.length
+      ? await seo.from('topics').select('id, priority, business_value').in('id', topicIds)
+      : { data: [] }
+    const weight = new Map<number, number>(
+      (topics ?? []).map((t: any) => [t.id, Number(t.priority ?? t.business_value ?? 0)]),
+    )
+    candidates.sort((a: any, b: any) => {
+      // Одобренная человеком идёт раньше любой непрочитанной, каким бы ни был
+      // вес темы. Одобрение — это принятое решение; вес темы — всего лишь
+      // оценка машины, и ставить оценку выше решения было бы странно.
+      const appr = (x: any) => (x.status === 'approved' ? 1 : 0)
+      if (appr(a) !== appr(b)) return appr(b) - appr(a)
+
+      // Статья без темы веса не имеет — ставим ниже любой темы с весом. В
+      // разбор она всё равно попадёт, просто последней.
+      const wa = weight.get(a.topic_id) ?? 0
+      const wb = weight.get(b.topic_id) ?? 0
+      if (wb !== wa) return wb - wa
+
+      return Date.parse(a.created_at) - Date.parse(b.created_at)
+    })
+  }
 
   const { checkBlogStandard, loadSiteTargets } = await import('./blog-style')
   const { factGate } = await import('./fact-gate')
