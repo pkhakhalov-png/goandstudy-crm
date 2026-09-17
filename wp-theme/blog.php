@@ -81,7 +81,7 @@ function goandstudy_render_blog_index(): string {
 		<div class="container">
 			<div class="blog-grid">
 				<?php foreach ( $articles as $a ) : ?>
-					<a class="blog-card" href="<?php echo esc_url( '/blog/' . $a['slug'] ); ?>" data-cat="<?php echo esc_attr( $a['cat'] ?? '' ); ?>">
+					<a class="blog-card" href="<?php echo esc_url( '/blog/' . $a['slug'] . '/' ); ?>" data-cat="<?php echo esc_attr( $a['cat'] ?? '' ); ?>">
 						<div class="blog-card__img" style="background-image:url('<?php echo esc_url( $img_base . '/' . $a['slug'] . '.jpg' ); ?>')">
 							<?php if ( ! empty( $a['cat'] ) ) : ?>
 								<span class="blog-card__cat"><?php echo esc_html( $a['cat'] ); ?></span>
