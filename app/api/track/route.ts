@@ -31,10 +31,26 @@ const COOKIE = 'gs_anon'
 const YEAR = 60 * 60 * 24 * 365
 const MAX_BODY = 4096
 
-/** Куда разрешено отвечать. Пусто — не разрешено никуда. */
+/**
+ * Откуда принимаем события.
+ *
+ * Значение по умолчанию задано в коде намеренно. Первая версия читала только
+ * переменную окружения — она была прописана в .env.local и не прописана в
+ * Vercel. Счётчик на сайте встал и заработал, приёмник отвечал 204, а события
+ * не записывались: разрешения не было ни одного, и каждый запрос отклонялся
+ * молча. Со стороны выглядело как «всё установлено и ничего не происходит» —
+ * худший вид поломки.
+ *
+ * Домен у нас один и не меняется, а забыть переменную при следующем деплое
+ * можно снова. Переменная осталась и переопределяет умолчание — если появится
+ * второй домен, менять код не придётся.
+ */
+const DEFAULT_ORIGINS = ['https://goandstudy.com', 'https://www.goandstudy.com']
+
 function allowedOrigins(): string[] {
-  return (process.env.TRACK_ALLOWED_ORIGINS ?? '')
+  const fromEnv = (process.env.TRACK_ALLOWED_ORIGINS ?? '')
     .split(',').map((s) => s.trim()).filter(Boolean)
+  return fromEnv.length ? fromEnv : DEFAULT_ORIGINS
 }
 
 function corsHeaders(origin: string | null): Record<string, string> {
