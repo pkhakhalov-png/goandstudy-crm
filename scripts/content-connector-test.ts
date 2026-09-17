@@ -16,7 +16,7 @@ import {
   attemptPublish, requestHash, statusFor, capabilityConfidence,
   type PublishingConnector, type Capabilities, type Payload, type Outcome,
 } from '../lib/content/connector'
-import { TelegramConnector, разобратьОтвет, ссылкаСМетками, ссылкаНаПост } from '../lib/content/telegram'
+import { TelegramConnector, разобратьОтвет, разобратьСтраницуПоста, ссылкаСМетками, ссылкаНаПост } from '../lib/content/telegram'
 
 const seo = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } })
 const content = seo.schema('content' as any)
@@ -129,6 +129,34 @@ async function main() {
   const rec = await tg.reconcile()
   ok('Telegram честно говорит, что выяснить нечем',
     rec.kind === 'выяснить_нечем', 'а не делает вид, что проверил')
+
+  // ── Три состояния выхода (E5.14)
+  //
+  // Разбор страницы — на сохранённых кусках настоящих ответов t.me.
+  const естьПост = разобратьСтраницуПоста('<div class="tgme_widget_message_bubble"><a class="tgme_widget_message_date" href="x">', 'https://t.me/x/1')
+  ok('пост на месте опознаётся по дате со ссылкой', естьПост.kind === 'на_месте')
+  const нетПоста = разобратьСтраницуПоста('<div class="tgme_widget_message_error" dir="auto">Post not found</div>', 'https://t.me/x/1')
+  ok('«Post not found» — это исчез', нетПоста.kind === 'исчез')
+  const чужая = разобратьСтраницуПоста('<html>совсем другая разметка</html>', 'https://t.me/x/1')
+  ok('незнакомая разметка — «не проверить», а не «исчез»', чужая.kind === 'не_проверить',
+    'объявлять пост исчезнувшим из-за смены вёрстки нельзя')
+
+  const приватный = new TelegramConnector('-1001', null, null)
+  const статусПриватного = await приватный.getStatus('5')
+  ok('у приватного канала проверить публичность нечем',
+    статусПриватного.kind === 'не_проверить' && /getMessage не существует/.test(статусПриватного.why))
+
+  // Живая проверка на публичном канале: существующий и заведомо отсутствующий.
+  if (!process.argv.includes('--без-сети')) {
+    const публичный = new TelegramConnector('@telegram', null, '@telegram')
+    const есть = await публичный.getStatus('1')
+    const нету = await публичный.getStatus('999999999')
+    ok('живая проверка: существующий пост найден', есть.kind === 'на_месте', есть.kind)
+    ok('живая проверка: несуществующий не найден', нету.kind === 'исчез', нету.kind)
+    ok('обычный адрес для этого не годится — разводит только embed',
+      есть.kind === 'на_месте' && нету.kind === 'исчез',
+      't.me/канал/номер отдаёт одну карточку и для поста, и для пустого номера')
+  }
 
   const метрики = await tg.fetchMetrics('77', '2026-09-17')
   ok('недоступная метрика — недоступна, а не ноль',
