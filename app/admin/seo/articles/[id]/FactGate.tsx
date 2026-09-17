@@ -2,13 +2,19 @@
 import { useState, useTransition } from 'react'
 import { confirmFact } from '../actions'
 
-type Issue = { level: string; kind: string; statement: string; why: string; claimId?: number }
+type Issue = {
+  level: string; kind: string; statement: string; why: string; claimId?: number
+  /** Есть у находок без числа: дословная цитата из текста и место в теле статьи. */
+  quote?: string; offset?: number; category?: string
+}
 
 const KIND_RU: Record<string, string> = {
   tuition_fee: 'стоимость', deadline: 'дедлайн', language_req: 'язык',
   visa_requirement: 'виза', eligibility: 'кого берут', document_req: 'документы',
   scholarship: 'стипендия', practice_vs_official: 'практика', system_basics: 'устройство',
   practical_timeline: 'сроки', internal_stat: 'наша статистика',
+  // Виды без числа: сверять нечего, но стоят они читателю столько же
+  promise: 'обещание результата', work_rights: 'право на работу',
 }
 
 export function FactGate({ blocking, warnings, checked }: { blocking: Issue[]; warnings: Issue[]; checked: number }) {
@@ -26,7 +32,7 @@ export function FactGate({ blocking, warnings, checked }: { blocking: Issue[]; w
         <div style={{ fontSize: 13, fontWeight: 700 }}>Существенные утверждения · проверено {checked}</div>
         <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3, lineHeight: 1.5 }}>
           {left.length
-            ? `${left.length} мешают согласованию: ошибка в стоимости, дедлайне или требованиях стоит читателю денег или года. Подтвердите то, за что ручаетесь, либо уберите из текста.`
+            ? `${left.length} ${left.length === 1 ? 'мешает' : 'мешают'} согласованию: ошибка в стоимости, сроке, требованиях или обещании стоит читателю денег или года. Факт из реестра подтвердите, если за него ручаетесь; формулировку — перепишите или уберите.`
             : 'Всё существенное подтверждено — согласование возможно.'}
         </div>
       </div>
@@ -48,6 +54,18 @@ export function FactGate({ blocking, warnings, checked }: { blocking: Issue[]; w
               <div style={{ color: 'var(--muted)', fontSize: 11 }}>
                 {confirmed ? 'подтверждено вами' : issue.why}
               </div>
+              {/*
+                У находки по формулировке нет claimId: подписаться не под чем —
+                в реестре нет строки. Без объяснения карточка читается как поломка
+                («замечание есть, кнопки нет»), а не как строгость, поэтому прямо
+                говорим, чем такое замечание снимается.
+              */}
+              {!issue.claimId && (
+                <div style={{ color: 'var(--muted)', fontSize: 11, marginTop: 4 }}>
+                  Снимается только правкой текста: подписью подтверждают число из источника,
+                  а категоричную формулировку подтвердить нечем.
+                </div>
+              )}
               {issue.claimId && !confirmed && (
                 <button className="btn-s" disabled={pending} style={{ fontSize: 11, padding: '2px 8px', marginTop: 4 }}
                   onClick={() => start(async () => {
