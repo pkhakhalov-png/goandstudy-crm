@@ -7,12 +7,61 @@ import {
   downloadTelegramFile,
 } from '@/lib/telegram'
 import { normalizePhone } from '@/lib/phone'
+import { секретыСовпали, секретГодится } from '@/lib/webhook-secret'
 import { warnOnError } from '@/lib/supabase/write-guard'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
+/**
+ * Проверка того, что запрос пришёл от Телеграма.
+ *
+ * До сих пор её не было вовсе: адрес вебхука угадывается с первой попытки, и
+ * любой, кто его знает, мог прислать сюда сообщение от имени любого клиента —
+ * оно легло бы в чат сделки как настоящее.
+ *
+ * Включается переменной `TELEGRAM_WEBHOOK_SECRET`, и порядок раскатки
+ * принципиален, иначе клиентские чаты замолчат:
+ *
+ *   1. СНАЧАЛА `npx tsx scripts/telegram-set-webhook.ts` — Телеграм начинает
+ *      слать заголовок. Код его пока игнорирует, ничего не меняется.
+ *   2. ПОТОМ переменная в окружении — код начинает требовать заголовок,
+ *      который уже приходит.
+ *
+ * Обратный порядок означает промежуток, в котором мы требуем то, чего ещё не
+ * шлют, и все сообщения отклоняются.
+ *
+ * Пока переменная не задана, поведение прежнее. Это не «мягкий режим на
+ * всякий случай», а способ выкатить проверку, не останавливая работающее: в
+ * логе при каждом запросе стоит напоминание, и молча забыть про него сложно.
+ */
+export function подписьВерна(req: { headers: { get(name: string): string | null } }): { ok: true } | { ok: false; причина: string } {
+  const секрет = process.env.TELEGRAM_WEBHOOK_SECRET
+  if (!секрет) {
+    console.warn('[telegram webhook] TELEGRAM_WEBHOOK_SECRET не задан — подпись не проверяется, '
+      + 'любой знающий адрес может прислать сюда сообщение от имени клиента')
+    return { ok: true }
+  }
+  const годность = секретГодится(секрет)
+  if (!годность.ok) {
+    // Негодный секрет — это не повод пропускать всех. Пропустить здесь значит
+    // не проверять подпись вовсе и думать, что проверяем.
+    return { ok: false, причина: `секрет не годится: ${годность.почему}` }
+  }
+  return секретыСовпали(req.headers.get('x-telegram-bot-api-secret-token'), секрет)
+    ? { ok: true }
+    : { ok: false, причина: 'заголовок с секретом не сошёлся' }
+}
+
 export async function POST(req: NextRequest) {
+  const подпись = подписьВерна(req)
+  if (!подпись.ok) {
+    // Наружу — коротко и без подробностей: тому, кто подбирает секрет, знать
+    // причину незачем. Подробность идёт в журнал.
+    console.warn(`[telegram webhook] запрос отклонён: ${подпись.причина}`)
+    return NextResponse.json({ ok: false }, { status: 401 })
+  }
+
   try {
     const update = (await req.json()) as TelegramUpdate
     const msg = update.message || update.edited_message || update.channel_post
