@@ -68,17 +68,30 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Только перечень: подписывать ссылки здесь нельзя. На первой же попытке
+    // манифест не уложился в две минуты — двести пятьдесят файлов означали
+    // двести пятьдесят отдельных запросов на подпись. Ссылки выдаются пачкой,
+    // отдельным вызовом ниже.
     const { data: buckets } = await sb.storage.listBuckets()
-    const files: { bucket: string; path: string; url: string }[] = []
+    const files: { bucket: string; path: string }[] = []
     for (const b of buckets ?? []) {
-      const list = await listAll(sb, b.name)
-      for (const p of list) {
-        const { data } = await sb.storage.from(b.name).createSignedUrl(p, 3600)
-        if (data?.signedUrl) files.push({ bucket: b.name, path: p, url: data.signedUrl })
-      }
+      for (const p of await listAll(sb, b.name)) files.push({ bucket: b.name, path: p })
     }
 
     return NextResponse.json({ at: new Date().toISOString(), tables, files })
+  }
+
+  // Подписанные ссылки пачкой: один вызов на сотню файлов вместо сотни вызовов.
+  if (body.kind === 'files') {
+    const bucket = String(body.bucket ?? '')
+    const paths: string[] = Array.isArray(body.paths) ? body.paths.slice(0, 100).map(String) : []
+    if (!bucket || !paths.length) return NextResponse.json({ error: 'нечего подписывать' }, { status: 400 })
+
+    const { data, error } = await sb.storage.from(bucket).createSignedUrls(paths, 3600)
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+    return NextResponse.json({
+      urls: (data ?? []).map((d: any) => ({ path: d.path, url: d.signedUrl, error: d.error })),
+    })
   }
 
   // Одна таблица страницей. Страницами, потому что в gsc_daily двести тысяч

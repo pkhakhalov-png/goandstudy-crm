@@ -101,14 +101,30 @@ done
 # прямым текстом.
 log "качаю файлы хранилища"
 saved=0
-while read -r line; do
-  bucket=$(echo "$line" | jq -r '.bucket')
-  path=$(echo "$line" | jq -r '.path')
-  url=$(echo "$line" | jq -r '.url')
-  target="$OUT/files/$bucket/$path"
-  mkdir -p "$(dirname "$target")"
-  if curl -sS --max-time 120 -o "$target" "$url"; then saved=$((saved + 1)); fi
-done < <(jq -c '.files[]' "$MANIFEST")
+for bucket in $(jq -r '.files[].bucket' "$MANIFEST" | sort -u); do
+  # Пачками по сотне: подписывать каждую ссылку отдельным запросом слишком
+  # долго — на первом прогоне манифест не уложился и в две минуты.
+  mapfile -t paths < <(jq -r --arg b "$bucket" '.files[] | select(.bucket==$b) | .path' "$MANIFEST")
+  total=${#paths[@]}
+  log "  бакет $bucket: файлов $total"
+
+  for ((i = 0; i < total; i += 100)); do
+    chunk=$(printf '%s\n' "${paths[@]:i:100}" | jq -R . | jq -s -c .)
+    resp=$(call "{\"kind\":\"files\",\"bucket\":\"$bucket\",\"paths\":$chunk}")
+    if ! echo "$resp" | jq -e '.urls' >/dev/null 2>&1; then
+      log "    ссылки не выдались: $(echo "$resp" | head -c 140)"
+      continue
+    fi
+    while read -r line; do
+      path=$(echo "$line" | jq -r '.path')
+      url=$(echo "$line" | jq -r '.url // empty')
+      [ -z "$url" ] && continue
+      target="$OUT/files/$bucket/$path"
+      mkdir -p "$(dirname "$target")"
+      curl -sS --max-time 120 -o "$target" "$url" && saved=$((saved + 1))
+    done < <(echo "$resp" | jq -c '.urls[]')
+  done
+done
 log "  файлов сохранено: $saved из $FILES_COUNT"
 
 # ─── 4. Сайт ─────────────────────────────────────────────────────────────────
