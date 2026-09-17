@@ -21,24 +21,39 @@ export type IndexVerdict = {
 
 const SITE = process.env.GSC_SITE_URL || 'sc-domain:goandstudy.com'
 
+/** Ответ есть, но он означает «Google про такой адрес ничего не знает». */
+function isUnknown(v: IndexVerdict): boolean {
+  return /неизвестен|unknown|not found|404/i.test(v.coverageState)
+}
+
 /**
  * Спросить Google про страницу, не гадая с формой адреса.
  *
- * Форма имеет значение: сайт отвечает 301 с адреса без слэша на адрес со слэшем,
- * но в индексе Google держит вариант БЕЗ слэша — и на вариант со слэшем честно
- * отвечает «URL неизвестен». Поэтому спрашиваем сначала форму без слэша (её же
- * использует Search Console в отчётах), а если Google её не знает — пробуем вторую.
+ * Форма имеет значение: сайт отвечает 301 с адреса без слэша на адрес со слэшем.
+ * Со слэшем живут sitemap и канонические ссылки — это и есть форма, которую знает
+ * Google про новые статьи. Но старые страницы сайта попали в индекс ещё без слэша,
+ * и про них настоящий ответ приходит на бесслэшевую форму.
+ *
+ * Поэтому спрашиваем сначала слэш-форму, а если Google её не знает — вторую, и
+ * оставляем тот ответ, в котором есть содержание. «URL неизвестен» — это ответ про
+ * форму адреса, а не про страницу, и вытеснять им живой ответ («обнаружена»,
+ * «просканирована», «в индексе») нельзя: именно так статья, найденная Google из
+ * sitemap, выглядела на экране как невидимая.
+ *
+ * Ошибку доступа или квоты за ответ не выдаём: `checked: false` дальше по цепочке
+ * означает «мы не знаем», и такой результат никто не сохраняет.
  */
 export async function inspectPage(url: string): Promise<IndexVerdict & { url: string }> {
   const bare = url.replace(/\/+$/, '')
   const slashed = `${bare}/`
 
-  const first = await inspectUrl(bare)
-  if (!first.checked || first.verdict === 'PASS') return { ...first, url: bare }
+  const first = await inspectUrl(slashed)
+  if (!first.checked) return { ...first, url: slashed }          // нет доступа или квоты — второй заход не поможет
+  if (!isUnknown(first)) return { ...first, url: slashed }
 
-  const second = await inspectUrl(slashed)
-  if (second.checked && second.verdict === 'PASS') return { ...second, url: slashed }
-  return { ...first, url: bare }
+  const second = await inspectUrl(bare)
+  if (second.checked && !isUnknown(second)) return { ...second, url: bare }
+  return { ...first, url: slashed }
 }
 
 /** Спросить Google про конкретный адрес ровно в той форме, что передали. */
@@ -84,19 +99,35 @@ export async function inspectUrl(url: string): Promise<IndexVerdict> {
   }
 }
 
+// Google отвечает на языке запроса, а мы просим по-русски: сверять надо оба
+// написания, иначе «Обнаружена, не проиндексирована» проваливается в общее
+// «ещё не проиндексировано» и теряется разница между «нашёл и ждёт» и «не видел».
 function humanVerdict(verdict?: string, coverage?: string): string {
   if (verdict === 'PASS') return 'в индексе'
   if (verdict === 'FAIL') return 'не в индексе, есть проблема'
-  if (coverage && /Discovered|Crawled/i.test(coverage)) return 'Google знает адрес, но ещё не проиндексировал'
-  if (coverage && /not found|404/i.test(coverage)) return 'Google адрес не видел'
+  if (coverage && /переадресац|redirect/i.test(coverage)) return 'переадресация на другой адрес'
+  if (coverage && /Обнаружен|Просканирован|Discovered|Crawled/i.test(coverage)) return 'Google знает адрес, но ещё не проиндексировал'
+  if (coverage && /неизвестен|unknown|not found|404/i.test(coverage)) return 'Google адрес не видел'
   return 'ещё не проиндексировано'
 }
 
-/** Сохранить результат проверки, чтобы видеть историю и не дёргать квоту зря. */
-export async function saveIndexStatus(seo: any, pageId: number, v: IndexVerdict): Promise<void> {
+/**
+ * Сохранить результат проверки, чтобы видеть историю и не дёргать квоту зря.
+ *
+ * Неудачную проверку (нет доступа, кончилась квота, сеть) не пишем вовсе: «мы не
+ * смогли спросить» — это не ответ Google, и подменять им прошлый настоящий ответ
+ * значит терять то, что мы уже знали.
+ *
+ * `retryDays` — через сколько спросить снова, если страница ещё не в индексе.
+ * Для свежей статьи это сутки: там важен день попадания, и шаг в двое суток
+ * систематически промахивается мимо события.
+ */
+export async function saveIndexStatus(
+  seo: any, pageId: number, v: IndexVerdict, opts: { retryDays?: number } = {},
+): Promise<void> {
   if (!v.checked) return
   // Пока страница не в индексе, проверяем чаще: смысл в том, чтобы поймать момент
-  const nextDays = v.verdict === 'PASS' ? 14 : 2
+  const nextDays = v.verdict === 'PASS' ? 14 : (opts.retryDays ?? 2)
 
   const row: Record<string, unknown> = {
     page_id: pageId,

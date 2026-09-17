@@ -448,18 +448,43 @@ export async function checkIndex(articleId: number) {
   const slug = meta.publish?.slug ?? meta.slug
   const url = `https://goandstudy.com/blog/${slug}/`
 
+  // Не чаще раза в пять минут: ответ Google за это время не меняется, а квота
+  // метода общая с суточной проверкой всего сайта — 2000 адресов.
+  const lastAt = meta.index_check?.at ? Date.parse(meta.index_check.at) : 0
+  if (Date.now() - lastAt < 5 * 60_000) {
+    const mins = Math.max(1, Math.round((Date.now() - lastAt) / 60_000))
+    return { ok: true, note: `Спрашивали ${mins} мин назад: Google — ${meta.index_check.note}. Чаще раза в пять минут ответ не меняется.` }
+  }
+
   const { inspectPage, saveIndexStatus } = await import('@/lib/seo/index-status')
   const v = await inspectPage(url)
 
-  // Привязываем к странице инвентаря, если она уже обойдена краулером
-  const { data: page } = await seo.from('pages').select('id').eq('normalized_url', url.replace(/\/$/, '')).maybeSingle()
-  if (page?.id) await saveIndexStatus(seo, page.id, v)
+  // Спросить не вышло (нет доступа, кончилась квота, сеть) — это не ответ Google.
+  // Записать его значило бы стереть прошлый настоящий ответ пустотой.
+  if (!v.checked) return { error: `Search Console не ответил: ${v.note}` }
+
+  // Страницы может не быть в инвентаре — до сентября её заводил только ручной
+  // обход. Заводим сами, иначе ответ некуда записать и история не ведётся.
+  let { data: page } = await seo.from('pages').select('id').eq('normalized_url', url.replace(/\/$/, '')).maybeSingle()
+  if (!page?.id) {
+    const { ensureArticlePage } = await import('@/lib/seo/crawl')
+    const made = await ensureArticlePage(seo, slug).catch(() => ({ pageId: undefined }))
+    if (made.pageId) page = { id: made.pageId }
+  }
+  if (page?.id) await saveIndexStatus(seo, page.id, v, { retryDays: 1 })
 
   await seo.from('article_versions')
     .update({ meta: { ...meta, index_check: { at: new Date().toISOString(), verdict: v.verdict, coverage: v.coverageState, note: v.note, last_crawl: v.lastCrawl } } })
     .eq('id', version?.id).then(warnOnError('article_versions · app/admin/seo/articles/actions.ts:451'))
 
+  // Дата попадания в индекс — дата обхода Google, а не минута, когда мы узнали
+  if (v.verdict === 'PASS') {
+    await seo.from('articles').update({ indexed_at: v.lastCrawl ?? new Date().toISOString() })
+      .eq('id', articleId).is('indexed_at', null).then(warnOnError('articles · app/admin/seo/articles/actions.ts:checkIndex'))
+  }
+
   revalidatePath(`/admin/seo/articles/${articleId}`)
+  revalidatePath('/admin/seo/indexation')
   return { ok: true, note: `Google: ${v.note}${v.lastCrawl ? `, последний обход ${String(v.lastCrawl).slice(0, 10)}` : ''}` }
 }
 
