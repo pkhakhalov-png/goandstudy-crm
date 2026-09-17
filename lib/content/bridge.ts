@@ -60,10 +60,15 @@ export async function consumeVerified(
   seo: any,
   consumer = 'package_builder',
   limit = 20,
-): Promise<{ eventId: string; packageId: number; created: boolean }[]> {
+): Promise<{ eventId: string; packageId: number; created: boolean; superseded: number; attention: number }[]> {
   const { data, error } = await content(seo).rpc('consume_verified', { p_consumer: consumer, p_limit: limit })
   if (error) throw new Error(`события не разобрались: ${error.message}`)
-  return (data ?? []).map((r: any) => ({ eventId: r.out_event_id, packageId: r.out_package_id, created: !!r.out_created }))
+  return (data ?? []).map((r: any) => ({
+    eventId: r.out_event_id, packageId: r.out_package_id, created: !!r.out_created,
+    // Сколько запланированных постов снято и сколько вопросов заведено по уже
+    // вышедшим. Ноль и ноль — обычное дело: постов у пакета может не быть вовсе.
+    superseded: Number(r.out_superseded ?? 0), attention: Number(r.out_attention ?? 0),
+  }))
 }
 
 /**
