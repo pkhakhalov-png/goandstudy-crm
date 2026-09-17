@@ -15,7 +15,7 @@ export type BlogCategory = typeof BLOG_CATEGORIES[number]
 
 /** §3: последний блок статьи, дословно. */
 export const CTA_HTML =
-  '<p>Хотите поступить за рубеж? <a href="https://crm.goandstudy.com/book" target="_blank" rel="noopener noreferrer">Запишитесь на бесплатную консультацию</a> — разберём ваш случай и составим план.</p>'
+  '<p>Хотите поступить за рубеж? <a href="https://goandstudy.com/book" target="_blank" rel="noopener noreferrer">Запишитесь на бесплатную консультацию</a> — разберём ваш случай и составим план.</p>'
 
 /**
  * §2: белый список блоков. Всё остальное в теме не стилизовано.
@@ -39,7 +39,7 @@ export function normalizeBody(body: string): string {
   // «от начала абзаца до ссылки» уже показало, чем это кончается: на живых статьях
   // оно съело весь текст между первым абзацем и призывом в конце.
   const blocks = splitBlocks(body)
-  while (blocks.length && blocks[blocks.length - 1].includes('crm.goandstudy.com/book')) blocks.pop()
+  while (blocks.length && /(?:crm\.)?goandstudy\.com\/book/.test(blocks[blocks.length - 1])) blocks.pop()
   blocks.push(`<!-- wp:paragraph -->\n${CTA_HTML}\n<!-- /wp:paragraph -->`)
   return blocks.join('\n\n')
 }
@@ -117,7 +117,7 @@ export function checkBlogStandard(input: BlogCheckInput): Check[] {
   }
 
   const lastBlock = body.trimEnd().split(/<!--\s*\/wp:[a-z]+\s*-->/).filter((s) => s.trim()).pop() ?? ''
-  const hasLink = lastBlock.includes('crm.goandstudy.com/book')
+  const hasLink = /(?:crm\.)?goandstudy\.com\/book/.test(lastBlock)
   const exact = lastBlock.includes('Запишитесь на бесплатную консультацию')
   add('3 последний блок — дословный CTA', 'B', hasLink && exact,
     !hasLink ? 'CTA отсутствует или стоит не последним'
@@ -134,7 +134,9 @@ export function checkBlogStandard(input: BlogCheckInput): Check[] {
 
   /* §7 Перелинковка */
   const hrefs = [...body.matchAll(/href="([^"]+)"/g)].map((m) => m[1])
-  const absolute = hrefs.filter((h) => h.includes('goandstudy.com') && !h.includes('crm.goandstudy.com/book'))
+  // Ссылка на форму записи — единственная абсолютная, которой тут место:
+  // она ведёт на общий домен, но это отдельная страница, а не раздел блога.
+  const absolute = hrefs.filter((h) => h.includes('goandstudy.com') && !/(?:crm\.)?goandstudy\.com\/book/.test(h))
   add('7 внутренние ссылки относительные', 'B', absolute.length === 0,
     absolute.length ? `абсолютных: ${absolute.length}` : 'все относительные')
 

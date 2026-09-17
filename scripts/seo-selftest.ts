@@ -166,6 +166,8 @@ async function main() {
     assert(landingPathOf({ landing_url: 'https://goandstudy.com/blog/x/' }) === '/blog/x', 'своя страница не распознана')
     assert(landingPathOf({ referrer: 'https://yandex.ru/search/' }) === null, 'чужой сайт принят за посадочную')
     assert(landingPathOf({ landing_url: 'https://crm.goandstudy.com/book' }) === null, 'форма записи принята за посадочную')
+    assert(landingPathOf({ landing_url: 'https://goandstudy.com/book' }) === null, 'форма записи на домене сайта принята за посадочную')
+    assert(landingPathOf({ landing_url: 'https://goandstudy.com/blog/postuplenie-v-ssha/' }) === '/blog/postuplenie-v-ssha', 'статья не распозналась как посадочная')
     return 'три случая разобраны верно'
   })
 

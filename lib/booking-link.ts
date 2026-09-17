@@ -25,7 +25,15 @@
  * Собирать его обратно из слага — угадывание; проще передать как есть.
  */
 
-export const BOOK_URL = 'https://crm.goandstudy.com/book'
+/**
+ * Адрес формы записи.
+ *
+ * Отдаётся через goandstudy.com, хотя сама форма живёт в CRM: сайт стоит в
+ * Москве и доступен всем, а Vercel во Франкфурте часть посетителей из России
+ * не открывает — и заявка терялась до заполнения. Посетитель общается только с
+ * московским сервером, дальше запрос идёт сервер-сервер.
+ */
+export const BOOK_URL = 'https://goandstudy.com/book'
 
 /** Ключи, которые форма записи читает из своего адреса. */
 export const BOOK_SOURCE_KEYS = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'from'] as const
@@ -73,7 +81,10 @@ export function bookUrl(src: BookSource, base: string = BOOK_URL): string {
  * от подмены вкладки защищает `noopener`, который остаётся на месте.
  */
 export function stampBookLinks(html: string, src: Omit<BookSource, 'content'>): { html: string; stamped: number } {
-  const re = /href="(https:\/\/crm\.goandstudy\.com\/book[^"]*)"/g
+  // Ловим оба адреса: старые статьи ссылаются на crm.goandstudy.com, и их
+  // тоже переводим на московский домен — иначе половина ссылок останется вести
+  // туда, куда часть читателей не попадает.
+  const re = /href="(https:\/\/(?:crm\.)?goandstudy\.com\/book[^"]*)"/g
   const hits = [...html.matchAll(re)]
   if (!hits.length) return { html, stamped: 0 }
 
@@ -82,7 +93,8 @@ export function stampBookLinks(html: string, src: Omit<BookSource, 'content'>): 
     const last = i === hits.length - 1
     const content = last ? 'cta-final' : `cta-text-${i + 1}`
     i++
-    return `href="${bookUrl({ ...src, content }, href)}"`
+    const onSiteDomain = href.replace('https://crm.goandstudy.com/book', BOOK_URL)
+    return `href="${bookUrl({ ...src, content }, onSiteDomain)}"`
   })
 
   return {
@@ -150,7 +162,11 @@ function pageUrl(u: Record<string, string>): string | null {
     if (!raw) continue
     try {
       const parsed = new URL(raw)
+      // Сама форма источником не является. Раньше отсекали её по домену `crm.`,
+      // но теперь она отдаётся с goandstudy.com — значит отсекаем по пути,
+      // иначе строка «Откуда» снова начнёт показывать саму форму.
       if (parsed.hostname.startsWith('crm.')) continue
+      if (parsed.pathname === '/book' || parsed.pathname.startsWith('/book/')) continue
       return raw
     } catch { /* не адрес — пропускаем */ }
   }

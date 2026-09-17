@@ -32,6 +32,9 @@ export function landingPathOf(utm: Record<string, string>): string | null {
     if (!/(^|\.)goandstudy\.com$/i.test(u.hostname)) return null   // чужой сайт — не наша посадочная
     if (u.hostname.startsWith('crm.')) return null                 // сама форма записи посадочной не является
     const p = u.pathname.replace(/\/+$/, '')
+    // Форма записи теперь отдаётся с основного домена, поэтому отсекаем её ещё
+    // и по пути: иначе посадочной страницей у всех заявок станет сама форма.
+    if (p === '/book' || p.startsWith('/book/')) return null
     return p || '/'
   } catch { return null }
 }
