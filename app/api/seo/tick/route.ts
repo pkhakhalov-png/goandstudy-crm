@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { runStep, hasStep, registeredSteps } from '@/lib/seo/steps'
 import { outcomeFor } from '@/lib/seo/failure'
-import { withHeartbeat } from '@/lib/seo/lease'
+import { heartbeatAll } from '@/lib/seo/lease'
 import '@/lib/seo/steps-article'   // регистрация шагов производства статьи
 
 // Воркер SEO-очереди (PRD 10.3). Вызывается pg_cron через pg_net раз в минуту.
@@ -139,37 +139,51 @@ export async function POST(req: NextRequest) {
     if (error) return NextResponse.json({ error: error.message, processed }, { status: 500 })
     if (!jobs || jobs.length === 0) break
 
-    for (const job of jobs as any[]) {
-      // Кончилось время — вернуть остаток в pending, не выполнять.
-      // Для долгих шагов нужен не остаток времени, а полный запас: иначе шаг
-      // начнётся и будет убит на середине.
-      const need = isLongStep(job.step) ? LONG_STEP_MS : 0
-      if (Date.now() - started >= TIME_BUDGET_MS - need) {
-        await finish(seo, job, 'released', {})
-        released++
-        continue
+    // Отмечаемся за ВСЮ пачку, а не за текущую задачу.
+    //
+    // Пачка до пяти штук выполняется по очереди, и шаг статьи идёт до трёх с
+    // половиной минут. Стучать только за выполняемую значило бы, что у
+    // остальных четырёх сердце молчит всё это время — а очередь по молчанию
+    // решает, что исполнитель умер, и отдаёт их другому тику. Получился бы
+    // ровно тот дубль, ради исключения которого аренда и заводилась.
+    const beat = heartbeatAll(seo, jobs as any[], HANDLER_VERSION)
+
+    try {
+      for (const job of jobs as any[]) {
+        // Кончилось время — вернуть остаток в pending, не выполнять.
+        // Для долгих шагов нужен не остаток времени, а полный запас: иначе шаг
+        // начнётся и будет убит на середине.
+        const need = isLongStep(job.step) ? LONG_STEP_MS : 0
+        if (Date.now() - started >= TIME_BUDGET_MS - need) {
+          await finish(seo, job, 'released', {})
+          beat.done(job.id)
+          released++
+          continue
+        }
+        // Шаг может быть неизвестен этому воркеру: публикация в тему требует SSH,
+        // и её делает воркер с ключом, а не Vercel. Возвращаем задачу в очередь,
+        // а не убиваем — иначе один воркер ломает работу другого.
+        if (!hasStep(job.step) || !canRunHere(job.step)) {
+          await finish(seo, job, 'released', { skipped: 'этот воркер такую работу не делает' })
+          beat.done(job.id)
+          released++
+          continue
+        }
+        try {
+          const outcome = await runStep(job, seo)
+          await finish(seo, job, outcome.outcome, outcome.result ?? {})
+        } catch (e: any) {
+          // Повторять имеет смысл перегрузку и обрыв связи. Нехватку денег,
+          // неверный ключ и занятый слаг повторять бессмысленно — это только
+          // сожжёт попытки и спрячет причину за общим «retry».
+          const { outcome, result } = outcomeFor(e)
+          await finish(seo, job, outcome, result)
+        }
+        beat.done(job.id)
+        processed++
       }
-      // Шаг может быть неизвестен этому воркеру: публикация в тему требует SSH,
-      // и её делает воркер с ключом, а не Vercel. Возвращаем задачу в очередь,
-      // а не убиваем — иначе один воркер ломает работу другого.
-      if (!hasStep(job.step) || !canRunHere(job.step)) {
-        await finish(seo, job, 'released', { skipped: 'этот воркер такую работу не делает' })
-        released++
-        continue
-      }
-      try {
-        // Пока шаг идёт, подтверждаем, что живы: иначе долгий шаг выглядит
-        // для очереди неотличимо от умершего воркера и будет перезапущен.
-        const { value: outcome } = await withHeartbeat(seo, job, HANDLER_VERSION, () => runStep(job, seo))
-        await finish(seo, job, outcome.outcome, outcome.result ?? {})
-      } catch (e: any) {
-        // Повторять имеет смысл перегрузку и обрыв связи. Нехватку денег,
-        // неверный ключ и занятый слаг повторять бессмысленно — это только
-        // сожжёт попытки и спрячет причину за общим «retry».
-        const { outcome, result } = outcomeFor(e)
-        await finish(seo, job, outcome, result)
-      }
-      processed++
+    } finally {
+      beat.stop()
     }
   }
 

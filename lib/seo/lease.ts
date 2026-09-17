@@ -72,3 +72,47 @@ export async function withHeartbeat<T>(
     clearInterval(beat)
   }
 }
+
+/**
+ * Подтверждать жизнь сразу за пачку задач.
+ *
+ * Тик берёт до пяти задач за раз и выполняет их по очереди. Если стучать
+ * только за ту, что выполняется сейчас, у остальных сердце молчит всё время
+ * ожидания — а первая задача может идти три с половиной минуты. Другой тик
+ * увидит молчание, сочтёт исполнителя мёртвым и заберёт их себе. Это ровно
+ * тот дубль, который вся конструкция и должна исключать.
+ *
+ * Поэтому отмечаемся за все задачи, которые держим, пока не отпустим их явно.
+ * Задача, которая уже завершилась, из набора убирается: стучать за неё значило
+ * бы мешать очереди её закрыть.
+ */
+export function heartbeatAll(
+  seo: any,
+  jobs: Leased[],
+  handlerVersion: string,
+): { done: (jobId: number) => void; stop: () => void } {
+  const held = new Map<number, number>()
+  for (const j of jobs) if (j.fencing_token != null) held.set(j.id, j.fencing_token)
+  if (held.size === 0) return { done: () => {}, stop: () => {} }
+
+  const beat = setInterval(async () => {
+    for (const [id, token] of held) {
+      try {
+        const { data, error } = await seo.rpc('heartbeat_job', {
+          p_job_id: id, p_fencing_token: token, p_handler_version: handlerVersion,
+        })
+        if (error) return                       // функции ещё нет — не наша беда
+        if (data === false) {
+          // Аренду отобрали. Держать её в наборе незачем: стучать больше некуда.
+          held.delete(id)
+          console.error(`  ⚠ аренда задачи #${id} отобрана`)
+        }
+      } catch { /* сеть моргнула: следующий удар через полминуты */ }
+    }
+  }, BEAT_MS)
+
+  return {
+    done: (jobId: number) => { held.delete(jobId) },
+    stop: () => clearInterval(beat),
+  }
+}

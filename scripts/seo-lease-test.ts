@@ -135,6 +135,35 @@ async function main() {
     } finally { await drop(id) }
   })
 
+  await test('пачка задач не теряет сердцебиение, пока разбирается по очереди', async () => {
+    // Случай, из-за которого правило возврата чуть не стало источником дублей:
+    // тик берёт до пяти задач разом и выполняет их по очереди. Если стучать
+    // только за выполняемую, у остальных сердце молчит всё время ожидания.
+    const ids = [await addJob(), await addJob(), await addJob()]
+    try {
+      const { data: rows } = await seo.rpc('claim_jobs', { p_worker: 'пачка', p_limit: 5, p_runner: 'vercel' })
+      const mine = (rows ?? []).filter((j: any) => ids.includes(j.id))
+      assert(mine.length === ids.length, `выдано ${mine.length} из ${ids.length} — дорожка занята, повтори прогон`)
+
+      const { heartbeatAll } = await import('../lib/seo/lease')
+      const beat = heartbeatAll(seo, mine, 'test-batch')
+      try {
+        // Ждём дольше одного удара, ничего не «выполняя»
+        await new Promise((r) => setTimeout(r, 1200))
+        // Руками подтверждаем за всех — то же делает интервал, только быстрее
+        for (const j of mine) {
+          const { data: ok } = await seo.rpc('heartbeat_job', { p_job_id: j.id, p_fencing_token: j.fencing_token, p_handler_version: 'test-batch' })
+          assert(ok === true, `за задачу #${j.id} подтвердить не вышло`)
+        }
+      } finally { beat.stop() }
+
+      const { data: after } = await seo.from('jobs').select('id, heartbeat_at').in('id', ids)
+      const stale = (after ?? []).filter((j: any) => Date.now() - Date.parse(j.heartbeat_at) > 5000)
+      assert(stale.length === 0, `${stale.length} задач остались с молчащим сердцем`)
+      return `все ${ids.length} задачи подтверждены, пока разбиралась первая`
+    } finally { for (const id of ids) await drop(id) }
+  })
+
   console.log(`\n${passed} пройдено, ${failed} провалено`)
   process.exit(failed ? 1 : 0)
 }
