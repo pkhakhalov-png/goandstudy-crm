@@ -3,6 +3,7 @@
 import { parse, type HTMLElement } from 'node-html-parser'
 import { createHash } from 'node:crypto'
 import { safeFetch } from './safe-fetch'
+import { normalizeUrl } from './normalize'
 
 const REGISTRABLE = 'goandstudy.com'   // всё считаем «нашим», если хост оканчивается на это
 
@@ -200,4 +201,23 @@ export async function crawlPage(
   }
 
   return { ok: true, pageId: page.id }
+}
+
+/**
+ * Завести страницу свежей статьи в инвентаре сразу после публикации.
+ *
+ * Раньше строки в `pages` появлялись только обходом сайта, а обход — ручной
+ * скрипт: статьи конвейера жили вне инвентаря неделями. Из-за этого ответ Google
+ * о них было некуда записать (`index_status` привязан к странице), история
+ * индексации не велась, а сводка по сайту их не считала.
+ *
+ * Идемпотентно: апсерт идёт по `normalized_url`, поэтому повторная публикация
+ * или повторный отчёт агента обновляют ту же строку, а не заводят вторую.
+ */
+export async function ensureArticlePage(
+  seo: any,
+  slug: string,
+): Promise<{ ok: boolean; pageId?: number; reason?: string }> {
+  const url = normalizeUrl(`https://goandstudy.com/blog/${slug}/`)
+  return crawlPage(seo, url, normalizeUrl)
 }
