@@ -192,8 +192,15 @@ export function settle(check: CodeCheck, notes: ReviewerNote[]): Finding {
   const whyParts = [check.why]
   if (upgraded.length) {
     // Не молчим об этом: «проверка считает иначе» — это то, что человек должен
-    // увидеть, а не то, что код должен выкинуть.
-    whyParts.push(`проверка(и) сочли утверждение подтверждённым, но выдержки из источника нет — вердикт кода сильнее`)
+    // увидеть, а не то, что код должен выкинуть. Причина называется настоящая:
+    // «выдержки нет» и «выдержка просрочена» — разные вещи, и путать их значит
+    // отправить редактора искать источник, который на самом деле есть.
+    const because = check.verdict === 'insufficient'
+      ? 'выдержки из источника под утверждением нет'
+      : check.verdict === 'stale'
+        ? 'годность подтверждения истекла'
+        : 'вердикт кода тяжелее'
+    whyParts.push(`проверка сочла утверждение подтверждённым, но ${because} — вердикт кода сильнее`)
   }
   const worseNote = notes.find((n) => n.verdict === verdict && verdict !== check.verdict)
   if (worseNote) whyParts.push(worseNote.explanation)
