@@ -73,9 +73,9 @@ export async function POST(req: NextRequest) {
     // двести пятьдесят отдельных запросов на подпись. Ссылки выдаются пачкой,
     // отдельным вызовом ниже.
     const { data: buckets } = await sb.storage.listBuckets()
-    const files: { bucket: string; path: string }[] = []
+    const files: { bucket: string; path: string; size: number }[] = []
     for (const b of buckets ?? []) {
-      for (const p of await listAll(sb, b.name)) files.push({ bucket: b.name, path: p })
+      for (const f of await listAll(sb, b.name)) files.push({ bucket: b.name, ...f })
     }
 
     return NextResponse.json({ at: new Date().toISOString(), tables, files })
@@ -115,14 +115,20 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ error: 'неизвестный запрос' }, { status: 400 })
 }
 
-/** Все объекты бакета, включая вложенные папки. */
-async function listAll(sb: any, bucket: string, prefix = ''): Promise<string[]> {
-  const out: string[] = []
+/**
+ * Все объекты бакета, включая вложенные папки.
+ *
+ * Размер отдаём вместе с путём: по нему сервер поймёт, что файл не менялся, и
+ * не станет качать его второй раз. Без этого каждая ночная копия тянула бы все
+ * две тысячи файлов заново — пять гигабайт за ночь и забитый диск за месяц.
+ */
+async function listAll(sb: any, bucket: string, prefix = ''): Promise<{ path: string; size: number }[]> {
+  const out: { path: string; size: number }[] = []
   const { data } = await sb.storage.from(bucket).list(prefix, { limit: 1000 })
   for (const item of data ?? []) {
     const full = prefix ? `${prefix}/${item.name}` : item.name
     if (item.id === null) out.push(...await listAll(sb, bucket, full))
-    else out.push(full)
+    else out.push({ path: full, size: Number(item.metadata?.size ?? 0) })
   }
   return out
 }

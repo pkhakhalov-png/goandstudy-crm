@@ -99,17 +99,36 @@ done
 # Их не покрывают бэкапы Supabase ни на каком тарифе: в базе лежат только
 # записи о файлах, а сами файлы — в хранилище. Панель Supabase пишет об этом
 # прямым текстом.
-log "качаю файлы хранилища"
-saved=0
+# Файлы держим одним зеркалом, а в ночную копию кладём жёсткими ссылками.
+# Иначе каждая ночь стоила бы пять гигабайт, и тридцать дней истории не влезли
+# бы на диск. Жёсткая ссылка не занимает места: неизменившийся файл лежит один
+# раз, а виден во всех копиях.
+MIRROR="$DEST/files-mirror"
+mkdir -p "$MIRROR"
+
+log "обновляю зеркало файлов хранилища"
+downloaded=0; skipped=0
 for bucket in $(jq -r '.files[].bucket' "$MANIFEST" | sort -u); do
-  # Пачками по сотне: подписывать каждую ссылку отдельным запросом слишком
-  # долго — на первом прогоне манифест не уложился и в две минуты.
-  mapfile -t paths < <(jq -r --arg b "$bucket" '.files[] | select(.bucket==$b) | .path' "$MANIFEST")
-  total=${#paths[@]}
+  mapfile -t entries < <(jq -c --arg b "$bucket" '.files[] | select(.bucket==$b)' "$MANIFEST")
+  total=${#entries[@]}
   log "  бакет $bucket: файлов $total"
 
-  for ((i = 0; i < total; i += 100)); do
-    chunk=$(printf '%s\n' "${paths[@]:i:100}" | jq -R . | jq -s -c .)
+  # Сначала отбираем те, которых нет или размер разошёлся
+  need=()
+  for e in "${entries[@]}"; do
+    path=$(echo "$e" | jq -r '.path')
+    size=$(echo "$e" | jq -r '.size // 0')
+    local_file="$MIRROR/$bucket/$path"
+    if [ -f "$local_file" ]; then
+      have=$(stat -c%s "$local_file" 2>/dev/null || echo 0)
+      if [ "$size" = "0" ] || [ "$have" = "$size" ]; then skipped=$((skipped + 1)); continue; fi
+    fi
+    need+=("$path")
+  done
+  log "    качать: ${#need[@]}, уже есть: $skipped"
+
+  for ((i = 0; i < ${#need[@]}; i += 100)); do
+    chunk=$(printf '%s\n' "${need[@]:i:100}" | jq -R . | jq -s -c .)
     resp=$(call "{\"kind\":\"files\",\"bucket\":\"$bucket\",\"paths\":$chunk}")
     if ! echo "$resp" | jq -e '.urls' >/dev/null 2>&1; then
       log "    ссылки не выдались: $(echo "$resp" | head -c 140)"
@@ -119,13 +138,17 @@ for bucket in $(jq -r '.files[].bucket' "$MANIFEST" | sort -u); do
       path=$(echo "$line" | jq -r '.path')
       url=$(echo "$line" | jq -r '.url // empty')
       [ -z "$url" ] && continue
-      target="$OUT/files/$bucket/$path"
+      target="$MIRROR/$bucket/$path"
       mkdir -p "$(dirname "$target")"
-      curl -sS --max-time 120 -o "$target" "$url" && saved=$((saved + 1))
+      curl -sS --max-time 120 -o "$target" "$url" && downloaded=$((downloaded + 1))
     done < <(echo "$resp" | jq -c '.urls[]')
   done
 done
-log "  файлов сохранено: $saved из $FILES_COUNT"
+log "  скачано новых: $downloaded, не менялось: $skipped"
+
+log "снимок файлов в копию за $DAY"
+rm -rf "$OUT/files"
+cp -al "$MIRROR" "$OUT/files"
 
 # ─── 4. Сайт ─────────────────────────────────────────────────────────────────
 log "дамп базы WordPress"

@@ -117,7 +117,19 @@ async function main() {
     const { data: before } = await seo.from('gsc_page_daily').select('normalized_url, impressions').eq('date', day).order('impressions', { ascending: false }).limit(1)
     if (!before?.length) return 'нет данных за контрольный день'
     const { runStep } = await import('../lib/seo/steps')
-    await runStep({ id: 0, step: 'gsc_import', lane: 'gsc', payload: { startDate: day, endDate: day } } as any, seo)
+    // Импорт пишет след полноты в settings.gsc_import_health. След сторожит
+    // молчаливую потерю данных: по нему видно, сколько строк приехало за день.
+    // Прогон за один день записал бы туда однодневное окно, и сторож после
+    // проверки врал бы до следующего ночного импорта. Поэтому снимаем и кладём
+    // обратно — проверка не должна портить то, что охраняет базу.
+    const { data: healthBefore } = await seo.from('settings').select('value').eq('key', 'gsc_import_health').maybeSingle()
+    try {
+      await runStep({ id: 0, step: 'gsc_import', lane: 'gsc', payload: { startDate: day, endDate: day } } as any, seo)
+    } finally {
+      if (healthBefore) {
+        await seo.from('settings').upsert({ key: 'gsc_import_health', value: healthBefore.value }, { onConflict: 'key' })
+      }
+    }
     const { data: after } = await seo.from('gsc_page_daily').select('impressions').eq('date', day).eq('normalized_url', before[0].normalized_url).single()
     assert(after!.impressions === before[0].impressions, `показы изменились: ${before[0].impressions} → ${after!.impressions}`)
     return `показы устойчивы: ${after!.impressions}`
