@@ -8,7 +8,7 @@
 import { registerStep, type Job, type StepOutcome } from './steps'
 import { metaByVersion, urlsOfArticles, slugOf } from './article-meta'
 import { readAll, readAllByDay } from '@/lib/supabase/read-all'
-import { generateBrief, generateDraft, reviseDraft, qaWithModel, qaDeterministic, GEN_MODEL, PROMPT_VERSION, type GenContext, type Brief, type QaReport } from './generate'
+import { generateBrief, generateDraft, reviseDraft, qaWithModel, qaDeterministic, writerConfig, GEN_MODEL, PROMPT_VERSION, type GenContext, type Brief, type QaReport } from './generate'
 import { summarize } from './standard'
 import { loadSiteTargets, normalizeBody } from './blog-style'
 import { loadClaims, subjectKeysFor } from './claims'
@@ -325,11 +325,13 @@ registerStep('article_draft', async (job: Job, seo: any): Promise<StepOutcome> =
   const articleId = job.article_id!
   const html = normalizeBody(await generateDraft(ctx, brief))
 
+  // Чем писали на самом деле, а не что стояло в коде на момент выкладки.
+  const writer = await writerConfig(seo)
   const { data: v, error } = await seo.from('article_versions').insert({
     article_id: articleId, version_no: 1, origin: 'generated',
     title: brief.title, body: html,
     meta: { description: brief.meta_description, slug: brief.slug, brief },
-    prompt_version: PROMPT_VERSION, model: GEN_MODEL,
+    prompt_version: writer.promptVersion ?? PROMPT_VERSION, model: writer.model,
   }).select('id').single()
   if (error) return { outcome: 'failed', result: { error: `article_versions: ${error.message}` } }
 
@@ -378,9 +380,11 @@ registerStep('article_qa', async (job: Job, seo: any): Promise<StepOutcome> => {
   }
 
   const fixed = await reviseDraft(ctx, brief, html, failedB.map((c) => ({ id: c.id, detail: c.detail })), modelIssues)
+  // Чем писали на самом деле, а не что стояло в коде на момент выкладки.
+  const writer = await writerConfig(seo)
   const nv = await insertVersion(seo, articleId, {
     origin: 'qa_fixed', title: brief.title, body: fixed, meta: version.meta,
-    prompt_version: PROMPT_VERSION, model: GEN_MODEL,
+    prompt_version: writer.promptVersion ?? PROMPT_VERSION, model: writer.model,
   })
   await seo.from('articles').update({ current_version_id: nv.id }).eq('id', articleId).throwOnError()
 
@@ -737,9 +741,11 @@ registerStep('article_fix', async (job: Job, seo: any): Promise<StepOutcome> => 
 
   const fixed = normalizeBody(await reviseDraft(ctx, brief, html, failedB.map((c) => ({ id: c.id, detail: c.detail })), modelIssues))
 
+  // Чем писали на самом деле, а не что стояло в коде на момент выкладки.
+  const writer = await writerConfig(seo)
   const nv = await insertVersion(seo, articleId, {
     origin: 'qa_fixed', title: version.title, body: fixed, meta,
-    prompt_version: PROMPT_VERSION, model: GEN_MODEL,
+    prompt_version: writer.promptVersion ?? PROMPT_VERSION, model: writer.model,
   })
 
   // Перепроверяем уже исправленный текст, чтобы отчёт относился к нему, а не к прошлому

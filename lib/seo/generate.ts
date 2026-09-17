@@ -3,6 +3,7 @@
 // не входят. Задача — довести одну тему до черновика, который человек читает и судит.
 import type Anthropic from '@anthropic-ai/sdk'
 import { withSpend, type SpendRole } from './spend'
+import { resolveRole, type RoleName } from './model-roles'
 import { getAnthropic } from '../ai'
 import { COMPANY_FACTS } from './facts'
 import { embed } from './embeddings'
@@ -13,8 +14,21 @@ import { audienceBlock } from './audience'
 export { summarize } from './standard'
 export type { Check, Level } from './standard'
 
+/**
+ * Значения по умолчанию, а не решение.
+ *
+ * Чем работает роль на самом деле — отвечает `resolveRole` из `model-roles.ts`:
+ * настройка, потом окружение, потом вот эти константы. Оставлены здесь потому,
+ * что на них ссылается код, писавшийся до настройки, и потому что без базы
+ * (в скриптах) работать надо ровно так же, как работало.
+ */
 export const GEN_MODEL = 'claude-opus-5'
 export const PROMPT_VERSION = 'v1'
+
+/** Чем сейчас работает писатель: для записи в версию статьи — правды, а не константы. */
+export async function writerConfig(seo: any | null) {
+  return resolveRole(seo, 'writer')
+}
 
 export type PageRef = { id: number; url: string; title: string | null; page_type: string | null }
 export type QueryRef = { query: string; impressions: number; clicks: number; position: number }
@@ -257,7 +271,11 @@ const BRIEF_SCHEMA = {
  */
 async function askModel(ctx: GenContext, role: SpendRole, params: any) {
   const client = getAnthropic()
-  const run = () => client.messages.create({ model: GEN_MODEL, ...params })
+  const cfg = await resolveRole(ctx.spend?.seo ?? null, role as RoleName)
+  const run = () => client.messages.create({
+    model: cfg.model, ...params,
+    ...(cfg.maxTokens ? { max_tokens: cfg.maxTokens } : {}),
+  })
 
   if (!ctx.spend) return run()
 
@@ -268,9 +286,9 @@ async function askModel(ctx: GenContext, role: SpendRole, params: any) {
       articleId: ctx.spend.articleId,
       traceId: ctx.spend.traceId,
       role,
-      provider: 'anthropic',
-      model: GEN_MODEL,
-      promptVersion: PROMPT_VERSION,
+      provider: cfg.provider,
+      model: cfg.model,
+      promptVersion: cfg.promptVersion,
       estimate: SPEND_ESTIMATE[role] ?? 0.50,
     },
     async () => {
@@ -300,7 +318,11 @@ async function askModel(ctx: GenContext, role: SpendRole, params: any) {
  */
 async function askModelStream(ctx: GenContext, role: SpendRole, params: any) {
   const client = getAnthropic()
-  const open = () => client.messages.stream({ model: GEN_MODEL, ...params })
+  const cfg = await resolveRole(ctx.spend?.seo ?? null, role as RoleName)
+  const open = () => client.messages.stream({
+    model: cfg.model, ...params,
+    ...(cfg.maxTokens ? { max_tokens: cfg.maxTokens } : {}),
+  })
 
   if (!ctx.spend) return open().finalMessage()
 
@@ -311,9 +333,9 @@ async function askModelStream(ctx: GenContext, role: SpendRole, params: any) {
       articleId: ctx.spend.articleId,
       traceId: ctx.spend.traceId,
       role,
-      provider: 'anthropic',
-      model: GEN_MODEL,
-      promptVersion: PROMPT_VERSION,
+      provider: cfg.provider,
+      model: cfg.model,
+      promptVersion: cfg.promptVersion,
       estimate: SPEND_ESTIMATE[role] ?? 0.50,
     },
     async () => {

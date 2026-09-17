@@ -11,6 +11,7 @@
  * сошлась.
  */
 import { safeFetch } from './safe-fetch'
+import { cachedVerify, CODE_CHECKER } from './verify-cache'
 import crypto from 'node:crypto'
 
 /** Снимок страницы: что прочитали, когда и в каком виде. */
@@ -55,22 +56,58 @@ export function extractText(html: string): string {
 }
 
 /**
+ * Текст снимка по версии источника.
+ *
+ * Текст хранится только у той строки, где он впервые отличился от предыдущего:
+ * неизменившиеся копии одной страницы занимали бы место и ничего не добавляли.
+ * Поэтому ищем по хешу первую строку, у которой текст есть.
+ */
+export async function snapshotText(seo: any, sourceId: number, contentHash: string): Promise<string | null> {
+  const { data } = await seo.from('source_snapshots')
+    .select('raw_text').eq('source_id', sourceId).eq('content_hash', contentHash)
+    .not('raw_text', 'is', null).order('fetched_at', { ascending: true }).limit(1)
+  return data?.[0]?.raw_text ?? null
+}
+
+/**
  * Снять снимок источника и записать его.
  *
  * Строка создаётся и при неудаче: недоступность источника — это наблюдение,
  * а не отсутствие наблюдения. PRD отдельно требует различать «источник не
  * изменился» и «источник не проверялся», и хранить только первое нельзя.
  */
-export async function snapshotSource(seo: any, sourceId: number): Promise<Snapshot> {
+export async function snapshotSource(
+  seo: any,
+  sourceId: number,
+  opts: { maxAgeMin?: number } = {},
+): Promise<Snapshot> {
   const { data: src, error } = await seo.from('sources').select('id, url, source_type').eq('id', sourceId).single()
   if (error || !src) throw new Error(`источник #${sourceId} не найден: ${error?.message}`)
   if (src.source_type !== 'web' || !src.url) throw new Error(`источник #${sourceId} не веб-страница — снимок не снять`)
 
   const { data: prev } = await seo.from('source_snapshots')
-    .select('id, content_hash').eq('source_id', sourceId)
+    .select('id, content_hash, fetched_at, http_status, final_url').eq('source_id', sourceId)
     .order('fetched_at', { ascending: false }).limit(1)
   const previousId = prev?.[0]?.id ?? null
   const previousHash = prev?.[0]?.content_hash ?? null
+
+  // Свежий снимок уже есть — не ходим на сайт заново.
+  //
+  // Проверка одной статьи трогает десятки утверждений с общими источниками;
+  // без этого мы бы качали страницу вуза по разу на каждое. Новую строку при
+  // этом не пишем: снимок — это наблюдение, а второго наблюдения не было.
+  if (opts.maxAgeMin && previousHash && prev?.[0]?.fetched_at) {
+    const ageMin = (Date.now() - new Date(prev[0].fetched_at).getTime()) / 60_000
+    if (ageMin <= opts.maxAgeMin) {
+      const text = await snapshotText(seo, sourceId, previousHash)
+      if (text != null) {
+        return {
+          id: previousId, sourceId, finalUrl: prev[0].final_url ?? null,
+          httpStatus: prev[0].http_status ?? null, text, contentHash: previousHash, error: null,
+        }
+      }
+    }
+  }
 
   const res = await safeFetch(src.url, process.env.SEO_CRAWL_USER_AGENT || 'goandstudy-seo-bot')
 
@@ -242,11 +279,28 @@ export async function verifyClaimAgainst(
 
   // Предмет должен совпасть. Источник про Таиланд не подтверждает утверждение
   // про Китай, сколько бы совпадающих чисел в нём ни нашлось.
+  //
+  // Проверяется до кэша и намеренно: сравнение двух строк бесплатно, а класть
+  // в кэш «не тот предмет» значило бы хранить ответ на вопрос, который не
+  // задавали.
   const { data: src } = await seo.from('sources').select('subject_key').eq('id', snapshot.sourceId).single()
   if (!src?.subject_key || src.subject_key !== claim.subject_key) return null
 
-  const found = findEvidence(snapshot.text, claim)
-  if (!found) return null
+  // Пара «версия утверждения × версия источника» проверяется один раз (E2.6).
+  const res = await cachedVerify(seo, {
+    claimId,
+    claimVersion: claim.version ?? 1,
+    sourceId: snapshot.sourceId,
+    contentHash: snapshot.contentHash,
+    snapshotId: snapshot.id,
+    checker: CODE_CHECKER,
+  }, async () => {
+    const hit = findEvidence(snapshot.text, claim)
+    return hit ? { outcome: 'supports' as const, evidence: hit } : { outcome: 'not_found' as const, evidence: null }
+  })
+
+  const found = res.evidence
+  if (res.outcome !== 'supports' || !found) return null
 
   await seo.from('claim_sources').upsert({
     claim_id: claimId,
