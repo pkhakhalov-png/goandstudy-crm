@@ -136,8 +136,8 @@ export async function notifyNewBooking(params: {
   clientPhone: string
   clientTelegram: string | null
   quizSummary?: string | null
-  source?: string | null   // откуда пришли: место и кнопка, словами
-  page?: string | null     // адрес страницы-источника (не формы записи)
+  source?: string | null    // откуда пришли: место и кнопка, словами
+  page?: string | null      // адрес страницы-источника (не формы записи)
 }): Promise<void> {
   const token = process.env.TELEGRAM_BOOKINGS_BOT_TOKEN
   const chatId = process.env.TELEGRAM_BOOKINGS_CHAT_ID
@@ -165,6 +165,8 @@ export async function notifyNewBooking(params: {
   // «Откуда», а не «Источник»: строка отвечает на вопрос, с какой страницы и по
   // какой кнопке человек пришёл. Адрес — отдельной строкой, чтобы по нему можно
   // было кликнуть.
+  // Название страницы уже внутри описания источника — оно собирается там, где
+  // известно, нашёлся заголовок или нет.
   const src = params.source ? `\n📍 Откуда: ${escHtml(params.source)}` : ''
   const pg = params.page ? `\n🔗 ${escHtml(params.page)}` : ''
 

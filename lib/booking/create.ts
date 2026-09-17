@@ -16,7 +16,7 @@ import { normalizePhone } from '@/lib/phone'
 import { timeToMinutes, MIN_GAP_MINUTES } from '@/lib/time'
 import { notifyNewBooking } from '@/lib/telegram'
 import { warnOnError } from '@/lib/supabase/write-guard'
-import { describeBookSource } from '@/lib/booking-link'
+import { describeBookSource, pageTitleFor } from '@/lib/booking-link'
 
 export type BookingInput = {
   date: string
@@ -268,7 +268,10 @@ export async function createBookingCore(input: BookingInput): Promise<BookingRes
     if (quizData.year) quizParts.push(`Год: ${quizData.year}`)
     const quizSummary = quizParts.length > 0 ? quizParts.join(' · ') : null
 
-    const origin = describeBookSource(utm)
+    // Сначала заголовок, потом описание: зная название страницы, описание
+    // становится короче и понятнее.
+    const pageTitle = await pageTitleFor(describeBookSource(utm).url)
+    const origin = describeBookSource(utm, pageTitle)
 
     console.log('[BOOK] TG notify start:', { salesperson: assignedUser.name, tg: assignedUser.telegram_username, date, time: st })
     await notifyNewBooking({

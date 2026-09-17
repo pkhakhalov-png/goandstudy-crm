@@ -107,8 +107,20 @@ export function stampBookLinks(html: string, src: Omit<BookSource, 'content'>): 
  * Человеческое описание источника для уведомления: строка «откуда» и адрес
  * страницы, если он известен.
  */
-export function describeBookSource(u: Record<string, string>): { where: string; url: string | null } {
+export function describeBookSource(
+  u: Record<string, string>,
+  /** Название страницы, если его удалось найти: тогда слаг не нужен. */
+  title?: string | null,
+): { where: string; url: string | null } {
   const url = pageUrl(u)
+
+  // Когда название страницы известно, оно и есть ответ на вопрос «откуда».
+  // Повторять рядом слаг незачем: «Поступление в США · статья блога
+  // «postuplenie-v-ssha»» — это одно и то же дважды.
+  if (title) {
+    const spot = describeContent(u.utm_content)
+    return { where: [title, spot].filter(Boolean).join(' · '), url }
+  }
 
   // Наши метки узнаём по источнику: `utm_source=goandstudy` ставим только мы.
   // Чужие (реклама, рассылки) показываем как есть — придумывать им описание
@@ -146,6 +158,10 @@ function describeContent(content?: string): string | null {
   const inText = content.match(/^cta-text-(\d+)$/)
   if (inText) return `ссылка в тексте, ${inText[1]}-я`
   if (content === 'final-cta-button') return 'кнопка «Записаться» внизу страницы'
+  const onPage = content.match(/^cta-(\d+)$/)
+  if (onPage) return `${onPage[1]}-я кнопка на странице`
+  if (content === 'cta-hero') return 'кнопка в начале страницы'
+  if (content === 'cta-steps') return 'кнопка после шагов'
   return content
 }
 
@@ -171,4 +187,59 @@ function pageUrl(u: Record<string, string>): string | null {
     } catch { /* не адрес — пропускаем */ }
   }
   return null
+}
+
+
+/**
+ * Человеческое название страницы, с которой пришла заявка.
+ *
+ * В уведомлении менеджеру слаг вроде `postuplenie-v-ssha` ничего не говорит, а
+ * «Поступление в США: от выбора вуза до студенческой визы» говорит всё.
+ * Заголовки уже есть в инвентаре сайта, который ведёт SEO-модуль, — берём
+ * оттуда, а не заводим второй справочник.
+ *
+ * Если страницы в инвентаре нет (новая, чужая, с параметрами), возвращаем null
+ * и показываем просто адрес: выдумывать название нельзя.
+ */
+export async function pageTitleFor(url: string | null): Promise<string | null> {
+  if (!url) return null
+  try {
+    const { createAdminClient } = await import('@/lib/supabase/server')
+    const seo = (await createAdminClient()).schema('seo')
+
+    const clean = url.split('?')[0].replace(/\/$/, '')
+    const { data } = await seo.from('pages')
+      .select('title')
+      .in('normalized_url', [clean, `${clean}/`])
+      .limit(1)
+      .maybeSingle()
+
+    const fromInventory = tidy((data as any)?.title)
+    if (fromInventory) return fromInventory
+
+    // Свежая статья могла ещё не попасть в инвентарь: его обновляет ночной
+    // обход. Заголовок своей статьи знаем и без него.
+    const slug = clean.match(/\/blog\/([a-z0-9-]+)$/i)?.[1]
+    if (slug) {
+      const { data: version } = await seo.from('article_versions')
+        .select('title')
+        .eq('meta->>slug', slug)
+        .order('version_no', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      return tidy((version as any)?.title)
+    }
+
+    return null
+  } catch {
+    // Статистика не повод ронять запись клиента.
+    return null
+  }
+}
+
+/** Убираем хвост вроде «– Go and Study»: в уведомлении он только мешает. */
+function tidy(title: unknown): string | null {
+  if (typeof title !== 'string') return null
+  const clean = title.replace(/\s*[–—-]\s*Go\s*and\s*Study\s*$/i, '').trim()
+  return clean || null
 }
