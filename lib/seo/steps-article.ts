@@ -89,7 +89,29 @@ async function buildContext(seo: any, topic: any): Promise<GenContext> {
   const stems = kw.split(/[^\p{L}\d]+/u).filter((w) => w.length >= 4).map((w) => w.slice(0, 5))
 
   const agg = new Map<string, { imp: number; clicks: number; pos: number; n: number; score: number }>()
-  for (const r of await fetchAll(seo, 'gsc_daily', 'query,clicks,impressions,position')) {
+
+  // Отбор запросов переехал в базу.
+  //
+  // Было: вычитывали gsc_daily целиком — 198 тысяч строк — и оставляли из них
+  // десяток, у которого совпала половина основ слов. Таблица росла, и 17 сентября
+  // это добралось до предела: «canceling statement due to statement timeout»,
+  // пять попыток подряд, задача насмерть.
+  //
+  // Стало: база отдаёт только строки, где встречается хотя бы одна основа. Это
+  // заведомо шире нужного — половину основ проверяем всё так же здесь, — но
+  // строк приезжает на три порядка меньше. Условие отбора не изменилось:
+  // «хотя бы одна» надмножество «хотя бы половины».
+  //
+  // Основы состоят только из букв и цифр (split по всему остальному), поэтому
+  // подставлять их в фильтр безопасно.
+  const rows = stems.length
+    ? await fetchAll(seo, 'gsc_daily', 'query,clicks,impressions,position',
+        (q: any) => q.or(stems.map((st) => `query.ilike.*${st}*`).join(',')))
+    // Основ нет — совпасть не с чем: score будет нулём для любого запроса.
+    // Раньше мы всё равно читали таблицу целиком, чтобы всё выбросить.
+    : []
+
+  for (const r of rows) {
     const q = String(r.query).toLowerCase()
     const score = stems.length ? stems.filter((st) => q.includes(st)).length / stems.length : 0
     if (score < 0.5) continue

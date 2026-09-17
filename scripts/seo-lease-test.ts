@@ -33,18 +33,27 @@ const drop = (id: number) => seo.from('jobs').delete().eq('id', id)
 
 async function main() {
   // Готовность базы. Без этого остальные проверки соврут «пройдено».
+  //
+  // process.exit внутри try обошёл бы finally и оставил задачу в боевой очереди
+  // — так и случилось при первом прогоне, задача #897 повисла в running с
+  // исполнителем lease-probe. Поэтому сначала прибираем, и только потом выходим.
   const probe = await addJob()
+  let stop: string[] | null = null
   try {
     const { data: rows } = await seo.rpc('claim_jobs', { p_worker: 'lease-probe', p_limit: 5, p_runner: 'vercel' })
     const mine = (rows ?? []).find((j: any) => j.id === probe)
-    if (!mine) { console.log('! задача не выдана — дорожка занята, повтори прогон'); process.exit(2) }
-    if (mine.fencing_token == null) {
-      console.log('! миграция 20260917010000 не применена: выдача не проставляет fencing_token')
-      console.log('  применить supabase/migrations/20260917010000_job_lease_expand.sql и повторить')
-      process.exit(2)
+    if (!mine) {
+      stop = ['! задача не выдана — дорожка занята, повтори прогон']
+    } else if (mine.fencing_token == null) {
+      stop = [
+        '! миграция 20260917010000 не применена: выдача не проставляет fencing_token',
+        '  применить supabase/migrations/20260917010000_job_lease_expand.sql и повторить',
+      ]
+    } else {
+      console.log(`база готова: номер выдачи ${mine.fencing_token}, аренда до ${mine.lease_expires_at}\n`)
     }
-    console.log(`база готова: номер выдачи ${mine.fencing_token}, аренда до ${mine.lease_expires_at}\n`)
   } finally { await drop(probe) }
+  if (stop) { stop.forEach((l) => console.log(l)); process.exit(2) }
 
   await test('подтверждение жизни продлевает аренду', async () => {
     const id = await addJob()
