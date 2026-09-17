@@ -98,14 +98,32 @@ export async function recordBookingTouch(
 
     if (path) pageId = await pageIdForPath(seo, path)
 
-    const { error } = await seo.from('lead_identities').upsert({
+    const leadAt = new Date().toISOString()
+
+    // Цепочка просмотров, если человека узнали по куке. Она точнее одиночного
+    // адреса из формы: форма знает только последний шаг, а цепочка — весь путь.
+    const touches = await resolveTouches(seo, input.anonId, leadAt).catch(() => null)
+
+    const row: Record<string, any> = {
       lead_source: 'book',
       external_lead_id: String(input.bookingId),
-      lead_at: new Date().toISOString(),
+      lead_at: leadAt,
       anon_id: input.anonId ?? null,
-      first_touch_page: pageId,
-      last_touch_page: pageId,
-    }, { onConflict: 'external_lead_id' })
+      // Без цепочки остаётся прежнее поведение: обе страницы — та, что в форме.
+      first_touch_page: touches?.firstPage ?? pageId,
+      last_touch_page: touches?.lastPage ?? pageId,
+    }
+    if (touches) {
+      row.first_touch_at = touches.firstAt
+      row.first_touch_utm = touches.firstUtm
+      row.first_touch_referrer = touches.firstReferrer
+      row.last_touch_at = touches.lastAt
+      row.last_touch_utm = touches.lastUtm
+      row.last_touch_referrer = touches.lastReferrer
+      row.touches_count = touches.count
+    }
+
+    const { error } = await seo.from('lead_identities').upsert(row, { onConflict: 'external_lead_id' })
 
     if (error) return { ok: false, why: error.message }
     return { ok: true, page: path }
@@ -118,6 +136,58 @@ export async function recordBookingTouch(
  * Сшивка с продажами. У записи на консультацию есть сделка (deals.booking_id),
  * но появляется она не в тот же миг, поэтому связываем отдельным проходом.
  */
+/**
+ * Цепочка касаний одного посетителя.
+ *
+ * Первое касание отвечает на вопрос «что привело интерес», последнее — «что
+ * привело к действию». Это разные заслуги, и PRD требует хранить обе, а в
+ * отчёте показывать раздельно и НЕ складывать: одна заявка — одно первое
+ * касание и одно последнее, а не две заявки.
+ *
+ * Берём по анонимному идентификатору, а не по сессии: человек может прочитать
+ * статью сегодня, а прийти через неделю — и это одна цепочка, хотя сессии две.
+ */
+export type Touches = {
+  firstAt: string | null
+  firstPage: number | null
+  firstUtm: Record<string, string> | null
+  firstReferrer: string | null
+  lastAt: string | null
+  lastPage: number | null
+  lastUtm: Record<string, string> | null
+  lastReferrer: string | null
+  count: number
+}
+
+export async function resolveTouches(
+  seo: any,
+  anonId: string | null | undefined,
+  before?: string,
+): Promise<Touches | null> {
+  if (!anonId) return null
+
+  // До момента заявки, а не вообще: просмотры ПОСЛЕ заявки к ней не привели.
+  let q = seo.from('attribution_events')
+    .select('created_at, page_id, utm, referrer')
+    .eq('anon_id', anonId)
+    .order('created_at', { ascending: true })
+    .limit(500)
+  if (before) q = q.lte('created_at', before)
+
+  const { data, error } = await q
+  if (error || !data?.length) return null
+
+  const first = data[0]
+  const last = data[data.length - 1]
+  return {
+    firstAt: first.created_at, firstPage: first.page_id ?? null,
+    firstUtm: first.utm ?? null, firstReferrer: first.referrer ?? null,
+    lastAt: last.created_at, lastPage: last.page_id ?? null,
+    lastUtm: last.utm ?? null, lastReferrer: last.referrer ?? null,
+    count: data.length,
+  }
+}
+
 export async function stitchDeals(seo: any, sb: any): Promise<{ matched: number; pending: number }> {
   const { data: unmatched } = await seo.from('lead_identities')
     .select('id, external_lead_id').is('deal_id', null).eq('lead_source', 'book').limit(500)
