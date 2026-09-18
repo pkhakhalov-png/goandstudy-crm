@@ -84,7 +84,7 @@ function cosine(a: number[], b: number[]): number {
   return dot / (Math.sqrt(na) * Math.sqrt(nb) || 1)
 }
 
-async function buildContext(
+export async function buildContext(
   seo: any,
   topic: any,
   /** Задача, в рамках которой идёт генерация: по ней расход привязывается к статье. */
@@ -219,7 +219,7 @@ function next(seo: any, step: string, articleId: number, topicId: number, payloa
  * же максимум. Поэтому при столкновении пересчитываем и пробуем снова —
  * уникальный индекс здесь работает как арбитр, а не как приговор.
  */
-async function insertVersion(
+export async function insertVersion(
   seo: any,
   articleId: number,
   fields: Record<string, any>,

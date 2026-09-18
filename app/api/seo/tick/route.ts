@@ -5,6 +5,7 @@ import { outcomeFor } from '@/lib/seo/failure'
 import { heartbeatAll } from '@/lib/seo/lease'
 import '@/lib/seo/steps-article'   // регистрация шагов производства статьи
 import '@/lib/seo/steps-freshness'   // наблюдение за источниками и планы правки
+import '@/lib/seo/steps-legacy'      // правка опубликованного архива
 
 // Воркер SEO-очереди (PRD 10.3). Вызывается pg_cron через pg_net раз в минуту.
 // Тики МОГУТ пересекаться — конкуренция регулируется в БД (claim_jobs, SKIP LOCKED).
@@ -47,7 +48,7 @@ const LONG_STEP_MS = 230_000
  * условия задачу первым забирал Vercel и ронял её на отсутствии ssh, хотя рядом
  * стоял агент, который умеет.
  */
-const SERVER_ONLY_STEPS = new Set(['article_publish_blog', 'link_insert_theme'])
+const SERVER_ONLY_STEPS = new Set(['article_publish_blog', 'link_insert_theme', 'content_legacy_fix'])
 const canRunHere = (step: string) => !(process.env.VERCEL && SERVER_ONLY_STEPS.has(step))
 
 const QUICK_ARTICLE_STEPS = new Set(['article_index_check', 'article_autostart', 'attribution_stitch', 'alerts_check', 'article_autopublish'])

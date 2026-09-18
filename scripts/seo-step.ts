@@ -12,6 +12,7 @@ config({ path: path.resolve(process.cwd(), '.env.local') })
 import { runStep } from '../lib/seo/steps'
 import '../lib/seo/steps-article'   // шаги производства статьи и подбора тем
 import '../lib/seo/steps-freshness'   // content_freshness_check, content_correction_plan
+import '../lib/seo/steps-legacy'      // content_legacy_fix
 
 const seo = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } }).schema('seo')
 
