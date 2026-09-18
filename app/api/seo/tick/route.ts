@@ -4,6 +4,7 @@ import { runStep, hasStep, registeredSteps } from '@/lib/seo/steps'
 import { outcomeFor } from '@/lib/seo/failure'
 import { heartbeatAll } from '@/lib/seo/lease'
 import '@/lib/seo/steps-article'   // регистрация шагов производства статьи
+import '@/lib/seo/steps-freshness'   // наблюдение за источниками и планы правки
 
 // Воркер SEO-очереди (PRD 10.3). Вызывается pg_cron через pg_net раз в минуту.
 // Тики МОГУТ пересекаться — конкуренция регулируется в БД (claim_jobs, SKIP LOCKED).
@@ -50,7 +51,15 @@ const SERVER_ONLY_STEPS = new Set(['article_publish_blog', 'link_insert_theme'])
 const canRunHere = (step: string) => !(process.env.VERCEL && SERVER_ONLY_STEPS.has(step))
 
 const QUICK_ARTICLE_STEPS = new Set(['article_index_check', 'article_autostart', 'attribution_stitch', 'alerts_check', 'article_autopublish'])
-const isLongStep = (step: string) => step.startsWith('article_') && !QUICK_ARTICLE_STEPS.has(step)
+/**
+ * Наблюдение за источниками модель не зовёт, но ходит по чужим серверам: одно
+ * наблюдение это robots.txt и страница, по двадцать секунд таймаута каждая.
+ * Начинать такой обход под конец бюджета нельзя по той же причине, что и
+ * генерацию, — поэтому он в длинных, хотя и дешёвый.
+ */
+const LONG_OTHER_STEPS = new Set(['content_freshness_check'])
+const isLongStep = (step: string) =>
+  LONG_OTHER_STEPS.has(step) || (step.startsWith('article_') && !QUICK_ARTICLE_STEPS.has(step))
 
 export async function POST(req: NextRequest) {
   const secret = process.env.SEO_TICK_SECRET
@@ -122,6 +131,20 @@ export async function POST(req: NextRequest) {
         .eq('step', 'article_autopublish').in('status', ['pending', 'running', 'waiting']).limit(1)
       if (!ap?.length) {
         await seo.from('jobs').insert({ step: 'article_autopublish', lane: 'production', priority: 14, payload: {} }).throwOnError()
+      }
+      // Свежесть фактов. Шаг сам смотрит, у каких источников вышел срок, и
+      // молча ничего не делает, если не вышел ни у одного. Раз в час, потому
+      // что критичные источники — визы, дедлайны — смотрятся каждые шесть, а за
+      // один прогон разбирается пять штук: реже значит отставать от расписания.
+      //
+      // Ставится безусловно. Если миграция свежести не применена, задача упадёт
+      // с прямым указанием, какой файл применить, и это попадёт в сторожа. Тихо
+      // не ставить её вовсе было бы хуже: молчание на экране читается как
+      // «источники проверяются».
+      const { data: fr } = await seo.from('jobs').select('id')
+        .eq('step', 'content_freshness_check').in('status', ['pending', 'running', 'waiting']).limit(1)
+      if (!fr?.length) {
+        await seo.from('jobs').insert({ step: 'content_freshness_check', lane: 'content', priority: 13, payload: {} }).throwOnError()
       }
       await seo.from('settings').upsert({ key: 'last_autostart_check', value: { at: new Date().toISOString() } }, { onConflict: 'key' }).throwOnError()
     }

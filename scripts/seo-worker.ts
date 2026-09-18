@@ -12,6 +12,7 @@ import { runStep, hasStep } from '../lib/seo/steps'
 import { outcomeFor } from '../lib/seo/failure'
 import { withHeartbeat } from '../lib/seo/lease'
 import '../lib/seo/steps-article'   // регистрация шагов производства статьи
+import '../lib/seo/steps-freshness'   // наблюдение за источниками и планы правки
 
 const seo = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } }).schema('seo')
 const ONCE = process.argv.includes('--once')
