@@ -118,7 +118,7 @@ async function История({ content, id }: { content: any; id: number }) {
       <Таблица
         columns={['Слот', 'Исход', 'Ссылка', 'Попыток', 'Кликабельна', 'Проверено']}
         rows={(пабы as any[]).map((p) => [
-          дата(p.scheduled_at),
+          <Link key="s" href={`/admin/content/publications/${p.id}`} style={{ color: 'var(--purple)' }}>{дата(p.scheduled_at)}</Link>,
           <span key="s" style={{ color: p.status === 'verified' || p.status === 'published' ? 'var(--green)' : p.status === 'unknown' || p.status === 'failed' || p.status === 'blocked' ? 'var(--red)' : 'var(--text)' }}>
             {ru(p.status)}
           </span>,
@@ -155,7 +155,7 @@ async function План({ content, id, зона }: { content: any; id: number; �
       <Таблица
         columns={['Слот', 'Состояние', 'Версия варианта', 'Ключ повтора']}
         rows={(пабы as any[]).map((p) => [
-          дата(p.scheduled_at),
+          <Link key="s" href={`/admin/content/publications/${p.id}`} style={{ color: 'var(--purple)' }}>{дата(p.scheduled_at)}</Link>,
           <span key="s" style={{ color: p.status === 'blocked' ? 'var(--red)' : 'var(--text)' }}>
             {p.status === 'blocked' ? 'заблокировано: под публикацией изменился факт' : ru(p.status)}
           </span>,

@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { createAdminClient } from '@/lib/supabase/server'
 import { ru, ago } from '@/lib/content/overview'
 import { Пусто, Таблица } from '../Bits'
@@ -47,7 +48,10 @@ export default async function PublicationsPage() {
           const tries = (attempts ?? []).filter((a: any) => a.publication_id === p.id)
           const failed = tries.filter((a: any) => a.error)
           return [
-            <span key="id">#{p.id}{p.caught_up_at ? <span style={{ color: 'var(--muted)', fontSize: 11 }}> · догнан</span> : null}</span>,
+            <span key="id">
+              <Link href={`/admin/content/publications/${p.id}`} style={{ color: 'var(--purple)' }}>#{p.id}</Link>
+              {p.caught_up_at ? <span style={{ color: 'var(--muted)', fontSize: 11 }}> · догнан</span> : null}
+            </span>,
             ch ? `${ch.title ?? ch.account_external_id} (${ch.platform})` : `канал #${p.channel_id}`,
             <span key="s">{p.slot_day ?? '—'}<div style={{ fontSize: 11, color: 'var(--muted)' }}>{ago(p.scheduled_at) ?? ''}</div></span>,
             ru(p.status),
