@@ -1,36 +1,45 @@
+import Link from 'next/link'
 import { createAdminClient } from '@/lib/supabase/server'
-import { ru, ago } from '@/lib/content/overview'
-import { Пусто, Таблица } from '../Bits'
-import { НовыйКанал, РежимКанала, Рубильник } from './Controls'
+import { карточкиКаналов, сводка, ДОСТАВКА_RU } from '@/lib/content/channel-panel'
+import { Пусто } from '../Bits'
+import { НовыйКанал, Рубильник } from './Controls'
+import { Состояние_, Метка, Числом } from './Кусочки'
 
 export const dynamic = 'force-dynamic'
 
 /**
- * Каналы: куда вообще можно выпускать.
+ * Каналы: куда выпускаем и что там происходит.
  *
- * Отдельная колонка «проверено вызовом» стоит здесь не для красоты. Запись в
- * справочнике возможностей без ссылки на успешный вызов означает «мы так
- * думаем», а не «площадка это умеет», и разница выясняется в тот момент, когда
- * пост уходит не туда или не так.
+ * Наверху у каждого канала одна строка состояния и пять чисел. Всё остальное —
+ * история, расписание, настройки, проблемы, метрики — лежит внутри карточки.
+ * Разделение сделано нарочно: экран, показывающий сразу всё, перестают читать
+ * через неделю, и тогда неважно, насколько точны его цифры.
  */
 export default async function ChannelsPage() {
-  const content = (await createAdminClient()).schema('content' as any)
+  const sb = await createAdminClient()
+  const content = sb.schema('content' as any)
+  const seo = sb.schema('seo')
 
-  const { data: chans, error } = await content
-    .from('channels')
-    .select('id, platform, account_external_id, title, timezone, mode, daily_cap, max_catch_up, policy_id, created_at')
-    .order('id')
+  let карточки
+  try {
+    карточки = await карточкиКаналов(content, seo)
+  } catch (e: any) {
+    return <Пусто что="Каналы не прочитались" почему={String(e?.message ?? e)} />
+  }
 
-  if (error) return <Пусто что="Каналы не прочитались" почему={error.message} />
+  return (
+    <>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap', marginBottom: 4 }}>
+        <h2 style={{ margin: 0 }}>Каналы</h2>
+        <span style={{ fontSize: 12, color: 'var(--muted)' }}>{сводка(карточки)}</span>
+      </div>
 
-  const { data: caps } = await content.from('connector_capabilities')
-    .select('platform, account_external_id, verified_actions, proof_ref, checked_at')
+      <div style={{ display: 'flex', gap: 10, margin: '12px 0 16px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+        <НовыйКанал />
+        {карточки.length ? <Рубильник активных={карточки.filter((k) => k.режим === 'active').length} /> : null}
+      </div>
 
-  if (!chans?.length) {
-    return (
-      <>
-        <h2 style={{ margin: '0 0 12px' }}>Каналы</h2>
-        <div style={{ marginBottom: 14 }}><НовыйКанал /></div>
+      {!карточки.length ? (
         <Пусто
           что="Каналов нет"
           почему={
@@ -39,42 +48,44 @@ export default async function ChannelsPage() {
             + 'приостановленным: включение — отдельное решение человека, а не побочный эффект создания.'
           }
         />
-      </>
-    )
-  }
+      ) : (
+        <div style={{ display: 'grid', gap: 10 }}>
+          {карточки.map((к) => (
+            <Link key={к.id} href={`/admin/content/channels/${к.id}`}
+              style={{
+                display: 'block', textDecoration: 'none', color: 'inherit',
+                padding: '14px 16px', border: '1px solid var(--bor2)', borderRadius: 12, background: 'var(--surf)',
+              }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <strong style={{ fontSize: 14 }}>{к.название}</strong>
+                <span style={{ fontSize: 12, color: 'var(--muted)' }}>{к.аккаунт}</span>
+                <Метка тон="тихий">{к.платформа}</Метка>
+                <Метка тон="тихий">{ДОСТАВКА_RU[к.доставка].split(' — ')[0]}</Метка>
+                <span style={{ marginLeft: 'auto' }}><Состояние_ с={к.состояние} /></span>
+              </div>
 
-  const capOf = (c: any) => (caps ?? []).find((k: any) =>
-    k.platform === c.platform && (k.account_external_id === c.account_external_id || !k.account_external_id))
+              <div style={{ fontSize: 12, color: 'var(--muted)', margin: '6px 0 12px' }}>{к.строка}</div>
 
-  return (
-    <>
-      <h2 style={{ margin: '0 0 12px' }}>Каналы</h2>
-      <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-        <НовыйКанал />
-        <Рубильник активных={(chans as any[]).filter((c) => c.mode === 'active').length} />
-      </div>
-      <Таблица
-        columns={['Канал', 'Площадка', 'Режим', 'Зона', 'Темп', 'Догон', 'Возможности', '']}
-        rows={(chans as any[]).map((c) => {
-          const cap = capOf(c)
-          const проверено = cap?.proof_ref ? 'проверено вызовом' : cap ? 'записано, но не проверено' : 'не проверяли'
-          return [
-            <span key="t">{c.title ?? c.account_external_id}</span>,
-            c.platform,
-            <span key="m" style={{ color: c.mode === 'active' ? 'var(--green)' : 'var(--muted)' }}>{ru(c.mode)}</span>,
-            c.timezone,
-            `${c.daily_cap} в день`,
-            String(c.max_catch_up),
-            <span key="c" style={{ color: cap?.proof_ref ? 'var(--green)' : 'var(--muted)' }}>
-              {проверено}{cap?.checked_at ? ` · ${ago(cap.checked_at)}` : ''}
-            </span>,
-            <РежимКанала key="r" id={c.id} mode={c.mode} />,
-          ]
-        })}
-      />
-      <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 10, lineHeight: 1.6 }}>
-        «Записано, но не проверено» значит, что возможности площадки взяты из документации, а не из
-        успешного вызова. До проверки вызовом любые выводы о ссылках и переходах — оценка, а не измерение.
+              <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+                <Числом label="вышло · 7 дн" мера={к.вышло7} />
+                <Числом label="вышло · 30 дн" мера={к.вышло30} />
+                <Числом label="в плане · нед" мера={к.вПлане7} />
+                {к.доставка === 'manual'
+                  ? <Числом label="ждут рук" мера={к.ждутРук} />
+                  : <Числом label="заблокировано" мера={к.заблокировано} />}
+                <Числом label="переходы · 30" мера={к.переходы30} />
+                <Числом label="заявки · 30" мера={к.заявки30} />
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
+
+      <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 14, lineHeight: 1.6, maxWidth: 780 }}>
+        Переходы и заявки — из CRM по меткам, и считаются только у публикаций с подтверждённой
+        кликабельной ссылкой: если площадка ссылку переписала или не отдала, приписывать ей переходы
+        значит выдумывать результат. Охваты приходят от самой площадки и с этими числами не
+        складываются — это разные измерения разных вещей.
       </div>
     </>
   )

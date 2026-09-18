@@ -122,6 +122,15 @@ export const STATUS_RU: Record<string, string> = {
   stale: 'устарело', passed: 'прошло', failed_review: 'не прошло',
   low: 'низкая', medium: 'средняя', high: 'высокая',
   article: 'статья', social_post: 'пост',
+  // Исход отправки, о котором нельзя сказать ни «вышел», ни «не ушёл»: запрос
+  // ушёл, ответ не дошёл, а спросить у площадки нечем.
+  unknown: 'исход неизвестен',
+  // Причины из очереди внимания — на экране канала они стоят вместо кода.
+  claim_changed_after_publish: 'под вышедшим постом изменился факт',
+  claim_changed_in_draft: 'изменился факт в неопубликованном варианте',
+  source_observation_gap: 'источник молчит несколько наблюдений подряд',
+  unknown_outcome: 'отправляли, исход неизвестен',
+  channel_auth_failed: 'доступ к каналу отозван',
 }
 
 export const ru = (k: string) => STATUS_RU[k] ?? k
