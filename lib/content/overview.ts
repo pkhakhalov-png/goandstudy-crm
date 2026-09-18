@@ -134,6 +134,9 @@ export const STATUS_RU: Record<string, string> = {
   source_observation_gap: 'источник молчит несколько наблюдений подряд',
   unknown_outcome: 'отправляли, исход неизвестен',
   channel_auth_failed: 'доступ к каналу отозван',
+  manual_publish_unverified: 'выложили руками, страницу поста прочитать не удалось',
+  manual_publish_no_utm: 'выложили руками, метки публикации в посте нет',
+  manual_publish_cancelled: 'снято из очереди ручной выкладки',
 }
 
 export const ru = (k: string) => STATUS_RU[k] ?? k

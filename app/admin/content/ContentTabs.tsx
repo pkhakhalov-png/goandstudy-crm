@@ -16,6 +16,7 @@ const GROUPS: { title: string; tabs: { href: string; label: string }[] }[] = [
       { href: '/admin/content/packages', label: 'Пакеты' },
       { href: '/admin/content/reviews', label: 'Проверки' },
       { href: '/admin/content/calendar', label: 'Календарь' },
+      { href: '/admin/content/export', label: 'Ждут рук' },
       { href: '/admin/content/publications', label: 'Публикации' },
     ],
   },
