@@ -62,7 +62,22 @@ async function main() {
   const cards: { slug: string; title: string; hook: string; accent: string[]; shot: string; file: string }[] = []
   const recent: Shot[] = []
 
-  for (const slug of targets) {
+  // Переверстать уже одобренный текст на уже нарисованной фотографии: ни одного
+  // платного вызова. Нужен, когда правится макет, а не содержание.
+  if (argv.includes('--relayout')) {
+    const manifest: any[] = JSON.parse(fs.readFileSync(path.join(outDir, 'hooks.json'), 'utf8'))
+    for (const m of manifest.filter((x) => !slugs.length || slugs.includes(x.slug))) {
+      const photo = path.join(outDir, `${m.slug}.photo.jpg`)
+      if (!fs.existsSync(photo)) { console.log(`${m.slug}: фотографии нет, пропускаю`); continue }
+      const card = await renderHookCover(fs.readFileSync(photo), { text: m.hook, accent: m.accent })
+      const file = path.join(outDir, `${m.slug}.jpg`)
+      fs.writeFileSync(file, card.buffer)
+      cards.push({ ...m, file })
+      console.log(`${m.slug}: переверстано, ${Math.round(card.bytes / 1024)} КБ`)
+    }
+  }
+
+  for (const slug of cards.length ? [] : targets) {
     const title = titles.get(slug) ?? slug
     console.log(`${slug}\n   «${title}»`)
     try {

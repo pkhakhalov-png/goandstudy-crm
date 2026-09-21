@@ -130,11 +130,24 @@ function layout(font: Font, hook: Hook, size: number, maxWidth: number): Line[] 
   return best
 }
 
+/**
+ * Пропорция карточки в ленте — `.blog-card__img { aspect-ratio: 1.3 }` при
+ * `background-size: cover`. Фотография у нас 3:2, то есть шире: тема срезает
+ * с каждого края по (1 − 1.3/1.5) / 2 — это 6.7% ширины, 80 px из 1200.
+ *
+ * Первый заход это проигнорировал: отступ в 6% ширины встал ровно на линию
+ * среза, и в ленте у фраз откусило первую букву, хотя в файле всё было цело.
+ * Поэтому поле считается от пропорции темы, а не подбирается на глаз.
+ */
+export const CARD_RATIO = 1.3
+
 export type HookCoverOptions = {
   /** Сколько строк допускаем. Больше трёх на карточке 480 px уже не читается. */
   maxLines?: number
   /** Доля высоты, которую занимает затемнение снизу. */
   scrim?: number
+  /** Пропорция, в которой картинку покажет лента. null — не резать поле вовсе. */
+  cardRatio?: number | null
 }
 
 /**
@@ -154,7 +167,12 @@ export async function renderHookCover(
   const H = meta.height ?? 800
 
   const maxLines = options.maxLines ?? 3
-  const pad = Math.round(W * 0.06)
+
+  // Отступ = срезанное темой + воздух. Воздух отдельно: текст, вплотную
+  // подошедший к краю кадра, читается как обрезанный, даже когда он целый.
+  const ratio = options.cardRatio === undefined ? CARD_RATIO : options.cardRatio
+  const cropped = ratio ? Math.max(0, (1 - ratio / (W / H)) / 2) : 0
+  const pad = Math.round(W * (cropped + 0.05))
   const maxWidth = W - pad * 2
 
   // Кегль: от крупного вниз, пока фраза не уложится в отведённые строки
