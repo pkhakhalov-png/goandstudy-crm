@@ -19,6 +19,7 @@ const ЦВЕТ: Record<Состояние, string> = {
   нет_доступа: 'var(--red)',
   руками: 'var(--muted)',
   по_ssh: 'var(--green)',
+  нет_коннектора: 'var(--red)',
 }
 
 /**
