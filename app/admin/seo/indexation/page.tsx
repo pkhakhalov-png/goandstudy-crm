@@ -84,7 +84,10 @@ export default async function IndexationPage({ searchParams }: { searchParams: P
   ] = await Promise.all([
     seo.from('pages').select('id, normalized_url, page_type, first_seen_at')
       .is('removed_at', null).eq('indexable', true).eq('http_status', 200),
-    seo.from('index_status').select('page_id, verdict, coverage_state, last_crawl, checked_at, first_indexed_at'),
+    // next_check_at читаем вместе с остальным: без него строка «след.» всегда
+    // пустела, и экран писал «нет в инвентаре» даже про страницу, которая в
+    // инвентаре стоит и ждёт очередной проверки.
+    seo.from('index_status').select('page_id, verdict, coverage_state, last_crawl, checked_at, first_indexed_at, next_check_at'),
     // Наши статьи — то, ради чего этот экран и нужен. У них известна настоящая
     // дата выхода, а не дата, когда их впервые увидел обход.
     seo.from('articles').select('id, published_at, indexed_at, primary_keyword, current_version_id')
@@ -279,7 +282,7 @@ export default async function IndexationPage({ searchParams }: { searchParams: P
                               <div>
                                 {a.nextCheckAt
                                   ? `след. ${new Date(a.nextCheckAt).toLocaleString('ru', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}`
-                                  : 'нет в инвентаре'}
+                                  : a.inInventory ? 'проверка не назначена' : 'нет в инвентаре'}
                               </div>
                             </>
                           : 'ещё не спрашивали'}
