@@ -295,7 +295,9 @@ method` — 2 падения. Блокирует проверку канниба
 - `attention_items`, `metrics_daily`, `audit_events`;
 - коннекторы Telegram и VK (бот Telegram в CRM есть, но это бот уведомлений,
   не канальный коннектор с `capabilities`/`reconcile`/`fetchMetrics`);
-- приёмник атрибуции для форм Tilda — сейчас UTM тянутся только с квиза `/book`;
+- приёмник атрибуции для обращений из чата Jivo — UTM тянутся только с квиза `/book`.
+  Формулировка PRD «заявки с Tilda» неприменима: Tilda на сайте нет, всё на WordPress
+  (проверено разметкой страниц, см. `docs/seo-session-report.md`);
 - экран `/admin/content`.
 
 Из полезного к переиспользованию: `seo.lead_identities` и `seo.attribution_events`
