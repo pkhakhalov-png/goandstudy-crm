@@ -14,6 +14,7 @@
  * в кривые здесь, и результат одинаков на маке, на воркере и на сервере темы.
  */
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import sharp from 'sharp'
 import opentype, { type Font } from 'opentype.js'
@@ -21,23 +22,45 @@ import { BRAND } from './cover'
 
 /** Фирменный шрифт сайта. Берём тот же файл, что отдаёт тема, — он там публичный. */
 const FONT_URL = 'https://goandstudy.com/wp-content/themes/goandstudy/assets/fonts/ArtegraSans-Bold.woff2'
-const FONT_DIR = path.resolve(process.cwd(), 'temp/fonts')
-const FONT_FILE = path.join(FONT_DIR, 'ArtegraSans-Bold.ttf')
+
+/**
+ * Куда класть распакованный шрифт.
+ *
+ * Обложки рисует воркер на Vercel, а там файловая система только для чтения,
+ * кроме /tmp: путь внутри проекта развалил бы ночной прогон, хотя на маке
+ * выглядел бы исправным. На своей машине держим файл в temp/ — он в .gitignore,
+ * и шрифт (коммерческий) в репозиторий не попадает.
+ */
+function fontDir(): string {
+  const local = path.resolve(process.cwd(), 'temp/fonts')
+  if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) return path.join(os.tmpdir(), 'gs-fonts')
+  try {
+    fs.mkdirSync(local, { recursive: true })
+    fs.accessSync(local, fs.constants.W_OK)
+    return local
+  } catch {
+    return path.join(os.tmpdir(), 'gs-fonts')
+  }
+}
 
 let cached: Font | null = null
 
 /** Шрифт в память: скачиваем и распаковываем один раз, дальше из файла. */
 export async function brandFont(): Promise<Font> {
   if (cached) return cached
-  if (!fs.existsSync(FONT_FILE)) {
+  const file = path.join(fontDir(), 'ArtegraSans-Bold.ttf')
+  let ttf: Buffer
+  if (fs.existsSync(file)) {
+    ttf = fs.readFileSync(file)
+  } else {
     const res = await fetch(FONT_URL, { signal: AbortSignal.timeout(30000) })
     if (!res.ok) throw new Error(`шрифт не скачался: ${res.status}`)
     const { decompress } = await import('wawoff2')
-    const ttf = await decompress(Buffer.from(await res.arrayBuffer()))
-    fs.mkdirSync(FONT_DIR, { recursive: true })
-    fs.writeFileSync(FONT_FILE, Buffer.from(ttf))
+    ttf = Buffer.from(await decompress(Buffer.from(await res.arrayBuffer())))
+    // Кэш — ускорение, а не условие работы: если записать некуда, рисуем всё равно
+    try { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, ttf) } catch { /* обойдёмся */ }
   }
-  cached = opentype.parse(fs.readFileSync(FONT_FILE).buffer.slice(0) as ArrayBuffer)
+  cached = opentype.parse(ttf.buffer.slice(ttf.byteOffset, ttf.byteOffset + ttf.byteLength) as ArrayBuffer)
   return cached
 }
 
@@ -54,7 +77,7 @@ type Line = { words: Word[]; width: number }
 const norm = (s: string) => s.toLowerCase().replace(/[«»",.!?:;()]/g, '')
 
 /** Разложить фразу по строкам настоящими метриками шрифта, а не по числу букв. */
-function layout(font: Font, hook: Hook, size: number, maxWidth: number): Line[] {
+function greedy(font: Font, hook: Hook, size: number, maxWidth: number): Line[] {
   const accents = new Set((hook.accent ?? []).flatMap((a) => a.split(/\s+/)).map(norm))
   const space = font.getAdvanceWidth(' ', size)
   const lines: Line[] = []
@@ -85,6 +108,26 @@ function runs(words: Word[]): Word[][] {
     else out.push([w])
   }
   return out.filter((r) => r.length)
+}
+
+/**
+ * Строки ровнее. Жадный перенос оставляет висячий хвост: «Сколько стоит и где /
+ * сдать» — и подсветка рвётся пополам, хотя «где сдать» одна мысль. Сжимаем
+ * колонку, пока число строк не выросло: получается та же разбивка, но без
+ * одинокого слова внизу.
+ */
+function layout(font: Font, hook: Hook, size: number, maxWidth: number): Line[] {
+  let best = greedy(font, hook, size, maxWidth)
+  if (best.length < 2) return best
+  const target = best.length
+  let lo = Math.round(maxWidth * 0.5)
+  let hi = maxWidth
+  while (hi - lo > 8) {
+    const mid = Math.round((lo + hi) / 2)
+    const tried = greedy(font, hook, size, mid)
+    if (tried.length <= target) { best = tried; hi = mid } else lo = mid
+  }
+  return best
 }
 
 export type HookCoverOptions = {

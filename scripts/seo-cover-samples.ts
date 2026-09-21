@@ -114,6 +114,10 @@ async function main() {
     top: GAP + Math.floor(i / COLS) * (CH + GAP),
   })))
 
+  // Список фраз рядом с картинками: переверстать текст можно без новых
+  // платных вызовов — фотография и крючок уже есть.
+  fs.writeFileSync(path.join(outDir, 'hooks.json'), JSON.stringify(cards.map(({ file, ...c }) => c), null, 2))
+
   const sheetFile = path.join(outDir, 'sheet.png')
   await sharp(sheet).composite(tiles).png().toFile(sheetFile)
   console.log(`контактный лист: ${sheetFile}`)
