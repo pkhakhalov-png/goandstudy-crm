@@ -2,6 +2,7 @@
 
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { площадка } from '@/lib/content/platforms'
 
 /**
  * Действия раздела «Контент» (E4.11).
@@ -46,7 +47,7 @@ async function journal(content: any, actor: string, operation: string, entityTyp
  * успели настроить.
  */
 export async function createChannel(input: {
-  platform: 'telegram' | 'vk'
+  platform: string
   accountExternalId: string
   title: string
   timezone?: string
@@ -57,7 +58,15 @@ export async function createChannel(input: {
 
   const account = String(input.accountExternalId ?? '').trim()
   if (!account) return { error: 'Нужен идентификатор аккаунта на площадке' }
-  if (input.platform !== 'telegram' && input.platform !== 'vk') return { error: 'Площадка только telegram или vk' }
+
+  // Площадка берётся из реестра, а не из списка в двух строках кода: способ
+  // доставки — его же поле, и вывести его из названия нельзя. У VC сегодня
+  // выкладка руками, а завтра появится токен, и это меняется в реестре, а не
+  // здесь.
+  const п = площадка(input.platform)
+  if (!п) return { error: `Площадки «${input.platform}» нет в реестре` }
+  if (п.доставка === 'ssh') return { error: 'Сайт публикуется агентом, каналом он не заводится' }
+
   const cap = Number(input.dailyCap ?? 1)
   if (!Number.isInteger(cap) || cap < 1 || cap > 10) {
     return { error: 'Темп от 1 до 10 постов в день. Больше — только после замера, так написано в плане' }
@@ -65,20 +74,27 @@ export async function createChannel(input: {
 
   const content = (await createAdminClient()).schema('content' as any)
   const { data, error } = await content.from('channels').insert({
-    platform: input.platform,
+    platform: п.код,
     account_external_id: account,
     title: String(input.title ?? '').trim() || account,
     timezone: input.timezone || 'Europe/Moscow',
     mode: 'paused',
+    delivery: п.доставка,
     daily_cap: cap,
   }).select('id').single()
 
   if (error) {
     return { error: /duplicate|unique/i.test(error.message) ? 'Такой канал уже заведён' : error.message }
   }
-  await journal(content, user!.name, 'create_channel', 'channel', (data as any).id, `${input.platform}/${account}`)
+  await journal(content, user!.name, 'create_channel', 'channel', (data as any).id, `${п.код}/${account}`)
   revalidatePath('/admin/content/channels')
-  return { ok: true, note: 'Канал заведён приостановленным. Включить — отдельной кнопкой.' }
+  revalidatePath('/admin/content/connections')
+  return {
+    ok: true,
+    note: п.доставка === 'manual'
+      ? 'Канал заведён приостановленным. Выкладка здесь ручная: машина готовит, публикует человек.'
+      : 'Канал заведён приостановленным. Включить — отдельной кнопкой.',
+  }
 }
 
 /** Включить или приостановить канал. */

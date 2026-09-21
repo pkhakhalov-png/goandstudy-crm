@@ -1,6 +1,7 @@
 'use client'
 import { useState, useTransition } from 'react'
 import { createChannel, setChannelMode, stopAllPublishing } from '../actions'
+import { ПЛОЩАДКИ } from '@/lib/content/platforms'
 
 function Ответ({ text, ошибка }: { text: string | null; ошибка?: boolean }) {
   if (!text) return null
@@ -30,24 +31,40 @@ export function РежимКанала({ id, mode }: { id: number; mode: string 
   )
 }
 
-/** Завести канал. Всегда приостановленным — включение отдельным действием. */
-export function НовыйКанал() {
+/**
+ * Завести канал. Всегда приостановленным — включение отдельным действием.
+ *
+ * С экрана подключений площадка приходит заданной: там уже выбрали, к чему
+ * подключаемся, и второй выбор в форме означал бы, что его можно сделать иначе,
+ * чем нажатием в карточке.
+ */
+export function НовыйКанал({ площадка }: { площадка?: string } = {}) {
   const [open, setOpen] = useState(false)
   const [pending, start] = useTransition()
   const [msg, setMsg] = useState<string | null>(null)
   const [err, setErr] = useState(false)
-  const [f, setF] = useState({ platform: 'telegram' as 'telegram' | 'vk', accountExternalId: '', title: '', dailyCap: 1 })
+  const [f, setF] = useState({
+    platform: площадка ?? 'telegram',
+    accountExternalId: '', title: '', dailyCap: 1,
+  })
+  // Сайт публикуется агентом по SSH и каналом в этом смысле не заводится.
+  const выбор = ПЛОЩАДКИ.filter((п) => п.код !== 'site')
 
   if (!open) return <button className="btn-s" onClick={() => setOpen(true)}>Завести канал</button>
 
   return (
     <div style={{ padding: 14, border: '1px solid var(--bor2)', borderRadius: 10, background: 'var(--surf2)', maxWidth: 520 }}>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-        <select value={f.platform} onChange={(e) => setF({ ...f, platform: e.target.value as any })}
-          style={{ padding: '6px 8px', borderRadius: 8, border: '1px solid var(--bor2)', background: 'var(--surf)', color: 'var(--text)' }}>
-          <option value="telegram">Telegram</option>
-          <option value="vk">VK</option>
-        </select>
+        {площадка ? (
+          <span style={{ fontSize: 13, fontWeight: 600 }}>
+            {выбор.find((п) => п.код === площадка)?.имя ?? площадка}
+          </span>
+        ) : (
+          <select value={f.platform} onChange={(e) => setF({ ...f, platform: e.target.value })}
+            style={{ padding: '6px 8px', borderRadius: 8, border: '1px solid var(--bor2)', background: 'var(--surf)', color: 'var(--text)' }}>
+            {выбор.map((п) => <option key={п.код} value={п.код}>{п.имя}</option>)}
+          </select>
+        )}
         <input placeholder="идентификатор аккаунта" value={f.accountExternalId}
           onChange={(e) => setF({ ...f, accountExternalId: e.target.value })}
           style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--bor2)', background: 'var(--surf)', color: 'var(--text)', flex: 1, minWidth: 180 }} />

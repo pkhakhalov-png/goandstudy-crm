@@ -26,6 +26,7 @@ const GROUPS: { title: string; tabs: { href: string; label: string }[] }[] = [
       { href: '/admin/content', label: 'Обзор' },
       { href: '/admin/content/attention', label: 'Требуют внимания' },
       { href: '/admin/content/channels', label: 'Каналы' },
+      { href: '/admin/content/connections', label: 'Подключения' },
     ],
   },
 ]
