@@ -95,10 +95,13 @@ function Группа({ title, подпись, карточки }: {
     <section style={{ marginBottom: 26 }}>
       <h3 style={{ margin: '0 0 4px', fontSize: 14 }}>{title}</h3>
       <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12, lineHeight: 1.6, maxWidth: 820 }}>{подпись}</div>
-      <div style={{ display: 'grid', gap: 10 }}>
+      {/* Три блока в строку: на планшете два, на телефоне один — классы .kg .k3
+          те же, что у KPI-плиток, чтобы сетка везде ломалась одинаково. */}
+      <div className="kg k3">
         {карточки.map((к) => (
           <div key={к.площадка.код} style={{
             padding: '14px 16px', border: '1px solid var(--bor2)', borderRadius: 12, background: 'var(--surf)',
+            display: 'flex', flexDirection: 'column',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
               <strong style={{ fontSize: 14 }}>{к.площадка.имя}</strong>
@@ -110,7 +113,7 @@ function Группа({ title, подпись, карточки }: {
                   </Link>
                 : null}
               <span style={{
-                marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6,
+                display: 'inline-flex', alignItems: 'center', gap: 6,
                 fontSize: 12, color: ЦВЕТ[к.состояние],
               }}>
                 <span style={{ width: 7, height: 7, borderRadius: 999, background: ЦВЕТ[к.состояние] }} />
@@ -147,7 +150,7 @@ function Группа({ title, подпись, карточки }: {
               </div>
             ) : null}
 
-            <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginTop: 10, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 'auto', paddingTop: 12, flexWrap: 'wrap' }}>
               {к.площадка.доставка !== 'ssh' ? <НовыйКанал площадка={к.площадка.код} /> : null}
               {к.площадка.док
                 ? <a href={к.площадка.док} target="_blank" rel="noreferrer"

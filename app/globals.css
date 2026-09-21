@@ -571,6 +571,7 @@ tbody tr:hover { background: var(--rh); }
   margin-bottom: 14px;
 }
 
+.k3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .k4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .k5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 
@@ -830,7 +831,7 @@ tbody tr:hover { background: var(--rh); }
   }
 
   /* KPI гриды — 2 колонки на мобиле */
-  .k4, .k5 {
+  .k3, .k4, .k5 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -886,7 +887,7 @@ tbody tr:hover { background: var(--rh); }
 @media (max-width: 480px) {
 
   /* KPI — 1 колонка на маленьких */
-  .k4, .k5 {
+  .k3, .k4, .k5 {
     grid-template-columns: 1fr;
   }
 

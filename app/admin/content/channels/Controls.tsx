@@ -53,7 +53,13 @@ export function НовыйКанал({ площадка }: { площадка?: 
   if (!open) return <button className="btn-s" onClick={() => setOpen(true)}>Завести канал</button>
 
   return (
-    <div style={{ padding: 14, border: '1px solid var(--bor2)', borderRadius: 10, background: 'var(--surf2)', maxWidth: 520 }}>
+    // Форма живёт и во всю ширину экрана каналов, и внутри узкой плитки на
+    // экране подключений, поэтому полей не хватает не по ширине, а по месту:
+    // минимальные размеры малые, перенос разрешён.
+    <div style={{
+      padding: 14, border: '1px solid var(--bor2)', borderRadius: 10, background: 'var(--surf2)',
+      width: '100%', maxWidth: 520, boxSizing: 'border-box',
+    }}>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
         {площадка ? (
           <span style={{ fontSize: 13, fontWeight: 600 }}>
@@ -67,9 +73,9 @@ export function НовыйКанал({ площадка }: { площадка?: 
         )}
         <input placeholder="идентификатор аккаунта" value={f.accountExternalId}
           onChange={(e) => setF({ ...f, accountExternalId: e.target.value })}
-          style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--bor2)', background: 'var(--surf)', color: 'var(--text)', flex: 1, minWidth: 180 }} />
+          style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--bor2)', background: 'var(--surf)', color: 'var(--text)', flex: 1, minWidth: 120, boxSizing: 'border-box' }} />
         <input placeholder="название" value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })}
-          style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--bor2)', background: 'var(--surf)', color: 'var(--text)', flex: 1, minWidth: 140 }} />
+          style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--bor2)', background: 'var(--surf)', color: 'var(--text)', flex: 1, minWidth: 110, boxSizing: 'border-box' }} />
         <label style={{ fontSize: 12, color: 'var(--muted)' }}>
           постов в день{' '}
           <input type="number" min={1} max={10} value={f.dailyCap} onChange={(e) => setF({ ...f, dailyCap: Number(e.target.value) })}
