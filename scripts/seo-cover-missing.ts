@@ -135,9 +135,15 @@ async function main() {
   console.log('')
 
   let drawn = 0, failed = 0
-  for (const t of targets.slice(0, limit)) {
-    console.log(`${t.slug}  [${t.cat}] — ${t.why}`)
-    console.log(`   «${t.title}»`)
+
+  // По одной картинке за раз это три четверти часа на три десятка карточек:
+  // почти всё время уходит на ожидание модели, а не на работу. Четыре в параллель
+  // укладываются в десять минут и не упираются в ограничения поставщика.
+  const queue = targets.slice(0, limit)
+  const LANES = Number(process.env.COVER_LANES ?? 4)
+
+  const draw = async (t: Target) => {
+    const say: string[] = [`${t.slug}  [${t.cat}] — ${t.why}`, `   «${t.title}»`]
     try {
       const local = path.join(outDir, `${t.slug}.jpg`)
       const reuse = fs.existsSync(local) && !argv.includes('--redraw')
@@ -147,7 +153,7 @@ async function main() {
       if (!scene && !reuse) {
         scenes = await planScenes({ title: t.title, h1: t.title, headings: await headings(t.slug) })
         scene = scenes.cover
-        console.log(`   сцена: ${String(scene).slice(0, 140)}`)
+        say.push(`   сцена: ${String(scene).slice(0, 140)}`)
       }
 
       let img: { buffer: Buffer; width: number; height: number; bytes: number }
@@ -156,44 +162,50 @@ async function main() {
         const sharp = (await import('sharp')).default
         const m = await sharp(buffer).metadata()
         img = { buffer, width: m.width ?? 0, height: m.height ?? 0, bytes: buffer.length }
-        console.log(`   · беру готовую ${img.width}×${img.height}, ${Math.round(img.bytes / 1024)} КБ`)
+        say.push(`   · беру готовую ${img.width}×${img.height}, ${Math.round(img.bytes / 1024)} КБ`)
       } else {
         img = await generateCover(coverPrompt(scene!))
         fs.writeFileSync(local, img.buffer)
-        console.log(`   ✓ нарисовано ${img.width}×${img.height}, ${Math.round(img.bytes / 1024)} КБ`)
+        say.push(`   ✓ нарисовано ${img.width}×${img.height}, ${Math.round(img.bytes / 1024)} КБ`)
       }
       drawn++
 
-      if (!apply) { console.log(''); continue }
+      if (apply) {
+        const remote = `${THEME}/assets/img/blog/${t.slug}.jpg`
+        await ssh(`[ -f ${remote} ] && cp ${remote} ${remote}.bak || true`)
+        await scp(local, remote)
+        await ssh(`chown root:www-data ${remote} && chmod 644 ${remote}`)
+        const { stdout: sz } = await ssh(`ls -l ${remote} | awk '{print $5}'`)
+        say.push(`   ✓ на сайте: ${sz.trim()} байт`)
 
-      const remote = `${THEME}/assets/img/blog/${t.slug}.jpg`
-      await ssh(`[ -f ${remote} ] && cp ${remote} ${remote}.bak || true`)
-      await scp(local, remote)
-      await ssh(`chown root:www-data ${remote} && chmod 644 ${remote}`)
-      const { stdout: sz } = await ssh(`ls -l ${remote} | awk '{print $5}'`)
-      console.log(`   ✓ на сайте: ${sz.trim()} байт`)
-
-      if (t.versionId) {
-        const { data: fresh } = await seo.from('article_versions').select('meta').eq('id', t.versionId).single()
-        const meta: any = fresh?.meta ?? t.meta
-        const { error: upErr } = await seo.from('article_versions').update({
-          meta: {
-            ...meta,
-            cover: {
-              format: 'jpeg', width: img.width, height: img.height, bytes: img.bytes,
-              base64: img.buffer.toString('base64'), drawn_at: new Date().toISOString(),
+        if (t.versionId) {
+          const { data: fresh } = await seo.from('article_versions').select('meta').eq('id', t.versionId).single()
+          const meta: any = fresh?.meta ?? t.meta
+          const { error: upErr } = await seo.from('article_versions').update({
+            meta: {
+              ...meta,
+              cover: {
+                format: 'jpeg', width: img.width, height: img.height, bytes: img.bytes,
+                base64: img.buffer.toString('base64'), drawn_at: new Date().toISOString(),
+              },
+              images: { ...(meta.images ?? {}), scenes: scenes ?? meta.images?.scenes },
             },
-            images: { ...(meta.images ?? {}), scenes: scenes ?? meta.images?.scenes },
-          },
-        }).eq('id', t.versionId)
-        console.log(upErr ? `   ✗ база: ${upErr.message}` : '   ✓ записано в базу')
+          }).eq('id', t.versionId)
+          say.push(upErr ? `   ✗ база: ${upErr.message}` : '   ✓ записано в базу')
+        }
       }
     } catch (e) {
       failed++
-      console.log(`   ✗ ${(e as Error).message}`)
+      say.push(`   ✗ ${(e as Error).message}`)
     }
-    console.log('')
+    // Печатаем статью целиком и разом: иначе четыре потока перемешают строки
+    console.log(say.join('\n') + '\n')
   }
+
+  const lanes = Array.from({ length: Math.min(LANES, queue.length) }, async () => {
+    for (let t = queue.shift(); t; t = queue.shift()) await draw(t)
+  })
+  await Promise.all(lanes)
 
   console.log(`нарисовано ${drawn}${failed ? `, не вышло ${failed}` : ''}`)
   if (!apply && drawn) console.log(`заливка: повторите с --apply --out ${outDir}`)

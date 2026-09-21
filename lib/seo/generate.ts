@@ -654,26 +654,58 @@ function parseJson<T>(res: Anthropic.Message, what: string): T {
 
 /* ── Сцены для картинок ───────────────────────────────────────────────────── */
 
+/**
+ * Типы кадра. Раньше их не было, и модель раз за разом предлагала одно и то же:
+ * человек за столом с ноутбуком у окна. В ленте из шести карточек четыре
+ * оказывались буквально одним снимком. Однообразие лечится не стилем, а планом:
+ * сначала выбирается тип кадра, и только потом под него придумывается сцена.
+ */
+export const SHOTS = ['деталь', 'предмет', 'улица', 'интерьер', 'через-плечо', 'общий-план', 'со-спины'] as const
+export type Shot = typeof SHOTS[number]
+
+const SHOT_HINTS: Record<Shot, string> = {
+  'деталь': 'close-up of hands and papers, no faces — documents, stamps, a form being filled',
+  'предмет': 'a single object filling the frame on a plain surface — a passport, a key, a boarding pass, a folder',
+  'улица': 'exterior wide shot of a street, square or campus path, people small and blurred in motion',
+  'интерьер': 'the inside of a room that belongs to the topic — lecture hall, library, waiting room, office',
+  'через-плечо': 'over-the-shoulder view of what a person is looking at, the person only partly in frame',
+  'общий-план': 'a wide establishing frame of a place with depth, several planes, no single hero',
+  'со-спины': 'a person seen from behind or in profile, occupied with something, face not readable',
+}
+
 const SCENES_SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['cover', 'inline', 'inline_alt', 'after_heading'],
+  required: ['shot', 'cover', 'inline', 'inline_alt', 'after_heading', 'hook', 'hook_accent'],
   properties: {
+    shot: { type: 'string', enum: SHOTS as unknown as string[], description: 'Тип кадра обложки' },
     cover: { type: 'string', description: 'Сцена для обложки, на английском, 1–2 предложения' },
     inline: { type: 'string', description: 'Сцена для картинки внутри статьи, на английском, 1–2 предложения' },
     inline_alt: { type: 'string', description: 'Подпись alt по-русски, 4–12 слов, описывает изображение' },
     after_heading: { type: 'string', description: 'Точный текст подзаголовка H2, ПОСЛЕ раздела которого встанет картинка' },
+    hook: { type: 'string', description: 'Фраза на обложку по-русски, 3–7 слов. НЕ заголовок статьи' },
+    // Длину массива задаём словами, а не minItems/maxItems: структурированный
+    // ответ такие ограничения для массива не принимает и отвечает 400.
+    hook_accent: { type: 'array', items: { type: 'string' }, description: 'Одно или два слова из hook дословно — то, что встанет под подсветку. Больше двух нельзя' },
   },
 } as const
 
-export type Scenes = { cover: string; inline: string; inline_alt: string; after_heading: string }
+export type Scenes = {
+  shot: Shot
+  cover: string
+  inline: string
+  inline_alt: string
+  after_heading: string
+  hook: string
+  hook_accent: string[]
+}
 
 /**
  * Что именно изобразить. Решает модель, а не шаблон: «Австрия» шаблонно даёт
  * флаг и башню, а нужна сцена, отвечающая теме статьи.
  */
 export async function planScenes(
-  input: { title: string; h1: string; headings: string[] },
+  input: { title: string; h1: string; headings: string[]; avoidShots?: Shot[] },
   /** Привязка учёта. Подбор сцен — тоже платный вызов, и в отчёте он виден. */
   spend?: GenContext['spend'],
 ): Promise<Scenes> {
@@ -689,6 +721,12 @@ export async function planScenes(
 Описываешь СЦЕНУ для фотографа — что в кадре, где, при каком свете. По-английски,
 одно-два предложения, без художественных эпитетов и без указаний стиля: стиль
 добавляется отдельно.
+
+Сначала выбираешь ТИП КАДРА, потом под него придумываешь сцену:
+${SHOTS.map((k) => `— ${k}: ${SHOT_HINTS[k]}`).join('\n')}
+
+Тип кадра ${input.avoidShots?.length ? `НЕ должен совпадать ни с одним из недавних: ${input.avoidShots.join(', ')}. ` : ''}\
+Человек за столом с ноутбуком — это один вариант из семи, а не рубрика по умолчанию.
 
 Правила:
 — никакого текста, вывесок с читаемыми словами, логотипов и флагов крупным планом;
@@ -743,7 +781,15 @@ creating a gentle rim on hair and shoulder.
 
 Про свет и обработку в сцене не пиши вовсе, кроме случаев, когда время суток
 важно самому сюжету: характер кадра задаётся отдельным стилевым блоком, и
-дублировать его — значит спорить с ним.`,
+дублировать его — значит спорить с ним.
+
+Поле hook — фраза, которая ляжет поверх фотографии. Это НЕ заголовок: заголовок
+уже стоит подписью под карточкой, и тот же текст дважды в одной карточке —
+brak, а не акцент. Пиши крючок: 3–7 слов, разговорно, обещание или вопрос по
+теме статьи. Без точки в конце, без кавычек, без названия компании.
+
+Поле hook_accent — одно-два слова ИЗ hook дословно, те, что встанут под
+фиолетовую плашку. Выбирай смысловые (что именно обещаем), а не служебные.`,
     messages: [{
       role: 'user',
       content: `Заголовок: ${input.title}\nH1: ${input.h1}\n\nПодзаголовки:\n${input.headings.map((h) => `— ${h}`).join('\n')}`,
