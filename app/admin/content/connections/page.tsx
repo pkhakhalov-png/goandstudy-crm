@@ -178,6 +178,14 @@ function Группа({ title, подпись, карточки }: {
             <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 'auto', paddingTop: 12, flexWrap: 'wrap' }}>
               {к.площадка.доставка !== 'ssh' && к.площадка.путь !== 'нет'
                 ? <НовыйКанал площадка={к.площадка.код} /> : null}
+              {/* У VK есть свой экран выпуска: что вышло, когда и на сколько
+                  хватит запаса картинок. Ссылка отсюда, потому что человек
+                  приходит сюда с вопросом «работает ли», а ответ на него —
+                  список вышедших постов, а не цвет метки. */}
+              {к.площадка.код === 'vk'
+                ? <Link href="/admin/content/vk"
+                    style={{ fontSize: 12, color: 'var(--purple)', alignSelf: 'center' }}>выпуск и запас</Link>
+                : null}
               {к.площадка.док
                 ? <a href={к.площадка.док} target="_blank" rel="noreferrer"
                     style={{ fontSize: 12, color: 'var(--purple)', alignSelf: 'center' }}>документация</a>

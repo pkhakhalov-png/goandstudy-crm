@@ -6,6 +6,7 @@ import { heartbeatAll } from '@/lib/seo/lease'
 import '@/lib/seo/steps-article'   // регистрация шагов производства статьи
 import '@/lib/seo/steps-freshness'   // наблюдение за источниками и планы правки
 import '@/lib/seo/steps-legacy'      // правка опубликованного архива
+import '@/lib/seo/steps-vk'          // самостоятельный выпуск в VK
 
 // Воркер SEO-очереди (PRD 10.3). Вызывается pg_cron через pg_net раз в минуту.
 // Тики МОГУТ пересекаться — конкуренция регулируется в БД (claim_jobs, SKIP LOCKED).
@@ -51,7 +52,7 @@ const LONG_STEP_MS = 230_000
 const SERVER_ONLY_STEPS = new Set(['article_publish_blog', 'link_insert_theme', 'content_legacy_fix'])
 const canRunHere = (step: string) => !(process.env.VERCEL && SERVER_ONLY_STEPS.has(step))
 
-const QUICK_ARTICLE_STEPS = new Set(['article_index_check', 'article_autostart', 'attribution_stitch', 'alerts_check', 'article_autopublish'])
+const QUICK_ARTICLE_STEPS = new Set(['article_index_check', 'article_autostart', 'attribution_stitch', 'alerts_check', 'article_autopublish', 'vk_autopost'])
 /**
  * Наблюдение за источниками модель не зовёт, но ходит по чужим серверам: одно
  * наблюдение это robots.txt и страница, по двадцать секунд таймаута каждая.
@@ -133,6 +134,16 @@ export async function POST(req: NextRequest) {
       if (!ap?.length) {
         await seo.from('jobs').insert({ step: 'article_autopublish', lane: 'production', priority: 14, payload: {} }).throwOnError()
       }
+      // Самостоятельный выпуск в VK. Ставится рядом с выпуском статей и по той
+      // же причине: шаг дешёвый и сам считает паузу от факта последней
+      // публикации. Раз в час — достаточно для ритма «пост раз в двое суток»,
+      // и при этом промах одного тика ничего не сдвигает.
+      const { data: vk } = await seo.from('jobs').select('id')
+        .eq('step', 'vk_autopost').in('status', ['pending', 'running', 'waiting']).limit(1)
+      if (!vk?.length) {
+        await seo.from('jobs').insert({ step: 'vk_autopost', lane: 'production', priority: 14, payload: {} }).throwOnError()
+      }
+
       // Свежесть фактов. Шаг сам смотрит, у каких источников вышел срок, и
       // молча ничего не делает, если не вышел ни у одного. Раз в час, потому
       // что критичные источники — визы, дедлайны — смотрятся каждые шесть, а за
