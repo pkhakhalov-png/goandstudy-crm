@@ -396,8 +396,9 @@ registerStep('article_qa', async (job: Job, seo: any): Promise<StepOutcome> => {
 
 /**
  * Схем внутри текста у блога не бывает: wp:image в теме не стилизован, картинка
- * отрендерится голым HTML. Поэтому шаг делает только обложку карточки — 480×320
- * JPEG без текста и логотипов, как требует стандарт.
+ * отрендерится голым HTML. Поэтому шаг делает обложку карточки: фотография
+ * 1200×800 JPEG, а поверх неё — фраза из плана сцен, буквами фирменного шрифта
+ * (см. cover-hook.ts). Модель текста не рисует: по-русски она в нём ошибается.
  *
  * Файл кладём в мету версии base64: воркер может крутиться на Vercel, где нет
  * постоянного диска, а при публикации обложка всё равно уезжает на сервер темы.
@@ -448,6 +449,21 @@ registerStep('article_cover', async (job: Job, seo: any): Promise<StepOutcome> =
     return fallback(`картинки не нарисовались: ${String(e?.message ?? e).slice(0, 120)}`)
   }
 
+  // Фраза поверх фотографии. Отдельной попыткой, а не внутри общего try: за
+  // фотографию уже заплачено, и если не скачался шрифт, разумно выйти с чистым
+  // кадром, а не откатываться к фиолетовой заглушке и терять оплаченное.
+  let hookDrawn: { text: string; accent: string[] } | null = null
+  try {
+    const { renderHookCover } = await import('./cover-hook')
+    const card = await renderHookCover(cover.buffer, { text: scenes.hook, accent: scenes.hook_accent })
+    cover = { ...cover, buffer: card.buffer, width: card.width, height: card.height, bytes: card.bytes }
+    hookDrawn = { text: scenes.hook, accent: scenes.hook_accent }
+  } catch (e: any) {
+    // Молчать нельзя: обложка без фразы выглядит исправной, и разницу заметит
+    // только человек в ленте — через сутки после выхода статьи.
+    console.error(`[cover] фраза не легла на обложку ${slug}: ${String(e?.message ?? e).slice(0, 200)}`)
+  }
+
   // Вставляем картинку после раздела, который выбрала модель. Если такого
   // подзаголовка в тексте нет — ставим в середину, а не теряем картинку.
   const blocks = splitBlocks(body)
@@ -462,7 +478,13 @@ registerStep('article_cover', async (job: Job, seo: any): Promise<StepOutcome> =
     body: blocks.join('\n\n'),
     meta: {
       ...meta,
-      cover: { format: 'jpeg', width: cover.width, height: cover.height, bytes: cover.bytes, base64: cover.buffer.toString('base64') },
+      // Фразу храним рядом с картинкой: перерисовка возьмёт ту же, а не придумает
+      // новую, и в базе видно, что на обложке написано, без открывания файла.
+      cover: {
+        format: 'jpeg', width: cover.width, height: cover.height, bytes: cover.bytes,
+        base64: cover.buffer.toString('base64'),
+        ...(hookDrawn ? { hook: hookDrawn.text, hook_accent: hookDrawn.accent } : {}),
+      },
       images: {
         ...(meta.images ?? {}),
         scenes,
@@ -476,6 +498,7 @@ registerStep('article_cover', async (job: Job, seo: any): Promise<StepOutcome> =
     outcome: 'done',
     result: {
       cover: `${cover.width}×${cover.height}`, kb: Math.round(cover.bytes / 102.4) / 10,
+      hook: hookDrawn?.text ?? 'НЕ ЛЕГЛА',
       inline: `${inline.width}×${inline.height}`, after: target >= 0 ? scenes.after_heading : 'середина текста',
       cost: 0,
     },

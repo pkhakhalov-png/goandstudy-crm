@@ -87,6 +87,26 @@ async function headings(slug: string): Promise<string[]> {
     .map((m) => m[1].replace(/<[^>]+>/g, '').trim()).filter(Boolean).slice(0, 14)
 }
 
+/**
+ * Положить фразу поверх кадра. Если фразы нет или шрифт не скачался — отдаём
+ * чистую фотографию: она уже оплачена, и терять её из-за надписи нечестно.
+ */
+async function withHook(
+  photo: { buffer: Buffer; width: number; height: number; bytes: number },
+  scenes: any,
+  slug: string,
+): Promise<{ buffer: Buffer; width: number; height: number; bytes: number }> {
+  if (!scenes?.hook) return photo
+  try {
+    const { renderHookCover } = await import('../lib/seo/cover-hook')
+    const card = await renderHookCover(photo.buffer, { text: scenes.hook, accent: scenes.hook_accent ?? [] })
+    return { buffer: card.buffer, width: card.width, height: card.height, bytes: card.bytes }
+  } catch (e) {
+    console.error(`   ! фраза не легла (${slug}): ${(e as Error).message}`)
+    return photo
+  }
+}
+
 async function main() {
   const argv = process.argv.slice(2)
   const apply = argv.includes('--apply')
@@ -150,6 +170,17 @@ async function main() {
 
       let scene: string | null = t.meta?.images?.scenes?.cover ?? null
       let scenes = t.meta?.images?.scenes ?? null
+      // Сохранённая сцена без фразы — это план, составленный до того, как фраза
+      // появилась. Подбираем заново: иначе карточка снова выйдет молчащей.
+      if (!scenes?.hook) scene = null
+      // План рядом с картинкой. Заливка — отдельный запуск, и без этого файла
+      // на втором заходе сцена не восстановится: картинка поедет с фразой, а
+      // база запишет, что фразы нет — расхождение, которое видно не сразу.
+      const planFile = path.join(outDir, `${t.slug}.scenes.json`)
+      if (reuse && !scenes?.hook && fs.existsSync(planFile)) {
+        scenes = JSON.parse(fs.readFileSync(planFile, 'utf8'))
+        scene = scenes.cover
+      }
       if (!scene && !reuse) {
         scenes = await planScenes({ title: t.title, h1: t.title, headings: await headings(t.slug) })
         scene = scenes.cover
@@ -164,9 +195,14 @@ async function main() {
         img = { buffer, width: m.width ?? 0, height: m.height ?? 0, bytes: buffer.length }
         say.push(`   · беру готовую ${img.width}×${img.height}, ${Math.round(img.bytes / 1024)} КБ`)
       } else {
-        img = await generateCover(coverPrompt(scene!))
+        const photo = await generateCover(coverPrompt(scene!))
+        // Фотография отдельным файлом: переверстать фразу потом можно бесплатно,
+        // а перерисовать кадр — нет.
+        fs.writeFileSync(path.join(outDir, `${t.slug}.photo.jpg`), photo.buffer)
+        img = await withHook(photo, scenes, t.title)
         fs.writeFileSync(local, img.buffer)
-        say.push(`   ✓ нарисовано ${img.width}×${img.height}, ${Math.round(img.bytes / 1024)} КБ`)
+        if (scenes) fs.writeFileSync(planFile, JSON.stringify(scenes, null, 1))
+        say.push(`   ✓ нарисовано ${img.width}×${img.height}, ${Math.round(img.bytes / 1024)} КБ${scenes?.hook ? ` · «${scenes.hook}»` : ' · БЕЗ ФРАЗЫ'}`)
       }
       drawn++
 
@@ -187,6 +223,7 @@ async function main() {
               cover: {
                 format: 'jpeg', width: img.width, height: img.height, bytes: img.bytes,
                 base64: img.buffer.toString('base64'), drawn_at: new Date().toISOString(),
+                ...(scenes?.hook ? { hook: scenes.hook, hook_accent: scenes.hook_accent ?? [] } : {}),
               },
               images: { ...(meta.images ?? {}), scenes: scenes ?? meta.images?.scenes },
             },
