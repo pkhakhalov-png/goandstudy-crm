@@ -17,7 +17,10 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import sharp from 'sharp'
-import opentype, { type Font } from 'opentype.js'
+// opentype.js@2 убрал default-экспорт: parse и Font теперь именованные.
+// Со старым `import opentype from` сборка падает на этапе бандла, а не типов —
+// tsc проходит, npm run build нет.
+import { parse as parseFont, type Font } from 'opentype.js'
 import { BRAND } from './cover'
 
 /** Фирменный шрифт сайта. Берём тот же файл, что отдаёт тема, — он там публичный. */
@@ -60,7 +63,7 @@ export async function brandFont(): Promise<Font> {
     // Кэш — ускорение, а не условие работы: если записать некуда, рисуем всё равно
     try { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, ttf) } catch { /* обойдёмся */ }
   }
-  cached = opentype.parse(ttf.buffer.slice(ttf.byteOffset, ttf.byteOffset + ttf.byteLength) as ArrayBuffer)
+  cached = parseFont(ttf.buffer.slice(ttf.byteOffset, ttf.byteOffset + ttf.byteLength) as ArrayBuffer)
   return cached
 }
 
