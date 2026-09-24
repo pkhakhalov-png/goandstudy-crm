@@ -9,6 +9,14 @@ export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 export const maxDuration = 300
 
+/**
+ * Wikimedia по своей bot policy отвечает 403 на безымянные User-Agent: строка
+ * «go-and-study-crm/1.0» без контакта под запрет попадала, и фолбэк на
+ * Wikipedia молча не работал ни для одного вуза — карточки оставались без
+ * фотографии, хотя картинка в статье была. Контакт в UA обязателен.
+ */
+const WIKI_UA = 'goandstudy-crm/1.0 (https://crm.goandstudy.com; tech@goandstudy.com)'
+
 const SAVE_TOOL = {
   name: 'save_school_info',
   description:
@@ -166,7 +174,7 @@ async function getWikipediaSummaryImage(title: string): Promise<string | null> {
       `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title.replace(/\s+/g, '_'))}`,
       {
         signal: AbortSignal.timeout(8000),
-        headers: { 'User-Agent': 'go-and-study-crm/1.0' },
+        headers: { 'User-Agent': WIKI_UA },
       },
     )
     if (!r.ok) return null
@@ -190,7 +198,7 @@ async function getWikipediaPageImage(title: string): Promise<string | null> {
       `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(title.replace(/\s+/g, '_'))}&prop=pageimages&format=json&pithumbsize=1600&origin=*`,
       {
         signal: AbortSignal.timeout(8000),
-        headers: { 'User-Agent': 'go-and-study-crm/1.0' },
+        headers: { 'User-Agent': WIKI_UA },
       },
     )
     if (!r.ok) return null
@@ -211,7 +219,7 @@ async function searchWikipedia(query: string): Promise<string | null> {
       `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&srlimit=3&format=json&origin=*`,
       {
         signal: AbortSignal.timeout(8000),
-        headers: { 'User-Agent': 'go-and-study-crm/1.0' },
+        headers: { 'User-Agent': WIKI_UA },
       },
     )
     if (!r.ok) return null

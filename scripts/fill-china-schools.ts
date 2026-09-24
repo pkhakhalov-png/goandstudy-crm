@@ -1,9 +1,10 @@
 /**
- * Дозаполняет карточки китайских вузов через продуктовый маршрут
- * /api/ai/fill-school — тот же, что за кнопкой «Заполнить ИИ» на странице вуза.
+ * Дозаполняет китайские карточки через продуктовые маршруты /api/ai/fill-school
+ * и /api/ai/fill-program — те же, что за кнопками «Заполнить ИИ» в интерфейсе.
  *
- *   npx tsx scripts/fill-china-schools.ts            # показать список и выйти
- *   npx tsx scripts/fill-china-schools.ts --confirm  # прогнать
+ *   npx tsx scripts/fill-china-schools.ts                        # показать и выйти
+ *   npx tsx scripts/fill-china-schools.ts --confirm              # вузы
+ *   npx tsx scripts/fill-china-schools.ts --confirm --programs   # программы
  *   npx tsx scripts/fill-china-schools.ts --confirm --ids 5414,5415
  *
  * Почему через HTTP, а не своим запросом к Anthropic: маршрут не просто зовёт
@@ -25,6 +26,7 @@ const BASE = process.argv.includes('--local') ? 'http://localhost:3000' : 'https
 const CONFIRM = process.argv.includes('--confirm')
 const idsArg = process.argv[process.argv.indexOf('--ids') + 1]
 const ONLY = process.argv.includes('--ids') ? idsArg.split(',').map(Number) : null
+const PROGRAMS = process.argv.includes('--programs')
 
 const parser = createClient(
   process.env.NEXT_PUBLIC_PARSER_SUPABASE_URL!,
@@ -48,7 +50,56 @@ async function sessionCookie(): Promise<string> {
   return createChunks(`sb-${REF}-auth-token`, value).map(c => `${c.name}=${c.value}`).join('; ')
 }
 
+/** Один POST к маршруту заполнения; возвращает строку для лога. */
+async function call(endpoint: string, body: object, cookie: string): Promise<{ ok: boolean; line: string }> {
+  const t0 = Date.now()
+  try {
+    const res = await fetch(`${BASE}${endpoint}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie },
+      body: JSON.stringify(body),
+    })
+    const text = await res.text()
+    let json: any = null
+    try { json = JSON.parse(text) } catch {}
+    const secs = Math.round((Date.now() - t0) / 1000)
+    if (!res.ok || !json?.ok) {
+      return { ok: false, line: `✗ ${res.status} ${(json?.error ?? text).toString().slice(0, 160)} (${secs}s)` }
+    }
+    const f = json.saved ?? json.fields ?? json.data ?? {}
+    const filled = Object.entries(f)
+      .filter(([, v]) => v !== null && v !== undefined && v !== '')
+      .map(([k]) => k)
+    return { ok: true, line: `✓ ${secs}s · ${filled.length ? filled.join(', ') : 'ответ без полей'}` }
+  } catch (e) {
+    return { ok: false, line: `✗ ${e instanceof Error ? e.message : e}` }
+  }
+}
+
+async function runPrograms() {
+  const { data: schools } = await parser.from('schools').select('id, name').eq('country_code', 'cn')
+  const ids = (schools ?? []).map(s => s.id)
+  const byId = new Map((schools ?? []).map(s => [s.id, s.name]))
+  const { data: progs } = await parser.from('programs')
+    .select('id, school_id, name, degree_text').in('school_id', ids).order('school_id')
+  const list = progs ?? []
+  console.log(`Программ cn: ${list.length}\n`)
+  if (!CONFIRM) { console.log('⚠️ Показ. Запусти с --confirm --programs.'); return }
+
+  const cookie = await sessionCookie()
+  console.log(`endpoint: ${BASE}/api/ai/fill-program\n`)
+  let ok = 0, fail = 0
+  for (const p of list) {
+    process.stdout.write(`#${p.id} ${byId.get(p.school_id)} · ${p.name} … `)
+    const r = await call('/api/ai/fill-program', { programId: p.id }, cookie)
+    console.log(r.line)
+    r.ok ? ok++ : fail++
+  }
+  console.log(`\nИтог: ✓ ${ok} · ✗ ${fail}`)
+}
+
 async function main() {
+  if (PROGRAMS) return runPrograms()
   const { data: schools } = await parser.from('schools')
     .select('id, name, city, website, logo_url, qs_rank, description, campus_photo_url')
     .eq('country_code', 'cn').order('id')
