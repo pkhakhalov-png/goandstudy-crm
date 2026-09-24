@@ -7,6 +7,7 @@ interface Props {
   deals: any[]
   stages: any[]
   settings: any[]
+  touches: any[]
 }
 
 function fmt(n: number) { return Math.round(n).toLocaleString('ru') }
@@ -16,24 +17,58 @@ function getSetting(settings: any[], key: string, fallback: any = null) {
   return s ? (typeof s.value === 'string' ? JSON.parse(s.value) : s.value) : fallback
 }
 
-export function StuckDashboard({ salespersons, deals, stages, settings }: Props) {
+export function StuckDashboard({ salespersons, deals, stages, settings, touches }: Props) {
   const stageMap = Object.fromEntries(stages.map(s => [s.id, s]))
   const spMap = Object.fromEntries(salespersons.map(sp => [sp.id, sp]))
+  const touchMap = Object.fromEntries((touches ?? []).map(t => [t.deal_id, t]))
   const stuckDays = getSetting(settings, 'stuck_deal_days', 5)
   const nowMs = Date.now()
 
   const cardStyle: React.CSSProperties = { background: 'var(--surf)', border: '1px solid var(--bor2)', borderRadius: 14, padding: '16px 20px', marginBottom: 16 }
   const sectionTitle: React.CSSProperties = { fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--muted)', marginBottom: 12 }
 
-  // ═══ Section 1: Stuck deals ═══
-  const activeDeals = deals.filter(d => stageMap[d.stage_id]?.stage_type === 'active')
+  // ═══ Застрявшие ═══
+  //
+  // Два изменения против прежней версии, и оба меняют смысл списка.
+  //
+  // 1. Считаем только этапы, которые вообще являются продажами. «НЕ ЦЕЛЕВЫЕ»
+  //    (210 сделок), «Релокац» (297) и групповые чаты (98) — другие потоки;
+  //    пока они были в списке, он состоял из всей базы.
+  // 2. Давность считаем от последнего касания ЧЕЛОВЕКОМ, а не от updated_at,
+  //    который двигает любое входящее сообщение. Сделка, где клиент пишет
+  //    третий день без ответа, по старому счёту выглядела «в работе».
+  //
+  // Замер 24.09.2026: было 1041 сделка из 1111 (94 % базы), стало 341 из 354
+  // продажных. Список не стал коротким — потому что долг действительно есть,
+  // — но стал про продажи и делится на корзины, с которыми можно работать.
+  const activeDeals = deals.filter(d => {
+    const st = stageMap[d.stage_id]
+    return st?.stage_type === 'active' && st?.counts_in_sales !== false
+  })
+
   const stuckDeals = activeDeals
     .map(d => {
-      const daysSince = Math.floor((nowMs - new Date(d.updated_at).getTime()) / 86400000)
-      return { ...d, daysSince, stageName: stageMap[d.stage_id]?.name || '—', spName: spMap[d.salesperson_id]?.name || '—' }
+      const t = touchMap[d.id]
+      const lastTouch = t?.last_touch_at ?? d.created_at ?? d.updated_at
+      const daysSince = Math.floor((nowMs - new Date(lastTouch).getTime()) / 86400000)
+      // Ни заметки с автором, ни исходящего — с этой заявкой не работали ни разу.
+      const neverTouched = !t?.last_human_activity_at && !t?.last_outgoing_at
+      return {
+        ...d, daysSince, neverTouched,
+        stageName: stageMap[d.stage_id]?.name || '—',
+        spName: spMap[d.salesperson_id]?.name || '—',
+      }
     })
     .filter(d => d.daysSince > stuckDays)
     .sort((a, b) => b.daysSince - a.daysSince)
+
+  // Корзины по давности. Смысл в том, что это три разные задачи, а не один
+  // длинный список: свежие — дожать сегодня; нетронутые — провал на приёме
+  // заявок; старше месяца — не «застрявшие», а архив, и работать с ним надо
+  // не отсюда, а возвратом из ожидания.
+  const свежие = stuckDeals.filter(d => d.daysSince <= 14)
+  const нетронутые = stuckDeals.filter(d => d.neverTouched)
+  const архив = stuckDeals.filter(d => d.daysSince > 31)
 
   // ═══ Section 2: Workload balance ═══
   const successDeals = deals.filter(d => stageMap[d.stage_id]?.stage_type === 'success')
@@ -52,9 +87,30 @@ export function StuckDashboard({ salespersons, deals, stages, settings }: Props)
 
   return (
     <>
+      {/* ═══ Три корзины: разные задачи, а не один длинный список ═══ */}
+      <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+        {[
+          { ярлык: 'Дожать на этой неделе', сколько: свежие.length, подпись: `застряли ${stuckDays}–14 дней назад`, цвет: 'var(--gold)' },
+          { ярлык: 'Ни разу не в работе', сколько: нетронутые.length, подпись: 'заявка есть, касания нет ни одного', цвет: 'var(--red)' },
+          { ярлык: 'Старше месяца', сколько: архив.length, подпись: 'это не застревание, а долг', цвет: 'var(--muted)' },
+        ].map(к => (
+          <div key={к.ярлык} style={{ ...cardStyle, flex: 1, marginBottom: 0 }}>
+            <div style={{ fontSize: 26, fontWeight: 800, color: к.цвет, lineHeight: 1.1 }}>{к.сколько}</div>
+            <div style={{ fontSize: 12, fontWeight: 700, marginTop: 4 }}>{к.ярлык}</div>
+            <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>{к.подпись}</div>
+          </div>
+        ))}
+      </div>
+
       {/* ═══ STUCK DEALS TABLE ═══ */}
       <div style={cardStyle}>
-        <div style={sectionTitle}>Застрявшие сделки (без обновлений &gt; {stuckDays} дней)</div>
+        <div style={sectionTitle}>
+          Застрявшие сделки — без касания человеком &gt; {stuckDays} дней ({stuckDeals.length})
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: -6, marginBottom: 12 }}>
+          Считаются только этапы продаж. Касание — заметка с автором или исходящее сообщение;
+          входящее письмо клиента работой не считается.
+        </div>
         {stuckDeals.length === 0 ? (
           <div style={{ fontSize: 13, color: 'var(--muted)', padding: '12px 0' }}>Нет застрявших сделок</div>
         ) : (
@@ -64,17 +120,22 @@ export function StuckDashboard({ salespersons, deals, stages, settings }: Props)
                 <th style={{ padding: '6px 8px' }}>Сделка</th>
                 <th style={{ padding: '6px 8px' }}>Этап</th>
                 <th style={{ padding: '6px 8px' }}>Менеджер</th>
-                <th style={{ padding: '6px 8px', textAlign: 'right' }}>Дней без обновления</th>
+                <th style={{ padding: '6px 8px', textAlign: 'right' }}>Дней без касания</th>
               </tr>
             </thead>
             <tbody>
-              {stuckDeals.map(d => (
+              {stuckDeals.slice(0, 200).map(d => (
                 <tr key={d.id} style={{
                   borderTop: '1px solid var(--bor2)',
                   background: d.daysSince > 7 ? 'rgba(220,53,69,.06)' : d.daysSince > 3 ? 'rgba(201,125,0,.06)' : undefined,
                 }}>
                   <td style={{ padding: '10px 8px', fontWeight: 600 }}>
                     <Link href={`/rop/funnel/${d.id}`} style={{ color: 'var(--text)', textDecoration: 'none' }}>{d.title}</Link>
+                    {d.neverTouched && (
+                      <span style={{ marginLeft: 8, padding: '2px 7px', borderRadius: 8, fontSize: 10, fontWeight: 700, background: 'rgba(220,53,69,.12)', color: 'var(--red)' }}>
+                        ни разу
+                      </span>
+                    )}
                   </td>
                   <td style={{ padding: '10px 8px' }}>{d.stageName}</td>
                   <td style={{ padding: '10px 8px' }}>{d.spName}</td>
@@ -86,6 +147,12 @@ export function StuckDashboard({ salespersons, deals, stages, settings }: Props)
               ))}
             </tbody>
           </table>
+        )}
+        {stuckDeals.length > 200 && (
+          <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 10 }}>
+            Показаны первые 200 из {stuckDeals.length} — остальные старше и разбираются не отсюда,
+            а возвратом из ожидания.
+          </div>
         )}
       </div>
 

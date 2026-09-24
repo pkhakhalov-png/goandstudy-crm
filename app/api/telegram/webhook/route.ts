@@ -9,6 +9,7 @@ import {
 import { normalizePhone } from '@/lib/phone'
 import { секретыСовпали, секретГодится } from '@/lib/webhook-secret'
 import { warnOnError } from '@/lib/supabase/write-guard'
+import { closeReplyTasks } from '@/lib/sales/reply-tasks'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -99,6 +100,34 @@ async function processTelegramMessage(
 
   // Real sender name
   const senderName = buildSenderName(msg.from)
+
+  // Кто написал: клиент или наш сотрудник.
+  //
+  // В групповом чате сообщения продажника приходят тем же вебхуком, что и
+  // сообщения клиента, и до сих пор всё подряд сохранялось как «входящее».
+  // Отсюда две поломки сразу: время ответа посчитать нельзя (исходящих в
+  // Telegram по данным вебхука не существует вовсе), а задача «клиент написал —
+  // надо ответить» заводилась даже на реплику самого менеджера и не
+  // закрывалась никогда.
+  //
+  // Узнаём своих по telegram_username в карточке пользователя CRM. Заполнен он
+  // не у всех (на 24.09.2026 — у четверых из одиннадцати), поэтому это
+  // улучшение, а не гарантия: у кого не заполнен, поведение остаётся прежним.
+  // Заполнить username — разовая операция в настройках, и она сразу чинит
+  // статистику по этому человеку.
+  const tgUsername = (msg.from?.username ?? '').replace(/^@/, '').toLowerCase()
+  let staff: { id: string; name: string | null } | null = null
+  if (tgUsername) {
+    const { data } = await supabase
+      .from('users')
+      .select('id, name, telegram_username')
+      .not('telegram_username', 'is', null)
+      .ilike('telegram_username', tgUsername)
+      .limit(1)
+      .maybeSingle()
+    staff = data ? { id: data.id, name: data.name } : null
+  }
+  const направление: 'incoming' | 'outgoing' = staff ? 'outgoing' : 'incoming'
 
   // Resolve / create deal
   let dealId: string | null = null
@@ -366,9 +395,9 @@ async function processTelegramMessage(
   } else {
     await supabase.from('deal_messages').insert({
       deal_id: dealId,
-      direction: 'incoming',
+      direction: направление,
       channel: 'telegram',
-      sender_name: senderName,
+      sender_name: staff ? (staff.name || senderName) : senderName,
       content,
       file_id: fileId,
       external_id: externalId,
@@ -390,12 +419,18 @@ async function processTelegramMessage(
     await supabase.from('deal_activities').insert({
       deal_id: dealId,
       activity_type: 'message',
-      content: `${isEdited ? 'Изменено' : 'Входящее'} TG (${senderName}): ${content.slice(0, 100)}`,
-      metadata: { channel: 'telegram', direction: 'incoming', sender: senderName },
+      content: `${isEdited ? 'Изменено' : направление === 'outgoing' ? 'Исходящее' : 'Входящее'} TG (${senderName}): ${content.slice(0, 100)}`,
+      metadata: { channel: 'telegram', direction: направление, sender: senderName },
     }).then(warnOnError('deal_activities · app/api/telegram/webhook/route.ts:340'))
 
-    // Auto-create task for incoming messages
-    if (!isEdited) {
+    // Ответ сотрудника закрывает задачу «клиент написал». Раньше этой ветки не
+    // было, и задача оставалась открытой навсегда — отсюда 333 просроченных.
+    if (staff) {
+      await closeReplyTasks(supabase, dealId, 'telegram webhook · ответ сотрудника')
+    }
+
+    // Auto-create task for incoming messages — только на сообщения клиента.
+    if (!isEdited && !staff) {
       const { data: deal } = await supabase.from('deals').select('salesperson_id, contact_name').eq('id', dealId).single()
       if (deal?.salesperson_id) {
         const { data: existingTask } = await supabase

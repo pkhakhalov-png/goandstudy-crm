@@ -155,3 +155,59 @@ export async function setExpectedOfferMonth(clientId: number, month: string) {
   return { success: true }
 }
 
+
+/**
+ * Отметить исход консультации.
+ *
+ * Зачем. Бронь заводится со статусом `confirmed` и живёт с ним дальше, даже
+ * когда консультация давно прошла. Замер 24.09.2026: из 157 прошедших броней
+ * 35 так и остались `confirmed` — никто не отметил, состоялась встреча или
+ * человек не пришёл. Пока это не отмечено, показатель «дошёл до консультации»
+ * посчитать нельзя вообще, а он один из двух главных в воронке.
+ *
+ * Отдельного поля «исход» не заводим: статус брони уже про это. Не хватало
+ * следа — кто и когда отметил, — и его добавляет миграция блока 0.
+ */
+export async function markBookingOutcome(formData: FormData): Promise<{ error?: string; ok?: true }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Не авторизован' }
+
+  const bookingId = formData.get('booking_id') as string
+  const outcome = formData.get('outcome') as string
+  if (!bookingId) return { error: 'Не указана консультация' }
+
+  // Тот же набор, что уже разрешён в `bookings.status`. Ничего нового не
+  // изобретаем: иначе проверка CHECK на таблице отклонит запись, и человек
+  // увидит ошибку базы вместо понятного сообщения.
+  const допустимые = ['completed', 'no_show', 'cancelled']
+  if (!допустимые.includes(outcome)) return { error: 'Неизвестный исход' }
+
+  const admin = await createAdminClient()
+
+  // Отмечать исход может только тот, за кем закреплена консультация. Иначе
+  // «не пришёл» может поставить кто угодно, и спрашивать будет не с кого.
+  const { data: booking } = await admin
+    .from('bookings')
+    .select('id, salesperson_id, status')
+    .eq('id', bookingId)
+    .maybeSingle()
+
+  if (!booking) return { error: 'Консультация не найдена' }
+  if (booking.salesperson_id !== user.id) return { error: 'Это не ваша консультация' }
+
+  const { error } = await admin
+    .from('bookings')
+    .update({
+      status: outcome,
+      outcome_at: new Date().toISOString(),
+      outcome_by: user.id,
+    })
+    .eq('id', bookingId)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/sales')
+  revalidatePath('/rop')
+  return { ok: true }
+}

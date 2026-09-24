@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { normalizePhone } from '@/lib/phone'
 import { downloadWazzupFile, type WazzupMessage } from '@/lib/wazzup'
 import { warnOnError } from '@/lib/supabase/write-guard'
+import { closeReplyTasks } from '@/lib/sales/reply-tasks'
 
 interface WebhookPayload {
   messages?: WazzupMessage[]
@@ -388,14 +389,11 @@ async function processMessage(supabase: SupabaseAdmin, msg: WazzupMessage) {
     }
   }
 
-  // Auto-close reply task when manager responds
+  // Auto-close reply task when manager responds.
+  // Закрытие вынесено в общий помощник: он же проставляет closed_as='done',
+  // без которого «сделана» и «протухла» в отчёте неразличимы.
   if (msg.isEcho) {
-    await supabase
-      .from('deal_tasks')
-      .update({ is_done: true, completed_at: new Date().toISOString() })
-      .eq('deal_id', dealId)
-      .eq('task_type', 'reply')
-      .eq('is_done', false).then(warnOnError('deal_tasks · app/api/wazzup/webhook/route.ts:394'))
+    await closeReplyTasks(supabase, dealId, 'wazzup webhook · эхо исходящего')
   }
 
   // Log activity

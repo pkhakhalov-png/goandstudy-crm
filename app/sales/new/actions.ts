@@ -1,9 +1,11 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { revalidatePath } from 'next/cache'
 import { normalizePhone } from '@/lib/phone'
 import { warnOnError } from '@/lib/supabase/write-guard'
+import { closeDealOnSale } from '@/lib/sales/close-deal-on-sale'
 
 export async function createClientSales(formData: FormData): Promise<void> {
   const supabase = await createClient()
@@ -62,6 +64,31 @@ export async function createClientSales(formData: FormData): Promise<void> {
     }
     if (Object.keys(updates).length > 0) {
       await supabase.from('clients').update(updates).eq('id', newClient.id).then(warnOnError('clients · app/sales/new/actions.ts:63'))
+    }
+  }
+
+  // Продажа оформлена — двигаем сделку в воронке, иначе воронка продолжит
+  // расходиться с фактом продаж (PRD_SALES_UPGRADE, раздел 3.1). Сбой здесь не
+  // повод показывать ошибку: клиент и платежи уже созданы, операция удалась.
+  if (newClient) {
+    try {
+      const admin = await createAdminClient()
+      const результат = await closeDealOnSale(admin, {
+        clientId: newClient.id,
+        phone,
+        amount: totalAmount,
+        userId: user.id,
+        dealId: (formData.get('deal_id') as string) || null,
+      })
+      console.log('[sales/new] сделка в воронке:', результат.moved
+        ? `переведена в «${результат.stageName}» (${результат.dealId})`
+        : `не переведена — ${результат.why}`)
+      if (результат.moved) {
+        revalidatePath('/sales/funnel')
+        revalidatePath(`/sales/funnel/${результат.dealId}`)
+      }
+    } catch (e: any) {
+      console.error('[sales/new] перевод сделки упал:', e?.message ?? e)
     }
   }
 

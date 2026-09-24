@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { SalesPage } from './SalesPage'
 import { SalesTasksPanel } from './SalesTasksPanel'
+import { PendingOutcomePanel } from './PendingOutcomePanel'
+import { readRopSettings, num } from '@/lib/rop-settings'
 import { viewer } from '@/lib/auth/viewer'
 
 export default async function SalesCabinetPage() {
@@ -33,6 +35,35 @@ export default async function SalesCabinetPage() {
     (await createAdminClient()).from('clients').select('id, salesperson_id'),
     (await createAdminClient()).from('sales_plans').select('salesperson_id, plan_amount').eq('month', currentMonth),
   ])
+
+  // ── Консультации без отметки об исходе ────────────────────────────────────
+  //
+  // Бронь остаётся в статусе `confirmed` и после того, как время прошло, —
+  // отметить исход некому и негде. Отсюда 35 подвисших броней из 157 и
+  // невозможность посчитать «дошёл до консультации». Показываем продажнику
+  // только его собственные и только те, где время уже вышло с запасом:
+  // дёргать человека за пять минут до конца встречи бессмысленно.
+  const admin0 = await createAdminClient()
+  const настройки = await readRopSettings(admin0)
+  const запасЧасов = num(настройки, 'outcome_prompt_hours', 2)
+
+  const { data: confirmedBookings } = await admin0
+    .from('bookings')
+    .select('id, booking_date, start_time, end_time, client_name, client_phone')
+    .eq('salesperson_id', user.id)
+    .eq('status', 'confirmed')
+    .lte('booking_date', new Date().toISOString().slice(0, 10))
+    .order('booking_date', { ascending: false })
+
+  // `now` объявлен выше по функции — второй вызов часов в том же рендере дал бы
+  // два разных «сейчас» и попал бы под правило чистоты рендера.
+  const порогМс = now.getTime() - запасЧасов * 3600_000
+  const pendingOutcome = (confirmedBookings ?? []).filter(b => {
+    // Время слота — московское (в нём живёт всё расписание), поэтому конец
+    // встречи собираем явным смещением, а не локальной зоной браузера сервера.
+    const конец = new Date(`${b.booking_date}T${b.end_time.length === 5 ? b.end_time + ':00' : b.end_time}+03:00`)
+    return конец.getTime() < порогМс
+  })
 
   // Load urgent tasks for this salesperson
   const { data: urgentTasks } = await (await createAdminClient())
@@ -79,6 +110,10 @@ export default async function SalesCabinetPage() {
           </Link>
         </div>
       </div>
+      {/* Исход консультации — выше задач: без него не считается главный
+          показатель воронки, и откладывать его нельзя. */}
+      <PendingOutcomePanel bookings={pendingOutcome} />
+
       {/* Leaderboard — department progress (competition) */}
       {(urgentTasks ?? []).length > 0 && (
         <SalesTasksPanel tasks={urgentTasks ?? []} dealMap={dealMap} />
