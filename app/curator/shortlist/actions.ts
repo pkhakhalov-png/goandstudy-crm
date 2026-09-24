@@ -26,6 +26,7 @@ const COUNTRY_LABEL: Record<string, string> = {
   us: 'США', ie: 'Ирландия', nl: 'Нидерланды', fr: 'Франция', se: 'Швеция',
   fi: 'Финляндия', dk: 'Дания', it: 'Италия', es: 'Испания', ch: 'Швейцария',
   pt: 'Португалия', si: 'Словения', tr: 'Турция', sk: 'Словакия', cn: 'Китай',
+  cz: 'Чехия', pl: 'Польша', lt: 'Литва',
 }
 
 export async function addToShortlist(params: {

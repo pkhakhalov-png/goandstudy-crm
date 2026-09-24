@@ -539,12 +539,18 @@ async function handle(req: NextRequest) {
     const url = String(aiInput.campus_photo_url).trim()
     const isImage = /\.(jpe?g|png|webp|svg)(\?|#|$)/i.test(url)
     const isHtmlPage = /\/wiki\/File:|\.html?(\?|#|$)/i.test(url)
-    if (isImage && !isHtmlPage) {
+    if (!isImage || isHtmlPage) {
+      console.warn('[fill-school] AI photo rejected (не картинка):', url)
+    } else if (!(await checkUrl(url, true))) {
+      // Расширение в конце URL ничего не доказывает. Модель уверенно выдаёт
+      // правдоподобные адреса Wikimedia вида /thumb/…/1280px-Название.jpg,
+      // которых там нет, — и такой 404 доезжал до карточки: у logo_url HEAD-
+      // проверка была, у фото не было. Не прошло — уходим в Wikipedia ниже.
+      console.warn('[fill-school] AI photo rejected (404/не изображение):', url)
+    } else {
       campusPhoto = url
       photoDiag.source = 'AI'
       console.log('[fill-school] AI photo accepted ✓')
-    } else {
-      console.warn('[fill-school] AI photo rejected (не картинка):', url)
     }
   }
   if (!campusPhoto) {

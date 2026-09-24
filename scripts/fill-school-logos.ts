@@ -20,6 +20,10 @@ import { createClient } from '@supabase/supabase-js'
 config({ path: path.resolve(process.cwd(), '.env.local') })
 
 const isDry = process.argv.includes('--dry')
+// --country cn — не гонять по всей базе, когда добрали одну страну
+const onlyCountry = process.argv.includes('--country')
+  ? process.argv[process.argv.indexOf('--country') + 1]?.toLowerCase()
+  : null
 
 const sb = createClient(
   process.env.NEXT_PUBLIC_PARSER_SUPABASE_URL!,
@@ -78,8 +82,10 @@ async function main() {
     all.push(...data)
     if (data.length < 1000) break
   }
-  const need = all.filter(s => !s.logo_url && s.website)
-  console.log(`schools without logo (with website): ${need.length}`)
+  const need = all
+    .filter(s => !s.logo_url && s.website)
+    .filter(s => !onlyCountry || (s.country_code || '').toLowerCase() === onlyCountry)
+  console.log(`schools without logo (with website)${onlyCountry ? `, country=${onlyCountry}` : ''}: ${need.length}`)
 
   let found = 0, skipped = 0, errored = 0, processed = 0
 

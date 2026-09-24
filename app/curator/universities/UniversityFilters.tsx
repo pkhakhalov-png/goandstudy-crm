@@ -32,6 +32,11 @@ const COUNTRY_FLAGS: Record<string, string> = {
   fr: '🇫🇷', it: '🇮🇹', es: '🇪🇸', nl: '🇳🇱', at: '🇦🇹',
   ie: '🇮🇪', ae: '🇦🇪', hu: '🇭🇺',
   pt: '🇵🇹', si: '🇸🇮', tr: '🇹🇷', cn: '🇨🇳',
+  // Эти три висели без флага — в ряду читались как дырки между соседями
+  se: '🇸🇪', fi: '🇫🇮', sk: '🇸🇰',
+  // А эти вообще не показывались: вузы в базе есть, а кода не было ни в
+  // подписях, ни в списке для подсчёта — страна молча пропадала из фильтра
+  cz: '🇨🇿', pl: '🇵🇱', lt: '🇱🇹',
 }
 
 const BUDGET_OPTIONS = [
@@ -172,54 +177,48 @@ export function UniversityFilters({ countryCodes, countryLabels, countryCounts, 
         )}
       </div>
 
-      {/* Country tabs */}
-      <div style={{ display: 'flex', gap: 4, overflowX: 'auto', borderBottom: '1px solid var(--ds-border-soft)', paddingBottom: 2 }}>
-        <button
-          type="button"
-          onClick={() => { setCountry(''); setSchool(''); push({ country: '', school: '' }) }}
-          style={{
-            background: 'transparent', border: 'none', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', gap: 6,
-            padding: '10px 14px',
-            borderBottom: country === '' ? '2.5px solid var(--ds-purple)' : '2.5px solid transparent',
-            marginBottom: -2,
-            fontSize: 13, fontWeight: 700,
-            color: country === '' ? 'var(--ds-purple)' : 'var(--ds-muted)',
-            whiteSpace: 'nowrap',
-            fontFamily: 'inherit',
-          }}
-        >
-          🌍 Все
-        </button>
-        {countryCodes.map(code => {
+      {/* Страны.
+          Раньше это был ряд вкладок в горизонтальной прокрутке: полоса влезала
+          примерно наполовину, и всё, что не влезло, существовало только если
+          догадаться, что её можно листать — Китай в конце списка не видел никто.
+          Теперь это переносимая сетка: страны видно все сразу, без прокрутки. */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+        {[{ code: '', label: 'Все', flag: '🌍', cnt: undefined as number | undefined },
+          ...countryCodes.map(code => ({
+            code,
+            label: countryLabels[code] || code.toUpperCase(),
+            flag: COUNTRY_FLAGS[code] || '',
+            cnt: countryCounts?.[code],
+          }))].map(({ code, label, flag, cnt }) => {
           const active = country === code
-          const cnt = countryCounts?.[code]
           return (
             <button
-              key={code}
+              key={code || '__all'}
               type="button"
               onClick={() => { setCountry(code); setSchool(''); push({ country: code, school: '' }) }}
               style={{
-                background: 'transparent', border: 'none', cursor: 'pointer',
-                display: 'flex', alignItems: 'center', gap: 6,
-                padding: '10px 14px',
-                borderBottom: active ? '2.5px solid var(--ds-purple)' : '2.5px solid transparent',
-                marginBottom: -2,
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                padding: '7px 12px',
+                borderRadius: 'var(--ds-r-sm, 8px)',
+                border: `1px solid ${active ? 'rgba(177,94,204,.35)' : 'var(--ds-border-soft)'}`,
+                background: active ? 'var(--ds-purple-soft)' : 'var(--ds-bg)',
+                color: active ? 'var(--ds-purple-deep)' : 'var(--ds-muted)',
                 fontSize: 13, fontWeight: 700,
-                color: active ? 'var(--ds-purple)' : 'var(--ds-muted)',
-                whiteSpace: 'nowrap',
                 fontFamily: 'inherit',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                transition: 'background 120ms, border-color 120ms, color 120ms',
               }}
             >
-              <span style={{ fontSize: 16 }}>{COUNTRY_FLAGS[code] || ''}</span>
-              {countryLabels[code] || code.toUpperCase()}
+              {flag && <span style={{ fontSize: 15, lineHeight: 1 }}>{flag}</span>}
+              {label}
               {cnt !== undefined && (
                 <span style={{
-                  background: active ? 'var(--ds-purple-soft)' : 'var(--ds-bg-alt)',
-                  border: `1px solid ${active ? 'rgba(177,94,204,.3)' : 'var(--ds-border-soft)'}`,
+                  background: active ? 'rgba(177,94,204,.18)' : 'var(--ds-bg-alt)',
                   borderRadius: 100,
                   fontSize: 9, fontWeight: 800,
-                  padding: '1px 7px',
+                  padding: '1px 6px',
+                  fontVariantNumeric: 'tabular-nums',
                   color: active ? 'var(--ds-purple)' : 'var(--ds-muted)',
                 }}>{cnt}</span>
               )}
