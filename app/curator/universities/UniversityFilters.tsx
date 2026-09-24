@@ -31,7 +31,7 @@ const COUNTRY_FLAGS: Record<string, string> = {
   us: '🇺🇸', gb: '🇬🇧', ca: '🇨🇦', au: '🇦🇺', de: '🇩🇪',
   fr: '🇫🇷', it: '🇮🇹', es: '🇪🇸', nl: '🇳🇱', at: '🇦🇹',
   ie: '🇮🇪', ae: '🇦🇪', hu: '🇭🇺',
-  pt: '🇵🇹', si: '🇸🇮', tr: '🇹🇷',
+  pt: '🇵🇹', si: '🇸🇮', tr: '🇹🇷', cn: '🇨🇳',
 }
 
 const BUDGET_OPTIONS = [

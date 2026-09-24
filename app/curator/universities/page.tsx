@@ -14,7 +14,7 @@ const COUNTRY_LABEL: Record<string, string> = {
   de: 'Германия', fr: 'Франция', it: 'Италия', es: 'Испания',
   nl: 'Нидерланды', at: 'Австрия', ie: 'Ирландия', ae: 'ОАЭ', hu: 'Венгрия',
   pt: 'Португалия', si: 'Словения', tr: 'Турция', se: 'Швеция', fi: 'Финляндия',
-  sk: 'Словакия',
+  sk: 'Словакия', cn: 'Китай',
 }
 
 type SortKey = 'name_asc' | 'price_asc' | 'price_desc' | 'recent'
@@ -92,7 +92,7 @@ export default async function UniversitiesPage({
 
   // Считаем количество ПРОГРАММ по странам — без inner-join (на проде он давал ложные count=0).
   // Группируем school_id по country_code один раз, потом считаем programs с .in() по списку id.
-  const COUNTRY_CODES_FOR_COUNT = ['us', 'gb', 'ca', 'de', 'fr', 'it', 'es', 'nl', 'at', 'au', 'ie', 'ae', 'hu', 'pt', 'si', 'tr', 'se', 'fi', 'sk']
+  const COUNTRY_CODES_FOR_COUNT = ['us', 'gb', 'ca', 'de', 'fr', 'it', 'es', 'nl', 'at', 'au', 'ie', 'ae', 'hu', 'pt', 'si', 'tr', 'se', 'fi', 'sk', 'cn']
   const idsByCountry = new Map<string, number[]>()
   for (const s of schoolsList) {
     const cc = (s.country_code || '').toLowerCase()
