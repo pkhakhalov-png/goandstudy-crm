@@ -22,6 +22,7 @@ const navItems = [
   { key: 'conversions', href: '/rop/conversions', label: 'Конверсии', icon: 'M2 14L6 6l4 4 4-8' },
   { key: 'response', href: '/rop/response-times', label: 'Время ответа', icon: 'M8 3v5l3 3M8 15a7 7 0 100-14 7 7 0 000 14z' },
   { key: 'pipeline', href: '/rop/pipeline', label: 'Pipeline', icon: 'M2 3h12l-3 5v4l-2 1.5V8L2 3z' },
+  { key: 'hot', href: '/rop/hot', label: 'Кого дожимать', icon: 'M8 1.5s3.5 3 3.5 6a3.5 3.5 0 11-7 0c0-3 3.5-6 3.5-6z' },
   { key: 'stuck', href: '/rop/stuck', label: 'Застрявшие', icon: 'M8 1v6M4.9 4.9L8 8M1 8h6' },
   { key: 'analytics', href: '/rop/analytics', label: 'Аналитика', icon: 'M2 14V8l3-4 3 2 3-5 3 4v9' },
   { key: 'tasks', href: '/rop/tasks', label: 'Задачи', icon: 'M4 7l3 3 5-5M3 2h10a2 2 0 012 2v8a2 2 0 01-2 2H3a2 2 0 01-2-2V4a2 2 0 012-2z' },

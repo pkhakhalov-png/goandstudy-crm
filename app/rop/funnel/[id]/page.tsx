@@ -59,8 +59,20 @@ export default async function RopDealPage({ params }: { params: Promise<{ id: st
       ? supabase.from('bookings').select('id, booking_date, start_time, end_time, status').eq('id', deal.booking_id).single().then(r => r.data)
       : null,
   ])
+  // Последний разбор разговора — показывается первым на вкладке «Основное».
+  // Берём один, самый свежий: история разборов живёт в таблице, но карточке
+  // нужен текущий взгляд, а не архив.
+  const { data: analysis } = await (await createAdminClient())
+    .from('deal_analyses')
+    .select('id, source, summary, client_type, next_step, payload, covered_to, items_count, model, created_at')
+    .eq('deal_id', id)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
   return (
     <DealCard
+      analysis={analysis}
       deal={deal}
       stages={stages ?? []}
       activities={enrichedActivities}

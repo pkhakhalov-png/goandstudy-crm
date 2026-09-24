@@ -7,6 +7,7 @@ import { moveDeal, addDealNote, updateDeal, createDealTask, toggleDealTask, dele
 import { uploadDealFile, deleteDealFile } from './fileActions'
 import { createClient } from '@/lib/supabase/client'
 import { SalesInviteButton } from '@/app/sales/SalesInviteButton'
+import { DealAnalysis } from './DealAnalysis'
 
 interface Stage { id: string; name: string; color: string; position: number; stage_type: string }
 
@@ -24,6 +25,8 @@ interface Props {
   curators: { id: string; name: string }[]
   availableGroups: { chat_id: string; title: string }[]
   backUrl?: string
+  /** Последний разбор разговора, если он был. */
+  analysis?: any | null
 }
 
 const fileIcon: Record<string, string> = {
@@ -60,7 +63,8 @@ function colorForSender(name: string | null | undefined): string {
 }
 const activityIcon: Record<string, string> = { note: '📝', stage_change: '→', system: '⚙️', call: '📞', message: '💬', file_upload: '📎', task_done: '✅' }
 
-export function DealCard({ deal, stages, activities, salespersons, clientData, bookingData, files, messages, tasks, userId, curators, availableGroups, backUrl = '/admin/funnel' }: Props) {
+export function DealCard({ deal, stages, activities, salespersons, clientData, bookingData, files, messages, tasks, userId, curators, availableGroups, backUrl = '/admin/funnel', analysis,
+}: Props) {
   const router = useRouter()
   const [tab, setTab] = useState<'main' | 'activity' | 'files' | 'messages' | 'tasks'>('main')
 
@@ -745,6 +749,13 @@ export function DealCard({ deal, stages, activities, salespersons, clientData, b
             {/* Основное */}
             {tab === 'main' && (
               <div>
+                {/* Разбор стоит выше реквизитов: открывая карточку, человек
+                    хочет понять, о чём был разговор, а не сверить бюджет с этапом. */}
+                <DealAnalysis
+                  dealId={deal.id}
+                  analysis={analysis ?? null}
+                  lastMessageAt={messages.length > 0 ? messages[messages.length - 1].created_at : null}
+                />
                 <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>Информация о сделке</div>
                 <div style={{ background: 'var(--surf)', border: '1px solid var(--bor)', borderRadius: 14, padding: '18px 20px', boxShadow: 'var(--sh)', marginBottom: 16 }}>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, fontSize: 13 }}>

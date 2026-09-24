@@ -8,6 +8,7 @@ import { sendTelegramMessage } from '@/lib/telegram'
 import { suggestSalesReply } from '@/lib/ai'
 import { createClientInvitation } from '@/lib/invitation'
 import { warnOnError } from '@/lib/supabase/write-guard'
+import { closeReplyTasks } from '@/lib/sales/reply-tasks'
 
 function reval() {
   revalidatePath('/admin/funnel')
@@ -634,6 +635,8 @@ export async function sendDealMessage(formData: FormData) {
       }).then(warnOnError('deal_activities · app/admin/funnel/actions.ts:627'))
 
       await supabase.from('deals').update({ updated_at: new Date().toISOString() }).eq('id', dealId).then(warnOnError('deals · app/admin/funnel/actions.ts:636'))
+      // Ответили — задача «клиент написал» больше не актуальна.
+      await closeReplyTasks(supabase, dealId, 'sendDealMessage · TG-группа')
       revalidatePath(`/admin/funnel/${dealId}`)
       revalidatePath(`/sales/funnel/${dealId}`)
       return { success: true }
@@ -722,6 +725,11 @@ export async function sendDealMessage(formData: FormData) {
     }).then(warnOnError('deal_activities · app/admin/funnel/actions.ts:715'))
 
     await supabase.from('deals').update({ updated_at: new Date().toISOString() }).eq('id', dealId).then(warnOnError('deals · app/admin/funnel/actions.ts:724'))
+
+    // Ответили — задача «клиент написал» больше не актуальна. Эхо Wazzup
+    // закрывает её и само, но приходит оно не всегда и не сразу: полагаться
+    // на чужой вебхук там, где мы и так знаем факт отправки, незачем.
+    await closeReplyTasks(supabase, dealId, 'sendDealMessage · Wazzup')
 
     revalidatePath(`/admin/funnel/${dealId}`)
     revalidatePath(`/sales/funnel/${dealId}`)
@@ -996,5 +1004,77 @@ export async function mergeDeals(formData: FormData) {
   if (error) return { error: error.message }
 
   reval()
+  return { success: true }
+}
+
+/**
+ * Разобрать разговор по сделке.
+ *
+ * Материал собирается из переписки, анкеты с сайта и фактов о сделке; модель
+ * возвращает строгую структуру; результат ложится в `deal_analyses` и
+ * показывается в карточке.
+ *
+ * Повторный разбор не заменяет прежний, а добавляется рядом. История разборов
+ * — это не мусор: по ней видно, как менялся клиент, и можно сверить прошлый
+ * вывод с тем, чем всё кончилось. В карточке показывается последний.
+ */
+export async function analyzeDealConversation(formData: FormData) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Не авторизован' }
+
+  const dealId = formData.get('deal_id') as string
+  if (!dealId) return { error: 'Не указана сделка' }
+
+  const admin = await createAdminClient()
+
+  const { collectConversation } = await import('@/lib/sales/conversation-source')
+  const { analyzeConversation } = await import('@/lib/sales/analyze-conversation')
+  const { readRopSettings } = await import('@/lib/rop-settings')
+
+  const материал = await collectConversation(admin, dealId)
+  if (материал.empty) {
+    return { error: 'Разбирать нечего: в сделке почти нет переписки' }
+  }
+
+  // Модель задаётся настройкой, чтобы сменить её можно было без выкатки.
+  const настройки = await readRopSettings(admin)
+  const модель = настройки.find(s => s.key === 'calls_model')?.value
+  const модельСтрокой = typeof модель === 'string' ? модель.replace(/^"|"$/g, '') : undefined
+
+  const res = await analyzeConversation(материал, модельСтрокой ? { model: модельСтрокой } : {})
+  if (!res.ok) return { error: res.why }
+
+  const p = res.payload as any
+  const { error } = await admin.from('deal_analyses').insert({
+    deal_id: dealId,
+    source: 'chat',
+    covered_to: материал.coveredTo,
+    items_count: материал.messagesCount,
+    client_type: p['тип_клиента'] ?? null,
+    next_step: p['следующий_шаг']?.['есть'] ?? null,
+    summary: p['резюме'] ?? null,
+    payload: res.payload,
+    model: res.model,
+    cost_usd: res.costUsd,
+    ms: res.ms,
+  })
+  if (error) return { error: `Разбор получился, но не сохранился: ${error.message}` }
+
+  // Разбор — заметное событие в жизни сделки, и его автор — человек, нажавший
+  // кнопку. Поэтому запись с `user_id`: она же засчитывается как касание
+  // сделки в отчёте о застрявших.
+  await admin.from('deal_activities').insert({
+    deal_id: dealId,
+    user_id: user.id,
+    activity_type: 'system',
+    content: `Разговор разобран ИИ: ${p['тип_клиента']}, следующий шаг ${p['следующий_шаг']?.['есть'] ? 'зафиксирован' : 'НЕ зафиксирован'}`,
+    metadata: { source: 'chat', model: res.model, cost_usd: res.costUsd },
+  }).then(warnOnError('deal_activities · analyzeDealConversation'))
+
+  revalidatePath(`/admin/funnel/${dealId}`)
+  revalidatePath(`/sales/funnel/${dealId}`)
+  revalidatePath(`/rop/funnel/${dealId}`)
+  revalidatePath('/rop/hot')
   return { success: true }
 }
