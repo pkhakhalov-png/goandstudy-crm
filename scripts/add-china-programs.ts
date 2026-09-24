@@ -214,6 +214,31 @@ const SCHOOLS: School[] = [
     ],
   },
   {
+    name: 'Ningbo University', city: 'Нинбо', type: 'Государственный',
+    programs: [
+      {
+        name: 'Финансовая инженерия', en: 'Financial Engineering', specialty: 'Экономика и финансы',
+        degree: 'Bachelor', language: 'Английский', cny: 20000, start: ENG_START, duration: ENG_DURATION,
+        reqs: ['Аттестат о среднем образовании', 'TOEFL 70+ / IELTS 6.0+'],
+        housing: ['Общежитие — до ¥3,500'],
+        livingCost: 'до ¥3,500 (общежитие)',
+        note: 'Партнёр дал стоимость проживания без периода («до 3 500 юаней») — год это или семестр, уточняем.',
+      },
+    ],
+  },
+  {
+    name: 'Wenzhou University', city: 'Вэньчжоу', type: 'Государственный',
+    programs: [
+      {
+        name: 'Материаловедение и инженерия', en: 'Material Science and Engineering', specialty: 'Инженерия',
+        degree: 'Bachelor', language: 'Английский', cny: 22000, start: ENG_START, duration: ENG_DURATION,
+        reqs: ['Аттестат о среднем образовании', 'Экзамен CSCA: математика + химия', 'Duolingo 105+ / IELTS 6.0+ / TOEFL 70+'],
+        housing: ['Трёхместное общежитие — ¥2,900/год'],
+        livingCost: '¥2,900/год (трёхместное общежитие)',
+      },
+    ],
+  },
+  {
     name: 'Harbin Institute of Technology', city: 'Харбин', type: 'Государственный',
     programs: [
       {
