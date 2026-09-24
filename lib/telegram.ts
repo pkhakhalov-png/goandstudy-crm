@@ -138,6 +138,7 @@ export async function notifyNewBooking(params: {
   quizSummary?: string | null
   source?: string | null    // откуда пришли: место и кнопка, словами
   page?: string | null      // адрес страницы-источника (не формы записи)
+  zoomLink?: string | null  // ссылка на встречу, если её создали при брони
 }): Promise<void> {
   const token = process.env.TELEGRAM_BOOKINGS_BOT_TOKEN
   const chatId = process.env.TELEGRAM_BOOKINGS_CHAT_ID
@@ -170,12 +171,16 @@ export async function notifyNewBooking(params: {
   const src = params.source ? `\n📍 Откуда: ${escHtml(params.source)}` : ''
   const pg = params.page ? `\n🔗 ${escHtml(params.page)}` : ''
 
+  // Ссылка на встречу — прямо в уведомлении. Продажнику больше не нужно
+  // заводить её вручную и отправлять клиенту отдельным сообщением.
+  const zoom = params.zoomLink ? `\n🎥 ${escHtml(params.zoomLink)}` : ''
+
   const text = `🆕 <b>Новая запись на консультацию</b>
 ${tag}
 
 🗓 ${escHtml(dateLabel)} · ${escHtml(params.startTime)}–${escHtml(params.endTime)} (МСК)
 👤 ${escHtml(params.clientName)}
-📞 ${escHtml(params.clientPhone)}${tg}${src}${pg}${quiz}`
+📞 ${escHtml(params.clientPhone)}${tg}${zoom}${src}${pg}${quiz}`
 
   try {
     const res = await fetch(`${TG_API}/bot${token}/sendMessage`, {

@@ -259,6 +259,34 @@ export async function createBookingCore(input: BookingInput): Promise<BookingRes
 
   console.log('[BOOK] success! assigned to:', assignedUser.id)
 
+  // Встреча Zoom под эту бронь. Создаётся до уведомления, чтобы ссылка ушла
+  // продажнику сразу: раньше он заводил её руками и отправлял клиенту
+  // отдельным сообщением — а клиент не получал её вовсе (10 неявок из 157).
+  let zoomLink: string | null = null
+  if (insertedBooking?.id) {
+    try {
+      const { создатьВстречуДляБрони } = await import('@/lib/zoom/meeting-for-booking')
+      const встреча = await создатьВстречуДляБрони(supabase, {
+        bookingId: insertedBooking.id,
+        date,
+        startTime: st,
+        endTime: et,
+        clientName,
+        salespersonName: assignedUser.name || '',
+      })
+      if (встреча.создана) {
+        zoomLink = встреча.joinUrl
+        console.log(`[BOOK] Zoom: встреча ${встреча.meetingId} под ${встреча.hostEmail}`)
+      } else {
+        console.log(`[BOOK] Zoom: встреча не создана — ${встреча.почему}`)
+      }
+    } catch (e: any) {
+      // Запись на консультацию важнее ссылки: человек записался, и ронять это
+      // из-за Zoom нельзя.
+      console.error('[BOOK] Zoom упал:', e?.message ?? e)
+    }
+  }
+
   // 8. Уведомление в TG-группу (не блокируем — fire-and-forget с логом ошибок)
   try {
     const quizParts: string[] = []
@@ -286,6 +314,7 @@ export async function createBookingCore(input: BookingInput): Promise<BookingRes
       quizSummary,
       source: origin.where,
       page: origin.url,
+      zoomLink,
     })
     console.log('[BOOK] TG notify done')
   } catch (e) {
