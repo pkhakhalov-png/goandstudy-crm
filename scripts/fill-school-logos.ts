@@ -45,30 +45,51 @@ function extractDomain(url: string): string | null {
   }
 }
 
-async function findLogo(domain: string): Promise<string | null> {
-  // 1) DuckDuckGo Icon API — free, reliable, returns proper favicon
-  const ddgUrl = `https://icons.duckduckgo.com/ip3/${domain}.ico`
+async function tryDdg(host: string): Promise<string | null> {
+  const url = `https://icons.duckduckgo.com/ip3/${host}.ico`
   try {
-    const res = await fetch(ddgUrl, { method: 'GET' })
-    if (res.ok) {
-      const ct = res.headers.get('content-type') || ''
-      const len = Number(res.headers.get('content-length') || '0')
-      if (ct.includes('image') && len > 200) return ddgUrl
-    }
-  } catch { /* skip */ }
+    const res = await fetch(url, { method: 'GET' })
+    if (!res.ok) return null
+    const ct = res.headers.get('content-type') || ''
+    if (!ct.includes('image')) return null
+    // Размер читаем из тела, а не из Content-Length. Для части хостов DDG
+    // отдаёт иконку chunked, без заголовка длины — и проверка на «> 200»
+    // отбраковывала живые 4-килобайтные значки (напр. www.shnu.edu.cn).
+    const bytes = (await res.arrayBuffer()).byteLength
+    return bytes > 200 ? url : null
+  } catch { return null }
+}
+
+async function findLogo(domain: string, fullHost?: string | null): Promise<string | null> {
+  // Пробуем и «голый» домен, и хост как он записан на сайте вуза: у shnu.edu.cn
+  // иконки нет, а у www.shnu.edu.cn есть — DDG индексирует их раздельно.
+  const hosts = [...new Set([domain, fullHost].filter(Boolean) as string[])]
+
+  // 1) DuckDuckGo Icon API
+  for (const h of hosts) {
+    const hit = await tryDdg(h)
+    if (hit) return hit
+  }
 
   // 2) Google s2/favicons — fallback (всегда возвращает что-то, даже generic)
-  const googleUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=128`
-  try {
-    const res = await fetch(googleUrl, { method: 'GET', redirect: 'follow' })
-    if (res.ok) {
+  for (const h of hosts) {
+    const googleUrl = `https://www.google.com/s2/favicons?domain=${h}&sz=128`
+    try {
+      const res = await fetch(googleUrl, { method: 'GET', redirect: 'follow' })
+      if (!res.ok) continue
       const ct = res.headers.get('content-type') || ''
       // Google всегда возвращает PNG, даже generic
       if (ct.startsWith('image/')) return googleUrl
-    }
-  } catch { /* skip */ }
+    } catch { /* skip */ }
+  }
 
   return null
+}
+
+/** Хост как он записан в website, без обрезки www — второй кандидат для DDG. */
+function rawHost(url: string): string | null {
+  try { return new URL(url.startsWith('http') ? url : 'https://' + url).hostname.toLowerCase() || null }
+  catch { return null }
 }
 
 async function main() {
@@ -102,7 +123,7 @@ async function main() {
         const domain = extractDomain(s.website)
         processed++
         if (!domain) { skipped++; continue }
-        const logoUrl = await findLogo(domain)
+        const logoUrl = await findLogo(domain, rawHost(s.website))
         if (!logoUrl) { skipped++; continue }
         if (!isDry) {
           const { error } = await sb.from('schools').update({ logo_url: logoUrl }).eq('id', s.id)
