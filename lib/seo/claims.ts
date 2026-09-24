@@ -129,6 +129,13 @@ export function subjectKeysFor(topic: string): string[] {
     'франц': 'fr', 'венгр': 'hu', 'коре': 'kr', 'сша': 'us', 'америк': 'us',
     'англ': 'gb', 'британ': 'gb', 'оаэ': 'ae', 'дуба': 'ae', 'чех': 'cz', 'польш': 'pl',
     'таил': 'th', 'тайла': 'th', 'бангкок': 'th', 'чулалонгкорн': 'th',
+    // Страны, которые реально идут в работе (public.client_universities), но в
+    // словаре их не было: тема про Канаду не находила ни одного факта, потому
+    // что ключа 'ca' было неоткуда взять. Источники по ним заведены в
+    // scripts/seo-sources-registry.ts.
+    'канад': 'ca', 'словен': 'si', 'португал': 'pt', 'швец': 'se', 'финлянд': 'fi',
+    'нидерл': 'nl', 'голланд': 'nl', 'ирланд': 'ie', 'япон': 'jp', 'австрал': 'au',
+    'серб': 'rs', 'словац': 'sk', 'словаки': 'sk', 'хорват': 'hr', 'болгар': 'bg', 'грец': 'gr',
   }
   const keys = new Set<string>(['global'])
   for (const [stem, code] of Object.entries(countries)) if (t.includes(stem)) keys.add(code)
