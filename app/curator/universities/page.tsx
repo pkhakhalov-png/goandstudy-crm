@@ -185,13 +185,15 @@ export default async function UniversitiesPage({
             initial={{ q, country, school: schoolFilter, levels, intakeYears, sort, specialty, uniType, budget, langOnly: languageOnly }}
           />
 
+          {/* catalog-results — по этому классу globals.css гасит выдачу, пока
+              UniversityFilters ждёт ответ (признак стоит на <html>). */}
           {(programs ?? []).length === 0 ? (
-            <div className="ds-empty" style={{ marginTop: 28 }}>
+            <div className="ds-empty catalog-results" style={{ marginTop: 28 }}>
               <div className="ds-empty-title">Ничего не найдено</div>
               Попробуй изменить фильтры или сбросить поиск.
             </div>
           ) : (
-            <>
+            <div className="catalog-results">
               <div style={{
                 marginTop: 20,
                 display: 'grid',
@@ -222,7 +224,7 @@ export default async function UniversitiesPage({
                   budget={budget}
                 />
               )}
-            </>
+            </div>
           )}
         </div>
       </div>

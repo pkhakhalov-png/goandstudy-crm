@@ -81,6 +81,21 @@ export function UniversityFilters({ countryCodes, countryLabels, countryCounts, 
   const [budget, setBudget] = useState(initial.budget || '')
   const [langOnly, setLangOnly] = useState(!!initial.langOnly)
   const [pending, startTransition] = useTransition()
+  // Какую именно страну ждём. Не признак загрузки — для него есть pending, —
+  // а адрес: спиннер должен встать в нажатый чип, иначе непонятно, куда
+  // кликнули, и на медленном ответе страну жмут второй раз. Значение
+  // намеренно не сбрасываем: оно читается только вместе с pending.
+  const [loadingCountry, setLoadingCountry] = useState<string | null>(null)
+
+  // Выдача живёт в серверном компоненте — соседе, а не потомке, и напрямую
+  // ей отсюда ничего не передать. Ставим признак на <html>, по нему globals.css
+  // приглушает .catalog-results. Дешевле, чем поднимать состояние через сервер.
+  useEffect(() => {
+    const root = document.documentElement
+    if (pending) root.dataset.catalogPending = '1'
+    else delete root.dataset.catalogPending
+    return () => { delete document.documentElement.dataset.catalogPending }
+  }, [pending])
 
   function push(next: Partial<{ q: string; country: string; school: string; levels: string[]; intakeYears: string[]; sort: string; specialty: string; uniType: string; budget: string; langOnly: boolean }>) {
     const merged = {
@@ -150,6 +165,10 @@ export function UniversityFilters({ countryCodes, countryLabels, countryCounts, 
         }
       `}</style>
 
+      {/* Полоса вверху окна. Запрос к каталогу идёт несколько секунд, и без
+          неё нажатие выглядело как промах: страница не двигалась вообще. */}
+      {pending && <div className="ds-topbar-progress" role="progressbar" aria-label="Загружаю программы" />}
+
       {/* Языковые курсы тоггл — отдельный режим выдачи */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <button
@@ -195,7 +214,10 @@ export function UniversityFilters({ countryCodes, countryLabels, countryCounts, 
             <button
               key={code || '__all'}
               type="button"
-              onClick={() => { setCountry(code); setSchool(''); push({ country: code, school: '' }) }}
+              onClick={() => {
+                setLoadingCountry(code)
+                setCountry(code); setSchool(''); push({ country: code, school: '' })
+              }}
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 6,
                 padding: '7px 12px',
@@ -212,7 +234,9 @@ export function UniversityFilters({ countryCodes, countryLabels, countryCounts, 
             >
               {flag && <span style={{ fontSize: 15, lineHeight: 1 }}>{flag}</span>}
               {label}
-              {cnt !== undefined && (
+              {pending && loadingCountry === code ? (
+                <span className="ds-chip-spinner" aria-label="Загружаю" />
+              ) : cnt !== undefined && (
                 <span style={{
                   background: active ? 'rgba(177,94,204,.18)' : 'var(--ds-bg-alt)',
                   borderRadius: 100,
