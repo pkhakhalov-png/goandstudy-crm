@@ -11,7 +11,7 @@ export default async function AdminCuratorsPage() {
     { data: clients },
     { data: users },
   ] = await Promise.all([
-    admin.from('curators').select('id, name, contact, email, is_active, user_id, specializations, languages, max_clients, telegram_username, created_at').order('name'),
+    admin.from('curators').select('id, name, full_name, phone, contact, email, is_active, user_id, specializations, languages, max_clients, telegram_username, created_at').order('name'),
     admin.from('clients').select('id, curator_id, status').eq('status', 'active'),
     admin.from('users').select('id, email, role').eq('role', 'curator'),
   ])

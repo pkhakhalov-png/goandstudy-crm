@@ -76,12 +76,21 @@ export default function NewCuratorPage() {
             <div style={{ fontSize: 12, fontWeight: 700, color: '#14121e', marginBottom: 16, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Данные аккаунта</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
               <div>
-                <label style={labelStyle}>ФИО *</label>
-                <input name="name" required placeholder="Анна Иванова" style={inputStyle} />
+                {/* Короткое имя — уходит в «Привет, {name}!» в письмах. ФИО — поле ниже. */}
+                <label style={labelStyle}>Имя (для обращений) *</label>
+                <input name="name" required placeholder="Анна" style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>ФИО полностью</label>
+                <input name="full_name" placeholder="Иванова Анна Сергеевна" style={inputStyle} />
               </div>
               <div>
                 <label style={labelStyle}>Email *</label>
                 <input name="email" type="email" required placeholder="curator@goandstudy.com" style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>Телефон</label>
+                <input name="phone" placeholder="+7 900 000-00-00" style={inputStyle} />
               </div>
               <div>
                 <label style={labelStyle}>Временный пароль *</label>

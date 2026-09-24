@@ -17,7 +17,7 @@ export default async function CuratorDetailPage({ params }: { params: Promise<{ 
     { data: curator },
     { data: clients },
   ] = await Promise.all([
-    admin.from('curators').select('id, name, contact, is_active, user_id, specializations, languages, max_clients, telegram_username, created_at').eq('id', id).single(),
+    admin.from('curators').select('id, name, full_name, phone, contact, is_active, user_id, specializations, languages, max_clients, telegram_username, created_at').eq('id', id).single(),
     admin.from('clients').select('id, name, country, status, created_at, curator_id, current_stage_code').eq('curator_id', id).order('created_at', { ascending: false }),
   ])
 

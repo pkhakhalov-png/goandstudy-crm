@@ -23,6 +23,8 @@ export async function createCurator(formData: FormData) {
   if (authErr) return { error: authErr }
 
   const name = (formData.get('name') as string)?.trim()
+  const fullName = (formData.get('full_name') as string)?.trim() || null
+  const phone = (formData.get('phone') as string)?.trim() || null
   const email = (formData.get('email') as string)?.trim()
   const password = (formData.get('password') as string)?.trim()
   const telegramUsername = (formData.get('telegram_username') as string)?.trim() || null
@@ -71,6 +73,9 @@ export async function createCurator(formData: FormData) {
     .from('curators')
     .insert({
       name,
+      full_name: fullName,
+      phone,
+      email,
       contact: email,
       is_active: true,
       user_id: userId,
@@ -93,6 +98,8 @@ export async function updateCurator(curatorId: string, formData: FormData) {
   if (authErr) return { error: authErr }
 
   const name = (formData.get('name') as string)?.trim()
+  const fullName = (formData.get('full_name') as string)?.trim() || null
+  const phone = (formData.get('phone') as string)?.trim() || null
   const telegramUsername = (formData.get('telegram_username') as string)?.trim() || null
   const maxClients = Number(formData.get('max_clients') || 20)
   const isActive = formData.get('is_active') === 'true'
@@ -107,6 +114,8 @@ export async function updateCurator(curatorId: string, formData: FormData) {
     .from('curators')
     .update({
       name,
+      full_name: fullName,
+      phone,
       is_active: isActive,
       specializations: specializations.length > 0 ? specializations : null,
       languages: languages.length > 0 ? languages : null,

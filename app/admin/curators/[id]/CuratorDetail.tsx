@@ -34,6 +34,8 @@ const sectionTitle: React.CSSProperties = {
 
 export function CuratorDetail({ curator, clients }: Props) {
   const [name, setName] = useState(curator.name || '')
+  const [fullName, setFullName] = useState(curator.full_name || '')
+  const [phone, setPhone] = useState(curator.phone || '')
   const [tg, setTg] = useState(curator.telegram_username || '')
   const [maxClients, setMaxClients] = useState(String(curator.max_clients ?? 20))
   const [isActive, setIsActive] = useState(curator.is_active)
@@ -49,6 +51,8 @@ export function CuratorDetail({ curator, clients }: Props) {
   function handleSave() {
     const form = new FormData()
     form.set('name', name)
+    form.set('full_name', fullName)
+    form.set('phone', phone)
     form.set('telegram_username', tg)
     form.set('max_clients', maxClients)
     form.set('is_active', String(isActive))
@@ -79,12 +83,21 @@ export function CuratorDetail({ curator, clients }: Props) {
             <div style={sectionTitle}>Профиль</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div>
-                <label style={labelStyle}>ФИО</label>
-                <input value={name} onChange={e => setName(e.target.value)} style={inputStyle} />
+                {/* Короткое имя — уходит в «Привет, {name}!» в письмах и в шапку карточки. */}
+                <label style={labelStyle}>Имя (для обращений)</label>
+                <input value={name} onChange={e => setName(e.target.value)} placeholder="Карина" style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>ФИО полностью</label>
+                <input value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Фамилия Имя Отчество" style={inputStyle} />
               </div>
               <div>
                 <label style={labelStyle}>Email</label>
                 <div style={{ fontSize: 13, color: 'var(--muted)', padding: '9px 0' }}>{curator.email}</div>
+              </div>
+              <div>
+                <label style={labelStyle}>Телефон</label>
+                <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="+7 900 000-00-00" style={inputStyle} />
               </div>
               <div>
                 <label style={labelStyle}>Telegram</label>
