@@ -52,6 +52,14 @@ export function extractText(html: string): string {
     .replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#(\d+);/g, (_, d) => String.fromCharCode(Number(d)))
     .replace(/[ \t ]+/g, ' ')
     .replace(/\n\s*\n+/g, '\n')
+    // Нулевой байт Postgres в text не принимает: запись падает с «unsupported
+    // Unicode escape sequence», и снимок теряется целиком. Прилетает он не из
+    // html, а из бинарей, которые отдаются под видом страницы, — на живом
+    // прогоне это был PDF с официальными правилами стипендии CLEC. Выкидываем
+    // управляющие символы: в тексте страницы им делать нечего, а из-за одного
+    // такого байта источник становился непроверяемым навсегда.
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '')
     .trim()
 }
 
