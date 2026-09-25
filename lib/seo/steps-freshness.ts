@@ -398,3 +398,35 @@ registerStep('content_correction_plan', async (job: Job, seo: any): Promise<Step
     },
   }
 })
+
+/**
+ * Собрать подтверждения самостоятельно.
+ *
+ * Реестр фактов заполнялся руками, и пока рука не дошла, ворота выпуска
+ * держали готовые статьи: десять утверждений про стипендии CSC пролежали
+ * непроверенными две недели только потому, что источник по Китаю никто не
+ * завёл. Ритм «статья в день» не может зависеть от блокнота.
+ *
+ * Шаг долгий: поиск в сети плюс скачивание нескольких страниц. Разбираем по
+ * двадцать утверждений за раз — этого хватает, чтобы за несколько часов закрыть
+ * новую страну, и не хватает, чтобы съесть весь запас времени у одного тика.
+ */
+registerStep('claims_autoverify', async (_job: Job, seo: any): Promise<StepOutcome> => {
+  const { autoverifyClaims } = await import('./claim-verify')
+  const { count } = await seo.from('claims')
+    .select('*', { count: 'exact', head: true }).is('verified_at', null)
+  if (!count) return { outcome: 'done', result: { skipped: 'неподтверждённых утверждений нет', cost: 0 } }
+
+  const r = await autoverifyClaims(seo, { limit: 20 })
+  return {
+    outcome: 'done',
+    result: {
+      подтверждено: r.confirmed,
+      не_нашлось: r.notFound,
+      источников_заведено: r.sourcesAdded,
+      утверждения: r.confirmedIds,
+      заметки: r.notes.slice(0, 8),
+      cost: 0,
+    },
+  }
+})

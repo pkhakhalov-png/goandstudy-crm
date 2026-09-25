@@ -1332,6 +1332,26 @@ registerStep('article_autopublish', async (_job: Job, seo: any): Promise<StepOut
     // 4. Модель могла пометить выдуманные факты и обещания — их тоже не пускаем
     const invented = (report.issues ?? []).filter((i: any) => (i.kind === 'facts' || i.kind === 'promise') && i.severity !== 'minor')
     if (invented.length) {
+      // Чего не хватило — заводим в реестр, а не только жалуемся.
+      //
+      // Числа без основания раньше оставались замечанием в отчёте: статья
+      // стояла, пока человек не заведёт утверждение руками. Теперь ненайденное
+      // становится задачей — часовой claims_autoverify пойдёт за источником
+      // сам. Вид у находок нестрогий, выпуск они не блокируют (см.
+      // claim-discovery.ts), так что хуже этой записью быть не может.
+      const subject = subjectKeysFor(a.primary_keyword ?? '').find((k) => k !== 'global')
+      if (subject) {
+        const { recordUnbackedClaims } = await import('./claim-discovery')
+        const numbers = (report.issues ?? [])
+          .filter((i: any) => i.kind === 'facts' && typeof i.why === 'string')
+          .map((i: any) => ({
+            value: (String(i.why).match(/«([^»]+)»/)?.[1] ?? '').trim(),
+            context: String(i.quote ?? ''),
+          }))
+          .filter((n: any) => n.value && n.context)
+        const added = await recordUnbackedClaims(seo, a.id, subject, numbers).catch(() => 0)
+        if (added) console.log(`[реестр] статья #${a.id}: заведено находок ${added} (предмет ${subject})`)
+      }
       if (flow.autoFix) {
         const { data: fixing } = await seo.from('jobs').select('id')
           .eq('step', 'article_fix').eq('article_id', a.id).in('status', ['pending', 'running', 'waiting']).limit(1)

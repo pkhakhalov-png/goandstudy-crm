@@ -59,7 +59,10 @@ const QUICK_ARTICLE_STEPS = new Set(['article_index_check', 'article_autostart',
  * Начинать такой обход под конец бюджета нельзя по той же причине, что и
  * генерацию, — поэтому он в длинных, хотя и дешёвый.
  */
-const LONG_OTHER_STEPS = new Set(['content_freshness_check'])
+// claims_autoverify тоже долгий: поиск в сети плюс скачивание нескольких
+// страниц. Начинать его под конец бюджета нельзя — Vercel убьёт функцию на
+// 300 c посреди обхода, и задача повиснет в running на десять минут.
+const LONG_OTHER_STEPS = new Set(['content_freshness_check', 'claims_autoverify'])
 const isLongStep = (step: string) =>
   LONG_OTHER_STEPS.has(step) || (step.startsWith('article_') && !QUICK_ARTICLE_STEPS.has(step))
 
@@ -142,6 +145,16 @@ export async function POST(req: NextRequest) {
         .eq('step', 'vk_autopost').in('status', ['pending', 'running', 'waiting']).limit(1)
       if (!vk?.length) {
         await seo.from('jobs').insert({ step: 'vk_autopost', lane: 'production', priority: 14, payload: {} }).throwOnError()
+      }
+
+      // Сбор подтверждений. Шаг сам смотрит, остались ли неподтверждённые
+      // утверждения, и молча выходит, если не осталось. Раз в час, потому что
+      // неподтверждённый факт — это не «когда-нибудь поправим», а стоящая
+      // статья: ворота выпуска держат материал, пока цифру некому подтвердить.
+      const { data: cv } = await seo.from('jobs').select('id')
+        .eq('step', 'claims_autoverify').in('status', ['pending', 'running', 'waiting']).limit(1)
+      if (!cv?.length) {
+        await seo.from('jobs').insert({ step: 'claims_autoverify', lane: 'findings', priority: 13, payload: {} }).throwOnError()
       }
 
       // Свежесть фактов. Шаг сам смотрит, у каких источников вышел срок, и
