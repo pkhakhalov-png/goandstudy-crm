@@ -765,6 +765,14 @@ registerStep('article_publish_blog', async (job: Job, seo: any): Promise<StepOut
  * всего две, дальше решает человек — но если он посмотрел и хочет ещё круг,
  * не надо перегенерировать статью с нуля.
  */
+/**
+ * Проверки, которые живут в карточке статьи, а не в её тексте: категория,
+ * slug, title, excerpt, unique_value. Переписывание тела их не двигает.
+ */
+function isMetadataCheck(id: string): boolean {
+  return /^(1 slug|8 title|8 excerpt|8 категория|2\.[12567] |7\.[1368] |PRD §13 unique_value)/.test(id)
+}
+
 registerStep('article_fix', async (job: Job, seo: any): Promise<StepOutcome> => {
   const articleId = job.article_id!
 
@@ -772,8 +780,20 @@ registerStep('article_fix', async (job: Job, seo: any): Promise<StepOutcome> => 
   const { data: version } = await seo.from('article_versions')
     .select('id, version_no, title, body, meta, qa_report').eq('id', article.current_version_id).single()
   const meta: any = version.meta ?? {}
-  const brief: Brief = meta.brief
-  if (!brief) return { outcome: 'failed', result: { error: 'у версии нет брифа' } }
+  if (!meta.brief) return { outcome: 'failed', result: { error: 'у версии нет брифа' } }
+
+  // Бриф статей ручного пути бывает огрызком вида {h1:'', category:''}. Проверки
+  // читают из него slug, title, excerpt — и на огрызке насчитывали пять провалов
+  // там, где ворота выпуска, смотрящие на настоящие meta и title версии, видят
+  // один. Достраиваем недостающее из того, что у статьи есть на самом деле,
+  // чтобы починка чинила настоящие проблемы, а не разницу двух представлений.
+  const brief: Brief = {
+    ...meta.brief,
+    title: meta.brief.title || version.title || '',
+    slug: meta.brief.slug || meta.slug || '',
+    meta_description: meta.brief.meta_description || meta.description || '',
+    primary_keyword: meta.brief.primary_keyword || version.title || '',
+  }
 
   // Тема может отсутствовать: статьи из ручного пути создаются с topic_id = null.
   // Раньше сюда прилетал null, и починка падала на чтении primary_keyword —
@@ -802,7 +822,24 @@ registerStep('article_fix', async (job: Job, seo: any): Promise<StepOutcome> => 
     return { outcome: 'done', result: { nothing_to_fix: true, cost: 0 } }
   }
 
-  const fixed = normalizeBody(await reviseDraft(ctx, brief, html, failedB.map((c) => ({ id: c.id, detail: c.detail })), modelIssues))
+  // Часть проверок правкой текста не лечится: пустая категория, незаполненный
+  // slug или excerpt живут в карточке статьи, а не в её теле. Просить модель
+  // переписать текст ради них — это счёт за вызов и новая версия каждый час,
+  // при неизменном числе блокеров. Статью #14 именно так и крутило бы: её
+  // единственный блокер — пустая категория.
+  const textFixable = failedB.filter((c) => !isMetadataCheck(c.id))
+  if (!textFixable.length && worth.length === 0) {
+    return {
+      outcome: 'done',
+      result: {
+        nothing_to_fix: true, cost: 0,
+        нужен_человек: failedB.map((c) => c.id),
+        why: 'остались только проверки карточки — текстом их не починить',
+      },
+    }
+  }
+
+  const fixed = normalizeBody(await reviseDraft(ctx, brief, html, textFixable.map((c) => ({ id: c.id, detail: c.detail })), modelIssues))
 
   // Чем писали на самом деле, а не что стояло в коде на момент выкладки.
   const writer = await writerConfig(seo)
