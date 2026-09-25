@@ -97,8 +97,23 @@ export function checkBlogStandard(input: BlogCheckInput): Check[] {
   add('2 блоки закрыты', 'B', opens === closes, `открыто ${opens}, закрыто ${closes}`)
 
   add('2 нет h1 в теле', 'B', !/<h1[\s>]/i.test(body), 'h1 отдаёт заголовок страницы')
+  // Блок картинки разрешён в ALLOWED_BLOCKS, а его собственный класс — нет.
+  //
+  // Гутенберг пишет картинке class="wp-block-image size-large", и белый список
+  // из двух значений её заворачивал. Чинить это было нечем: разметку вставляет
+  // сам конвейер на шаге обложки, модель тут ни при чём, а автопочинка на
+  // текстовых правках такое не двигает. Три статьи 25 сентября встали ровно на
+  // этом, и встала бы каждая следующая с картинкой.
+  //
+  // Список остался закрытым, просто теперь в нём то, что Гутенберг реально
+  // выдаёт: имена блоков плюс модификаторы размера и выравнивания.
+  const ALLOWED_CLASS_TOKENS = new Set([
+    'wp-block-table', 'wp-block-quote', 'wp-block-image',
+    'size-thumbnail', 'size-medium', 'size-large', 'size-full',
+    'aligncenter', 'alignleft', 'alignright', 'alignwide', 'alignfull',
+  ])
   const badClass = [...body.matchAll(/class="([^"]+)"/g)].map((m) => m[1])
-    .filter((c) => !/^wp-block-(table|quote)$/.test(c.trim()))
+    .filter((c) => c.trim().split(/\s+/).some((token) => token && !ALLOWED_CLASS_TOKENS.has(token)))
   add('2 нет посторонних class', 'B', badClass.length === 0,
     badClass.length ? `${[...new Set(badClass)].slice(0, 3).join(', ')}` : 'только классы Гутенберга')
   add('2 нет style= и <br>', 'B', !/style="/i.test(body) && !/<br\s*\/?>/i.test(body), 'инлайновые стили и переносы ломают ритм')
