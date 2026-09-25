@@ -56,7 +56,7 @@ export default async function RopDealPage({ params }: { params: Promise<{ id: st
       ? supabase.from('clients').select('id, name, country, university, status, months').eq('id', deal.client_id).single().then(r => r.data)
       : null,
     deal.booking_id
-      ? supabase.from('bookings').select('id, booking_date, start_time, end_time, status').eq('id', deal.booking_id).single().then(r => r.data)
+      ? supabase.from('bookings').select('id, booking_date, start_time, end_time, status, zoom_join_url').eq('id', deal.booking_id).single().then(r => r.data)
       : null,
   ])
   // Последний разбор разговора — показывается первым на вкладке «Основное».

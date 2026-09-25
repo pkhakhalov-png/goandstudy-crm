@@ -62,7 +62,7 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
       ? supabase.from('clients').select('id, name, country, university, status, months').eq('id', deal.client_id).single().then(r => r.data)
       : null,
     deal.booking_id
-      ? supabase.from('bookings').select('id, booking_date, start_time, end_time, status').eq('id', deal.booking_id).single().then(r => r.data)
+      ? supabase.from('bookings').select('id, booking_date, start_time, end_time, status, zoom_join_url').eq('id', deal.booking_id).single().then(r => r.data)
       : null,
   ])
 

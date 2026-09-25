@@ -543,6 +543,21 @@ export function DealCard({ deal, stages, activities, salespersons, clientData, b
                   <span className="dot"></span>{bookingData.status === 'completed' ? 'Проведена' : bookingData.status === 'cancelled' ? 'Отменена' : 'Подтверждена'}
                 </span>
               </div>
+              {/* Ссылка на встречу. CRM создаёт её сама при записи клиента —
+                  заводить встречу руками и слать ссылку отдельно больше не нужно. */}
+              {bookingData.zoom_join_url && (
+                <a href={bookingData.zoom_join_url} target="_blank" rel="noopener noreferrer"
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 7, marginTop: 6,
+                    padding: '8px 12px', borderRadius: 8, textDecoration: 'none',
+                    background: 'rgba(45,140,255,.07)', border: '1px solid rgba(45,140,255,.2)',
+                    fontSize: 12, fontWeight: 600, color: '#2d8cff',
+                  }}>
+                  <span>🎥</span>
+                  <span>Войти во встречу Zoom</span>
+                  <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 500, color: 'var(--muted)' }}>запись включится сама</span>
+                </a>
+              )}
             </div>
           )}
 
