@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { saveWeekSlots, updateBookingStatus } from './actions'
 import { mskTodayStr, mskTimeStr } from '@/lib/time'
+import { ZoomLinkRow } from '@/app/_shared/ZoomLinkRow'
 
 const DAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
 const HOURS_START = 9
@@ -379,19 +380,7 @@ export function ScheduleClient({ slots: initialSlots, bookings, allStats, userId
                         {b.client_phone && <a href={`tel:${b.client_phone}`} style={{ color: 'var(--purple)', textDecoration: 'none', fontWeight: 600 }}>{b.client_phone}</a>}
                         {b.client_telegram && <a href={`https://t.me/${b.client_telegram.replace('@', '')}`} target="_blank" rel="noopener" style={{ color: 'var(--purple)', textDecoration: 'none' }}>TG: {b.client_telegram}</a>}
                       </div>
-                      {b.zoom_join_url && b.status !== 'cancelled' && (
-                        <a href={b.zoom_join_url} target="_blank" rel="noopener noreferrer"
-                          style={{
-                            display: 'flex', alignItems: 'center', gap: 7, marginBottom: 8,
-                            padding: '8px 12px', borderRadius: 8, textDecoration: 'none',
-                            background: 'rgba(45,140,255,.07)', border: '1px solid rgba(45,140,255,.2)',
-                            fontSize: 12, fontWeight: 600, color: '#2d8cff',
-                          }}>
-                          <span>🎥</span>
-                          <span>Войти во встречу</span>
-                          <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 500, color: 'var(--muted)' }}>запись включится сама</span>
-                        </a>
-                      )}
+                      {b.zoom_join_url && b.status !== 'cancelled' && <ZoomLinkRow url={b.zoom_join_url} compact />}
                       {b.status === 'confirmed' && (
                         <div style={{ display: 'flex', gap: 6 }}>
                           <button onClick={() => handleStatus(b.id, 'completed')} className="btn-s" style={{ fontSize: 11, padding: '4px 10px', color: 'var(--green)', borderColor: 'rgba(52,199,89,.2)' }}>Проведена</button>
@@ -440,19 +429,7 @@ export function ScheduleClient({ slots: initialSlots, bookings, allStats, userId
                           {b.client_telegram && <a href={`https://t.me/${b.client_telegram.replace('@', '')}`} target="_blank" rel="noopener" style={{ color: 'var(--purple)', textDecoration: 'none' }}>TG: {b.client_telegram}</a>}
                         </div>
                       )}
-                      {b.zoom_join_url && b.status !== 'cancelled' && (
-                        <a href={b.zoom_join_url} target="_blank" rel="noopener noreferrer"
-                          style={{
-                            display: 'flex', alignItems: 'center', gap: 7, marginBottom: 8,
-                            padding: '8px 12px', borderRadius: 8, textDecoration: 'none',
-                            background: 'rgba(45,140,255,.07)', border: '1px solid rgba(45,140,255,.2)',
-                            fontSize: 12, fontWeight: 600, color: '#2d8cff',
-                          }}>
-                          <span>🎥</span>
-                          <span>Войти во встречу</span>
-                          <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 500, color: 'var(--muted)' }}>запись включится сама</span>
-                        </a>
-                      )}
+                      {b.zoom_join_url && b.status !== 'cancelled' && <ZoomLinkRow url={b.zoom_join_url} compact />}
                       {b.status === 'confirmed' && (
                         <div style={{ display: 'flex', gap: 6 }}>
                           <button onClick={() => handleStatus(b.id, 'completed')} className="btn-s" style={{ fontSize: 11, padding: '4px 10px', color: 'var(--green)', borderColor: 'rgba(52,199,89,.2)' }}>Проведена</button>

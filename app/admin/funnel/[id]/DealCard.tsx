@@ -8,6 +8,7 @@ import { uploadDealFile, deleteDealFile } from './fileActions'
 import { createClient } from '@/lib/supabase/client'
 import { SalesInviteButton } from '@/app/sales/SalesInviteButton'
 import { DealAnalysis } from './DealAnalysis'
+import { ZoomLinkRow } from '@/app/_shared/ZoomLinkRow'
 
 interface Stage { id: string; name: string; color: string; position: number; stage_type: string }
 
@@ -544,20 +545,9 @@ export function DealCard({ deal, stages, activities, salespersons, clientData, b
                 </span>
               </div>
               {/* Ссылка на встречу. CRM создаёт её сама при записи клиента —
-                  заводить встречу руками и слать ссылку отдельно больше не нужно. */}
-              {bookingData.zoom_join_url && (
-                <a href={bookingData.zoom_join_url} target="_blank" rel="noopener noreferrer"
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 7, marginTop: 6,
-                    padding: '8px 12px', borderRadius: 8, textDecoration: 'none',
-                    background: 'rgba(45,140,255,.07)', border: '1px solid rgba(45,140,255,.2)',
-                    fontSize: 12, fontWeight: 600, color: '#2d8cff',
-                  }}>
-                  <span>🎥</span>
-                  <span>Войти во встречу Zoom</span>
-                  <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 500, color: 'var(--muted)' }}>запись включится сама</span>
-                </a>
-              )}
+                  заводить встречу руками и слать ссылку отдельно больше не нужно.
+                  Копируют чаще, чем открывают: отправить её клиенту должен человек. */}
+              {bookingData.zoom_join_url && <ZoomLinkRow url={bookingData.zoom_join_url} />}
             </div>
           )}
 
