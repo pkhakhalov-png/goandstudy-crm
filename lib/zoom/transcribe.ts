@@ -101,6 +101,17 @@ const ЗАДАНИЕ = `Запиши этот разговор текстом, �
 - Если фрагмент не разобрать, пиши [неразборчиво] и продолжай.
 - Ответь только расшифровкой, без вступлений и пояснений.`
 
+/**
+ * Ошибка, которую имеет смысл пережить и повторить.
+ *
+ * 503 «перегружен» и 429 «слишком часто» — это не «не получилось», а «приходи
+ * через минуту». Помечать такую запись как проваленную значит терять разговор
+ * из-за чужой загруженности: первый же настоящий звонок на этом и сломался.
+ */
+function временная(код: number): boolean {
+  return код === 429 || код === 500 || код === 502 || код === 503 || код === 504
+}
+
 export async function расшифровать(audio: Buffer, mimeType = 'audio/m4a'): Promise<Расшифровка> {
   const ключ = process.env.GEMINI_API_KEY?.trim()
   if (!ключ) throw new Error('не настроен распознаватель речи: нет GEMINI_API_KEY')
@@ -111,38 +122,56 @@ export async function расшифровать(audio: Buffer, mimeType = 'audio/
   try {
     await дождаться(файл.name, ключ)
 
-    const res = await fetch(`${БАЗА}/v1beta/models/${МОДЕЛЬ}:generateContent?key=${ключ}`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{
-          parts: [
-            { text: ЗАДАНИЕ },
-            { file_data: { mime_type: mimeType, file_uri: файл.uri } },
-          ],
-        }],
-        // Ноль температуры: расшифровка — не творчество, и разные ответы на одну
-        // запись здесь были бы прямым вредом.
-        generationConfig: { temperature: 0, maxOutputTokens: 65536 },
-      }),
-      signal: AbortSignal.timeout(600_000),
-    })
+    // Пауза растёт: 5, 15, 45 секунд. Дольше ждать смысла нет — если
+    // распознаватель лежит минуту, он полежит и десять, а у функции есть
+    // предел времени. Не вышло за три попытки — запись остаётся у нас со
+    // статусом failed, и её можно переразобрать отдельно.
+    const паузы = [5_000, 15_000, 45_000]
+    let последняя = ''
 
-    const data: any = await res.json().catch(() => ({}))
-    if (!res.ok) {
-      throw new Error(`распознаватель ответил ошибкой (${res.status}): ${String(data?.error?.message ?? '').slice(0, 200)}`)
+    for (let попытка = 0; попытка <= паузы.length; попытка++) {
+      const res = await fetch(`${БАЗА}/v1beta/models/${МОДЕЛЬ}:generateContent?key=${ключ}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { text: ЗАДАНИЕ },
+              { file_data: { mime_type: mimeType, file_uri: файл.uri } },
+            ],
+          }],
+          // Ноль температуры: расшифровка — не творчество, и разные ответы на одну
+          // запись здесь были бы прямым вредом.
+          generationConfig: { temperature: 0, maxOutputTokens: 65536 },
+        }),
+        signal: AbortSignal.timeout(600_000),
+      })
+
+      const data: any = await res.json().catch(() => ({}))
+
+      if (!res.ok) {
+        последняя = `${res.status}: ${String(data?.error?.message ?? '').slice(0, 160)}`
+        if (временная(res.status) && попытка < паузы.length) {
+          console.warn(`[расшифровка] ${последняя} — повтор через ${паузы[попытка] / 1000} с`)
+          await new Promise(r => setTimeout(r, паузы[попытка]))
+          continue
+        }
+        throw new Error(`распознаватель ответил ошибкой (${последняя})`)
+      }
+
+      const текст = (data?.candidates?.[0]?.content?.parts ?? [])
+        .map((p: any) => p.text ?? '')
+        .join('')
+        .trim()
+
+      // Пустая расшифровка неотличима от «все молчали» — молча вернуть пустоту
+      // значит потерять разговор без следа.
+      if (!текст) throw new Error('в записи не разобрать слов')
+
+      return { текст, модель: МОДЕЛЬ, мс: Date.now() - начало }
     }
 
-    const текст = (data?.candidates?.[0]?.content?.parts ?? [])
-      .map((p: any) => p.text ?? '')
-      .join('')
-      .trim()
-
-    // Пустая расшифровка неотличима от «все молчали» — молча вернуть пустоту
-    // значит потерять разговор без следа.
-    if (!текст) throw new Error('в записи не разобрать слов')
-
-    return { текст, модель: МОДЕЛЬ, мс: Date.now() - начало }
+    throw new Error(`распознаватель не ответил за три попытки (${последняя})`)
   } finally {
     await удалить(файл.name, ключ)
   }
