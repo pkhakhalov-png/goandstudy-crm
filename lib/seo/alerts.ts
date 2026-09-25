@@ -114,6 +114,34 @@ export async function collectAlerts(seo: any): Promise<Alert[]> {
     })
   }
 
+  // Статья не выходила слишком долго.
+  //
+  // Правило выше ловит только мёртвую очередь, а именно этот случай она не
+  // ловила: с 17 по 25 сентября задачи исправно завершались каждый час —
+  // автостарт, автовыпуск, свежесть, — и всё это время ни одна статья не
+  // писалась и не выходила. Очередь была жива, результата не было, сторож
+  // молчал восемь дней. Здесь спрашиваем то, ради чего конвейер существует:
+  // когда на сайте последний раз появилась статья.
+  if ((flow?.value as any)?.enabled && (flow?.value as any)?.autoPublish) {
+    const { data: lastPub } = await seo.from('articles')
+      .select('published_at').eq('status', 'published')
+      .order('published_at', { ascending: false }).limit(1).maybeSingle()
+    const at = lastPub?.published_at ? Date.parse(lastPub.published_at) : 0
+    const hours = at ? Math.floor((Date.now() - at) / 36e5) : 999
+    // Полтора суток: одного пропущенного дня мало — выпуск плавает внутри
+    // дневного окна, и ровно 24 часа дали бы ложную тревогу почти каждый день.
+    if (hours >= 36) {
+      alerts.push({
+        // Ключ с числом суток: пока беда та же, сообщение приходит раз в сутки,
+        // а не каждые шесть часов.
+        key: `no-publish:${Math.floor(hours / 24)}`,
+        title: at ? `Статья не выходила ${hours} часов` : 'Не вышло ещё ни одной статьи',
+        detail: 'поток и самостоятельный выпуск включены, но публикаций нет. '
+          + 'Смотреть: упавшие задачи производства и причины отказа в article_autopublish.',
+      })
+    }
+  }
+
   // ── Голодание дорожек и бюджет ──────────────────────────────────────────
   //
   // Считаются тем же модулем, что и экран «Конвейер». Это важнее, чем экономия
@@ -234,14 +262,22 @@ export async function collectNews(seo: any): Promise<Alert[]> {
 }
 
 /** Отправить то, о чём ещё не говорили. Возвращает, сколько ушло. */
-export async function notifyAlerts(seo: any): Promise<{ sent: number; suppressed: number }> {
+export async function notifyAlerts(seo: any): Promise<{ sent: number; suppressed: number; channel?: string }> {
   // Настройка важнее удобства: о готовой статье сообщать не нужно, если человек
   // и так заходит в CRM. Оставляем по умолчанию только поломки — их пропустить
   // дороже, чем прочитать лишнее.
   const { data: cfg } = await seo.from('settings').select('value').eq('key', 'alerts').maybeSingle()
   const want = { problems: true, news: false, ...((cfg?.value as any) ?? {}) }
 
-  if (!alertChat()) return { sent: 0, suppressed: 0 }
+  // Некуда слать — это поломка сторожа, а не тишина в конвейере.
+  //
+  // Раньше здесь возвращался тот же {sent:0, suppressed:0}, что и при полном
+  // здоровье, и отличить «всё хорошо» от «мне некуда кричать» было нельзя ни с
+  // экрана, ни из результата задачи. Сторож так и простоял выключенным с
+  // одиннадцатого сентября, пока конвейер восемь дней не писал статьи.
+  if (!alertChat()) {
+    return { sent: 0, suppressed: 0, channel: 'не настроен: нет SEO_ALERT_CHAT_ID — уведомления никуда не уходят' }
+  }
 
   const [problems, news] = await Promise.all([
     want.problems ? collectAlerts(seo) : Promise.resolve([]),
