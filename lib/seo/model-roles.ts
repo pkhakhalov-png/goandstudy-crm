@@ -81,9 +81,15 @@ async function load(seo: any): Promise<Map<string, any>> {
  *
  * Без клиента базы или до применения миграции возвращает то же, что стояло в
  * коде: код обязан работать, когда настройки ещё нет.
+ *
+ * Проверяем не «есть ли объект», а «умеет ли он from». Разница стоила восьми
+ * статей: контекст генерации ездит между шагами через jobs.payload, то есть
+ * через JSON, и живой клиент Supabase этого не переживает — в базе от него
+ * остаётся скелет {url, headers, schemaName}. Он непустой, проверку на !seo
+ * проходил, а на первом же seo.from падал «e.from is not a function».
  */
 export async function resolveRole(seo: any | null, role: RoleName): Promise<RoleConfig> {
-  if (!seo || tableMissing) return fallback(role, 'по умолчанию')
+  if (!seo || typeof seo.from !== 'function' || tableMissing) return fallback(role, 'по умолчанию')
   const rows = await load(seo)
   const r = rows.get(role)
   if (!r) return fallback(role, 'по умолчанию')

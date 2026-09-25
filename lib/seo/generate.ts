@@ -606,9 +606,12 @@ export async function qaDeterministic(
   }
 
   // PRD §13: без ответа «чем отличается» статью не публикуем — защита от scaled content
-  const uvOk = brief.unique_value.trim().length > 40
+  // У статей ручного пути бриф бывает огрызком, и поля тут может не быть вовсе.
+  // Пустое unique_value — это проваленный блокер, а не повод уронить проверку.
+  const uniqueValue = typeof brief.unique_value === 'string' ? brief.unique_value : ''
+  const uvOk = uniqueValue.trim().length > 40
   checks.push({ id: 'PRD §13 unique_value заполнен', level: 'B', ok: uvOk, detail: uvOk ? 'заполнено' : 'пустое или отписка' })
-  if (!uvOk) issues.push({ severity: 'blocker', kind: 'seo', quote: brief.unique_value, why: 'нет ответа, чем материал отличается от типового' })
+  if (!uvOk) issues.push({ severity: 'blocker', kind: 'seo', quote: uniqueValue, why: 'нет ответа, чем материал отличается от типового' })
 
   // Каннибализация: близость к существующим страницам
   if (opts.pageEmbeddings.length) {

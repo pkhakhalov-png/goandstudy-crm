@@ -202,8 +202,46 @@ async function pageEmbeddings(seo: any) {
     .map((p: any) => ({ url: p.url, title: p.title, vec: vec(p.embedding) }))
 }
 
+/**
+ * Клиент базы в payload не кладём.
+ *
+ * Контекст генерации ездит между шагами через jobs.payload, то есть через
+ * JSON. Живой клиент Supabase этого не переживает: в базе от него остаётся
+ * скелет {url, headers, schemaName} — объект непустой, но без единого метода.
+ * Восемь статей подряд умерли на «e.from is not a function», когда resolveRole
+ * попробовал этим скелетом сходить в базу. Привязку учёта восстанавливает
+ * reviveSpend уже на стороне шага, где живой клиент есть.
+ */
+type JobPayload = Record<string, unknown> & { ctx?: Record<string, unknown> }
+
+function stripSpend(payload: JobPayload): JobPayload {
+  if (!payload?.ctx?.spend) return payload
+  const { spend, ...ctx } = payload.ctx
+  void spend
+  return { ...payload, ctx }
+}
+
+/**
+ * Вернуть контексту из payload привязку к учёту: клиент базы и номер задачи,
+ * под которой считается расход. Без неё вызовы модели не попадут в runs.
+ */
+function reviveSpend(ctx: GenContext, seo: any, job: Job): GenContext {
+  return {
+    ...ctx,
+    spend: {
+      seo,
+      jobId: job.id ?? null,
+      articleId: job.article_id ?? null,
+      traceId: job.id ? `job:${job.id}` : null,
+    },
+  }
+}
+
 function next(seo: any, step: string, articleId: number, topicId: number, payload: any = {}) {
-  return seo.from('jobs').insert({ step, lane: 'production', priority: 50, article_id: articleId, topic_id: topicId, payload }).throwOnError()
+  return seo.from('jobs').insert({
+    step, lane: 'production', priority: 50,
+    article_id: articleId, topic_id: topicId, payload: stripSpend(payload),
+  }).throwOnError()
 }
 
 /**
@@ -321,7 +359,8 @@ registerStep('article_brief', async (job: Job, seo: any): Promise<StepOutcome> =
 /* ── Шаг 2: черновик ──────────────────────────────────────────────────────── */
 
 registerStep('article_draft', async (job: Job, seo: any): Promise<StepOutcome> => {
-  const { brief, ctx } = job.payload as { brief: Brief; ctx: GenContext }
+  const { brief, ctx: raw } = job.payload as { brief: Brief; ctx: GenContext }
+  const ctx = reviveSpend(raw, seo, job)
   const articleId = job.article_id!
   const html = normalizeBody(await generateDraft(ctx, brief))
 
@@ -343,7 +382,8 @@ registerStep('article_draft', async (job: Job, seo: any): Promise<StepOutcome> =
 /* ── Шаг 3: QA и починка. Один прогон за задачу — иначе не влезаем в 10 минут ─ */
 
 registerStep('article_qa', async (job: Job, seo: any): Promise<StepOutcome> => {
-  const { brief, ctx, attempt } = job.payload as { brief: Brief; ctx: GenContext; attempt: number }
+  const { brief, ctx: raw, attempt } = job.payload as { brief: Brief; ctx: GenContext; attempt: number }
+  const ctx = reviveSpend(raw, seo, job)
   const articleId = job.article_id!
 
   const { data: article } = await seo.from('articles').select('current_version_id').eq('id', articleId).single()

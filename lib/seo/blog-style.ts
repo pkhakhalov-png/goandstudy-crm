@@ -70,9 +70,15 @@ export function checkBlogStandard(input: BlogCheckInput): Check[] {
   const add = (id: string, level: 'B' | 'W', ok: boolean, detail: string) => out.push({ id, level, ok, detail })
   const { body } = input
 
-  /* §1 Slug */
-  add('1 slug только [a-z0-9-]', 'B', /^[a-z0-9-]+$/.test(input.slug), input.slug)
-  const slugWords = input.slug.split('-').filter(Boolean).length
+  /* §1 Slug
+     Слага может не быть вовсе: у статей ручного пути бриф иногда сохранён
+     огрызком ({h1:'', category:''}), и тогда сюда приезжает undefined. Раньше
+     на нём падала вся проверка — а вместе с ней автопочинка, которая пыталась
+     починить эту же статью каждый час полторы недели подряд. Отсутствие слага
+     это проваленная проверка, а не повод уронить шаг. */
+  const slug = typeof input.slug === 'string' ? input.slug : ''
+  add('1 slug только [a-z0-9-]', 'B', slug.length > 0 && /^[a-z0-9-]+$/.test(slug), slug || 'слага нет')
+  const slugWords = slug.split('-').filter(Boolean).length
   add('1 slug 3–7 слов', 'W', slugWords >= 3 && slugWords <= 7, `${slugWords} слов`)
 
   /* §2.1 Ничего исполняемого в теле */
@@ -152,8 +158,11 @@ export function checkBlogStandard(input: BlogCheckInput): Check[] {
     broken.length ? `битые: ${broken.join(', ')}` : `${internal.length} проверено`)
 
   /* §8 Реестр */
-  add('8 title не длиннее 65', 'B', input.title.length <= 65, `${input.title.length} символов`)
-  add('8 excerpt 90–150', 'B', input.excerpt.length >= 90 && input.excerpt.length <= 160, `${input.excerpt.length} символов`)
+  // Те же огрызки брифа, что и у слага выше: title и excerpt могут не приехать.
+  const title = typeof input.title === 'string' ? input.title : ''
+  const excerpt = typeof input.excerpt === 'string' ? input.excerpt : ''
+  add('8 title не длиннее 65', 'B', title.length > 0 && title.length <= 65, title ? `${title.length} символов` : 'title не заполнен')
+  add('8 excerpt 90–150', 'B', excerpt.length >= 90 && excerpt.length <= 160, excerpt ? `${excerpt.length} символов` : 'excerpt не заполнен')
   add('8 категория из списка', 'B', (BLOG_CATEGORIES as readonly string[]).includes(input.category), input.category || '(пусто)')
 
   return out
