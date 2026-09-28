@@ -217,8 +217,17 @@ export function coverPrompt(scene: string): string {
   return `${scene}\n\n${STYLE}\n\n${AVOID}\n\n${FRAMING}`
 }
 
+/**
+ * Картинка внутри статьи.
+ *
+ * Хвост «a detail rather than a panorama» отсюда убран: он тянул каждый второй
+ * кадр к рукам над столом независимо от того, что просила сцена, — а тип кадра
+ * для этой картинки теперь выбирается отдельно и обложке не повторяется.
+ * Осталось единственное, что здесь действительно нужно: не пересказывать
+ * обложку второй раз.
+ */
 export function inlinePrompt(scene: string): string {
-  return `${scene}\n\n${STYLE}\n\n${AVOID}\n\n${FRAMING} Calmer and more specific than the title image — a detail rather than a panorama.`
+  return `${scene}\n\n${STYLE}\n\n${AVOID}\n\n${FRAMING} A different moment from the title image, not the same frame reshot.`
 }
 
 /** Разметка Гутенберга под картинку внутри статьи. */

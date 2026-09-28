@@ -467,12 +467,18 @@ registerStep('article_cover', async (job: Job, seo: any): Promise<StepOutcome> =
   if (!imagesConfigured()) return fallback('нет ключа поставщика картинок')
 
   const { generateCover, generateInline, coverPrompt, inlinePrompt, figureBlock } = await import('./images')
-  const { planScenes } = await import('./generate')
+  const { planScenes, recentScenes, rememberScene } = await import('./generate')
   const { splitBlocks } = await import('./blog-style')
 
   const body: string = version.body ?? ''
   const headings = [...body.matchAll(/<h2[^>]*>([\s\S]*?)<\/h2>/gi)]
     .map((m) => m[1].replace(/<[^>]+>/g, '').trim()).filter(Boolean)
+
+  // Чем заняты соседние карточки. Без этой памяти каждая статья выбирала кадр
+  // с нуля и выбирала одинаково: на шестнадцати сценах «деталь» выпала девять
+  // раз, и двенадцать подписей из шестнадцати описывали руки над бумагами.
+  // Лента получалась одной фотографией, повторённой семьдесят раз.
+  const история = await recentScenes(seo)
 
   let scenes: Awaited<ReturnType<typeof planScenes>>
   let cover: Awaited<ReturnType<typeof generateCover>>
@@ -482,6 +488,8 @@ registerStep('article_cover', async (job: Job, seo: any): Promise<StepOutcome> =
       title: version.title ?? slug,
       h1: job.payload?.brief?.h1 ?? version.title ?? slug,
       headings,
+      avoidShots: история.shots,
+      avoidSubjects: история.subjects,
     }, { seo, jobId: job.id, articleId, traceId: `job:${job.id}` })
     cover = await generateCover(coverPrompt(scenes.cover))
     inline = await generateInline(inlinePrompt(scenes.inline))
@@ -533,11 +541,17 @@ registerStep('article_cover', async (job: Job, seo: any): Promise<StepOutcome> =
     },
   }).eq('id', version.id).throwOnError()
 
+  // Память чередования. Пишется только здесь — то есть после того, как кадр
+  // действительно нарисован: заглушка и упавшая генерация тип кадра не тратят,
+  // иначе один сбой выбивал бы вариант из обращения на четыре статьи вперёд.
+  await rememberScene(seo, scenes.shot, scenes.inline_alt)
+
   await next(seo, 'article_linkplan', articleId, job.topic_id!, { brief: job.payload.brief })
   return {
     outcome: 'done',
     result: {
       cover: `${cover.width}×${cover.height}`, kb: Math.round(cover.bytes / 102.4) / 10,
+      shot: scenes.shot, inline_shot: scenes.inline_shot,
       hook: hookDrawn?.text ?? 'НЕ ЛЕГЛА',
       inline: `${inline.width}×${inline.height}`, after: target >= 0 ? scenes.after_heading : 'середина текста',
       cost: 0,

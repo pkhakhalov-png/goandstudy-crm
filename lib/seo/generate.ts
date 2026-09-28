@@ -667,35 +667,98 @@ export const SHOTS = ['деталь', 'предмет', 'улица', 'инте�
 export type Shot = typeof SHOTS[number]
 
 const SHOT_HINTS: Record<Shot, string> = {
-  'деталь': 'close-up of hands and papers, no faces — documents, stamps, a form being filled',
-  'предмет': 'a single object filling the frame on a plain surface — a passport, a key, a boarding pass, a folder',
+  // Бумаги на столе — один из вариантов детали, а не её определение: пока
+  // подсказка называла только документы, «деталь» выпадала девять раз из
+  // шестнадцати и каждый раз это были руки над бумагами.
+  'деталь': 'close-up of hands busy with something the article is about — packing a bag, counting cash, '
+    + 'holding a phone, lacing shoes, pouring tea, turning a key, sorting papers; no faces',
+  'предмет': 'a single object filling the frame on a plain surface — a passport, a key, a boarding pass, '
+    + 'a folder, a train ticket, a worn textbook, a dorm kettle, a coat on a hook',
   'улица': 'exterior wide shot of a street, square or campus path, people small and blurred in motion',
-  'интерьер': 'the inside of a room that belongs to the topic — lecture hall, library, waiting room, office',
+  'интерьер': 'the inside of a room that belongs to the topic — lecture hall, library, waiting room, '
+    + 'canteen, dorm kitchen, laundry, station hall',
   'через-плечо': 'over-the-shoulder view of what a person is looking at, the person only partly in frame',
   'общий-план': 'a wide establishing frame of a place with depth, several planes, no single hero',
   'со-спины': 'a person seen from behind or in profile, occupied with something, face not readable',
 }
 
-const SCENES_SCHEMA = {
-  type: 'object',
-  additionalProperties: false,
-  required: ['shot', 'cover', 'inline', 'inline_alt', 'after_heading', 'hook', 'hook_accent'],
-  properties: {
-    shot: { type: 'string', enum: SHOTS as unknown as string[], description: 'Тип кадра обложки' },
-    cover: { type: 'string', description: 'Сцена для обложки, на английском, 1–2 предложения' },
-    inline: { type: 'string', description: 'Сцена для картинки внутри статьи, на английском, 1–2 предложения' },
-    inline_alt: { type: 'string', description: 'Подпись alt по-русски, 4–12 слов, описывает изображение' },
-    after_heading: { type: 'string', description: 'Точный текст подзаголовка H2, ПОСЛЕ раздела которого встанет картинка' },
-    hook: { type: 'string', description: 'Фраза на обложку по-русски, 3–7 слов. НЕ заголовок статьи' },
-    // Длину массива задаём словами, а не minItems/maxItems: структурированный
-    // ответ такие ограничения для массива не принимает и отвечает 400.
-    hook_accent: { type: 'array', items: { type: 'string' }, description: 'Одно или два слова из hook дословно — то, что встанет под подсветку. Больше двух нельзя' },
-  },
-} as const
+/**
+ * Сколько последних кадров помним. Семь типов, четыре в памяти — модели всегда
+ * остаётся минимум три варианта, то есть выбор остаётся за темой, а не
+ * вырождается в «что не запрещено, то и берём».
+ */
+export const SHOT_MEMORY = 4
+
+/** Что легло на соседние карточки. Ключ `scene_history` в seo.settings. */
+type SceneHistory = { shots: Shot[]; subjects: string[] }
+
+/**
+ * Почему память отдельной строкой настроек, а не выборкой из версий статей.
+ *
+ * Сцены лежат в `article_versions.meta`, и рядом с ними в той же колонке лежит
+ * обложка в base64 — сто с лишним килобайт на версию. Достать последние четыре
+ * кадра значило бы тянуть полмегабайта картинок ради семи слов. Строка
+ * настроек стоит один запрос и не растёт.
+ */
+export async function recentScenes(seo: any): Promise<SceneHistory> {
+  const { data } = await seo.from('settings').select('value').eq('key', 'scene_history').maybeSingle()
+  const v = (data?.value ?? {}) as Partial<SceneHistory>
+  return {
+    shots: (Array.isArray(v.shots) ? v.shots : []).filter((k): k is Shot => (SHOTS as readonly string[]).includes(k)),
+    subjects: Array.isArray(v.subjects) ? v.subjects.filter((x) => typeof x === 'string') : [],
+  }
+}
+
+/** Запомнить выбор. Список подрезается спереди — свежее в начале. */
+export async function rememberScene(seo: any, shot: Shot, subject: string): Promise<void> {
+  const было = await recentScenes(seo)
+  const value: SceneHistory = {
+    shots: [shot, ...было.shots.filter((k) => k !== shot)].slice(0, SHOT_MEMORY),
+    // Подписей помним больше, чем кадров: предмет повторяется охотнее типа
+    // кадра — «руки над бумагами» пролезали и в деталь, и в через-плечо.
+    subjects: [subject, ...было.subjects].slice(0, 8),
+  }
+  // Ошибку глотаем: за фотографии уже заплачено, и ронять готовую статью
+  // из-за строчки памяти значит менять обложку на заглушку ради порядка.
+  try {
+    await seo.from('settings').upsert({ key: 'scene_history', value }, { onConflict: 'key' }).throwOnError()
+  } catch (e: any) {
+    console.error(`[cover] память чередования не записалась: ${String(e?.message ?? e).slice(0, 160)}`)
+  }
+}
+
+/**
+ * Схема ответа собирается под разрешённый набор кадров, а не берёт все семь.
+ *
+ * Список «избегай таких-то» в тексте задания модель читает как пожелание:
+ * проверено на живых статьях — просьба была, а кадр всё равно повторялся.
+ * Перечисление в схеме — не пожелание: значения вне enum структурированный
+ * ответ просто не пропустит.
+ */
+function scenesSchema(coverShots: readonly string[], inlineShots: readonly string[]) {
+  return {
+    type: 'object',
+    additionalProperties: false,
+    required: ['shot', 'cover', 'inline_shot', 'inline', 'inline_alt', 'after_heading', 'hook', 'hook_accent'],
+    properties: {
+      shot: { type: 'string', enum: [...coverShots], description: 'Тип кадра обложки' },
+      cover: { type: 'string', description: 'Сцена для обложки, на английском, 1–2 предложения' },
+      inline_shot: { type: 'string', enum: [...inlineShots], description: 'Тип кадра картинки внутри статьи. Другой, чем у обложки' },
+      inline: { type: 'string', description: 'Сцена для картинки внутри статьи, на английском, 1–2 предложения' },
+      inline_alt: { type: 'string', description: 'Подпись alt по-русски, 4–12 слов, описывает изображение' },
+      after_heading: { type: 'string', description: 'Точный текст подзаголовка H2, ПОСЛЕ раздела которого встанет картинка' },
+      hook: { type: 'string', description: 'Фраза на обложку по-русски, 3–7 слов. НЕ заголовок статьи' },
+      // Длину массива задаём словами, а не minItems/maxItems: структурированный
+      // ответ такие ограничения для массива не принимает и отвечает 400.
+      hook_accent: { type: 'array', items: { type: 'string' }, description: 'Одно или два слова из hook дословно — то, что встанет под подсветку. Больше двух нельзя' },
+    },
+  }
+}
 
 export type Scenes = {
   shot: Shot
   cover: string
+  inline_shot: Shot
   inline: string
   inline_alt: string
   after_heading: string
@@ -708,17 +771,33 @@ export type Scenes = {
  * флаг и башню, а нужна сцена, отвечающая теме статьи.
  */
 export async function planScenes(
-  input: { title: string; h1: string; headings: string[]; avoidShots?: Shot[] },
+  input: {
+    title: string; h1: string; headings: string[]
+    /** Кадры последних статей — эти типы модели не предлагаются вовсе. */
+    avoidShots?: Shot[]
+    /** Что уже изображено на соседних карточках: подписи последних картинок. */
+    avoidSubjects?: string[]
+  },
   /** Привязка учёта. Подбор сцен — тоже платный вызов, и в отчёте он виден. */
   spend?: GenContext['spend'],
 ): Promise<Scenes> {
+  // Чередование держится на вычитании, а не на просьбе. Если вычесть нечего
+  // (память шире набора, все типы недавние) — оставляем полный список: пустой
+  // enum это отказ модели отвечать, то есть статья без обложки.
+  const свежие = new Set(input.avoidShots ?? [])
+  const coverShots = SHOTS.filter((k) => !свежие.has(k))
+  const разрешено: readonly Shot[] = coverShots.length ? coverShots : SHOTS
+
   // Своего GenContext у подбора сцен нет: ему не нужны ни соседние страницы,
   // ни запросы, ни факты. Собираем пустой — только ради привязки учёта.
   const ctx = { topicTitle: input.title, primaryKeyword: input.h1, cluster: null,
                 related: [], queries: [], spend } as GenContext
   const res = await askModel(ctx, 'context_reviewer', {
     max_tokens: 2000,
-    output_config: { effort: 'low', format: { type: 'json_schema', schema: SCENES_SCHEMA as any } },
+    // Кадр внутри статьи выбирается из всех семи: совпадение с обложкой
+    // запрещено словами, а не схемой, потому что схема одна на оба поля и
+    // обложкин выбор на момент её сборки ещё не сделан.
+    output_config: { effort: 'low', format: { type: 'json_schema', schema: scenesSchema(разрешено, SHOTS) as any } },
     system: `Ты подбираешь фотографии к статье образовательного блога.
 
 Описываешь СЦЕНУ для фотографа — что в кадре, где, при каком свете. По-английски,
@@ -726,10 +805,15 @@ export async function planScenes(
 добавляется отдельно.
 
 Сначала выбираешь ТИП КАДРА, потом под него придумываешь сцену:
-${SHOTS.map((k) => `— ${k}: ${SHOT_HINTS[k]}`).join('\n')}
+${разрешено.map((k) => `— ${k}: ${SHOT_HINTS[k]}`).join('\n')}
 
-Тип кадра ${input.avoidShots?.length ? `НЕ должен совпадать ни с одним из недавних: ${input.avoidShots.join(', ')}. ` : ''}\
-Человек за столом с ноутбуком — это один вариант из семи, а не рубрика по умолчанию.
+${свежие.size && coverShots.length ? `Кадры ${[...свежие].join(', ')} заняты соседними статьями — их в списке выше нет.\n` : ''}\
+Человек за столом с бумагами — это один вариант из семи, а не рубрика по умолчанию.
+
+Картинка внутри статьи — ДРУГОЙ тип кадра, чем обложка. Поле inline_shot
+выбирай из полного набора (${SHOTS.join(', ')}), но не повторяй в нём shot:
+две фотографии одного типа в одной статье читаются как одна, снятая дважды.
+${input.avoidSubjects?.length ? `\nЭто уже изображено на соседних карточках блога — не повторяй ни предмет, ни место:\n${input.avoidSubjects.map((s) => `— ${s}`).join('\n')}\n` : ''}
 
 Правила:
 — никакого текста, вывесок с читаемыми словами, логотипов и флагов крупным планом;
