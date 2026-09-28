@@ -243,9 +243,13 @@ async function main() {
 
   // Секрет обхода уходит в адрес параметром: заголовок Телеграму не задать, а
   // параметр он сохранит и будет присылать при каждой доставке.
-  const хвост = ОБХОД
-    ? `?x-vercel-protection-bypass=${encodeURIComponent(ОБХОД)}&x-vercel-set-bypass-cookie=true`
-    : ''
+  //
+  // БЕЗ `x-vercel-set-bypass-cookie`. Проверено 28.09.2026: с этим параметром
+  // Vercel отвечает 307 — ставит cookie и перекидывает на адрес без параметров.
+  // Телеграм редиректы для вебхука не ходит и считает это ошибкой доставки:
+  // «Wrong response from the webhook: 307 Temporary Redirect». Cookie ему и не
+  // нужна — он присылает параметр при каждой доставке заново.
+  const хвост = ОБХОД ? `?x-vercel-protection-bypass=${encodeURIComponent(ОБХОД)}` : ''
   const адрес = `${базовый.replace(/\/+$/, '')}/api/care/webhooks/telegram`
 
   await проверитьАдрес(адрес)
