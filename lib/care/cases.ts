@@ -227,3 +227,44 @@ export async function сводкаКоманды(руководитель: Уч�
     }
   })
 }
+
+/**
+ * Кому можно передать дело.
+ *
+ * Не «все сотрудники контура». Список ограничен своей командой: руководитель
+ * и те, у кого тот же руководитель, плюс подчинённые — если спрашивает сам
+ * руководитель. Полный список персонала в выпадающем меню — это мелкая, но
+ * настоящая утечка: кто где работает и сколько их.
+ *
+ * Отключённые не показываются: передать дело тому, кто больше не работает,
+ * — способ потерять дело молча.
+ */
+export async function коллегиДляПередачи(
+  участник: Участник
+): Promise<{ id: string; имя: string }[]> {
+  const условия: string[] = [`id.eq.${участник.id}`]
+  if (участник.team_lead_id) {
+    условия.push(`team_lead_id.eq.${участник.team_lead_id}`, `id.eq.${участник.team_lead_id}`)
+  }
+  if (участник.care_role === 'lead') {
+    условия.push(`team_lead_id.eq.${участник.id}`)
+  }
+
+  const { data, error } = await базаCare()
+    .from('members')
+    .select('id, user_id, active')
+    .or(условия.join(','))
+    .eq('active', true)
+  if (error) throw new Error(`не удалось прочитать коллег: ${error.message}`)
+
+  const люди = (data ?? []).filter((ч) => ч.id !== участник.id) as { id: string; user_id: string }[]
+  if (!люди.length) return []
+
+  const { data: пользователи } = await базаPublic()
+    .from('users')
+    .select('id, name')
+    .in('id', люди.map((ч) => ч.user_id))
+
+  const имена = new Map((пользователи ?? []).map((п) => [п.id as string, (п.name as string | null) ?? null]))
+  return люди.map((ч) => ({ id: ч.id, имя: имена.get(ч.user_id) ?? 'без имени' }))
+}

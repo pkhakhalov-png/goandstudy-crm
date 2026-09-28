@@ -13,7 +13,8 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { сессияКонтура } from '@/lib/care/session'
-import { подробностиДела } from '@/lib/care/cases'
+import { подробностиДела, коллегиДляПередачи } from '@/lib/care/cases'
+import { NewTask, TaskActions, FactActions, TransferCase } from './CaseOperations'
 
 export const dynamic = 'force-dynamic'
 
@@ -47,7 +48,10 @@ export default async function ДелоСтраница({ params }: { params: Pro
   const сессия = await сессияКонтура()
   if (!сессия?.участник) notFound()
 
-  const д = await подробностиДела(сессия.участник, id)
+  const [д, коллеги] = await Promise.all([
+    подробностиДела(сессия.участник, id),
+    коллегиДляПередачи(сессия.участник),
+  ])
   // Нет доступа и нет дела отвечают одинаково: разные ответы рассказали бы
   // постороннему, что дело существует.
   if (!д) notFound()
@@ -68,6 +72,10 @@ export default async function ДелоСтраница({ params }: { params: Pro
         {' · '}
         <span className="ds-mono">клиент #{д.дело.client_id}</span>
       </p>
+
+      <div style={{ marginBottom: 20 }}>
+        <TransferCase caseId={id} кандидаты={коллеги} />
+      </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
         {/* ── Кто это и что известно ────────────────────────────────── */}
@@ -119,6 +127,7 @@ export default async function ДелоСтраница({ params }: { params: Pro
                         «{ф.quote}»
                       </div>
                     )}
+                    {ф.status === 'draft' && <FactActions caseId={id} factId={ф.id} />}
                   </li>
                 )
               })}
@@ -128,9 +137,12 @@ export default async function ДелоСтраница({ params }: { params: Pro
 
         {/* ── Что делаем ────────────────────────────────────────────── */}
         <section className="ds-card">
-          <h2 className="ds-label">Задачи</h2>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+            <h2 className="ds-label" style={{ margin: 0 }}>Задачи</h2>
+            <NewTask caseId={id} />
+          </div>
           {д.задачи.length === 0 ? (
-            <p style={{ fontSize: 13, color: 'var(--ds-muted)' }}>Задач нет.</p>
+            <p style={{ fontSize: 13, color: 'var(--ds-muted)', marginTop: 8 }}>Задач нет.</p>
           ) : (
             <ul style={{ listStyle: 'none', padding: 0, margin: 0, fontSize: 14 }}>
               {д.задачи.map((з) => (
@@ -141,6 +153,7 @@ export default async function ДелоСтраница({ params }: { params: Pro
                     {з.waiting_on !== 'none' && ` · ждём ${ПОДПИСЬ_ОЖИДАНИЯ[з.waiting_on] ?? з.waiting_on}`}
                     {з.due_on && ` · срок ${new Date(з.due_on).toLocaleDateString('ru-RU')}`}
                   </div>
+                  <TaskActions caseId={id} taskId={з.id} статус={з.status} />
                 </li>
               ))}
             </ul>
