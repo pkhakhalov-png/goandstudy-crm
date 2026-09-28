@@ -12,6 +12,7 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import { базаCare } from '@/lib/care/db'
 import { флагВключён } from '@/lib/care/flags'
+import { кабинетОткрыт } from '@/lib/care/session'
 
 const КЛИЕНТ = '-990001'
 const СОТРУДНИК = '00000000-0000-4000-8000-00000000f1a6'
@@ -86,5 +87,47 @@ describe('ограничения базы', () => {
       .from('feature_flags')
       .insert({ scope: 'all', scope_id: КЛИЕНТ, flag: 'ai', enabled: true })
     expect(error).not.toBeNull()
+  })
+})
+
+describe('доступ в кабинет', () => {
+  it('не вошедшего не пускает', () => {
+    expect(кабинетОткрыт(null)).toBe(false)
+  })
+
+  it('вошедшего, но не заведённого в контуре, не пускает', () => {
+    expect(
+      кабинетОткрыт({
+        userId: 'u',
+        имя: 'Кто-то',
+        рольCRM: 'curator',
+        участник: null,
+        интерфейсОткрыт: true,
+      })
+    ).toBe(false)
+  })
+
+  it('заведённого без флага не пускает', () => {
+    expect(
+      кабинетОткрыт({
+        userId: 'u',
+        имя: 'Куратор',
+        рольCRM: 'curator',
+        участник: { id: 'm', user_id: 'u', care_role: 'curator', team_lead_id: null, active: true },
+        интерфейсОткрыт: false,
+      })
+    ).toBe(false)
+  })
+
+  it('заведённого с флагом пускает', () => {
+    expect(
+      кабинетОткрыт({
+        userId: 'u',
+        имя: 'Куратор',
+        рольCRM: 'curator',
+        участник: { id: 'm', user_id: 'u', care_role: 'curator', team_lead_id: null, active: true },
+        интерфейсОткрыт: true,
+      })
+    ).toBe(true)
   })
 })

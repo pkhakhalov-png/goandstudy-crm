@@ -18,7 +18,7 @@ import { notFound } from 'next/navigation'
 import { Geist, Oswald } from 'next/font/google'
 import Link from 'next/link'
 import '../curator/ds.css'
-import { сессияКонтура } from '@/lib/care/session'
+import { сессияКонтура, кабинетОткрыт } from '@/lib/care/session'
 import { режим } from '@/lib/care/mode'
 
 const geist = Geist({
@@ -41,8 +41,10 @@ export default async function CareLayout({ children }: { children: React.ReactNo
   const сессия = await сессияКонтура()
 
   // Роль в CRM проверяет middleware. Здесь — то, чего он проверить не может:
-  // заведён ли человек в контуре и открыт ли ему интерфейс.
-  if (!сессия || !сессия.участник || !сессия.интерфейсОткрыт) {
+  // заведён ли человек в контуре и открыт ли ему интерфейс. Само правило
+  // живёт в lib/care/session.ts и покрыто тестом: правило внутри разметки
+  // проверяется только открытием страницы, то есть практически никогда.
+  if (!кабинетОткрыт(сессия)) {
     notFound()
   }
 
