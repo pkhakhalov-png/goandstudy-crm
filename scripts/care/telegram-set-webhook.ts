@@ -2,6 +2,7 @@
 //
 //   npx tsx scripts/care/telegram-set-webhook.ts --адрес https://<branch-alias>
 //   npx tsx scripts/care/telegram-set-webhook.ts --показать
+//   npx tsx scripts/care/telegram-set-webhook.ts --кто       # бот и его настройки
 //   npx tsx scripts/care/telegram-set-webhook.ts --снять
 //
 // Аргументы (любой можно не указывать — возьмётся из .env.local):
@@ -133,7 +134,64 @@ async function проверитьАдрес(адрес: string) {
   console.log('  проба адреса: 401 — маршрут жив и требует секрет, верно')
 }
 
+/**
+ * Кто этот бот и готов ли он к работе.
+ *
+ * Privacy mode проверяется здесь, а не глазами в BotFather. Настройка
+ * незаметная: бот в группе есть, отвечает на команды, а переписки не видит —
+ * и понять это можно только по тишине в базе через день после запуска.
+ * Телеграм отвечает на вопрос прямо, полем can_read_all_group_messages.
+ */
+async function кто() {
+  const б = (await позвать('getMe')) as {
+    username?: string
+    first_name?: string
+    can_join_groups?: boolean
+    can_read_all_group_messages?: boolean
+  }
+
+  console.log(`  бот:   @${б.username}`)
+  console.log(`  имя:   ${б.first_name}`)
+
+  const проверки = [
+    {
+      ок: б.can_join_groups === true,
+      имя: 'можно добавлять в группы',
+      чинить: 'BotFather → /mybots → бот → Bot Settings → Allow Groups? → Turn on',
+    },
+    {
+      ок: б.can_read_all_group_messages === true,
+      имя: 'видит все сообщения группы (privacy mode выключен)',
+      чинить: 'BotFather → /mybots → бот → Bot Settings → Group Privacy → Turn off,\n'
+        + '         затем удалить бота из уже добавленных групп и добавить заново',
+    },
+  ]
+
+  console.log('')
+  let бед = 0
+  for (const п of проверки) {
+    console.log(`  ${п.ок ? '✓' : '✗'} ${п.имя}`)
+    if (!п.ок) {
+      console.log(`      чинить: ${п.чинить}`)
+      бед += 1
+    }
+  }
+
+  console.log('')
+  if (бед) {
+    console.log(`✗ бот к работе не готов: не сошлось ${бед}. Вебхук вешать рано.`)
+    process.exit(1)
+  }
+  console.log('✓ бот готов: в группы пускают, переписку видит.')
+}
+
 async function main() {
+  if (есть('кто')) {
+    требуетсяТокен()
+    await кто()
+    return
+  }
+
   if (есть('показать')) {
     требуетсяТокен()
     console.log(JSON.stringify(await позвать('getWebhookInfo'), null, 2))
@@ -156,6 +214,10 @@ async function main() {
   }
 
   требуетсяТокен()
+
+  // Проверяем бота до адреса: вебхук на боте с включённым privacy mode
+  // повесится успешно и будет молчать — самая незаметная из поломок.
+  await кто()
 
   if (!СЕКРЕТ || СЕКРЕТ.length < 16) {
     console.error('Нет годного секрета вебхука (нужно не короче 16 символов).')
