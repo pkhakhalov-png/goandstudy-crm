@@ -46,6 +46,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/api/tbank') ||
     pathname.startsWith('/api/debug') ||
     pathname.startsWith('/api/seo') ||     // воркер SEO: своя авторизация по x-seo-tick-secret
+    pathname.startsWith('/api/care') ||    // воркер и вебхуки кабинета v2: свои секреты, проверяются внутри
     pathname.startsWith('/api/track')      // трекер/лид-webhook (M3): своя проверка
 
   // Не авторизован — редирект на /login
@@ -75,7 +76,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // Role-scoped redirects for non-staff paths
-  if (user && (pathname.startsWith('/admin') || pathname.startsWith('/sales') || pathname.startsWith('/rop') || pathname.startsWith('/curator'))) {
+  if (user && (pathname.startsWith('/admin') || pathname.startsWith('/sales') || pathname.startsWith('/rop') || pathname.startsWith('/curator') || pathname.startsWith('/care'))) {
     const { data: profile } = await supabase
       .from('users')
       .select('role')
@@ -84,6 +85,19 @@ export async function middleware(request: NextRequest) {
 
     if (profile?.role === 'curator' && (pathname.startsWith('/admin') || pathname.startsWith('/sales') || pathname.startsWith('/rop'))) {
       return NextResponse.redirect(new URL('/curator', request.url))
+    }
+
+    // Кабинет куратора v2. Пускаем только тех, кто ведёт клиентов; продажник и
+    // клиент отправляются к себе. Тонкой проверки — включён ли флаг `ui` этому
+    // куратору — здесь нет намеренно: она требует обращения к схеме `care`, а
+    // middleware выполняется на каждый запрос, включая статику. Флаг проверяет
+    // `app/care/layout.tsx`, и он же отдаёт 404, если доступа нет.
+    if (pathname.startsWith('/care')) {
+      const ведётКлиентов =
+        profile?.role === 'curator' || profile?.role === 'rop' || profile?.role === 'admin'
+      if (!ведётКлиентов) {
+        return NextResponse.redirect(new URL('/', request.url))
+      }
     }
     if (profile?.role === 'client') {
       // Клиент имеет read-only доступ к деталям программ/вузов/стипендий
