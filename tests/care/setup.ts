@@ -14,7 +14,7 @@ import path from 'path'
 
 config({ path: path.resolve(process.cwd(), '.env.local') })
 
-const обязательные = ['NEXT_PUBLIC_SUPABASE_URL', 'CARE_DB_KEY']
+const обязательные = ['NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_ANON_KEY', 'CARE_DB_KEY']
 const нет = обязательные.filter((имя) => !process.env[имя]?.trim())
 
 if (нет.length) {

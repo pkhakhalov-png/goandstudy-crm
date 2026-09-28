@@ -22,30 +22,47 @@ import { требуется } from './env'
 /**
  * Общие настройки обоих клиентов.
  *
+ * ДВА КЛЮЧА, А НЕ ОДИН. Шлюз Supabase принимает в заголовке `apikey` только
+ * anon или service_role — свой JWT там отвергается с «Invalid API key». Роль
+ * же берётся из `Authorization`. Поэтому anon идёт пропуском на входе, а права
+ * определяет `CARE_DB_KEY` с claim `role=care_app`.
+ *
+ * Anon сам по себе ничего не даёт: схема `care` ему не видна вовсе
+ * (проверяется в selftest-perms), а в `public` он ограничен RLS. Передать
+ * только `CARE_DB_KEY` нельзя — до PostgREST запрос просто не дойдёт.
+ *
  * Сессия не хранится и не обновляется: контур работает под ключом роли, а не
- * под пользователем, и обновлять здесь нечего. Заголовок `x-care-contour`
- * нужен, чтобы в журналах базы было видно, чей это запрос, когда рядом
- * работают три других контура.
+ * под пользователем. Заголовок `x-care-contour` нужен, чтобы в журналах базы
+ * было видно, чей это запрос, когда рядом работают три других контура.
  */
-const ОБЩЕЕ = {
-  auth: { persistSession: false, autoRefreshToken: false },
-  global: { headers: { 'x-care-contour': 'v2' } },
-} as const
+function ОБЩЕЕ() {
+  return {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: {
+      headers: {
+        Authorization: `Bearer ${требуется('CARE_DB_KEY')}`,
+        'x-care-contour': 'v2',
+      },
+    },
+  }
+}
 
 // Схема указывается литералом, а не переменной: тип клиента зависит от неё,
 // и `string` превратил бы точный тип в бесполезный.
 function новыйCare() {
-  return createClient(требуется('NEXT_PUBLIC_SUPABASE_URL'), требуется('CARE_DB_KEY'), {
-    db: { schema: 'care' },
-    ...ОБЩЕЕ,
-  })
+  return createClient(
+    требуется('NEXT_PUBLIC_SUPABASE_URL'),
+    требуется('NEXT_PUBLIC_SUPABASE_ANON_KEY'),
+    { db: { schema: 'care' }, ...ОБЩЕЕ() }
+  )
 }
 
 function новыйPublic() {
-  return createClient(требуется('NEXT_PUBLIC_SUPABASE_URL'), требуется('CARE_DB_KEY'), {
-    db: { schema: 'public' },
-    ...ОБЩЕЕ,
-  })
+  return createClient(
+    требуется('NEXT_PUBLIC_SUPABASE_URL'),
+    требуется('NEXT_PUBLIC_SUPABASE_ANON_KEY'),
+    { db: { schema: 'public' }, ...ОБЩЕЕ() }
+  )
 }
 
 let клиент: ReturnType<typeof новыйCare> | null = null

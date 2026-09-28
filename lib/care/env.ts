@@ -45,6 +45,8 @@ export function чегоНеХватает(имена: string[]): string[] {
 
 export const ПЕРЕМЕННЫЕ_КОНТУРА = [
   'NEXT_PUBLIC_SUPABASE_URL',
+  // Пропуск на шлюз. Прав не даёт: схема care анониму не видна.
+  'NEXT_PUBLIC_SUPABASE_ANON_KEY',
   'CARE_DB_KEY',
   'CARE_TICK_SECRET',
   'CARE_TELEGRAM_BOT_TOKEN',
