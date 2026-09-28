@@ -13,14 +13,28 @@ import { describe, it, expect } from 'vitest'
 import { базаCare, базаPublic } from '@/lib/care/db'
 
 describe('права роли care_app', () => {
-  it('читает клиентов', async () => {
-    const { error } = await базаPublic().from('clients').select('id').limit(1)
+  // Проверяем не код ответа, а наличие данных.
+  //
+  // RLS отказывает не ошибкой, а пустотой: нет политики для роли — 200 и
+  // пустой список. 28.09.2026 на этом и попались: selftest показывал «чтение
+  // клиентов прошло», пока роль не видела ни одной из 75 записей. Чинится
+  // миграцией care/007, а чтобы не вернулось — эти три теста.
+  it('читает клиентов И ВИДИТ СТРОКИ', async () => {
+    const { data, error } = await базаPublic().from('clients').select('id').limit(5)
     expect(error).toBeNull()
+    expect((data ?? []).length).toBeGreaterThan(0)
   })
 
-  it('читает кураторов', async () => {
-    const { error } = await базаPublic().from('curators').select('id').limit(1)
+  it('читает кураторов И ВИДИТ СТРОКИ', async () => {
+    const { data, error } = await базаPublic().from('curators').select('id').limit(5)
     expect(error).toBeNull()
+    expect((data ?? []).length).toBeGreaterThan(0)
+  })
+
+  it('читает переписку И ВИДИТ СТРОКИ', async () => {
+    const { data, error } = await базаPublic().from('client_tg_messages').select('id').limit(5)
+    expect(error).toBeNull()
+    expect((data ?? []).length).toBeGreaterThan(0)
   })
 
   it('НЕ изменяет клиента', async () => {
