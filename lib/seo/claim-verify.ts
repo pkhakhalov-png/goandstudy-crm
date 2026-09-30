@@ -74,14 +74,38 @@ function domainOf(url: string): string {
   try { return new URL(url).hostname.replace(/^www\./, '') } catch { return '' }
 }
 
-async function proposeSources(subject: string, claims: VerifyClaim[]): Promise<Proposed[]> {
+/**
+ * Модель для поиска источников.
+ *
+ * Названа явно, а не взята из роли `fact_reviewer`: та стоит на Opus, потому
+ * что решает, верен ли факт. Здесь задача другая — найти, ГДЕ смотреть, и
+ * решение всё равно принимает код по тексту страницы. Платить за поиск по
+ * тарифу самой дорогой модели незачем.
+ *
+ * Прежнее значение `claude-sonnet-4-6` в seo.model_pricing отсутствует — то
+ * есть каждый такой вызов стоил «ноль» и в отчёте его не было видно вовсе.
+ */
+const ПОИСКОВАЯ_МОДЕЛЬ = 'claude-sonnet-5'
+
+/**
+ * Сколько поисков в сети разрешаем на один вызов.
+ *
+ * Было восемь. При десяти предметах в пачке и часовом ритме это до 1900
+ * поисков в сутки — больше, чем весь остальной конвейер вместе взятый, и всё
+ * это мимо учёта. Четыре хватает: страницу всё равно скачивает и проверяет код,
+ * а модель здесь только предлагает адреса.
+ */
+const ПОИСКОВ_НА_ВЫЗОВ = 4
+
+async function proposeSources(seo: any, subject: string, claims: VerifyClaim[]): Promise<Proposed[]> {
   const list = claims
     .map((c) => `- [${c.kind}] ${c.statement}${c.value ? ` (значение: ${c.value}${c.unit ? ' ' + c.unit : ''})` : ''}`)
     .join('\n')
-  const res = await getAnthropic().messages.create({
-    model: 'claude-sonnet-4-6',
+
+  const запрос = () => getAnthropic().messages.create({
+    model: ПОИСКОВАЯ_МОДЕЛЬ,
     max_tokens: 4096,
-    tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 8 }, FIND_TOOL] as any,
+    tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: ПОИСКОВ_НА_ВЫЗОВ }, FIND_TOOL] as any,
     messages: [{
       role: 'user',
       content: `Найди официальные страницы, на которых можно проверить эти утверждения (предмет: ${subject}).
@@ -97,6 +121,35 @@ ${list}
 Проверь ссылки поиском, прежде чем возвращать. Вызови predlozhit_istochniki ровно один раз.`,
     }],
   })
+
+  // Учёт. До сих пор этот вызов шёл мимо него: в seo.runs его не было, в
+  // отчёте не было, и предел в двадцать пять долларов в сутки на него не
+  // распространялся — при том, что по деньгам он обгонял производство статей.
+  const { withSpend } = await import('./spend')
+  const { currentSpendContext } = await import('./spend-context')
+  const spend = currentSpendContext()
+
+  const res = spend
+    ? await withSpend(
+      {
+        ...spend, seo: spend.seo ?? seo, role: 'fact_reviewer',
+        provider: 'anthropic', model: ПОИСКОВАЯ_МОДЕЛЬ, estimate: 0.10,
+      },
+      async () => {
+        const r = await запрос()
+        return {
+          value: r,
+          usage: {
+            input_tokens: (r as any).usage?.input_tokens ?? 0,
+            output_tokens: (r as any).usage?.output_tokens ?? 0,
+            cache_creation_input_tokens: (r as any).usage?.cache_creation_input_tokens ?? 0,
+            cache_read_input_tokens: (r as any).usage?.cache_read_input_tokens ?? 0,
+          },
+        }
+      },
+    )
+    : await запрос()   // вне задачи (скрипт, ручной прогон) относить расход не к чему
+
   const use = (res.content as any[]).find((b) => b.type === 'tool_use' && b.name === 'predlozhit_istochniki')
   return (use?.input?.sources ?? []) as Proposed[]
 }
@@ -115,6 +168,57 @@ async function ensureSource(seo: any, s: Proposed, subject: string): Promise<num
   return data.id
 }
 
+
+/* ── Отступ по предметам ──────────────────────────────────────────────────── */
+
+/**
+ * Почему без отступа это вечный цикл.
+ *
+ * Пачка бралась как `verified_at is null order by id limit 20` — то есть КАЖДЫЙ
+ * час одни и те же первые двадцать утверждений. Если источник для них не
+ * находится (а он не находился: за пять дней заведено 166 источников и
+ * подтверждено 32 утверждения из 743), то следующий час повторяет ровно ту же
+ * работу. До остальных шестисот девяноста одного дело не доходит никогда.
+ *
+ * Отступ хранится в настройках, а не колонкой в claims: колонка — это миграция,
+ * а настройка есть уже сейчас, и этого достаточно, чтобы остановить перебор.
+ */
+const КЛЮЧ_ОТСТУПА = 'claims_autoverify_backoff'
+
+/** Через сколько часов пробовать предмет снова после неудачи. Дальше — не пробуем. */
+const ОТСТУП_ЧАСОВ = [6, 24, 72, 168]
+
+type Отступ = { fails: number; nextAt: string }
+
+async function загрузитьОтступы(seo: any): Promise<Record<string, Отступ>> {
+  const { data } = await seo.from('settings').select('value').eq('key', КЛЮЧ_ОТСТУПА).maybeSingle()
+  const v = data?.value
+  return v && typeof v === 'object' ? (v as Record<string, Отступ>) : {}
+}
+
+async function сохранитьОтступы(seo: any, м: Record<string, Отступ>): Promise<void> {
+  // Ошибку глотаем: отступ — это экономия, а не условие работы. Уронить из-за
+  // него разбор подтверждений значило бы поменять лишний запрос на ни одного.
+  try {
+    await seo.from('settings').upsert({ key: КЛЮЧ_ОТСТУПА, value: м }, { onConflict: 'key' }).throwOnError()
+  } catch (e: any) {
+    console.error(`[claims] отступ не записался: ${String(e?.message ?? e).slice(0, 160)}`)
+  }
+}
+
+/** Предмет ждёт своего часа — или уже исчерпал попытки. */
+function ждёт(о: Отступ | undefined): boolean {
+  if (!о) return false
+  if (о.fails >= ОТСТУП_ЧАСОВ.length) return true   // больше не пробуем вовсе
+  return Date.parse(о.nextAt) > Date.now()
+}
+
+function следующий(о: Отступ | undefined): Отступ {
+  const fails = (о?.fails ?? 0) + 1
+  const часов = ОТСТУП_ЧАСОВ[Math.min(fails, ОТСТУП_ЧАСОВ.length) - 1]
+  return { fails, nextAt: new Date(Date.now() + часов * 3600 * 1000).toISOString() }
+}
+
 /**
  * Разобрать пачку неподтверждённых утверждений.
  *
@@ -128,23 +232,45 @@ export async function autoverifyClaims(
 ): Promise<VerifyReport> {
   const report: VerifyReport = { confirmed: 0, notFound: 0, sourcesAdded: 0, confirmedIds: [], notes: [] }
 
+  const отступы = opts.subject ? {} : await загрузитьОтступы(seo)
+
+  // Берём с запасом и отсеиваем ждущие предметы здесь, а не в запросе: условие
+  // «предмет не в отступе» в базе не выразить, а limit там применяется раньше
+  // фильтра — тогда пачка снова состояла бы из одних и тех же двадцати.
   let q = seo.from('claims')
     .select('id, subject_key, kind, statement, value, value_num, unit')
-    .is('verified_at', null).order('id').limit(opts.limit ?? 20)
+    .is('verified_at', null).order('id').limit(opts.subject ? (opts.limit ?? 20) : 400)
   if (opts.subject) q = q.eq('subject_key', opts.subject)
   const { data: claims } = await q
   if (!claims?.length) return report
 
   const bySubject = new Map<string, VerifyClaim[]>()
+  let отложено = 0
   for (const c of claims as VerifyClaim[]) {
+    if (ждёт(отступы[c.subject_key])) { отложено++; continue }
     const list = bySubject.get(c.subject_key) ?? []
     list.push(c)
     bySubject.set(c.subject_key, list)
   }
+  if (отложено) report.notes.push(`отложено по отступу: ${отложено} утверждений`)
 
-  for (const [subject, list] of bySubject) {
+  // Предметов за прогон — не больше трёх. Каждый это вызов модели с поиском в
+  // сети, а шаг поднимается раз в час: без предела один прогон разбирал десять
+  // предметов, то есть до сорока поисков, и так круглые сутки.
+  const предметы = [...bySubject.entries()].slice(0, 3)
+  let разобрано = 0
+
+  for (const [subject, list] of предметы) {
+    if (разобрано >= (opts.limit ?? 20)) break
+    разобрано += list.length
+
+    // Считаем предмет неудачным заранее и снимаем отметку только при полном
+    // успехе. Так учтутся и выходы через continue: их здесь три, и каждый —
+    // потраченный вызов модели, после которого повторять через час незачем.
+    отступы[subject] = следующий(отступы[subject])
+
     let proposed: Proposed[] = []
-    try { proposed = await proposeSources(subject, list) }
+    try { proposed = await proposeSources(seo, subject, list) }
     catch (e: any) { report.notes.push(`${subject}: поиск источников не удался — ${e?.message ?? e}`); continue }
     if (!proposed.length) { report.notes.push(`${subject}: модель не нашла источников`); continue }
 
@@ -173,7 +299,14 @@ export async function autoverifyClaims(
       }
     }
     report.notFound += pending.size
+    // Отступ снимаем при любом продвижении, а не только при полном разборе.
+    // Подтвердить три утверждения из пяти — это работа, и наказывать за неё
+    // задержкой нельзя. Останавливаем ровно тот случай, который и был бедой:
+    // прогон, после которого не подтвердилось ни одного.
+    if (pending.size < list.length) delete отступы[subject]
   }
+
+  if (!opts.subject) await сохранитьОтступы(seo, отступы)
 
   return report
 }
