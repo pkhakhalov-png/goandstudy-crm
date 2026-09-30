@@ -14,8 +14,8 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { сессияКонтура } from '@/lib/care/session'
 import { подробностиДела, коллегиДляПередачи } from '@/lib/care/cases'
-import { подписьПоля, подписьЗначения, периодПоля, подписьСтатуса, подписьОжидания, срок, инициалы } from '@/lib/care/labels'
-import { NewTask, TaskActions, FactActions, TransferCase } from './CaseOperations'
+import { подписьПоля, подписьЗначения, периодПоля, подписьСтатуса, подписьОжидания, срок, инициалы, склонение } from '@/lib/care/labels'
+import { CaseAssistant, NewTask, TaskActions, FactActions, TransferCase } from './CaseOperations'
 import { AssistantPanel } from '../../AssistantPanel'
 import { флагВключён } from '@/lib/care/flags'
 
@@ -163,6 +163,93 @@ export default async function ДелоСтраница({ params }: { params: Pro
                     )}
                   </div>
                 ))
+              )}
+            </div>
+          </section>
+
+          <section className="care-sec">
+            <div className="care-sec-head">
+              <h2 className="ds-label" style={{ margin: 0 }}>
+                Подборка и стратегия
+              </h2>
+              <CaseAssistant caseId={id} />
+            </div>
+            <div className="ds-card">
+              {д.подборка ? (
+                <>
+                  <div style={{ fontSize: 12, color: 'var(--ds-muted)', marginBottom: 10 }}>
+                    Подборка №{д.подборка.version} · {д.подборка.строки.length}{' '}
+                    {склонение(д.подборка.строки.length, 'программа', 'программы', 'программ')} · собрана{' '}
+                    {new Date(д.подборка.created_at).toLocaleDateString('ru-RU')}
+                  </div>
+                  {д.подборка.строки.map((с) => {
+                    const ref = с.program_ref as Record<string, string>
+                    const почему = (с.fit_notes as { почему?: string }).почему
+                    return (
+                      <div key={с.id} className="care-fact">
+                        <div style={{ fontSize: 15, fontWeight: 500 }}>
+                          {ref.вуз} — {ref.программа}
+                        </div>
+                        <div style={{ fontSize: 12, color: 'var(--ds-muted)', marginTop: 2 }}>
+                          {[ref.город, ref.страна, с.tuition_amount ? `${с.tuition_amount} ${с.currency ?? ''}`.trim() : 'стоимость не указана']
+                            .filter(Boolean)
+                            .join(' · ')}
+                        </div>
+                        {почему && (
+                          <div style={{ fontSize: 13, marginTop: 5, lineHeight: 1.5 }}>{почему}</div>
+                        )}
+                        {ref.ссылка && (
+                          <div style={{ marginTop: 5 }}>
+                            <a
+                              href={ref.ссылка}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="ds-link"
+                              style={{ fontSize: 12 }}
+                            >
+                              страница программы ↗
+                            </a>
+                            {ref.проверено && (
+                              <span style={{ fontSize: 12, color: 'var(--ds-muted)' }}>
+                                {' '}· проверено {ref.проверено}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        {/* Список «что проверить» не прячем под «подробнее»: он и
+                            есть честность этой подборки. Пустым он не бывает. */}
+                        {с.unresolved.length > 0 && (
+                          <div style={{ fontSize: 12, color: 'var(--ds-amber-ink, var(--ds-muted))', marginTop: 5 }}>
+                            Проверить: {с.unresolved.join(' · ')}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </>
+              ) : (
+                <p style={{ fontSize: 13, color: 'var(--ds-muted)', margin: 0 }}>
+                  Подборки ещё нет. Нужны подтверждённые страна и направление — по ним и
+                  подбирается.
+                </p>
+              )}
+
+              {д.стратегия && (
+                <div
+                  style={{
+                    marginTop: 14,
+                    paddingTop: 14,
+                    borderTop: '1px solid var(--ds-line, var(--ds-muted))',
+                  }}
+                >
+                  <div style={{ fontSize: 12, color: 'var(--ds-muted)', marginBottom: 6 }}>
+                    Стратегия поступления · черновик от{' '}
+                    {new Date(д.стратегия.created_at).toLocaleDateString('ru-RU')}
+                  </div>
+                  <div style={{ fontSize: 14, lineHeight: 1.65, whiteSpace: 'pre-line' }}>
+                    {д.стратегия.текст}
+                  </div>
+                </div>
               )}
             </div>
           </section>

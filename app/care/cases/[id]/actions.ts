@@ -392,6 +392,125 @@ export async function отклонитьФакт(caseId: string, factId: string,
   }
 }
 
+// ── Подборка и стратегия ─────────────────────────────────────────────────────
+
+/**
+ * Собрать подборку программ по делу.
+ *
+ * Долгая операция: поиск ходит по сайтам вузов и читает страницы. Куратор
+ * нажимает и ждёт — это честнее, чем вернуть «поставлено в очередь» и оставить
+ * его гадать, случилось ли что-нибудь.
+ *
+ * Расход пишется внутри задания. Здесь остаётся только журнал: через месяц на
+ * вопрос «откуда взялась эта подборка» должен быть ответ.
+ */
+export async function собратьПодборкуДела(caseId: string): Promise<Итог> {
+  try {
+    const { участник } = await подготовить(caseId)
+    const { собратьПодборку } = await import('@/lib/care/jobs/shortlist')
+
+    const итог = await собратьПодборку(caseId)
+
+    await записатьВЖурнал(
+      caseId,
+      участник.id,
+      'shortlist_requested',
+      null,
+      { программ: итог.программ, откуда: итог.откуда, долларов: итог.долларов },
+      итог.причины.join('; ') || null
+    )
+    revalidatePath(`/care/cases/${caseId}`)
+
+    if (!итог.программ) {
+      // Пустая подборка — не сбой, а ответ. Причины показываем словами: без
+      // них куратор нажмёт ту же кнопку ещё раз и получит то же самое.
+      return { ok: false, ошибка: итог.причины.join('; ') || 'ничего не нашлось' }
+    }
+    return { ok: true }
+  } catch (e) {
+    return обработать(e)
+  }
+}
+
+/**
+ * Написать стратегию поступления.
+ *
+ * Ложится черновиком в предложения: стратегия — обещание клиенту от лица
+ * компании, и подписывает его куратор, а не помощник.
+ */
+export async function написатьСтратегиюДела(caseId: string): Promise<Итог> {
+  try {
+    const { участник, база } = await подготовить(caseId)
+    const { написатьСтратегию } = await import('@/lib/care/ai/strategy')
+    const { можноТратить, записатьРасход } = await import('@/lib/care/ai/budget')
+    const { подписьПоля, подписьЗначения, подписьОжидания, подписьСтатуса } = await import('@/lib/care/labels')
+    const { имяКлиентаДела } = await import('@/lib/care/jobs/shortlist')
+
+    const потолок = await можноТратить('review')
+    if (!потолок.можно) return { ok: false, ошибка: потолок.почему }
+
+    const [{ data: факты }, { data: задачи }, { data: подборки }] = await Promise.all([
+      база.from('facts').select('field, value, currency, is_plan').eq('case_id', caseId).eq('status', 'confirmed'),
+      база.from('tasks').select('title, due_on, waiting_on, status').eq('case_id', caseId).not('status', 'in', '("done","failed")'),
+      база.from('shortlists').select('id').eq('case_id', caseId).order('version', { ascending: false }).limit(1),
+    ])
+
+    let подборка: { вуз: string; программа: string; страна: string; стоимость: string; ссылка: string }[] = []
+    if ((подборки ?? [])[0]) {
+      const { data: строки } = await база
+        .from('shortlist_items')
+        .select('program_ref, tuition_amount, currency')
+        .eq('shortlist_id', подборки![0].id)
+        .order('position')
+      подборка = (строки ?? []).map((с) => {
+        const ref = с.program_ref as Record<string, string>
+        return {
+          вуз: ref.вуз ?? '',
+          программа: ref.программа ?? '',
+          страна: ref.страна ?? '',
+          стоимость: с.tuition_amount ? `${с.tuition_amount} ${с.currency ?? ''}`.trim() : 'не указана',
+          ссылка: ref.ссылка ?? '',
+        }
+      })
+    }
+
+    const итог = await написатьСтратегию({
+      клиент: await имяКлиентаДела(caseId),
+      факты: (факты ?? []).map((ф) => ({
+        поле: подписьПоля(ф.field as string),
+        значение: `${подписьЗначения(ф.field as string, ф.value)}${ф.currency ? ` ${ф.currency}` : ''}`,
+        намерение: ф.is_plan as boolean,
+      })),
+      задачи: (задачи ?? []).map((з) => ({
+        название: з.title as string,
+        срок: (з.due_on as string | null) ?? null,
+        ждём: подписьОжидания(з.waiting_on as string),
+        статус: подписьСтатуса(з.status as string),
+      })),
+      подборка,
+      изПереписки: [],
+    })
+
+    if (итог.расход) await записатьРасход('review', итог.расход, { caseId, пометка: 'стратегия поступления' })
+    if (итог.ошибка || !итог.текст) return { ok: false, ошибка: итог.ошибка ?? 'помощник не написал стратегию' }
+
+    await база.from('proposals').insert({
+      case_id: caseId,
+      kind: 'other',
+      payload: { вид: 'strategy', текст: итог.текст },
+      payload_hash: String(итог.текст.length),
+      data_version: new Date().toISOString().slice(0, 10),
+      status: 'pending',
+    })
+
+    await записатьВЖурнал(caseId, участник.id, 'strategy_written', null, { знаков: итог.текст.length }, null)
+    revalidatePath(`/care/cases/${caseId}`)
+    return { ok: true }
+  } catch (e) {
+    return обработать(e)
+  }
+}
+
 // ── Передача дела ────────────────────────────────────────────────────────────
 
 /**

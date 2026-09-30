@@ -171,6 +171,23 @@ export type ПодробностиДела = {
   сообщений: number
   источники: { id: string; kind: string; ref: Record<string, unknown>; note: string | null; captured_at: string; available: boolean }[]
   журнал: { id: string; action: string; actor_kind: string; created_at: string; reason: string | null }[]
+  /** Последняя собранная подборка программ, если она есть. */
+  подборка: {
+    id: string
+    version: number
+    status: string
+    created_at: string
+    строки: {
+      id: string
+      program_ref: Record<string, unknown>
+      tuition_amount: number | null
+      currency: string | null
+      fit_notes: Record<string, unknown>
+      unresolved: string[]
+    }[]
+  } | null
+  /** Последняя написанная стратегия — предложение, ждущее решения. */
+  стратегия: { id: string; текст: string; status: string; created_at: string } | null
 }
 
 /**
@@ -242,6 +259,63 @@ export async function подробностиДела(участник: Учас�
     источники: (источники.data ?? []) as ПодробностиДела['источники'],
     заявки: (заявки.data ?? []) as ПодробностиДела['заявки'],
     журнал: (журнал.data ?? []) as ПодробностиДела['журнал'],
+    подборка: await последняяПодборка(caseId),
+    стратегия: await последняяСтратегия(caseId),
+  }
+}
+
+/**
+ * Последняя подборка со своими строками.
+ *
+ * Только последняя: прежние версии никуда не деваются, но карточка — это
+ * «что сейчас», а не архив. История подборок понадобится, когда куратор
+ * начнёт их сравнивать, и тогда это будет отдельный экран.
+ */
+async function последняяПодборка(caseId: string): Promise<ПодробностиДела['подборка']> {
+  const { data: подборки } = await базаCare()
+    .from('shortlists')
+    .select('id, version, status, created_at')
+    .eq('case_id', caseId)
+    .order('version', { ascending: false })
+    .limit(1)
+
+  const подборка = (подборки ?? [])[0]
+  if (!подборка) return null
+
+  const { data: строки } = await базаCare()
+    .from('shortlist_items')
+    .select('id, program_ref, tuition_amount, currency, fit_notes, unresolved')
+    .eq('shortlist_id', подборка.id)
+    .order('position')
+
+  return {
+    id: подборка.id as string,
+    version: подборка.version as number,
+    status: подборка.status as string,
+    created_at: подборка.created_at as string,
+    строки: (строки ?? []) as NonNullable<ПодробностиДела['подборка']>['строки'],
+  }
+}
+
+/** Последняя стратегия — предложение, которое ещё ждёт решения куратора. */
+async function последняяСтратегия(caseId: string): Promise<ПодробностиДела['стратегия']> {
+  const { data } = await базаCare()
+    .from('proposals')
+    .select('id, payload, status, created_at')
+    .eq('case_id', caseId)
+    .eq('kind', 'other')
+    .order('created_at', { ascending: false })
+    .limit(1)
+
+  const п = (data ?? [])[0]
+  const payload = (п?.payload ?? {}) as { вид?: string; текст?: string }
+  if (!п || payload.вид !== 'strategy') return null
+
+  return {
+    id: п.id as string,
+    текст: payload.текст ?? '',
+    status: п.status as string,
+    created_at: п.created_at as string,
   }
 }
 
