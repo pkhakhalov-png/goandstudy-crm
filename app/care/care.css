@@ -1,0 +1,258 @@
+/* =======================================================================
+   Кабинет куратора v2 — добавления к дизайн-системе.
+
+   Источник правды: DESIGN.md и docs/DESIGN_CURATOR_V2.md, раздел 1.1.
+   Файл живёт в контуре care и НЕ меняет app/curator/ds.css: та таблица
+   общая с действующим кабинетом, и трогать её контуру нельзя.
+
+   Всё, что здесь есть, — это семь токенов ИИ-слоя из раздела 1.1 плюс
+   классы каркаса, которых в системе нет. Ничего из существующего не
+   переопределяется.
+
+   ⚠ Токены раздела 1.1 помечены в плане как «ждут утверждения владельцем».
+   Значения взяты из документа как есть; поменять их — правка одной строки.
+   ======================================================================= */
+
+.ds-scope {
+  /* ── ИИ-слой (DESIGN_CURATOR_V2, раздел 1.1) ─────────────────────── */
+  /* Индиго — это «источник», а не «действие». Purple уже занят главным
+     действием пользователя, и если ИИ тоже purple, кнопка «Применить» и
+     метка «это сделал ИИ» сливаются. */
+  --ds-ai: #5E5CE6;
+  --ds-ai-soft: rgba(94, 92, 230, 0.10);
+  --ds-ai-ink: #3F3DBF;
+  --ds-diff-add: rgba(52, 199, 89, 0.16);
+  --ds-diff-del: rgba(255, 59, 48, 0.12);
+  --ds-stale: #9A9AA0;
+  --ds-sh-ai: 0 2px 10px rgba(94, 92, 230, 0.10);
+}
+
+/* ── Каркас ──────────────────────────────────────────────────────────── */
+
+.care-shell {
+  display: flex;
+  min-height: 100vh;
+  background: var(--ds-bg-alt);
+}
+
+.care-side {
+  width: 240px;
+  flex: 0 0 240px;
+  background: var(--ds-bg);
+  border-right: 1px solid var(--ds-border);
+  padding: 20px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.care-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 28px 32px 64px;
+}
+
+/* Полоса среды. Раздел 3.3: не закрывается и не скрывается, стоит над
+   всем, включая сайдбар. Смысл — куратор на пилоте одним взглядом
+   понимает, куда уйдёт сообщение. */
+.care-env {
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ds-amber);
+  color: var(--ds-ink);
+  font-family: var(--ds-font-display), sans-serif;
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+
+.care-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--ds-ink-dim);
+  text-decoration: none;
+  transition: background 120ms ease-out, color 120ms ease-out;
+}
+.care-nav-item:hover { background: var(--ds-bg-alt); color: var(--ds-ink); }
+.care-nav-item[data-active='true'] {
+  background: var(--ds-purple-soft);
+  color: var(--ds-purple-deep);
+  font-weight: 600;
+}
+
+.care-nav-badge {
+  margin-left: auto;
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+  background: var(--ds-bor, var(--ds-border));
+  color: var(--ds-ink-dim);
+}
+.care-nav-badge[data-level='amber'] { background: var(--ds-amber-soft); color: var(--ds-ink); }
+.care-nav-badge[data-level='error'] { background: var(--ds-error-soft); color: var(--ds-error-ink); }
+
+.care-nav-sep {
+  height: 1px;
+  background: var(--ds-border-soft);
+  margin: 10px 12px;
+}
+
+/* ── Кружок с инициалами ─────────────────────────────────────────────── */
+
+.care-ava {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  background: var(--ds-purple-soft);
+  color: var(--ds-purple-deep);
+  font-weight: 700;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.care-ava[data-size='lg'] { width: 48px; height: 48px; font-size: 16px; }
+
+/* ── Карточка внимания (раздел 4.2) ──────────────────────────────────── */
+
+.care-attn {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  background: var(--ds-bg);
+  border: 1px solid var(--ds-border-soft);
+  border-radius: 12px;
+  padding: 16px 18px;
+  /* Левая полоса 3px — срочность. Прозрачная, когда всё спокойно:
+     позиция строки не должна прыгать от наличия проблемы. */
+  border-left: 3px solid transparent;
+  text-decoration: none;
+  color: inherit;
+  transition: box-shadow 120ms ease-out, border-color 120ms ease-out;
+}
+.care-attn:hover { box-shadow: var(--ds-sh-ai); border-color: var(--ds-border); }
+.care-attn[data-level='просрочен'] { border-left-color: var(--ds-error); }
+.care-attn[data-level='горит'],
+.care-attn[data-level='сегодня'] { border-left-color: var(--ds-amber); }
+.care-attn[data-level='ждёт'] { border-left-color: var(--ds-purple); }
+
+/* Причины — строки с точкой, а не чипы. Чип читается как статус, а
+   причина это предложение: «документ ждём 6 дней». */
+.care-reason {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  font-size: 13px;
+  color: var(--ds-ink-dim);
+  line-height: 1.5;
+}
+.care-reason::before {
+  content: '';
+  flex: 0 0 auto;
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--ds-muted);
+  transform: translateY(-2px);
+}
+.care-reason[data-kind='ai']::before { background: var(--ds-ai); }
+.care-reason[data-kind='error']::before { background: var(--ds-error); }
+.care-reason[data-kind='amber']::before { background: var(--ds-amber); }
+
+/* ── Поле факта (раздел 5.2) ─────────────────────────────────────────── */
+
+.care-fact { padding: 10px 0; border-bottom: 1px solid var(--ds-border-soft); }
+.care-fact:last-child { border-bottom: none; }
+
+.care-fact-name { font-size: 12px; color: var(--ds-muted); }
+
+.care-fact-value {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ds-ink);
+}
+/* Непроверенное машинное — пунктир индиго. Надёжность видна глазом, без
+   наведения и без клика (раздел 0, факт 2). */
+.care-fact-value[data-state='draft'] {
+  border-bottom: 1px dashed var(--ds-ai);
+  padding-bottom: 1px;
+}
+.care-fact-value[data-state='superseded'],
+.care-fact-value[data-state='rejected'] {
+  color: var(--ds-stale);
+  text-decoration: line-through;
+  font-weight: 400;
+}
+
+.care-fact-src {
+  font-size: 12px;
+  color: var(--ds-muted);
+  border-left: 2px solid var(--ds-ai);
+  padding-left: 8px;
+  margin-top: 5px;
+}
+
+/* ── Секция работы ───────────────────────────────────────────────────── */
+
+.care-sec { margin-bottom: 20px; }
+.care-sec-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.care-sec-count { font-size: 12px; color: var(--ds-muted); }
+
+/* ── Три колонки дела (раздел 5) ─────────────────────────────────────── */
+
+.care-case {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr) 320px;
+  gap: 28px;
+  align-items: start;
+}
+.care-case-ctx { position: sticky; top: 20px; }
+
+@media (max-width: 1439px) {
+  .care-case { grid-template-columns: 280px minmax(0, 1fr); }
+  .care-case-ai { display: none; }
+}
+@media (max-width: 1099px) {
+  .care-case { grid-template-columns: minmax(0, 1fr); }
+  .care-case-ctx { position: static; }
+}
+@media (max-width: 860px) {
+  .care-shell { flex-direction: column; }
+  .care-side { width: auto; flex: none; flex-direction: row; overflow-x: auto; padding: 10px; }
+  .care-nav-sep { display: none; }
+  .care-main { padding: 20px 16px 48px; }
+}
+
+/* ── Помощник: заглушка до этапа 2 ───────────────────────────────────── */
+
+.care-ai-panel {
+  background: var(--ds-bg);
+  border: 1px solid var(--ds-border-soft);
+  border-radius: 12px;
+  padding: 18px;
+}
+.care-ai-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--ds-ai);
+  margin-right: 7px;
+}

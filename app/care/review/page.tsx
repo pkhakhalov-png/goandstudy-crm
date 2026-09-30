@@ -1,0 +1,98 @@
+/**
+ * На проверку. Раздел 8 дизайн-документа.
+ *
+ * Однородные мелочи проверяются подряд, а не через открытие двадцати
+ * карточек. Куратор физически не может проверять всё, если каждая мелочь
+ * требует навигации.
+ *
+ * Сейчас здесь черновики фактов. Предложения помощника встанут сюда же на
+ * следующем этапе — форма у них одна, и куратор учит её один раз.
+ */
+import Link from 'next/link'
+import { notFound } from 'next/navigation'
+import { сессияКонтура } from '@/lib/care/session'
+import { очередьПроверки } from '@/lib/care/cases'
+import { подписьПоля, периодПоля, инициалы, склонение } from '@/lib/care/labels'
+import { FactActions } from '../cases/[id]/CaseOperations'
+
+export const dynamic = 'force-dynamic'
+
+function значение(v: unknown): string {
+  if (v === null || v === undefined) return '—'
+  return typeof v === 'object' ? JSON.stringify(v) : String(v)
+}
+
+export default async function НаПроверкуСтраница() {
+  const сессия = await сессияКонтура()
+  if (!сессия?.участник) notFound()
+
+  const очередь = await очередьПроверки(сессия.участник)
+  const всего = очередь.reduce((s, д) => s + д.факты.length, 0)
+
+  return (
+    <>
+      <h1 className="ds-hero-h1" style={{ fontSize: 30, marginBottom: 4 }}>
+        На проверку
+      </h1>
+      <p style={{ color: 'var(--ds-muted)', marginBottom: 22, fontSize: 14 }}>
+        {всего === 0
+          ? 'Ничего не ждёт вашего решения'
+          : `${всего} ${склонение(всего, 'запись ждёт', 'записи ждут', 'записей ждут')} решения у ${очередь.length} ${склонение(очередь.length, 'клиента', 'клиентов', 'клиентов')}`}
+      </p>
+
+      {всего === 0 ? (
+        <div className="ds-empty">
+          <div className="ds-empty-title">Всё проверено</div>
+          <p style={{ fontSize: 14, color: 'var(--ds-muted)', maxWidth: 460, margin: '8px auto 0' }}>
+            Неподтверждённых сведений нет. Новые появятся, когда помощник разберёт
+            встречу или сообщение.
+          </p>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gap: 16 }}>
+          {очередь.map((д) => (
+            <div key={д.caseId} className="ds-card">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+                <span className="care-ava">{инициалы(д.имяКлиента)}</span>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <Link href={`/care/cases/${д.caseId}`} className="ds-link" style={{ fontWeight: 700, fontSize: 16 }}>
+                    {д.имяКлиента}
+                  </Link>
+                  {д.is_synthetic && <span className="ds-chip ds-chip-warning">тест</span>}
+                  <div style={{ fontSize: 12, color: 'var(--ds-muted)' }}>{д.контекст}</div>
+                </div>
+                <span className="care-sec-count">
+                  {д.факты.length} {склонение(д.факты.length, 'запись', 'записи', 'записей')}
+                </span>
+              </div>
+
+              {д.факты.map((ф) => (
+                <div key={ф.id} className="care-fact">
+                  <div className="care-fact-name">{подписьПоля(ф.field)}</div>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+                    <span className="care-fact-value" data-state="draft">
+                      {значение(ф.value)}
+                      {ф.currency ? ` ${ф.currency}` : ''}
+                      {периодПоля(ф.field) ? ` ${периодПоля(ф.field)}` : ''}
+                    </span>
+                    {ф.is_plan && <span className="ds-chip ds-chip-warning">намерение, не результат</span>}
+                  </div>
+                  {/* Цитата обязательна: без неё проверить нечего, а значит
+                      и принимать нечего. */}
+                  {ф.quote ? (
+                    <div className="care-fact-src">«{ф.quote}»</div>
+                  ) : (
+                    <div style={{ fontSize: 12, color: 'var(--ds-stale)', marginTop: 5 }}>
+                      источник не указан — проверить нечем
+                    </div>
+                  )}
+                  <FactActions caseId={д.caseId} factId={ф.id} />
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  )
+}

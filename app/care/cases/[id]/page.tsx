@@ -1,46 +1,28 @@
 /**
- * Дело клиента.
+ * Дело клиента. Раздел 5 дизайн-документа.
  *
- * Три колонки по макету: кто это и что известно · что делаем · откуда знаем.
+ * Не вкладки, а три колонки: контекст · работа · помощник. Вкладки прячут
+ * противоречия — профиль в одной, переписка в другой, и то, что они
+ * расходятся, не видно никогда.
  *
- * У каждого факта видно происхождение и статус. Это не украшение: на вопрос
- * «почему тут написано вот это» нужно уметь ответить через полгода, когда ни
- * куратора, ни памяти о разговоре уже нет.
- *
- * Документы читаются из рабочей таблицы и только на чтение. Своих мы не
- * заводим до решения владельца по обработке персональных документов.
+ * Надёжность каждого факта видна глазом, без наведения и без клика:
+ * подтверждённый — с галочкой и датой, машинный непроверенный — пунктиром
+ * индиго, заменённый — зачёркнут. Это не украшение: без источника и цитаты
+ * предложение ИИ проверить нельзя, а значит нельзя и принять.
  */
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { сессияКонтура } from '@/lib/care/session'
 import { подробностиДела, коллегиДляПередачи } from '@/lib/care/cases'
+import { подписьПоля, периодПоля, подписьСтатуса, подписьОжидания, срок, инициалы } from '@/lib/care/labels'
 import { NewTask, TaskActions, FactActions, TransferCase } from './CaseOperations'
 
 export const dynamic = 'force-dynamic'
 
-const ПОДПИСЬ_СТАТУСА: Record<string, { текст: string; класс: string }> = {
-  draft: { текст: 'черновик', класс: 'ds-chip-warning' },
-  confirmed: { текст: 'подтверждён', класс: 'ds-chip-success' },
-  superseded: { текст: 'заменён', класс: 'ds-chip-neutral' },
-  rejected: { текст: 'отклонён', класс: 'ds-chip-error' },
-}
-
-const ПОДПИСЬ_ОЖИДАНИЯ: Record<string, string> = {
-  none: '—',
-  client: 'клиента',
-  university: 'вуз',
-  specialist: 'специалиста',
-  review: 'проверку',
-}
-
-function значениеФакта(value: unknown, unit: string | null, currency: string | null): string {
-  const основа =
-    value === null || value === undefined
-      ? '—'
-      : typeof value === 'object'
-        ? JSON.stringify(value)
-        : String(value)
-  return [основа, currency, unit].filter(Boolean).join(' ')
+function значениеФакта(value: unknown): string {
+  if (value === null || value === undefined) return '—'
+  if (typeof value === 'object') return JSON.stringify(value)
+  return String(value)
 }
 
 export default async function ДелоСтраница({ params }: { params: Promise<{ id: string }> }) {
@@ -56,166 +38,266 @@ export default async function ДелоСтраница({ params }: { params: Pro
   // постороннему, что дело существует.
   if (!д) notFound()
 
+  const черновиков = д.факты.filter((ф) => ф.status === 'draft').length
+  const открытыхЗадач = д.задачи.filter((з) => з.status !== 'done' && з.status !== 'failed').length
+
   return (
     <>
       <Link href="/care/cases" className="ds-link" style={{ fontSize: 13 }}>
-        ← К списку дел
+        ← Клиенты
       </Link>
 
-      <h1 className="ds-hero-h1" style={{ fontSize: 26, margin: '12px 0 4px' }}>
-        {д.имяКлиента}
-        {д.дело.is_synthetic && (
-          <span className="ds-chip ds-chip-warning" style={{ marginLeft: 8, verticalAlign: 'middle' }}>
-            тестовое дело
-          </span>
-        )}
-      </h1>
-      <p style={{ color: 'var(--ds-muted)', fontSize: 14, marginBottom: 24 }}>
-        Набор {д.дело.intake_year}
-        {д.дело.intake_term ? ` · ${д.дело.intake_term}` : ''}
-        {д.дело.service_scope ? ` · ${д.дело.service_scope}` : ''}
-        {' · '}
-        <span className="ds-mono">
-          {д.дело.is_synthetic ? 'синтетика, в рабочей базе такого клиента нет' : `клиент #${д.дело.client_id}`}
-        </span>
-      </p>
-
-      <div style={{ marginBottom: 20 }}>
-        <TransferCase caseId={id} кандидаты={коллеги} />
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
-        {/* ── Кто это и что известно ────────────────────────────────── */}
-        <section className="ds-card">
-          <h2 className="ds-label">Контакты</h2>
-          {д.контакты.length === 0 ? (
-            <p style={{ fontSize: 13, color: 'var(--ds-muted)' }}>
-              Контактов нет. Отправлять некому — и это к лучшему, пока их не проверили.
-            </p>
-          ) : (
-            <ul style={{ listStyle: 'none', padding: 0, margin: 0, fontSize: 14 }}>
-              {д.контакты.map((к) => (
-                <li key={к.id} style={{ padding: '8px 0', borderBottom: '1px solid var(--ds-border-soft)' }}>
-                  <strong>{к.name}</strong>{' '}
-                  <span className="ds-chip ds-chip-neutral">{к.kind}</span>
-                  {к.can_decide && <span className="ds-chip ds-chip-info">решает</span>}
-                  <div style={{ fontSize: 12, color: 'var(--ds-muted)' }}>
-                    {к.tg_chat_id ? `чат ${к.tg_chat_id}` : 'чата в Телеграме нет'}
-                    {к.phone ? ` · ${к.phone}` : ''}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          <h2 className="ds-label" style={{ marginTop: 20 }}>
-            Что известно
-          </h2>
-          {д.факты.length === 0 ? (
-            <p style={{ fontSize: 13, color: 'var(--ds-muted)' }}>
-              Фактов ещё нет. Они появятся, когда контур начнёт разбирать встречи — этап 4.
-            </p>
-          ) : (
-            <ul style={{ listStyle: 'none', padding: 0, margin: 0, fontSize: 14 }}>
-              {д.факты.map((ф) => {
-                const подпись = ПОДПИСЬ_СТАТУСА[ф.status] ?? { текст: ф.status, класс: 'ds-chip-neutral' }
-                return (
-                  <li key={ф.id} style={{ padding: '8px 0', borderBottom: '1px solid var(--ds-border-soft)' }}>
-                    <span className="ds-mono" style={{ fontSize: 12 }}>
-                      {ф.field}
-                    </span>
-                    <div>
-                      <strong>{значениеФакта(ф.value, ф.unit, ф.currency)}</strong>{' '}
-                      <span className={`ds-chip ${подпись.класс}`}>{подпись.текст}</span>
-                      {ф.is_plan && <span className="ds-chip ds-chip-warning">намерение</span>}
-                    </div>
-                    {ф.quote && (
-                      <div style={{ fontSize: 12, color: 'var(--ds-muted)', fontStyle: 'italic' }}>
-                        «{ф.quote}»
-                      </div>
-                    )}
-                    {ф.status === 'draft' && <FactActions caseId={id} factId={ф.id} />}
-                  </li>
-                )
-              })}
-            </ul>
-          )}
-        </section>
-
-        {/* ── Что делаем ────────────────────────────────────────────── */}
-        <section className="ds-card">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-            <h2 className="ds-label" style={{ margin: 0 }}>Задачи</h2>
-            <NewTask caseId={id} />
+      <div className="care-case" style={{ marginTop: 16 }}>
+        {/* ── Контекст ───────────────────────────────────────────────── */}
+        <aside className="care-case-ctx">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+            <span className="care-ava" data-size="lg">
+              {инициалы(д.имяКлиента)}
+            </span>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontWeight: 700, fontSize: 19, lineHeight: 1.2 }}>{д.имяКлиента}</div>
+              <div style={{ fontSize: 12, color: 'var(--ds-muted)' }}>
+                Куратор: {сессия.имя ?? 'вы'}
+              </div>
+            </div>
           </div>
-          {д.задачи.length === 0 ? (
-            <p style={{ fontSize: 13, color: 'var(--ds-muted)', marginTop: 8 }}>Задач нет.</p>
-          ) : (
-            <ul style={{ listStyle: 'none', padding: 0, margin: 0, fontSize: 14 }}>
-              {д.задачи.map((з) => (
-                <li key={з.id} style={{ padding: '8px 0', borderBottom: '1px solid var(--ds-border-soft)' }}>
-                  <div>{з.title}</div>
-                  <div style={{ fontSize: 12, color: 'var(--ds-muted)' }}>
-                    {з.status}
-                    {з.waiting_on !== 'none' && ` · ждём ${ПОДПИСЬ_ОЖИДАНИЯ[з.waiting_on] ?? з.waiting_on}`}
-                    {з.due_on && ` · срок ${new Date(з.due_on).toLocaleDateString('ru-RU')}`}
+
+          {д.дело.is_synthetic && (
+            <div className="ds-chip ds-chip-warning" style={{ marginBottom: 12 }}>
+              тестовое дело
+            </div>
+          )}
+
+          {/* Цикл поступления показывается всегда, даже когда он один:
+              интерфейс должен приучать, что заявки принадлежат циклу. */}
+          <div className="ds-card" style={{ padding: 14, marginBottom: 12 }}>
+            <div className="ds-label" style={{ marginBottom: 6 }}>
+              Цикл поступления
+            </div>
+            <div style={{ fontWeight: 600 }}>
+              {д.дело.intake_year}
+              {д.дело.intake_term ? ` · ${д.дело.intake_term}` : ''}
+            </div>
+            {д.дело.service_scope && (
+              <div style={{ fontSize: 13, color: 'var(--ds-muted)', marginTop: 2 }}>
+                {д.дело.service_scope}
+              </div>
+            )}
+          </div>
+
+          <div className="ds-card" style={{ padding: 14, marginBottom: 12 }}>
+            <div className="ds-label" style={{ marginBottom: 8 }}>
+              В деле
+            </div>
+            <div style={{ display: 'grid', gap: 5, fontSize: 13 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>Задачи</span>
+                <span style={{ fontWeight: 600 }}>{открытыхЗадач}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>Что известно</span>
+                <span style={{ fontWeight: 600 }}>
+                  {д.факты.length}
+                  {черновиков > 0 && (
+                    <span style={{ color: 'var(--ds-ai)', marginLeft: 5 }} title="не подтверждено">
+                      ●{черновиков}
+                    </span>
+                  )}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>Документы</span>
+                <span style={{ fontWeight: 600 }}>{д.документы.length}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>Переписка</span>
+                <span style={{ fontWeight: 600 }}>{д.сообщений}</span>
+              </div>
+            </div>
+          </div>
+
+          <TransferCase caseId={id} кандидаты={коллеги} />
+        </aside>
+
+        {/* ── Работа ─────────────────────────────────────────────────── */}
+        <div>
+          <section className="care-sec">
+            <div className="care-sec-head">
+              <h2 className="ds-label" style={{ margin: 0 }}>
+                Что известно
+              </h2>
+              <span className="care-sec-count">
+                {черновиков > 0 ? `${черновиков} не подтверждено` : 'всё подтверждено'}
+              </span>
+            </div>
+            <div className="ds-card">
+              {д.факты.length === 0 ? (
+                <p style={{ fontSize: 13, color: 'var(--ds-muted)', margin: 0 }}>
+                  Пока ничего не записано. Факты появятся, когда помощник разберёт встречу.
+                </p>
+              ) : (
+                д.факты.map((ф) => (
+                  <div key={ф.id} className="care-fact">
+                    <div className="care-fact-name">{подписьПоля(ф.field)}</div>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+                      <span className="care-fact-value" data-state={ф.status}>
+                        {значениеФакта(ф.value)}
+                        {ф.currency ? ` ${ф.currency}` : ''}
+                        {периодПоля(ф.field) ? ` ${периодПоля(ф.field)}` : ''}
+                      </span>
+                      {ф.status === 'confirmed' && (
+                        <span style={{ fontSize: 12, color: 'var(--ds-success-ink)' }}>
+                          ✓ подтверждено
+                        </span>
+                      )}
+                      {ф.is_plan && (
+                        <span className="ds-chip ds-chip-warning">намерение, не результат</span>
+                      )}
+                    </div>
+                    {ф.quote && <div className="care-fact-src">«{ф.quote}»</div>}
+                    {ф.status === 'draft' && <FactActions caseId={id} factId={ф.id} />}
                   </div>
-                  <TaskActions caseId={id} taskId={з.id} статус={з.status} />
-                </li>
-              ))}
-            </ul>
-          )}
+                ))
+              )}
+            </div>
+          </section>
 
-          <h2 className="ds-label" style={{ marginTop: 20 }}>
-            Документы
-          </h2>
-          <p style={{ fontSize: 12, color: 'var(--ds-muted)', marginBottom: 8 }}>
-            Из действующей CRM, только просмотр.
-          </p>
-          {д.документы.length === 0 ? (
-            <p style={{ fontSize: 13, color: 'var(--ds-muted)' }}>Документов нет.</p>
-          ) : (
-            <ul style={{ listStyle: 'none', padding: 0, margin: 0, fontSize: 14 }}>
-              {д.документы.map((док) => (
-                <li key={док.id} style={{ padding: '6px 0', borderBottom: '1px solid var(--ds-border-soft)' }}>
-                  {док.file_name ?? док.doc_type ?? 'без названия'}
-                  <span style={{ fontSize: 12, color: 'var(--ds-muted)' }}>
-                    {док.status ? ` · ${док.status}` : ''}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+          <section className="care-sec">
+            <div className="care-sec-head">
+              <h2 className="ds-label" style={{ margin: 0 }}>
+                План и задачи
+              </h2>
+              <NewTask caseId={id} />
+            </div>
+            <div className="ds-card">
+              {д.задачи.length === 0 ? (
+                <p style={{ fontSize: 13, color: 'var(--ds-muted)', margin: 0 }}>
+                  Задач нет — завести первую.
+                </p>
+              ) : (
+                д.задачи.map((з) => {
+                  const с = срок(з.due_on)
+                  const ждём = подписьОжидания(з.waiting_on)
+                  return (
+                    <div key={з.id} className="care-fact">
+                      <div style={{ fontSize: 15, fontWeight: 500 }}>{з.title}</div>
+                      <div
+                        style={{
+                          fontSize: 12,
+                          color:
+                            с.уровень === 'просрочен' ? 'var(--ds-error-ink)' : 'var(--ds-muted)',
+                          marginTop: 2,
+                        }}
+                      >
+                        {[подписьСтатуса(з.status), ждём, з.due_on ? с.текст : null]
+                          .filter(Boolean)
+                          .join(' · ')}
+                        {с.дата && <span style={{ color: 'var(--ds-muted)' }}> ({с.дата})</span>}
+                      </div>
+                      <TaskActions caseId={id} taskId={з.id} статус={з.status} />
+                    </div>
+                  )
+                })
+              )}
+            </div>
+          </section>
 
-        {/* ── Откуда знаем ──────────────────────────────────────────── */}
-        <section className="ds-card">
-          <h2 className="ds-label">Переписка</h2>
-          <p style={{ fontSize: 14 }}>
-            {д.сообщений === 0
-              ? 'Сообщений в действующей CRM нет.'
-              : `${д.сообщений} сообщений в действующей CRM.`}
-          </p>
-
-          <h2 className="ds-label" style={{ marginTop: 20 }}>
-            История дела
-          </h2>
-          {д.журнал.length === 0 ? (
-            <p style={{ fontSize: 13, color: 'var(--ds-muted)' }}>Записей нет.</p>
-          ) : (
-            <ul style={{ listStyle: 'none', padding: 0, margin: 0, fontSize: 13 }}>
-              {д.журнал.map((с) => (
-                <li key={с.id} style={{ padding: '6px 0', borderBottom: '1px solid var(--ds-border-soft)' }}>
-                  <span className="ds-mono">{с.action}</span>
-                  <div style={{ fontSize: 12, color: 'var(--ds-muted)' }}>
-                    {new Date(с.created_at).toLocaleString('ru-RU')} · {с.actor_kind}
-                    {с.reason ? ` · ${с.reason}` : ''}
+          <section className="care-sec">
+            <div className="care-sec-head">
+              <h2 className="ds-label" style={{ margin: 0 }}>
+                Документы
+              </h2>
+              <span className="care-sec-count">из действующей CRM, только просмотр</span>
+            </div>
+            <div className="ds-card">
+              {д.документы.length === 0 ? (
+                <p style={{ fontSize: 13, color: 'var(--ds-muted)', margin: 0 }}>
+                  Документы не загружены — запросить у клиента.
+                </p>
+              ) : (
+                д.документы.map((док) => (
+                  <div key={док.id} className="care-fact">
+                    <div style={{ fontSize: 14 }}>{док.file_name ?? док.doc_type ?? 'без названия'}</div>
+                    {док.status && (
+                      <div style={{ fontSize: 12, color: 'var(--ds-muted)' }}>{док.status}</div>
+                    )}
                   </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+                ))
+              )}
+            </div>
+          </section>
+
+          <section className="care-sec">
+            <div className="care-sec-head">
+              <h2 className="ds-label" style={{ margin: 0 }}>
+                Контакты
+              </h2>
+            </div>
+            <div className="ds-card">
+              {д.контакты.length === 0 ? (
+                <p style={{ fontSize: 13, color: 'var(--ds-muted)', margin: 0 }}>
+                  Контактов нет. Отправлять некому — и это к лучшему, пока их не проверили.
+                </p>
+              ) : (
+                д.контакты.map((к) => (
+                  <div key={к.id} className="care-fact">
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                      <span style={{ fontWeight: 600 }}>{к.name}</span>
+                      <span className="ds-chip ds-chip-neutral">
+                        {к.kind === 'student' ? 'студент' : к.kind === 'parent' ? 'родитель' : 'плательщик'}
+                      </span>
+                      {к.can_decide && <span className="ds-chip ds-chip-info">решает</span>}
+                    </div>
+                    <div style={{ fontSize: 12, color: 'var(--ds-muted)', marginTop: 2 }}>
+                      {к.tg_chat_id ? 'группа в Телеграме привязана' : 'группа в Телеграме не привязана'}
+                      {к.phone ? ` · ${к.phone}` : ''}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </section>
+
+          <section className="care-sec">
+            <div className="care-sec-head">
+              <h2 className="ds-label" style={{ margin: 0 }}>
+                История дела
+              </h2>
+            </div>
+            <div className="ds-card">
+              {д.журнал.length === 0 ? (
+                <p style={{ fontSize: 13, color: 'var(--ds-muted)', margin: 0 }}>Записей нет.</p>
+              ) : (
+                д.журнал.map((с) => (
+                  <div key={с.id} className="care-fact">
+                    <div style={{ fontSize: 14 }}>{с.action}</div>
+                    <div style={{ fontSize: 12, color: 'var(--ds-muted)' }}>
+                      {new Date(с.created_at).toLocaleString('ru-RU')} · {с.actor_kind}
+                      {с.reason ? ` · ${с.reason}` : ''}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </section>
+        </div>
+
+        {/* ── Помощник ───────────────────────────────────────────────── */}
+        <aside className="care-case-ai">
+          <div className="care-ai-panel">
+            <div className="ds-label" style={{ marginBottom: 10 }}>
+              <span className="care-ai-dot" />
+              Помощник
+            </div>
+            <p style={{ fontSize: 13, color: 'var(--ds-muted)', margin: 0, lineHeight: 1.6 }}>
+              Пока выключен. Появится на следующем этапе: разберёт встречу, предложит
+              изменения профиля и подборку вузов.
+            </p>
+            <p style={{ fontSize: 13, color: 'var(--ds-muted)', marginTop: 10, lineHeight: 1.6 }}>
+              Всё, что он предложит, сначала увидите вы — отправить сам он не сможет.
+            </p>
+          </div>
+        </aside>
       </div>
     </>
   )

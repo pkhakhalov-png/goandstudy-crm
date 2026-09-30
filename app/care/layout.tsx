@@ -1,25 +1,29 @@
 /**
- * Оболочка кабинета куратора v2.
+ * Оболочка кабинета куратора v2. Разделы 3.1–3.4 дизайн-документа.
  *
  * Три решения принимаются здесь и больше нигде.
  *
- * ПЕРВОЕ: 404 вместо редиректа, если доступа нет. Перенаправление на страницу
- * входа или в старый кабинет сообщает, что раздел существует. Пока кабинет
- * закрыт флагом, посторонний не должен узнать о нём даже этого.
+ * ПЕРВОЕ: 404 вместо редиректа, если доступа нет. Перенаправление на вход
+ * или в старый кабинет сообщает, что раздел существует. Пока кабинет закрыт
+ * флагом, посторонний не должен узнать о нём даже этого.
  *
- * ВТОРОЕ: полоса среды сверху. Пока контур живёт на превью и наружу ничего не
- * отправляет, человек, открывший его в соседней вкладке с рабочей CRM, обязан
- * видеть разницу без вглядывания в адресную строку.
+ * ВТОРОЕ: полоса среды над всем, включая сайдбар. Она не закрывается и не
+ * скрывается: куратор на пилоте обязан одним взглядом понимать, куда уйдёт
+ * сообщение. В production её нет вовсе — это единственное отличие каркаса
+ * между средами.
  *
- * ТРЕТЬЕ: `ds-scope` и шрифты — те же, что в действующем кабинете куратора.
- * Дизайн-система одна, и ветка v2 её не форкает.
+ * ТРЕТЬЕ: дизайн-система общая с действующим кабинетом. `ds.css` берётся
+ * оттуда без изменений, а `care.css` только добавляет — ветка v2 систему не
+ * форкает.
  */
 import { notFound } from 'next/navigation'
 import { Geist, Oswald } from 'next/font/google'
-import Link from 'next/link'
 import '../curator/ds.css'
+import './care.css'
 import { сессияКонтура, кабинетОткрыт } from '@/lib/care/session'
 import { режим } from '@/lib/care/mode'
+import { счётчикиНавигации } from '@/lib/care/cases'
+import { CareNav, type ПунктМеню } from './CareNav'
 
 const geist = Geist({
   subsets: ['latin', 'cyrillic'],
@@ -42,56 +46,68 @@ export default async function CareLayout({ children }: { children: React.ReactNo
 
   // Роль в CRM проверяет middleware. Здесь — то, чего он проверить не может:
   // заведён ли человек в контуре и открыт ли ему интерфейс. Само правило
-  // живёт в lib/care/session.ts и покрыто тестом: правило внутри разметки
-  // проверяется только открытием страницы, то есть практически никогда.
-  if (!кабинетОткрыт(сессия)) {
-    notFound()
-  }
+  // живёт в lib/care/session.ts и покрыто тестом.
+  if (!кабинетОткрыт(сессия)) notFound()
 
-  const состояние = await режим()
+  const [состояние, счётчики] = await Promise.all([режим(), счётчикиНавигации(сессия.участник)])
+
   const боевой = состояние.mode === 'prod' && состояние.external_sends
 
+  const пункты: ПунктМеню[] = [
+    { href: '/care', подпись: 'Главная' },
+    { href: '/care/cases', подпись: 'Клиенты', бейдж: счётчики.клиентов },
+    {
+      href: '/care/review',
+      подпись: 'На проверку',
+      бейдж: счётчики.наПроверку,
+      уровень: счётчики.естьПросроченные ? 'error' : счётчики.естьСрочные ? 'amber' : 'обычный',
+    },
+  ]
+  if (сессия.участник.care_role === 'lead') {
+    пункты.push({ href: '/care/team', подпись: 'Команда' })
+  }
+
   return (
-    <div className={`${geist.variable} ${oswald.variable} ds-scope`} style={{ minHeight: '100vh' }}>
+    <div className={`${geist.variable} ${oswald.variable} ds-scope`}>
       {!боевой && (
-        <div
-          style={{
-            background: 'var(--ds-amber-soft)',
-            borderBottom: '1px solid var(--ds-amber)',
-            padding: '6px 16px',
-            fontSize: 12,
-            textAlign: 'center',
-            color: 'var(--ds-ink-dim)',
-          }}
-        >
-          Тестовый контур · режим «{состояние.mode}» · наружу ничего не отправляется
+        <div className="care-env">
+          Тестовая среда · внешние отправки выключены · данные синтетические
         </div>
       )}
 
-      <header
-        style={{
-          borderBottom: '1px solid var(--ds-border)',
-          padding: '12px 16px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 20,
-          flexWrap: 'wrap',
-        }}
-      >
-        <Link href="/care/cases" className="ds-link" style={{ fontWeight: 600 }}>
-          Дела
-        </Link>
-        {сессия.участник.care_role === 'lead' && (
-          <Link href="/care/team" className="ds-link">
-            Команда
-          </Link>
-        )}
-        <span style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--ds-muted)' }}>
-          {сессия.имя ?? 'без имени'} · {сессия.участник.care_role}
-        </span>
-      </header>
+      <div className="care-shell">
+        <nav className="care-side">
+          <div
+            style={{
+              fontFamily: 'var(--ds-font-display), sans-serif',
+              fontWeight: 700,
+              fontSize: 17,
+              padding: '4px 12px 16px',
+            }}
+          >
+            goandstudy
+          </div>
 
-      <main style={{ padding: '24px 16px', maxWidth: 1100, margin: '0 auto' }}>{children}</main>
+          <CareNav пункты={пункты} />
+
+          <div style={{ marginTop: 'auto', paddingTop: 16 }}>
+            <div className="care-nav-sep" />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px' }}>
+              <span className="care-ava">{(сессия.имя ?? '??').slice(0, 2).toUpperCase()}</span>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {сессия.имя ?? 'без имени'}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--ds-muted)' }}>
+                  {сессия.участник.care_role === 'lead' ? 'руководитель' : 'куратор'}
+                </div>
+              </div>
+            </div>
+          </div>
+        </nav>
+
+        <main className="care-main">{children}</main>
+      </div>
     </div>
   )
 }

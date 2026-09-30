@@ -12,6 +12,7 @@
  */
 import { базаCare, базаPublic } from './db'
 import { видимыеДела, делоДоступно, type Участник } from './access'
+import { склонение, подписьОжидания, срок } from './labels'
 
 export type ДелоВСписке = {
   id: string
@@ -23,11 +24,16 @@ export type ДелоВСписке = {
   service_scope: string | null
   is_synthetic: boolean
   имяКлиента: string
-  страна: string | null
   этапCRM: string | null
   задачОткрыто: number
   ждутКлиента: number
   ближайшийСрок: string | null
+  /** Что происходит с делом сейчас — одной фразой, как в макете. */
+  сейчас: string
+  /** Что делать дальше — одной фразой с числом или датой. */
+  следующийШаг: string
+  требуетВнимания: boolean
+  страна: string | null
 }
 
 type ЗаписьДела = {
@@ -73,7 +79,7 @@ export async function списокДел(участник: Участник): Pr
   // строк получилось бы тридцать обращений к базе.
   const { data: задачи } = await базаCare()
     .from('tasks')
-    .select('case_id, status, waiting_on, due_on')
+    .select('case_id, title, status, waiting_on, due_on, updated_at')
     .in('case_id', список.map((д) => д.id))
     .not('status', 'in', '("done","failed")')
 
@@ -86,6 +92,27 @@ export async function списокДел(участник: Участник): Pr
     const свои = (задачи ?? []).filter((з) => з.case_id === д.id)
     const сроки = свои.map((з) => з.due_on).filter((s): s is string => !!s).sort()
     const клиент = клиенты.get(д.client_id)
+
+    // «Сейчас» и «следующий шаг» — то, что куратор ищет в списке глазами.
+    // Статус задачи (`todo`, `waiting`) на этот вопрос не отвечает: он про
+    // состояние записи, а не про состояние дела.
+    const ждут = свои.filter((з) => з.waiting_on !== 'none')
+    const ближайшая = свои
+      .filter((з) => з.due_on)
+      .sort((а, б) => (а.due_on ?? '').localeCompare(б.due_on ?? ''))[0]
+
+    const сейчас = свои.length === 0
+      ? 'Задач нет'
+      : ждут.length > 0
+        ? подписьОжидания(ждут[0].waiting_on)
+        : 'В работе'
+
+    const следующийШаг = ближайшая
+      ? `${ближайшая.title} · ${срок(ближайшая.due_on).текст}`
+      : свои.length > 0
+        ? свои[0].title
+        : 'Завести первую задачу'
+
     return {
       id: д.id,
       client_id: д.client_id,
@@ -103,6 +130,11 @@ export async function списокДел(участник: Участник): Pr
       задачОткрыто: свои.length,
       ждутКлиента: свои.filter((з) => з.waiting_on === 'client').length,
       ближайшийСрок: сроки[0] ?? null,
+      сейчас,
+      следующийШаг,
+      требуетВнимания:
+        свои.some((з) => з.due_on && з.due_on < new Date().toISOString().slice(0, 10)) ||
+        свои.some((з) => з.waiting_on === 'review'),
     }
   })
 
@@ -302,4 +334,270 @@ export async function коллегиДляПередачи(
 
   const имена = new Map((пользователи ?? []).map((п) => [п.id as string, (п.name as string | null) ?? null]))
   return люди.map((ч) => ({ id: ч.id, имя: имена.get(ч.user_id) ?? 'без имени' }))
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Главная: счётчики и лента внимания. Раздел 4 дизайн-документа.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type СчётчикиНавигации = {
+  клиентов: number
+  наПроверку: number
+  естьСрочные: boolean
+  естьПросроченные: boolean
+}
+
+/**
+ * Числа для сайдбара.
+ *
+ * Бейдж «На проверку» красится по худшему элементу очереди, а не по
+ * количеству: десять обычных предложений спокойнее одного просроченного.
+ */
+export async function счётчикиНавигации(участник: Участник): Promise<СчётчикиНавигации> {
+  const область = await видимыеДела(участник)
+  if (область.пусто) {
+    return { клиентов: 0, наПроверку: 0, естьСрочные: false, естьПросроченные: false }
+  }
+
+  const [{ data: предложения }, { data: задачи }] = await Promise.all([
+    базаCare().from('proposals').select('id, created_at').in('case_id', область.дела).eq('status', 'pending'),
+    базаCare()
+      .from('tasks')
+      .select('id, due_on, waiting_on')
+      .in('case_id', область.дела)
+      .eq('waiting_on', 'review')
+      .not('status', 'in', '("done","failed")'),
+  ])
+
+  const сегодня = new Date().toISOString().slice(0, 10)
+  const наПроверку = (предложения ?? []).length + (задачи ?? []).length
+
+  return {
+    клиентов: область.дела.length,
+    наПроверку,
+    естьСрочные: наПроверку > 0,
+    естьПросроченные: (задачи ?? []).some((з) => з.due_on && з.due_on < сегодня),
+  }
+}
+
+export type ПричинаВнимания = {
+  текст: string
+  вид: 'обычный' | 'ai' | 'amber' | 'error'
+}
+
+export type СтрокаВнимания = {
+  caseId: string
+  имя: string
+  контекст: string
+  уровень: 'просрочен' | 'горит' | 'сегодня' | 'ждёт' | 'спокойно'
+  причины: ПричинаВнимания[]
+  действие: string
+  is_synthetic: boolean
+}
+
+export type Главная = {
+  всегоДел: number
+  требуютВас: number
+  предложений: number
+  просроченныхЗадач: number
+  дедлайновЗа14Дней: number
+  ошибокОпераций: number
+  лента: СтрокаВнимания[]
+}
+
+/**
+ * Чем заняться прямо сейчас.
+ *
+ * Раздел 4: главная отвечает не «как распределены клиенты по этапам», а
+ * «за что хвататься». Поэтому сортировка по срочности, а причины — строками
+ * с числом или датой внутри. Причина без числа («есть задачи») не помогает
+ * решить, открывать ли карточку.
+ */
+export async function главная(участник: Участник): Promise<Главная> {
+  const область = await видимыеДела(участник)
+  const пусто: Главная = {
+    всегоДел: 0,
+    требуютВас: 0,
+    предложений: 0,
+    просроченныхЗадач: 0,
+    дедлайновЗа14Дней: 0,
+    ошибокОпераций: 0,
+    лента: [],
+  }
+  if (область.пусто) return пусто
+
+  const [{ data: дела }, { data: задачи }, { data: предложения }, { data: факты }] = await Promise.all([
+    базаCare()
+      .from('cases')
+      .select('id, client_id, intake_year, service_scope, is_synthetic, synthetic_name, notes')
+      .in('id', область.дела),
+    базаCare()
+      .from('tasks')
+      .select('case_id, title, status, waiting_on, due_on, updated_at')
+      .in('case_id', область.дела)
+      .not('status', 'in', '("done","failed")'),
+    базаCare().from('proposals').select('case_id, kind, created_at').in('case_id', область.дела).eq('status', 'pending'),
+    базаCare().from('facts').select('case_id').in('case_id', область.дела).eq('status', 'draft'),
+  ])
+
+  const список = (дела ?? []) as (ЗаписьДела & { notes: string | null })[]
+  const клиенты = await клиентыПоId(список.filter((д) => !д.is_synthetic).map((д) => д.client_id))
+
+  const сегодня = new Date().toISOString().slice(0, 10)
+  const через14 = new Date(Date.now() + 14 * 86_400_000).toISOString().slice(0, 10)
+
+  const лента: СтрокаВнимания[] = []
+  let просроченныхВсего = 0
+  let дедлайновВсего = 0
+
+  for (const д of список) {
+    const свои = (задачи ?? []).filter((з) => з.case_id === д.id)
+    const своиПредложения = (предложения ?? []).filter((п) => п.case_id === д.id)
+    const своиЧерновики = (факты ?? []).filter((ф) => ф.case_id === д.id)
+
+    const просрочено = свои.filter((з) => з.due_on && з.due_on < сегодня)
+    const близко = свои.filter((з) => з.due_on && з.due_on >= сегодня && з.due_on <= через14)
+    const ждёмКлиента = свои.filter((з) => з.waiting_on === 'client')
+
+    просроченныхВсего += просрочено.length
+    дедлайновВсего += близко.length
+
+    const причины: ПричинаВнимания[] = []
+
+    if (просрочено.length) {
+      const худшая = просрочено.sort((а, б) => (а.due_on ?? '').localeCompare(б.due_on ?? ''))[0]
+      const дней = Math.ceil((Date.now() - new Date(худшая.due_on!).getTime()) / 86_400_000)
+      причины.push({
+        текст: `«${худшая.title}» просрочена на ${дней} ${склонение(дней, 'день', 'дня', 'дней')}`,
+        вид: 'error',
+      })
+    }
+    if (своиПредложения.length) {
+      причины.push({
+        текст: `${своиПредложения.length} ${склонение(своиПредложения.length, 'предложение ждёт', 'предложения ждут', 'предложений ждут')} решения`,
+        вид: 'ai',
+      })
+    }
+    if (своиЧерновики.length) {
+      причины.push({
+        текст: `${своиЧерновики.length} ${склонение(своиЧерновики.length, 'факт не подтверждён', 'факта не подтверждены', 'фактов не подтверждены')}`,
+        вид: 'ai',
+      })
+    }
+    if (ждёмКлиента.length) {
+      const давняя = ждёмКлиента.sort((а, б) => а.updated_at.localeCompare(б.updated_at))[0]
+      const дней = Math.floor((Date.now() - new Date(давняя.updated_at).getTime()) / 86_400_000)
+      причины.push({
+        текст:
+          дней > 0
+            ? `ждём клиента ${дней} ${склонение(дней, 'день', 'дня', 'дней')}: «${давняя.title}»`
+            : `ждём клиента: «${давняя.title}»`,
+        вид: 'amber',
+      })
+    }
+    if (близко.length && !просрочено.length) {
+      const ближайшая = близко.sort((а, б) => (а.due_on ?? '').localeCompare(б.due_on ?? ''))[0]
+      const дней = Math.ceil((new Date(ближайшая.due_on!).getTime() - Date.now()) / 86_400_000)
+      причины.push({
+        текст: `срок «${ближайшая.title}» через ${дней} ${склонение(дней, 'день', 'дня', 'дней')}`,
+        вид: 'amber',
+      })
+    }
+
+    // Дела без причин на главную не попадают: лента отвечает на вопрос «что
+    // требует вас», а не «покажи всё». Список целиком — соседний экран.
+    if (!причины.length) continue
+
+    const уровень: СтрокаВнимания['уровень'] = просрочено.length
+      ? 'просрочен'
+      : своиПредложения.length || своиЧерновики.length
+        ? 'ждёт'
+        : близко.length
+          ? 'горит'
+          : 'спокойно'
+
+    лента.push({
+      caseId: д.id,
+      имя: д.is_synthetic ? (д.synthetic_name ?? 'тестовое дело') : (клиенты.get(д.client_id)?.name ?? `Клиент #${д.client_id}`),
+      контекст: [
+        д.is_synthetic ? (д.notes ?? '').replace(/^Тестовое дело\.\s*Страна:\s*/, '').replace(/\.$/, '') : клиенты.get(д.client_id)?.country,
+        д.service_scope,
+        `набор ${д.intake_year}`,
+      ]
+        .filter(Boolean)
+        .join(' · '),
+      уровень,
+      причины: причины.slice(0, 3),
+      действие: своиПредложения.length || своиЧерновики.length ? 'Разобрать' : ждёмКлиента.length ? 'Напомнить' : 'Открыть',
+      is_synthetic: д.is_synthetic,
+    })
+  }
+
+  const порядок = { просрочен: 0, ждёт: 1, горит: 2, сегодня: 3, спокойно: 4 }
+  лента.sort((а, б) => порядок[а.уровень] - порядок[б.уровень] || б.причины.length - а.причины.length)
+
+  return {
+    всегоДел: список.length,
+    требуютВас: лента.length,
+    предложений: (предложения ?? []).length + (факты ?? []).length,
+    просроченныхЗадач: просроченныхВсего,
+    дедлайновЗа14Дней: дедлайновВсего,
+    ошибокОпераций: 0,
+    лента,
+  }
+}
+
+export type НаПроверку = {
+  caseId: string
+  имяКлиента: string
+  контекст: string
+  is_synthetic: boolean
+  факты: ПодробностиДела['факты']
+}
+
+/**
+ * Очередь проверки: всё неподтверждённое по всем делам куратора.
+ *
+ * Раздел 8 дизайн-документа: однородные мелочи должны проверяться подряд, а
+ * не через открытие двадцати карточек. Куратор физически не может проверять
+ * всё, если каждая мелочь требует навигации.
+ *
+ * Сейчас в очередь попадают черновики фактов. Предложения помощника встанут
+ * сюда же на следующем этапе — форма у них одна.
+ */
+export async function очередьПроверки(участник: Участник): Promise<НаПроверку[]> {
+  const область = await видимыеДела(участник)
+  if (область.пусто) return []
+
+  const { data: факты, error } = await базаCare()
+    .from('facts')
+    .select('id, case_id, field, value, unit, currency, status, is_plan, quote, version, created_at')
+    .in('case_id', область.дела)
+    .eq('status', 'draft')
+    .order('created_at', { ascending: true })
+  if (error) throw new Error(`не удалось прочитать очередь: ${error.message}`)
+
+  const строки = (факты ?? []) as (ПодробностиДела['факты'][number] & { case_id: string })[]
+  if (!строки.length) return []
+
+  const идентификаторы = [...new Set(строки.map((ф) => ф.case_id))]
+  const { data: дела } = await базаCare()
+    .from('cases')
+    .select('id, client_id, intake_year, service_scope, is_synthetic, synthetic_name')
+    .in('id', идентификаторы)
+
+  const список = (дела ?? []) as ЗаписьДела[]
+  const клиенты = await клиентыПоId(список.filter((д) => !д.is_synthetic).map((д) => д.client_id))
+
+  return список.map((д) => ({
+    caseId: д.id,
+    имяКлиента: д.is_synthetic
+      ? (д.synthetic_name ?? 'тестовое дело')
+      : (клиенты.get(д.client_id)?.name ?? `Клиент #${д.client_id}`),
+    контекст: [клиенты.get(д.client_id)?.country, д.service_scope, `набор ${д.intake_year}`]
+      .filter(Boolean)
+      .join(' · '),
+    is_synthetic: д.is_synthetic,
+    факты: строки.filter((ф) => ф.case_id === д.id),
+  }))
 }
