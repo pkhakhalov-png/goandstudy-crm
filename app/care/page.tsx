@@ -11,7 +11,10 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { сессияКонтура } from '@/lib/care/session'
 import { главная } from '@/lib/care/cases'
+import { сводка } from '@/lib/care/ai/summary'
+import { флагВключён } from '@/lib/care/flags'
 import { инициалы, склонение } from '@/lib/care/labels'
+import { AssistantPanel } from './AssistantPanel'
 
 export const dynamic = 'force-dynamic'
 
@@ -59,6 +62,14 @@ export default async function ГлавнаяСтраница() {
   if (!сессия?.участник) notFound()
 
   const д = await главная(сессия.участник)
+  // Помощник включается отдельно от кабинета: смотреть на данные и тратить на
+  // них деньги — разные решения.
+  const помощникВключён = await флагВключён('ai', { memberId: сессия.участник.id })
+  // Числа уже посчитаны запросом; модель только формулирует к ним две фразы.
+  // Если она недоступна, фраза будет суше, а числа — те же.
+  const { фраза } = помощникВключён
+    ? await сводка(д, сессия.имя)
+    : { фраза: '' }
 
   const сегодня = new Date().toLocaleDateString('ru-RU', {
     weekday: 'long',
@@ -95,6 +106,12 @@ export default async function ГлавнаяСтраница() {
           {склонение(д.требуютВас, 'требует', 'требуют', 'требуют')} вас
         </h1>
 
+        {фраза && (
+          <p style={{ fontSize: 15, lineHeight: 1.6, maxWidth: 680, margin: '0 0 22px' }}>
+            {фраза}
+          </p>
+        )}
+
         <div style={{ display: 'flex', gap: 44, flexWrap: 'wrap' }}>
           <Стат число={д.предложений} подпись="на проверку" href="/care/review" />
           <Стат число={д.просроченныхЗадач} подпись="просроченных задачи" />
@@ -119,11 +136,13 @@ export default async function ГлавнаяСтраница() {
         </div>
       ) : (
         <>
-          <h2 className="ds-label" style={{ marginBottom: 12 }}>
-            Нужно ваше внимание
-          </h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 320px', gap: 24, alignItems: 'start' }}>
+            <div>
+              <h2 className="ds-label" style={{ marginBottom: 12 }}>
+                Нужно ваше внимание
+              </h2>
 
-          <div style={{ display: 'grid', gap: 12 }}>
+              <div style={{ display: 'grid', gap: 12 }}>
             {д.лента.map((с) => (
               <Link key={с.caseId} href={`/care/cases/${с.caseId}`} className="care-attn" data-level={с.уровень}>
                 <span className="care-ava">{инициалы(с.имя)}</span>
@@ -150,7 +169,16 @@ export default async function ГлавнаяСтраница() {
                   {с.действие}
                 </span>
               </Link>
-            ))}
+                ))}
+              </div>
+            </div>
+
+            <AssistantPanel
+              caseId={null}
+              областьПодпись="Все мои клиенты"
+              доступен={помощникВключён}
+              подсказки={['Что сегодня важнее всего?', 'Кто давно молчит?', 'Где мы работаем вслепую?']}
+            />
           </div>
         </>
       )}

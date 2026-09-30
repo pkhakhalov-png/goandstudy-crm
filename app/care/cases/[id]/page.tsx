@@ -16,6 +16,8 @@ import { сессияКонтура } from '@/lib/care/session'
 import { подробностиДела, коллегиДляПередачи } from '@/lib/care/cases'
 import { подписьПоля, подписьЗначения, периодПоля, подписьСтатуса, подписьОжидания, срок, инициалы } from '@/lib/care/labels'
 import { NewTask, TaskActions, FactActions, TransferCase } from './CaseOperations'
+import { AssistantPanel } from '../../AssistantPanel'
+import { флагВключён } from '@/lib/care/flags'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,9 +26,10 @@ export default async function ДелоСтраница({ params }: { params: Pro
   const сессия = await сессияКонтура()
   if (!сессия?.участник) notFound()
 
-  const [д, коллеги] = await Promise.all([
+  const [д, коллеги, помощникВключён] = await Promise.all([
     подробностиДела(сессия.участник, id),
     коллегиДляПередачи(сессия.участник),
+    флагВключён('ai', { memberId: сессия.участник.id }),
   ])
   // Нет доступа и нет дела отвечают одинаково: разные ответы рассказали бы
   // постороннему, что дело существует.
@@ -360,19 +363,12 @@ export default async function ДелоСтраница({ params }: { params: Pro
 
         {/* ── Помощник ───────────────────────────────────────────────── */}
         <aside className="care-case-ai">
-          <div className="care-ai-panel">
-            <div className="ds-label" style={{ marginBottom: 10 }}>
-              <span className="care-ai-dot" />
-              Помощник
-            </div>
-            <p style={{ fontSize: 13, color: 'var(--ds-muted)', margin: 0, lineHeight: 1.6 }}>
-              Пока выключен. Появится на следующем этапе: разберёт встречу, предложит
-              изменения профиля и подборку вузов.
-            </p>
-            <p style={{ fontSize: 13, color: 'var(--ds-muted)', marginTop: 10, lineHeight: 1.6 }}>
-              Всё, что он предложит, сначала увидите вы — отправить сам он не сможет.
-            </p>
-          </div>
+          <AssistantPanel
+            caseId={id}
+            областьПодпись={д.имяКлиента}
+            доступен={помощникВключён}
+            подсказки={['Что здесь требует решения?', 'Чего не хватает по этому делу?', 'Что ближе всего по срокам?']}
+          />
         </aside>
       </div>
     </>

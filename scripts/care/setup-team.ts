@@ -3,6 +3,7 @@
 //   npx tsx scripts/care/setup-team.ts --руководитель <user_id>              # предпросмотр
 //   npx tsx scripts/care/setup-team.ts --руководитель <user_id> --применить
 //   npx tsx scripts/care/setup-team.ts --флаг-ui <member_id|user_id>         # включить кабинет
+//   npx tsx scripts/care/setup-team.ts --флаг ai --кому <member_id|user_id>  # любой флаг
 //
 // Читает рабочие таблицы, пишет только в care. Повторный запуск не плодит
 // дублей: user_id в care.members уникален, скрипт сверяется до вставки.
@@ -57,18 +58,21 @@ async function найтиИлиЗавести(
   return создан[0]
 }
 
-async function включитьФлаг(memberId: string, писать: boolean): Promise<'уже' | 'включён' | 'будет'> {
+const ФЛАГИ = ['ui', 'ai', 'autowrite', 'outbound'] as const
+type Флаг = (typeof ФЛАГИ)[number]
+
+async function включитьФлаг(memberId: string, флаг: Флаг, писать: boolean): Promise<'уже' | 'включён' | 'будет'> {
   const есть = await запрос<{ id: string; enabled: boolean }>(
     'care',
     'GET',
-    `feature_flags?select=id,enabled&scope=eq.curator&scope_id=eq.${memberId}&flag=eq.ui`
+    `feature_flags?select=id,enabled&scope=eq.curator&scope_id=eq.${memberId}&flag=eq.${флаг}`
   )
   if (есть.length && есть[0].enabled) return 'уже'
   if (!писать) return 'будет'
   if (есть.length) {
     await запрос('care', 'PATCH', `feature_flags?id=eq.${есть[0].id}`, { enabled: true })
   } else {
-    await запрос('care', 'POST', 'feature_flags', { scope: 'curator', scope_id: memberId, flag: 'ui', enabled: true })
+    await запрос('care', 'POST', 'feature_flags', { scope: 'curator', scope_id: memberId, flag: флаг, enabled: true })
   }
   return 'включён'
 }
@@ -81,7 +85,13 @@ async function main() {
 
   const писать = process.argv.includes('--применить')
   const руководительUser = аргумент('руководитель')
-  const флагДля = аргумент('флаг-ui')
+  // `--флаг-ui <id>` оставлен ради совместимости: им уже пользовались.
+  const флагДля = аргумент('флаг-ui') ?? аргумент('кому')
+  const какойФлаг = (аргумент('флаг') ?? 'ui') as Флаг
+  if (!ФЛАГИ.includes(какойФлаг)) {
+    console.error(`Неизвестный флаг «${какойФлаг}». Бывают: ${ФЛАГИ.join(', ')}`)
+    process.exit(1)
+  }
 
   // Отдельный режим: только включить кабинет уже заведённому сотруднику.
   if (флагДля && !руководительUser) {
@@ -96,8 +106,8 @@ async function main() {
       console.error('Такого сотрудника в контуре нет. Сначала заведи команду.')
       process.exit(1)
     }
-    const итог = await включитьФлаг(участники[0].id, писать)
-    console.log(`Флаг ui для ${участники[0].id} (${участники[0].care_role}): ${итог}`)
+    const итог = await включитьФлаг(участники[0].id, какойФлаг, писать)
+    console.log(`Флаг ${какойФлаг} для ${участники[0].id} (${участники[0].care_role}): ${итог}`)
     if (!писать) console.log('Это предпросмотр. Добавь --применить')
     return
   }
