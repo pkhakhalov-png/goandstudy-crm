@@ -196,7 +196,13 @@ export default async function ДелоСтраница({ params }: { params: Pro
                           .join(' · ')}
                         {с.дата && <span style={{ color: 'var(--ds-muted)' }}> ({с.дата})</span>}
                       </div>
-                      <TaskActions caseId={id} taskId={з.id} статус={з.status} />
+                      <TaskActions
+                        caseId={id}
+                        taskId={з.id}
+                        статус={з.status}
+                        ждём={з.waiting_on}
+                        срок={з.due_on}
+                      />
                     </div>
                   )
                 })

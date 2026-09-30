@@ -20,6 +20,7 @@ import { useState, useTransition } from 'react'
 import {
   создатьЗадачу,
   изменитьСтатусЗадачи,
+  изменитьОжидание,
   подтвердитьФакт,
   отклонитьФакт,
   передатьДело,
@@ -94,14 +95,111 @@ export function NewTask({ caseId }: { caseId: string }) {
   )
 }
 
+/** Подписи ожидания в одном месте: и в выпадающем списке, и на кнопке. */
+const ОЖИДАНИЯ: { значение: string; подпись: string }[] = [
+  { значение: 'none', подпись: 'никого не ждём' },
+  { значение: 'client', подпись: 'ждём клиента' },
+  { значение: 'university', подпись: 'ждём вуз' },
+  { значение: 'specialist', подпись: 'ждём специалиста' },
+  { значение: 'review', подпись: 'ждём проверку' },
+]
+
+/**
+ * Кого ждём по задаче — и до какого числа.
+ *
+ * Стоит рядом с кнопками статуса, а не в отдельном экране, потому что это то
+ * же самое движение руки: посмотрел задачу — отметил, что ждёшь документ.
+ * Отметка «ждём клиента» со сроком — единственное, по чему помощник узнаёт,
+ * что тут может понадобиться напоминание.
+ *
+ * Срок в той же форме: правило без срока напоминание не создаёт, и просить
+ * заполнить его отдельно значит получить половину заполненных.
+ */
+export function TaskWaiting({
+  caseId,
+  taskId,
+  ждём,
+  срок,
+  закрыта,
+}: {
+  caseId: string
+  taskId: string
+  ждём: string
+  срок: string | null
+  закрыта: boolean
+}) {
+  const { идёт, ошибка, выполнить } = useAction()
+  const [открыта, открыть] = useState(false)
+
+  // У закрытой задачи ожидания нет по определению — прятать кнопку честнее,
+  // чем показывать и отказывать.
+  if (закрыта) return null
+
+  if (!открыта) {
+    return (
+      <button className="ds-btn ds-btn-ghost ds-btn-sm" onClick={() => открыть(true)}>
+        Кого ждём
+      </button>
+    )
+  }
+
+  return (
+    <form
+      action={(данные: FormData) =>
+        выполнить(async () => {
+          const итог = await изменитьОжидание(caseId, taskId, данные)
+          if (итог.ok) открыть(false)
+          return итог
+        })
+      }
+      style={{ display: 'grid', gap: 6, marginTop: 6, flexBasis: '100%' }}
+    >
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        <select className="ds-input" name="waiting_on" defaultValue={ждём} style={{ flex: '1 1 160px' }}>
+          {ОЖИДАНИЯ.map((о) => (
+            <option key={о.значение} value={о.значение}>
+              {о.подпись}
+            </option>
+          ))}
+        </select>
+        <input
+          className="ds-input"
+          name="due_on"
+          type="date"
+          defaultValue={срок ?? ''}
+          style={{ flex: '0 0 160px' }}
+        />
+      </div>
+      <div style={{ display: 'flex', gap: 6 }}>
+        <button className="ds-btn ds-btn-primary ds-btn-sm" type="submit" disabled={идёт}>
+          {идёт ? 'Сохраняю…' : 'Сохранить'}
+        </button>
+        <button
+          className="ds-btn ds-btn-ghost ds-btn-sm"
+          type="button"
+          onClick={() => открыть(false)}
+          disabled={идёт}
+        >
+          Отмена
+        </button>
+      </div>
+      <ErrorLine текст={ошибка} />
+    </form>
+  )
+}
+
 export function TaskActions({
   caseId,
   taskId,
   статус,
+  ждём,
+  срок,
 }: {
   caseId: string
   taskId: string
   статус: string
+  ждём: string
+  срок: string | null
 }) {
   const { идёт, ошибка, выполнить } = useAction()
   const закрыта = статус === 'done' || статус === 'failed'
@@ -124,6 +222,7 @@ export function TaskActions({
           >
             Готово
           </button>
+          <TaskWaiting caseId={caseId} taskId={taskId} ждём={ждём} срок={срок} закрыта={false} />
         </>
       ) : (
         <button
