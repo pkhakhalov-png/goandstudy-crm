@@ -5,6 +5,7 @@ import { revertToVersion } from '../actions'
 const ORIGIN_RU: Record<string, string> = {
   generated: 'сгенерирована',
   qa_fixed: 'после починки по замечаниям',
+  gate_fixed: 'правка перед выпуском',
   human_edited: 'правка человека',
   approved: 'утверждена',
   published: 'опубликована',

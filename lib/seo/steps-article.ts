@@ -796,6 +796,35 @@ registerStep('article_fix', async (job: Job, seo: any): Promise<StepOutcome> => 
   const meta: any = version.meta ?? {}
   if (!meta.brief) return { outcome: 'failed', result: { error: 'у версии нет брифа' } }
 
+  // Сколько раз эту статью уже переписывали перед выпуском.
+  //
+  // Считаем ДО платных вызовов, потому что весь смысл счёта — не делать их.
+  // Раньше предела не было вовсе: ворота выпуска отвергали статью, ставили
+  // починку, починка переписывала текст, блокеры оставались те же — и через час
+  // всё повторялось. На живых данных это 43 прогона, из которых 35 без единого
+  // изменения, 2 сделали хуже и только 6 помогли. У статьи #14 накопилось
+  // восемь платных переписываний при неизменных двух блокерах.
+  //
+  // Считаем ТОЛЬКО свои правки, с меткой gate_fixed. Метка qa_fixed принадлежит
+  // проверке качества, у неё свой предел на тех же двух попытках: складывать их
+  // в один счёт значило бы, что статья, честно прошедшая проверку, приходит к
+  // воротам уже без права на исправление.
+  const { count: переписей } = await seo.from('article_versions')
+    .select('*', { count: 'exact', head: true })
+    .eq('article_id', articleId).eq('origin', 'gate_fixed')
+
+  if ((переписей ?? 0) >= MAX_REVISIONS) {
+    return {
+      outcome: 'done',
+      result: {
+        nothing_to_fix: true, cost: 0, переписей,
+        нужен_человек: true,
+        why: `предел правок исчерпан (§12.2: ${MAX_REVISIONS}) — дальше решает человек`,
+      },
+    }
+  }
+
+
   // Бриф статей ручного пути бывает огрызком вида {h1:'', category:''}. Проверки
   // читают из него slug, title, excerpt — и на огрызке насчитывали пять провалов
   // там, где ворота выпуска, смотрящие на настоящие meta и title версии, видят
@@ -827,21 +856,51 @@ registerStep('article_fix', async (job: Job, seo: any): Promise<StepOutcome> => 
     ...(await loadSiteTargets(seo)),
     category: brief.category,
   })
-  const modelIssues = await qaWithModel(ctx, brief, html)
   const { failedB } = summarize(det.checks)
+
+  // Часть проверок правкой текста не лечится: пустая категория, незаполненный
+  // slug или excerpt живут в карточке статьи, а не в её теле. Просить модель
+  // переписать текст ради них — это счёт за вызов и новая версия каждый час,
+  // при неизменном числе блокеров.
+  const textFixable = failedB.filter((c) => !isMetadataCheck(c.id))
+
+  // Выход ДО обращения к модели.
+  //
+  // Прежний выход стоял после qaWithModel и требовал, чтобы замечаний не
+  // осталось ни одного. У статьи #14 текстовых блокеров нет, а замечаний
+  // девять — условие не срабатывало, и каждый час уходил вызов модели ради
+  // переписывания, которое блокеры снять не может по устройству.
+  //
+  // Два случая, и они разной природы.
+  //
+  // Есть блокеры, но ни одного текстового — переписывать бессмысленно по
+  // устройству, а не по наблюдению: категория и excerpt лежат в карточке
+  // статьи, и сколько ни правь тело, они не изменятся. Выходим сразу, не тратя
+  // ни одной попытки.
+  //
+  // Блокеров нет вовсе, но статью уже правили — замер показал, что число
+  // замечаний от правки к правке гуляет в обе стороны (9 → 13 → 9 → 10) и не
+  // сходится. Первую попытку оставляем: на ней правка иногда помогает.
+  if (!textFixable.length && (failedB.length > 0 || (переписей ?? 0) >= 1)) {
+    return {
+      outcome: 'done',
+      result: {
+        nothing_to_fix: true, cost: 0, переписей,
+        нужен_человек: failedB.map((c) => c.id),
+        why: failedB.length
+          ? 'остались только проверки карточки — текстом их не починить'
+          : 'блокеров нет; переписывать ради замечаний повторно не будем',
+      },
+    }
+  }
+
+  const modelIssues = await qaWithModel(ctx, brief, html)
 
   // Чинить нечего — не плодим версию впустую
   const worth = [...modelIssues.filter((i) => i.severity !== 'minor'), ...det.issues]
   if (!failedB.length && worth.length === 0) {
     return { outcome: 'done', result: { nothing_to_fix: true, cost: 0 } }
   }
-
-  // Часть проверок правкой текста не лечится: пустая категория, незаполненный
-  // slug или excerpt живут в карточке статьи, а не в её теле. Просить модель
-  // переписать текст ради них — это счёт за вызов и новая версия каждый час,
-  // при неизменном числе блокеров. Статью #14 именно так и крутило бы: её
-  // единственный блокер — пустая категория.
-  const textFixable = failedB.filter((c) => !isMetadataCheck(c.id))
   if (!textFixable.length && worth.length === 0) {
     return {
       outcome: 'done',
@@ -858,7 +917,9 @@ registerStep('article_fix', async (job: Job, seo: any): Promise<StepOutcome> => 
   // Чем писали на самом деле, а не что стояло в коде на момент выкладки.
   const writer = await writerConfig(seo)
   const nv = await insertVersion(seo, articleId, {
-    origin: 'qa_fixed', title: version.title, body: fixed, meta,
+    // gate_fixed, а не qa_fixed: по метке видно, кто правил — проверка качества
+    // на конвейере или ворота выпуска. От этого зависит, чей предел считать.
+    origin: 'gate_fixed', title: version.title, body: fixed, meta,
     prompt_version: writer.promptVersion ?? PROMPT_VERSION, model: writer.model,
   })
 
