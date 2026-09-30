@@ -64,13 +64,20 @@ export default async function ДелоСтраница({ params }: { params: Pro
 
       <h1 className="ds-hero-h1" style={{ fontSize: 26, margin: '12px 0 4px' }}>
         {д.имяКлиента}
+        {д.дело.is_synthetic && (
+          <span className="ds-chip ds-chip-warning" style={{ marginLeft: 8, verticalAlign: 'middle' }}>
+            тестовое дело
+          </span>
+        )}
       </h1>
       <p style={{ color: 'var(--ds-muted)', fontSize: 14, marginBottom: 24 }}>
         Набор {д.дело.intake_year}
         {д.дело.intake_term ? ` · ${д.дело.intake_term}` : ''}
         {д.дело.service_scope ? ` · ${д.дело.service_scope}` : ''}
         {' · '}
-        <span className="ds-mono">клиент #{д.дело.client_id}</span>
+        <span className="ds-mono">
+          {д.дело.is_synthetic ? 'синтетика, в рабочей базе такого клиента нет' : `клиент #${д.дело.client_id}`}
+        </span>
       </p>
 
       <div style={{ marginBottom: 20 }}>

@@ -69,6 +69,10 @@ export default async function СписокДелСтраница() {
                       <Link href={`/care/cases/${д.id}`} className="ds-link" style={{ fontWeight: 500 }}>
                         {д.имяКлиента}
                       </Link>
+                      {/* Тестовое дело помечается всегда и заметно: спутать
+                          синтетику с настоящим клиентом — дороже, чем лишняя
+                          плашка на экране. */}
+                      {д.is_synthetic && <span className="ds-chip ds-chip-warning">тест</span>}
                       {д.страна && (
                         <div style={{ fontSize: 12, color: 'var(--ds-muted)' }}>{д.страна}</div>
                       )}

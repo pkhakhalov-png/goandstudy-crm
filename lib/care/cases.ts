@@ -21,6 +21,7 @@ export type ДелоВСписке = {
   status: string
   automation_owner: 'legacy' | 'v2'
   service_scope: string | null
+  is_synthetic: boolean
   имяКлиента: string
   страна: string | null
   этапCRM: string | null
@@ -40,6 +41,8 @@ type ЗаписьДела = {
   owner_member_id: string | null
   notes: string | null
   created_at: string
+  is_synthetic: boolean
+  synthetic_name: string | null
 }
 
 /** Имена клиентов одним запросом: по одному на экран, а не на строку. */
@@ -59,7 +62,7 @@ export async function списокДел(участник: Участник): Pr
 
   const { data: дела, error } = await базаCare()
     .from('cases')
-    .select('id, client_id, intake_year, intake_term, status, automation_owner, service_scope, owner_member_id, notes, created_at')
+    .select('id, client_id, intake_year, intake_term, status, automation_owner, service_scope, owner_member_id, notes, created_at, is_synthetic, synthetic_name')
     .in('id', область.дела)
     .order('intake_year', { ascending: true })
   if (error) throw new Error(`не удалось прочитать дела: ${error.message}`)
@@ -75,7 +78,10 @@ export async function списокДел(участник: Участник): Pr
     .in('case_id', список.map((д) => д.id))
     .not('status', 'in', '("done","failed")')
 
-  const клиенты = await клиентыПоId(список.map((д) => д.client_id))
+  // У синтетических дел клиента в рабочей таблице нет и быть не должно:
+  // имя лежит в самом деле. Спрашивать про них public.clients значит искать
+  // заведомо отсутствующее.
+  const клиенты = await клиентыПоId(список.filter((д) => !д.is_synthetic).map((д) => д.client_id))
 
   return список.map((д) => {
     const свои = (задачи ?? []).filter((з) => з.case_id === д.id)
@@ -89,9 +95,10 @@ export async function списокДел(участник: Участник): Pr
       status: д.status,
       automation_owner: д.automation_owner,
       service_scope: д.service_scope,
+      is_synthetic: д.is_synthetic,
       // Клиента может не быть видно, если его удалили в CRM. Показываем номер,
       // а не пустоту: строка без подписи выглядит как ошибка отрисовки.
-      имяКлиента: клиент?.name ?? `Клиент #${д.client_id}`,
+      имяКлиента: д.is_synthetic ? (д.synthetic_name ?? 'тестовое дело') : (клиент?.name ?? `Клиент #${д.client_id}`),
       страна: клиент?.country ?? null,
       этапCRM: клиент?.current_stage_code ?? null,
       задачОткрыто: свои.length,
@@ -125,7 +132,7 @@ export async function подробностиДела(участник: Учас�
 
   const { data: дело, error } = await базаCare()
     .from('cases')
-    .select('id, client_id, intake_year, intake_term, status, automation_owner, service_scope, owner_member_id, notes, created_at')
+    .select('id, client_id, intake_year, intake_term, status, automation_owner, service_scope, owner_member_id, notes, created_at, is_synthetic, synthetic_name')
     .eq('id', caseId)
     .maybeSingle()
   if (error) throw new Error(`не удалось прочитать дело: ${error.message}`)
@@ -138,22 +145,31 @@ export async function подробностиДела(участник: Учас�
     базаCare().from('facts').select('id, field, value, unit, currency, status, is_plan, quote, version, created_at').eq('case_id', caseId).order('field'),
     базаCare().from('tasks').select('id, title, status, waiting_on, due_on, next_check_on').eq('case_id', caseId).order('due_on', { nullsFirst: false }),
     базаCare().from('events').select('id, action, actor_kind, created_at, reason').eq('case_id', caseId).order('created_at', { ascending: false }).limit(20),
-    клиентыПоId([запись.client_id]),
+    запись.is_synthetic ? Promise.resolve(new Map()) : клиентыПоId([запись.client_id]),
     // Документы читаются из рабочей таблицы как есть: своих мы не заводим до
     // решения владельца по обработке персональных документов (п. 0.7 плана).
-    базаPublic().from('client_documents').select('id, doc_type, file_name, status, uploaded_at').eq('client_id', запись.client_id).order('uploaded_at', { nullsFirst: false }),
-    базаPublic().from('client_tg_messages').select('id').eq('client_id', запись.client_id),
+    // Синтетика в рабочих таблицах не ищется: там её нет по построению.
+    запись.is_synthetic
+      ? Promise.resolve({ data: [] })
+      : базаPublic().from('client_documents').select('id, doc_type, file_name, status, uploaded_at').eq('client_id', запись.client_id).order('uploaded_at', { nullsFirst: false }),
+    запись.is_synthetic
+      ? Promise.resolve({ data: [] })
+      : базаPublic().from('client_tg_messages').select('id').eq('client_id', запись.client_id),
   ])
 
-  const { data: полныйКлиент } = await базаPublic()
-    .from('clients')
-    .select('name, country, email, phone, current_stage_code')
-    .eq('id', запись.client_id)
-    .maybeSingle()
+  const { data: полныйКлиент } = запись.is_synthetic
+    ? { data: null }
+    : await базаPublic()
+        .from('clients')
+        .select('name, country, email, phone, current_stage_code')
+        .eq('id', запись.client_id)
+        .maybeSingle()
 
   return {
     дело: запись,
-    имяКлиента: клиенты.get(запись.client_id)?.name ?? `Клиент #${запись.client_id}`,
+    имяКлиента: запись.is_synthetic
+      ? (запись.synthetic_name ?? 'тестовое дело')
+      : (клиенты.get(запись.client_id)?.name ?? `Клиент #${запись.client_id}`),
     клиент: полныйКлиент ?? null,
     контакты: (контакты.data ?? []) as ПодробностиДела['контакты'],
     факты: (факты.data ?? []) as ПодробностиДела['факты'],
