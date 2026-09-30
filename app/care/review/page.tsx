@@ -29,6 +29,11 @@ export default async function НаПроверкуСтраница() {
       <h1 className="ds-hero-h1" style={{ fontSize: 30, marginBottom: 4 }}>
         На проверку
       </h1>
+      <p style={{ marginBottom: 10 }}>
+        <Link href="/care/review/reminders" className="ds-link" style={{ fontSize: 14 }}>
+          Напоминания клиентам →
+        </Link>
+      </p>
       <p style={{ color: 'var(--ds-muted)', marginBottom: 22, fontSize: 14 }}>
         {всего === 0
           ? 'Ничего не ждёт вашего решения'
