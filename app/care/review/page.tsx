@@ -70,15 +70,39 @@ export default async function НаПроверкуСтраница() {
                 <div key={ф.id} className="care-fact">
                   <div className="care-fact-name">{подписьПоля(ф.field)}</div>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+                    {/* Если поле уже заполнено, показываем «было → стало».
+                        Принять замену, не увидев, что заменяешь, — это не
+                        решение, а нажатие кнопки. */}
+                    {ф.заменяет && (
+                      <>
+                        <span
+                          style={{
+                            fontSize: 15,
+                            color: 'var(--ds-stale)',
+                            textDecoration: 'line-through',
+                          }}
+                        >
+                          {подписьЗначения(ф.field, ф.заменяет.значение)}
+                          {ф.заменяет.currency ? ` ${ф.заменяет.currency}` : ''}
+                        </span>
+                        <span style={{ color: 'var(--ds-muted)' }}>→</span>
+                      </>
+                    )}
                     <span className="care-fact-value" data-state="draft">
                       {подписьЗначения(ф.field, ф.value)}
                       {ф.currency ? ` ${ф.currency}` : ''}
                       {периодПоля(ф.field) ? ` ${периодПоля(ф.field)}` : ''}
                     </span>
                     {ф.is_plan && <span className="ds-chip ds-chip-warning">намерение, не результат</span>}
+                    {ф.заменяет && <span className="ds-chip ds-chip-warning">заменит текущее</span>}
                   </div>
                   {/* Цитата обязательна: без неё проверить нечего, а значит
                       и принимать нечего. */}
+                  {ф.заменяет?.цитата && (
+                    <div className="care-fact-src" style={{ color: 'var(--ds-stale)' }}>
+                      прежнее стояло на: «{ф.заменяет.цитата}»
+                    </div>
+                  )}
                   {ф.quote ? (
                     <div className="care-fact-src">«{ф.quote}»</div>
                   ) : (
