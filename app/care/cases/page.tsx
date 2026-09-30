@@ -12,13 +12,22 @@ import { списокДел } from '@/lib/care/cases'
 
 export const dynamic = 'force-dynamic'
 
-function срокомЧерез(дата: string | null): { текст: string; тревожно: boolean } {
-  if (!дата) return { текст: '—', тревожно: false }
+/**
+ * Срок словами.
+ *
+ * Всегда относительно «сегодня», а дата — второй строкой. Смешивать «через
+ * 5 дн.» с «15.10.2026» в одной колонке значит заставлять человека считать в
+ * уме, какое из двух ближе, — а колонка существует ровно чтобы этого не делать.
+ */
+function срокомЧерез(дата: string | null): { текст: string; дата: string | null; уровень: 'пусто' | 'горит' | 'скоро' | 'спокойно' } {
+  if (!дата) return { текст: 'срока нет', дата: null, уровень: 'пусто' }
   const дней = Math.ceil((new Date(дата).getTime() - Date.now()) / 86_400_000)
-  if (дней < 0) return { текст: `просрочен на ${-дней} дн.`, тревожно: true }
-  if (дней === 0) return { текст: 'сегодня', тревожно: true }
-  if (дней <= 7) return { текст: `через ${дней} дн.`, тревожно: true }
-  return { текст: new Date(дата).toLocaleDateString('ru-RU'), тревожно: false }
+  const подпись = new Date(дата).toLocaleDateString('ru-RU')
+  if (дней < 0) return { текст: `просрочен на ${-дней} дн.`, дата: подпись, уровень: 'горит' }
+  if (дней === 0) return { текст: 'сегодня', дата: подпись, уровень: 'горит' }
+  if (дней <= 7) return { текст: `через ${дней} дн.`, дата: подпись, уровень: 'горит' }
+  if (дней <= 30) return { текст: `через ${дней} дн.`, дата: подпись, уровень: 'скоро' }
+  return { текст: `через ${дней} дн.`, дата: подпись, уровень: 'спокойно' }
 }
 
 export default async function СписокДелСтраница() {
@@ -35,7 +44,7 @@ export default async function СписокДелСтраница() {
       <p style={{ color: 'var(--ds-muted)', marginBottom: 24, fontSize: 14 }}>
         {дела.length === 0
           ? 'Область видимости пуста'
-          : `${дела.length} ${дела.length === 1 ? 'дело' : дела.length < 5 ? 'дела' : 'дел'} в вашей области`}
+          : `${дела.length} ${дела.length === 1 ? 'дело' : дела.length < 5 ? 'дела' : 'дел'} в вашей области · сверху то, что горит`}
       </p>
 
       {дела.length === 0 ? (
@@ -90,7 +99,21 @@ export default async function СписокДелСтраница() {
                       )}
                     </td>
                     <td style={{ padding: '12px 16px' }}>
-                      <span className={срок.тревожно ? 'ds-chip ds-chip-error' : ''}>{срок.текст}</span>
+                      <span
+                        className={
+                          срок.уровень === 'горит'
+                            ? 'ds-chip ds-chip-error'
+                            : срок.уровень === 'скоро'
+                              ? 'ds-chip ds-chip-warning'
+                              : ''
+                        }
+                        style={срок.уровень === 'пусто' ? { color: 'var(--ds-muted)' } : undefined}
+                      >
+                        {срок.текст}
+                      </span>
+                      {срок.дата && (
+                        <div style={{ fontSize: 11, color: 'var(--ds-muted)', marginTop: 2 }}>{срок.дата}</div>
+                      )}
                     </td>
                     <td style={{ padding: '12px 16px' }}>
                       <span
