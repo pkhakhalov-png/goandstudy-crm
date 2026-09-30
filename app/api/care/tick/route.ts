@@ -15,6 +15,8 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { взятьЗадания, закрытьЗадание, сохранитьПрогресс, type Задание } from '@/lib/care/jobs/claim'
+import { подготовитьНапоминания } from '@/lib/care/jobs/reminders'
+import { отправитьОчередь } from '@/lib/care/jobs/send'
 import { необязательна } from '@/lib/care/env'
 import { секретГодится, секретыСовпали } from '@/lib/care/secret'
 
@@ -37,6 +39,24 @@ const ЗАДАНИЙ_ЗА_ТИК = 5
 const ОБРАБОТЧИКИ: Record<string, (з: Задание, воркер: string) => Promise<Record<string, unknown>>> = {
   async echo(задание) {
     return { echo: задание.payload, at: new Date().toISOString() }
+  },
+
+  /** Подготовить напоминания. Ничего не отправляет — создаёт предложения. */
+  async prepare_reminders() {
+    const итог = await подготовитьНапоминания()
+    return { ...итог, at: new Date().toISOString() }
+  },
+
+  /**
+   * Отправить то, что куратор принял и что прошло ворота.
+   *
+   * Отдельным заданием от подготовки: готовить можно всегда, отправлять —
+   * только когда решение принято человеком. Смешать их значит потерять этот
+   * рубеж.
+   */
+  async send_outbound() {
+    const итог = await отправитьОчередь()
+    return { ...итог, at: new Date().toISOString() }
   },
 }
 
