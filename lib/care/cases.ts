@@ -165,7 +165,8 @@ export type ПодробностиДела = {
   клиент: { name: string | null; country: string | null; email: string | null; phone: string | null; current_stage_code: string | null } | null
   контакты: { id: string; kind: string; name: string; tg_chat_id: number | null; phone: string | null; email: string | null; can_decide: boolean }[]
   факты: { id: string; field: string; value: unknown; unit: string | null; currency: string | null; status: string; is_plan: boolean; quote: string | null; version: number; created_at: string }[]
-  задачи: { id: string; title: string; status: string; waiting_on: string; due_on: string | null; next_check_on: string | null }[]
+  задачи: { id: string; title: string; details: string | null; status: string; waiting_on: string; due_on: string | null; next_check_on: string | null }[]
+  заявки: { id: string; program_ref: Record<string, unknown>; status: string; note: string | null }[]
   документы: { id: string; doc_type: string | null; file_name: string | null; status: string | null; uploaded_at: string | null }[]
   сообщений: number
   источники: { id: string; kind: string; ref: Record<string, unknown>; note: string | null; captured_at: string; available: boolean }[]
@@ -192,10 +193,10 @@ export async function подробностиДела(участник: Учас�
 
   const запись = дело as ЗаписьДела
 
-  const [контакты, факты, задачи, журнал, клиенты, документы, сообщения, источники] = await Promise.all([
+  const [контакты, факты, задачи, журнал, клиенты, документы, сообщения, источники, заявки] = await Promise.all([
     базаCare().from('contacts').select('id, kind, name, tg_chat_id, phone, email, can_decide').eq('case_id', caseId).order('kind'),
     базаCare().from('facts').select('id, field, value, unit, currency, status, is_plan, quote, version, created_at').eq('case_id', caseId).order('field'),
-    базаCare().from('tasks').select('id, title, status, waiting_on, due_on, next_check_on').eq('case_id', caseId).order('due_on', { nullsFirst: false }),
+    базаCare().from('tasks').select('id, title, details, status, waiting_on, due_on, next_check_on').eq('case_id', caseId).order('due_on', { nullsFirst: false }),
     базаCare().from('events').select('id, action, actor_kind, created_at, reason').eq('case_id', caseId).order('created_at', { ascending: false }).limit(20),
     запись.is_synthetic ? Promise.resolve(new Map()) : клиентыПоId([запись.client_id]),
     // Документы читаются из рабочей таблицы как есть: своих мы не заводим до
@@ -212,6 +213,11 @@ export async function подробностиДела(участник: Учас�
       .select('id, kind, ref, note, captured_at, available')
       .eq('case_id', caseId)
       .order('captured_at', { ascending: false }),
+    базаCare()
+      .from('applications')
+      .select('id, program_ref, status, note')
+      .eq('case_id', caseId)
+      .order('created_at'),
   ])
 
   const { data: полныйКлиент } = запись.is_synthetic
@@ -234,6 +240,7 @@ export async function подробностиДела(участник: Учас�
     документы: (документы.data ?? []) as ПодробностиДела['документы'],
     сообщений: (сообщения.data ?? []).length,
     источники: (источники.data ?? []) as ПодробностиДела['источники'],
+    заявки: (заявки.data ?? []) as ПодробностиДела['заявки'],
     журнал: (журнал.data ?? []) as ПодробностиДела['журнал'],
   }
 }

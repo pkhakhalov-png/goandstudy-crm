@@ -12,15 +12,10 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { сессияКонтура } from '@/lib/care/session'
 import { очередьПроверки } from '@/lib/care/cases'
-import { подписьПоля, периодПоля, инициалы, склонение } from '@/lib/care/labels'
+import { подписьПоля, подписьЗначения, периодПоля, инициалы, склонение } from '@/lib/care/labels'
 import { FactActions } from '../cases/[id]/CaseOperations'
 
 export const dynamic = 'force-dynamic'
-
-function значение(v: unknown): string {
-  if (v === null || v === undefined) return '—'
-  return typeof v === 'object' ? JSON.stringify(v) : String(v)
-}
 
 export default async function НаПроверкуСтраница() {
   const сессия = await сессияКонтура()
@@ -71,7 +66,7 @@ export default async function НаПроверкуСтраница() {
                   <div className="care-fact-name">{подписьПоля(ф.field)}</div>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
                     <span className="care-fact-value" data-state="draft">
-                      {значение(ф.value)}
+                      {подписьЗначения(ф.field, ф.value)}
                       {ф.currency ? ` ${ф.currency}` : ''}
                       {периодПоля(ф.field) ? ` ${периодПоля(ф.field)}` : ''}
                     </span>

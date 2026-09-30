@@ -14,16 +14,10 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { сессияКонтура } from '@/lib/care/session'
 import { подробностиДела, коллегиДляПередачи } from '@/lib/care/cases'
-import { подписьПоля, периодПоля, подписьСтатуса, подписьОжидания, срок, инициалы } from '@/lib/care/labels'
+import { подписьПоля, подписьЗначения, периодПоля, подписьСтатуса, подписьОжидания, срок, инициалы } from '@/lib/care/labels'
 import { NewTask, TaskActions, FactActions, TransferCase } from './CaseOperations'
 
 export const dynamic = 'force-dynamic'
-
-function значениеФакта(value: unknown): string {
-  if (value === null || value === undefined) return '—'
-  if (typeof value === 'object') return JSON.stringify(value)
-  return String(value)
-}
 
 export default async function ДелоСтраница({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -141,7 +135,7 @@ export default async function ДелоСтраница({ params }: { params: Pro
                     <div className="care-fact-name">{подписьПоля(ф.field)}</div>
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
                       <span className="care-fact-value" data-state={ф.status}>
-                        {значениеФакта(ф.value)}
+                        {подписьЗначения(ф.field, ф.value)}
                         {ф.currency ? ` ${ф.currency}` : ''}
                         {периодПоля(ф.field) ? ` ${периодПоля(ф.field)}` : ''}
                       </span>
@@ -181,6 +175,11 @@ export default async function ДелоСтраница({ params }: { params: Pro
                   return (
                     <div key={з.id} className="care-fact">
                       <div style={{ fontSize: 15, fontWeight: 500 }}>{з.title}</div>
+                      {з.details && (
+                        <div style={{ fontSize: 12, color: 'var(--ds-ink-dim)', marginTop: 3, whiteSpace: 'pre-line' }}>
+                          {з.details.length > 220 ? `${з.details.slice(0, 220)}…` : з.details}
+                        </div>
+                      )}
                       <div
                         style={{
                           fontSize: 12,
@@ -195,6 +194,48 @@ export default async function ДелоСтраница({ params }: { params: Pro
                         {с.дата && <span style={{ color: 'var(--ds-muted)' }}> ({с.дата})</span>}
                       </div>
                       <TaskActions caseId={id} taskId={з.id} статус={з.status} />
+                    </div>
+                  )
+                })
+              )}
+            </div>
+          </section>
+
+          <section className="care-sec">
+            <div className="care-sec-head">
+              <h2 className="ds-label" style={{ margin: 0 }}>
+                Вузы и заявки
+              </h2>
+              <span className="care-sec-count">{д.заявки.length}</span>
+            </div>
+            <div className="ds-card">
+              {д.заявки.length === 0 ? (
+                <p style={{ fontSize: 13, color: 'var(--ds-muted)', margin: 0 }}>
+                  Подборки нет — предложить варианты.
+                </p>
+              ) : (
+                д.заявки.map((з) => {
+                  const п = з.program_ref as {
+                    title?: string
+                    country?: string
+                    tuition?: number | null
+                    currency?: string | null
+                    deadline?: string | null
+                  }
+                  const дедлайн = срок(п.deadline ?? null)
+                  return (
+                    <div key={з.id} className="care-fact">
+                      <div style={{ fontSize: 14, fontWeight: 500 }}>{п.title ?? 'без названия'}</div>
+                      <div style={{ fontSize: 12, color: 'var(--ds-muted)', marginTop: 2 }}>
+                        {[
+                          п.country,
+                          п.tuition ? `${п.tuition.toLocaleString('ru-RU')} ${п.currency ?? ''} / год` : null,
+                          п.deadline ? `дедлайн ${дедлайн.текст}` : null,
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </div>
+                      {з.note && <div className="care-fact-src">{з.note}</div>}
                     </div>
                   )
                 })

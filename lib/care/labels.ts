@@ -22,6 +22,37 @@ const ПОЛЯ: Record<string, string> = {
   'language.english.level': 'Английский, уровень',
   'gpa.value': 'Средний балл',
   'education.degree': 'Текущее образование',
+  'education.current': 'Текущее образование',
+  'education.level_target': 'Уровень поступления',
+  'program.field': 'Направление',
+  'service.scope': 'Услуга',
+  'intake.start_text': 'Сроки начала',
+  'profile.budget_text': 'Бюджет, как записано',
+  'profile.notes': 'Заметки куратора',
+}
+
+/**
+ * Значения-коды в человеческий вид.
+ *
+ * `full` в карточке клиента — это «полное сопровождение». Показывать код
+ * там, где ожидается название услуги, значит переложить расшифровку на
+ * человека, который её не обязан знать.
+ */
+const ЗНАЧЕНИЯ: Record<string, Record<string, string>> = {
+  'service.scope': {
+    full: 'полное сопровождение',
+    session: 'экспертная сессия',
+    language: 'языковые курсы',
+  },
+}
+
+export function подписьЗначения(поле: string, значение: unknown): string {
+  const текст = значение === null || значение === undefined
+    ? '—'
+    : typeof значение === 'object'
+      ? JSON.stringify(значение)
+      : String(значение)
+  return ЗНАЧЕНИЯ[поле]?.[текст] ?? текст
 }
 
 /** Подпись поля. Неизвестное поле показываем как есть — это честнее выдумки. */
