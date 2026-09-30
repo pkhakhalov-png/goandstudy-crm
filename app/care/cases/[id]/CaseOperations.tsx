@@ -22,6 +22,7 @@ import {
   изменитьСтатусЗадачи,
   изменитьОжидание,
   подтвердитьФакт,
+  исправитьФакт,
   отклонитьФакт,
   передатьДело,
 } from './actions'
@@ -238,15 +239,39 @@ export function TaskActions({
   )
 }
 
-export function FactActions({ caseId, factId }: { caseId: string; factId: string }) {
+/**
+ * Что можно сделать с черновиком факта: принять, исправить, отклонить.
+ *
+ * ПОЧЕМУ ИСПРАВЛЕНИЕ РЯДОМ С ОТКЛОНЕНИЕМ, А НЕ ВМЕСТО НЕГО. Это два разных
+ * ответа. «Исправить» — значение есть, модель его переврала. «Отклонить» —
+ * значения нет вовсе: модель придумала поле, которого в разговоре не было.
+ * Свести их в одно значит заставить человека врать в одну из сторон.
+ *
+ * Отклонение без своего варианта было тупиком: поле оставалось пустым, а
+ * правильное значение у куратора уже было в голове. Теперь оно вписывается
+ * прямо здесь, и оно же становится подтверждённым фактом.
+ */
+export function FactActions({
+  caseId,
+  factId,
+  значение,
+  валюта,
+  деньги,
+}: {
+  caseId: string
+  factId: string
+  значение: string
+  валюта: string | null
+  деньги: boolean
+}) {
   const { идёт, ошибка, выполнить } = useAction()
   const [причина, установитьПричину] = useState('')
-  const [отклоняем, отклонять] = useState(false)
+  const [что, показать] = useState<'кнопки' | 'исправляем' | 'отклоняем'>('кнопки')
 
   return (
     <div style={{ marginTop: 4 }}>
-      {!отклоняем ? (
-        <div style={{ display: 'flex', gap: 6 }}>
+      {что === 'кнопки' && (
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           <button
             className="ds-btn ds-btn-secondary ds-btn-sm"
             disabled={идёт}
@@ -254,17 +279,73 @@ export function FactActions({ caseId, factId }: { caseId: string; factId: string
           >
             Подтвердить
           </button>
-          <button className="ds-btn ds-btn-ghost ds-btn-sm" onClick={() => отклонять(true)} disabled={идёт}>
+          <button className="ds-btn ds-btn-secondary ds-btn-sm" onClick={() => показать('исправляем')} disabled={идёт}>
+            Исправить
+          </button>
+          <button className="ds-btn ds-btn-ghost ds-btn-sm" onClick={() => показать('отклоняем')} disabled={идёт}>
             Отклонить
           </button>
         </div>
-      ) : (
+      )}
+
+      {что === 'исправляем' && (
+        <form
+          action={(данные: FormData) =>
+            выполнить(async () => {
+              const итог = await исправитьФакт(caseId, factId, данные)
+              if (итог.ok) показать('кнопки')
+              return итог
+            })
+          }
+          style={{ display: 'grid', gap: 6 }}
+        >
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {/* Значение подставлено моделью — чаще всего править нужно одно
+                слово или одну цифру, а не писать заново. */}
+            <input
+              className="ds-input"
+              name="value"
+              defaultValue={значение}
+              placeholder="Как на самом деле"
+              style={{ flex: '1 1 240px' }}
+              autoFocus
+              required
+            />
+            {деньги && (
+              <input
+                className="ds-input"
+                name="currency"
+                defaultValue={валюта ?? ''}
+                placeholder="EUR"
+                style={{ flex: '0 0 90px' }}
+                maxLength={3}
+                required
+              />
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button className="ds-btn ds-btn-primary ds-btn-sm" type="submit" disabled={идёт}>
+              {идёт ? 'Сохраняю…' : 'Это верно'}
+            </button>
+            <button
+              className="ds-btn ds-btn-ghost ds-btn-sm"
+              type="button"
+              onClick={() => показать('кнопки')}
+              disabled={идёт}
+            >
+              Отмена
+            </button>
+          </div>
+        </form>
+      )}
+
+      {что === 'отклоняем' && (
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {/* Причина обязательна: отклонение без объяснения ничему не учит ни
               того, кто читает журнал, ни того, кто готовил факт. */}
           <input
             className="ds-input"
-            placeholder="Почему отклоняем"
+            placeholder="Почему этого факта нет"
             value={причина}
             onChange={(e) => установитьПричину(e.target.value)}
             style={{ flex: '1 1 200px' }}
@@ -277,7 +358,7 @@ export function FactActions({ caseId, factId }: { caseId: string; factId: string
           >
             Отклонить
           </button>
-          <button className="ds-btn ds-btn-ghost ds-btn-sm" onClick={() => отклонять(false)} disabled={идёт}>
+          <button className="ds-btn ds-btn-ghost ds-btn-sm" onClick={() => показать('кнопки')} disabled={идёт}>
             Отмена
           </button>
         </div>

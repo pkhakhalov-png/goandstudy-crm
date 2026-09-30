@@ -152,7 +152,15 @@ export default async function ДелоСтраница({ params }: { params: Pro
                       )}
                     </div>
                     {ф.quote && <div className="care-fact-src">«{ф.quote}»</div>}
-                    {ф.status === 'draft' && <FactActions caseId={id} factId={ф.id} />}
+                    {ф.status === 'draft' && (
+                      <FactActions
+                        caseId={id}
+                        factId={ф.id}
+                        значение={подписьЗначения(ф.field, ф.value)}
+                        валюта={ф.currency}
+                        деньги={ф.field.startsWith('budget.')}
+                      />
+                    )}
                   </div>
                 ))
               )}

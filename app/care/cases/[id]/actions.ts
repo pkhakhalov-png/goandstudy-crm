@@ -22,6 +22,7 @@ import { revalidatePath } from 'next/cache'
 import { базаCare } from '@/lib/care/db'
 import { требуетсяДоступ } from '@/lib/care/access'
 import { сессияКонтура } from '@/lib/care/session'
+import { разобратьЗначение } from '@/lib/care/facts'
 
 type Итог = { ok: true } | { ok: false; ошибка: string }
 
@@ -263,6 +264,100 @@ export async function подтвердитьФакт(caseId: string, factId: str
     if (error) return { ok: false, ошибка: error.message }
 
     await записатьВЖурнал(caseId, участник.id, 'fact_confirmed', прежний ?? null, факт)
+    revalidatePath(`/care/cases/${caseId}`)
+    return { ok: true }
+  } catch (e) {
+    return обработать(e)
+  }
+}
+
+/**
+ * Вписать свой вариант вместо предложенного моделью.
+ *
+ * ПОЧЕМУ ЭТО ОТДЕЛЬНАЯ ОПЕРАЦИЯ, А НЕ «ОТКЛОНИТЬ И ЗАВЕСТИ ЗАНОВО». Отклонение
+ * без своего варианта — тупик: модель ошиблась, куратор это знает, а поле
+ * осталось пустым. Правильное значение у человека в голове уже есть, и просить
+ * его завести факт заново другим путём значит терять его ровно там, где он
+ * готов был его отдать.
+ *
+ * Модельный черновик при этом не исчезает: он уходит в `rejected` с причиной
+ * «куратор вписал свой вариант» и остаётся в истории. Через полгода на вопрос
+ * «откуда взялось это значение» ответ должен быть «его вписал такой-то», а не
+ * «оно просто такое».
+ *
+ * Свой вариант — не из разговора, поэтому цитаты у него нет и не должно быть.
+ * Говорящий — `curator`: это и есть источник.
+ */
+export async function исправитьФакт(
+  caseId: string,
+  factId: string,
+  данные: FormData
+): Promise<Итог> {
+  try {
+    const { участник, база } = await подготовить(caseId)
+
+    const введено = String(данные.get('value') ?? '')
+    const введенаВалюта = String(данные.get('currency') ?? '')
+
+    const { data: черновик } = await база
+      .from('facts')
+      .select('id, field, value, currency, unit, period, is_plan, status')
+      .eq('id', factId)
+      .eq('case_id', caseId)
+      .maybeSingle()
+
+    if (!черновик) return { ok: false, ошибка: 'Факт не найден в этом деле' }
+    if (черновик.status !== 'draft') {
+      return { ok: false, ошибка: `Исправить можно только черновик, а этот — «${черновик.status}»` }
+    }
+
+    const разбор = разобратьЗначение(черновик.field, введено, введенаВалюта)
+    if (!разбор.ok) return { ok: false, ошибка: разбор.почему }
+
+    const { data: прежний } = await база
+      .from('facts')
+      .select('id')
+      .eq('case_id', caseId)
+      .eq('field', черновик.field)
+      .eq('status', 'confirmed')
+      .maybeSingle()
+
+    if (прежний) {
+      const { error } = await база.from('facts').update({ status: 'superseded' }).eq('id', прежний.id)
+      if (error) return { ok: false, ошибка: `не удалось снять прежний факт: ${error.message}` }
+    }
+
+    const { data: новый, error } = await база
+      .from('facts')
+      .insert({
+        case_id: caseId,
+        field: черновик.field,
+        value: разбор.значение,
+        currency: разбор.валюта,
+        unit: черновик.unit,
+        period: черновик.period,
+        // Намерение или результат решает не куратор в этой форме: если модель
+        // опознала «буду сдавать», а куратор правит саму цифру, признак
+        // остаётся прежним.
+        is_plan: черновик.is_plan,
+        speaker: 'curator',
+        status: 'confirmed',
+        confirmed_by: участник.id,
+        confirmed_at: new Date().toISOString(),
+        supersedes: прежний?.id ?? null,
+      })
+      .select('id, field, value, currency')
+      .single()
+
+    if (error) return { ok: false, ошибка: error.message }
+
+    const { error: ошибкаЧерновика } = await база
+      .from('facts')
+      .update({ status: 'rejected', reject_reason: 'куратор вписал свой вариант' })
+      .eq('id', factId)
+    if (ошибкаЧерновика) return { ok: false, ошибка: ошибкаЧерновика.message }
+
+    await записатьВЖурнал(caseId, участник.id, 'fact_corrected', черновик, новый, 'куратор вписал свой вариант')
     revalidatePath(`/care/cases/${caseId}`)
     return { ok: true }
   } catch (e) {

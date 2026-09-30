@@ -86,7 +86,13 @@ export default async function НаПроверкуСтраница() {
                       источник не указан — проверить нечем
                     </div>
                   )}
-                  <FactActions caseId={д.caseId} factId={ф.id} />
+                  <FactActions
+                    caseId={д.caseId}
+                    factId={ф.id}
+                    значение={подписьЗначения(ф.field, ф.value)}
+                    валюта={ф.currency}
+                    деньги={ф.field.startsWith('budget.')}
+                  />
                 </div>
               ))}
             </div>
