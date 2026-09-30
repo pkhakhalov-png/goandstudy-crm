@@ -15,10 +15,21 @@
 //
 // Этот контекст у нас уже есть — старый бот писал его полгода. Берём оттуда.
 //
-// ЧТО ИМЕННО ПЕРЕНОСИТСЯ. Не сами сообщения, а ссылки на них: строка в
-// care.sources с видом 'message' и ссылкой на запись в рабочей таблице.
-// Копировать текст незачем — он никуда не делся, а дубликат пришлось бы
-// поддерживать в согласии с оригиналом.
+// ЧТО ИМЕННО ПЕРЕНОСИТСЯ. Не сами сообщения, а запись об их существовании:
+// строка в care.sources с видом 'message', ссылкой на чат и границами
+// периода. Копировать текст незачем — он никуда не делся, а дубликат
+// пришлось бы поддерживать в согласии с оригиналом.
+//
+// ОТКУДА. Из представления `care.group_chats` по chat_id, проставленному
+// скриптом link-chats.ts. Не из `client_tg_messages`: туда сообщение
+// попадает только если у клиента заполнен tg_group_chat_id, а он заполнен
+// у двоих из семидесяти шести. Не из `public.deal_messages` напрямую: та
+// таблица роли контура не выдана, и правильно — там вся воронка продаж.
+//
+// ⚠ ТЕКСТ ПЕРЕПИСКИ КОНТУРУ ПОКА НЕДОСТУПЕН. Видно, что она есть, сколько
+// её и за какой период. Читать её помощнику — отдельное решение владельца:
+// это содержимое разговоров с клиентами, и открывать его роли нужно
+// осознанно, а не заодно.
 //
 // ИДЕМПОТЕНТНОСТЬ. Повторный запуск не создаёт вторых записей: перед
 // вставкой проверяется, нет ли уже источника с той же ссылкой.
@@ -50,17 +61,9 @@ async function запрос<T>(схема: 'public' | 'care', метод: string
   return текст ? (JSON.parse(текст) as T[]) : []
 }
 
-type Дело = { id: string; client_id: number }
-type Сообщение = {
-  id: string
-  client_id: number
-  direction: string
-  sender_name: string | null
-  sender_role: string | null
-  content: string | null
-  tg_chat_id: number | null
-  created_at: string
-}
+type Дело = { id: string; client_id: number; synthetic: boolean }
+type Контакт = { case_id: string; tg_chat_id: number | null; name: string }
+type Чат = { chat_id: string; title: string; first_at: string; last_at: string; message_count: number }
 
 async function main() {
   if (!SUPA || !ANON || !KEY) {
@@ -71,17 +74,33 @@ async function main() {
   const писать = process.argv.includes('--применить')
   const дней = Number(аргумент('дней') ?? 90)
   const одноДело = аргумент('дело')
-  const граница = new Date(Date.now() - дней * 86_400_000).toISOString()
 
   const дела = await запрос<Дело>(
     'care',
     'GET',
-    `cases?select=id,client_id${одноДело ? `&id=eq.${одноДело}` : ''}`
+    `cases?select=id,client_id,is_synthetic&is_synthetic=eq.false${одноДело ? `&id=eq.${одноДело}` : ''}`
   )
   if (!дела.length) {
     console.log('Дел нет. Сначала заведи их — scripts/care/import-cases.ts')
     return
   }
+
+  const контакты = await запрос<Контакт>(
+    'care',
+    'GET',
+    `contacts?select=case_id,tg_chat_id,name&kind=eq.student&case_id=in.(${дела.map((д) => д.id).join(',')})`
+  )
+  const чатПоДелу = new Map(
+    контакты.filter((к) => к.tg_chat_id != null).map((к) => [к.case_id, String(к.tg_chat_id)])
+  )
+  const имяПоДелу = new Map(контакты.map((к) => [к.case_id, к.name]))
+
+  const чаты = await запрос<Чат>(
+    'care',
+    'GET',
+    'group_chats?select=chat_id,title,first_at,last_at,message_count'
+  )
+  const чатПоId = new Map(чаты.map((ч) => [ч.chat_id, ч]))
 
   console.log(`\n${писать ? 'ПРИМЕНЯЮ' : 'ПРЕДПРОСМОТР'} · глубина ${дней} дней · дел ${дела.length}\n`)
 
@@ -89,52 +108,49 @@ async function main() {
   let пропущено = 0
 
   for (const дело of дела) {
-    // Читаем только зеркало для кабинета куратора: в нём сообщения уже
-    // привязаны к клиенту. deal_messages привязаны к сделке, и связать их с
-    // делом можно только через chat_id — это следующий шаг, когда привязки
-    // проставлены link-chats.ts.
-    const сообщения = await запрос<Сообщение>(
-      'public',
-      'GET',
-      `client_tg_messages?select=id,client_id,direction,sender_name,sender_role,content,tg_chat_id,created_at` +
-        `&client_id=eq.${дело.client_id}&created_at=gte.${граница}&order=created_at.asc`
-    )
+    const подпись = (имяПоДелу.get(дело.id) ?? `#${дело.client_id}`).slice(0, 24).padEnd(26)
+    const chatId = чатПоДелу.get(дело.id)
 
-    if (!сообщения.length) {
-      console.log(`  = дело ${дело.id.slice(0, 8)} (клиент ${дело.client_id}) — сообщений за период нет`)
+    if (!chatId) {
+      console.log(`  ✗ ${подпись} группа не привязана — сначала link-chats.ts`)
       пропущено += 1
       continue
     }
 
-    // Один источник на переписку, а не на каждое сообщение. Источник отвечает
-    // на вопрос «откуда сведения», и ответ «из переписки с 1 июня по 5 августа,
-    // 87 сообщений» точнее и полезнее, чем 87 одинаковых строк.
-    const первое = сообщения[0]
-    const последнее = сообщения[сообщения.length - 1]
+    const чат = чатПоId.get(chatId)
+    if (!чат) {
+      console.log(`  ✗ ${подпись} по чату ${chatId} переписки не нашлось`)
+      пропущено += 1
+      continue
+    }
+
+    if (new Date(чат.last_at).getTime() < Date.now() - дней * 86_400_000) {
+      console.log(`  = ${подпись} последнее сообщение ${чат.last_at.slice(0, 10)} — старше окна`)
+      пропущено += 1
+      continue
+    }
+
     const ссылка = {
-      kind: 'client_tg_messages',
-      client_id: дело.client_id,
-      tg_chat_id: последнее.tg_chat_id,
-      from: первое.created_at,
-      to: последнее.created_at,
-      count: сообщения.length,
-      first_id: первое.id,
-      last_id: последнее.id,
+      kind: 'telegram_group',
+      chat_id: chatId,
+      title: чат.title,
+      from: чат.first_at,
+      to: чат.last_at,
+      count: чат.message_count,
     }
 
     const уже = await запрос<{ id: string }>(
       'care',
       'GET',
-      `sources?select=id&case_id=eq.${дело.id}&kind=eq.message&ref->>last_id=eq.${последнее.id}`
+      `sources?select=id&case_id=eq.${дело.id}&kind=eq.message&ref->>chat_id=eq.${chatId}`
     )
     if (уже.length) {
-      console.log(`  = дело ${дело.id.slice(0, 8)} — уже перенесено (${сообщения.length} сообщ.)`)
+      console.log(`  = ${подпись} уже перенесено (${чат.message_count} сообщ.)`)
       continue
     }
 
     console.log(
-      `  + дело ${дело.id.slice(0, 8)} (клиент ${дело.client_id}) — ${сообщения.length} сообщ., ` +
-        `${первое.created_at.slice(0, 10)} … ${последнее.created_at.slice(0, 10)}`
+      `  + ${подпись} ${чат.message_count} сообщ., ${чат.first_at.slice(0, 10)} … ${чат.last_at.slice(0, 10)}`
     )
 
     if (писать) {
@@ -142,11 +158,12 @@ async function main() {
         case_id: дело.id,
         kind: 'message',
         ref: ссылка,
-        captured_at: последнее.created_at,
+        captured_at: чат.last_at,
         available: true,
         note:
-          `История из действующей CRM: ${сообщения.length} сообщений. ` +
-          `Care-бот эту переписку не видел — Bot API историю до добавления не отдаёт.`,
+          `Переписка в группе «${чат.title}»: ${чат.message_count} сообщений с ` +
+          `${чат.first_at.slice(0, 10)} по ${чат.last_at.slice(0, 10)}. ` +
+          `Care-бот её не видел — Bot API историю до добавления не отдаёт.`,
       })
       await запрос('care', 'POST', 'events', {
         actor_kind: 'system',
@@ -162,8 +179,8 @@ async function main() {
 
   console.log(`\nИтого: ${писать ? 'перенесено' : 'будет перенесено'} ${перенесено}, пропущено ${пропущено}`)
   if (!писать) console.log('Это предпросмотр. Чтобы записать, добавь --применить')
-  console.log('\nСами сообщения не копируются — переносятся ссылки на них. Текст остаётся')
-  console.log('в рабочей таблице, и дубликат не придётся держать в согласии с оригиналом.')
+  console.log('\nСами сообщения не копируются: переносится запись об их существовании —')
+  console.log('чат, период и количество. Текст переписки контуру пока не выдан.')
 }
 
 main().catch((e) => {

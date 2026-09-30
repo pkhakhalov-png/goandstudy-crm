@@ -50,41 +50,43 @@ async function запрос<T>(схема: 'public' | 'care', метод: string
 
 type Дело = { id: string; client_id: number }
 type Контакт = { id: string; case_id: string; kind: string; name: string; tg_chat_id: number | null }
-type Сообщение = { metadata: { tgChatId?: string; chatTitle?: string; chatType?: string } | null; created_at: string }
+type Группа = { chat_id: string; title: string; last_at: string; message_count: number }
 
-/** Группы из переписки сделок: chat_id → название и дата последнего сообщения. */
+/**
+ * Группы Телеграма из представления `care.group_chats`.
+ *
+ * Не из `public.deal_messages` напрямую: та таблица роли контура не выдана,
+ * и правильно — там вся переписка воронки продаж. Представление отдаёт
+ * четыре поля и ни строчки текста (миграция care/009).
+ */
 async function собратьГруппы() {
-  const группы = new Map<string, { название: string; последнее: string }>()
-  // Страницами: сообщений десятки тысяч, одним запросом их брать незачем.
-  const размер = 1000
-  for (let сдвиг = 0; ; сдвиг += размер) {
-    const порция = await запрос<Сообщение>(
-      'public',
-      'GET',
-      `deal_messages?select=metadata,created_at&metadata->>chatType=in.(group,supergroup)&order=created_at.desc&limit=${размер}&offset=${сдвиг}`
-    )
-    for (const с of порция) {
-      const id = с.metadata?.tgChatId
-      const название = с.metadata?.chatTitle
-      if (!id || !название) continue
-      // Идём от новых к старым, поэтому первое встреченное — самое свежее.
-      if (!группы.has(id)) группы.set(id, { название, последнее: с.created_at })
-    }
-    if (порция.length < размер) break
-  }
-  return группы
+  const строки = await запрос<Группа>(
+    'care',
+    'GET',
+    'group_chats?select=chat_id,title,last_at,message_count&order=message_count.desc'
+  )
+  return new Map(строки.map((г) => [г.chat_id, г]))
 }
 
-/** Совпадение строгое: и имя, и фамилия. Иначе — не совпадение. */
+/**
+ * Совпадение строгое: в названии группы есть и имя, и фамилия.
+ *
+ * Обе части обязательны. По одному имени совпадений втрое больше, но среди
+ * них ложные: «Александр Потапов» попадает на «Александру Яшникову». Чужая
+ * переписка в карточке клиента — утечка, а не неудобство.
+ *
+ * Требование к длине — к самой длинной части, а не к обеим. Иначе «Ян
+ * Уступс» не сопоставится: «Ян» это две буквы, хотя «Уступс» в названии
+ * стоит и ошибиться тут не на чем.
+ */
 function подходит(имяКлиента: string, названиеГруппы: string): boolean {
-  const части = имяКлиента.trim().split(/\s+/).filter((ч) => ч.length >= 4)
+  const части = имяКлиента.trim().split(/\s+/).filter(Boolean).slice(0, 2)
   if (части.length < 2) return false
-  const н = названиeНижний(названиеГруппы)
-  return части.slice(0, 2).every((ч) => н.includes(ч.toLowerCase()))
-}
-
-function названиeНижний(s: string): string {
-  return s.toLowerCase()
+  // Хотя бы одна часть должна быть достаточно редкой, чтобы не ловить всё
+  // подряд: два коротких слова совпадут слишком со многим.
+  if (!части.some((ч) => ч.length >= 5)) return false
+  const н = названиеГруппы.toLowerCase()
+  return части.every((ч) => н.includes(ч.toLowerCase()))
 }
 
 async function main() {
@@ -96,10 +98,12 @@ async function main() {
   const писать = process.argv.includes('--применить')
   const одноДело = аргумент('дело')
 
+  // Синтетические дела пропускаем молча: клиента в рабочей таблице у них нет
+  // по построению, и группы тоже — ругаться тут не на что.
   const дела = await запрос<Дело>(
     'care',
     'GET',
-    `cases?select=id,client_id${одноДело ? `&id=eq.${одноДело}` : ''}`
+    `cases?select=id,client_id&is_synthetic=eq.false${одноДело ? `&id=eq.${одноДело}` : ''}`
   )
   if (!дела.length) {
     console.log('Дел нет. Сначала заведи их — scripts/care/import-cases.ts')
@@ -148,7 +152,7 @@ async function main() {
       continue
     }
 
-    const совпавшие = [...группы.entries()].filter(([, г]) => подходит(имя, г.название))
+    const совпавшие = [...группы.entries()].filter(([, г]) => подходит(имя, г.title))
 
     if (совпавшие.length === 0) {
       console.log(`  ✗ ${подпись} группа не найдена по ФИО`)
@@ -158,13 +162,13 @@ async function main() {
     if (совпавшие.length > 1) {
       // Несколько групп на одного человека — не повод выбрать любую.
       console.log(`  ? ${подпись} найдено ${совпавшие.length} групп, нужен человек:`)
-      for (const [id, г] of совпавшие.slice(0, 4)) console.log(`        ${id}  ${г.название.slice(0, 50)}`)
+      for (const [id, г] of совпавшие.slice(0, 4)) console.log(`        ${id}  ${г.title.slice(0, 50)}`)
       пропущено += 1
       continue
     }
 
     const [chatId, группа] = совпавшие[0]
-    console.log(`  + ${подпись} ${группа.название.slice(0, 44)}  (${chatId})`)
+    console.log(`  + ${подпись} ${группа.title.slice(0, 40)}  ${группа.message_count} сообщ.`)
 
     if (писать) {
       await запрос('care', 'PATCH', `contacts?id=eq.${контакт.id}`, { tg_chat_id: Number(chatId) })
@@ -172,7 +176,7 @@ async function main() {
         actor_kind: 'system',
         case_id: дело.id,
         action: 'chat_linked',
-        after: { tg_chat_id: chatId, title: группа.название },
+        after: { tg_chat_id: chatId, title: группа.title, messages: группа.message_count },
         source: { script: 'scripts/care/link-chats.ts', match: 'фамилия+имя в названии' },
         reason: 'привязка группы по совпадению ФИО',
       })

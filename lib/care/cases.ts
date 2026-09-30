@@ -168,6 +168,7 @@ export type ПодробностиДела = {
   задачи: { id: string; title: string; status: string; waiting_on: string; due_on: string | null; next_check_on: string | null }[]
   документы: { id: string; doc_type: string | null; file_name: string | null; status: string | null; uploaded_at: string | null }[]
   сообщений: number
+  источники: { id: string; kind: string; ref: Record<string, unknown>; note: string | null; captured_at: string; available: boolean }[]
   журнал: { id: string; action: string; actor_kind: string; created_at: string; reason: string | null }[]
 }
 
@@ -191,7 +192,7 @@ export async function подробностиДела(участник: Учас�
 
   const запись = дело as ЗаписьДела
 
-  const [контакты, факты, задачи, журнал, клиенты, документы, сообщения] = await Promise.all([
+  const [контакты, факты, задачи, журнал, клиенты, документы, сообщения, источники] = await Promise.all([
     базаCare().from('contacts').select('id, kind, name, tg_chat_id, phone, email, can_decide').eq('case_id', caseId).order('kind'),
     базаCare().from('facts').select('id, field, value, unit, currency, status, is_plan, quote, version, created_at').eq('case_id', caseId).order('field'),
     базаCare().from('tasks').select('id, title, status, waiting_on, due_on, next_check_on').eq('case_id', caseId).order('due_on', { nullsFirst: false }),
@@ -206,6 +207,11 @@ export async function подробностиДела(участник: Учас�
     запись.is_synthetic
       ? Promise.resolve({ data: [] })
       : базаPublic().from('client_tg_messages').select('id').eq('client_id', запись.client_id),
+    базаCare()
+      .from('sources')
+      .select('id, kind, ref, note, captured_at, available')
+      .eq('case_id', caseId)
+      .order('captured_at', { ascending: false }),
   ])
 
   const { data: полныйКлиент } = запись.is_synthetic
@@ -227,6 +233,7 @@ export async function подробностиДела(участник: Учас�
     задачи: (задачи.data ?? []) as ПодробностиДела['задачи'],
     документы: (документы.data ?? []) as ПодробностиДела['документы'],
     сообщений: (сообщения.data ?? []).length,
+    источники: (источники.data ?? []) as ПодробностиДела['источники'],
     журнал: (журнал.data ?? []) as ПодробностиДела['журнал'],
   }
 }

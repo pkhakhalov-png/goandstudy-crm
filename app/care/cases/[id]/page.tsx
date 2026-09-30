@@ -110,8 +110,8 @@ export default async function ДелоСтраница({ params }: { params: Pro
                 <span style={{ fontWeight: 600 }}>{д.документы.length}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>Переписка</span>
-                <span style={{ fontWeight: 600 }}>{д.сообщений}</span>
+                <span>Источники</span>
+                <span style={{ fontWeight: 600 }}>{д.источники.length}</span>
               </div>
             </div>
           </div>
@@ -254,6 +254,41 @@ export default async function ДелоСтраница({ params }: { params: Pro
                     </div>
                   </div>
                 ))
+              )}
+            </div>
+          </section>
+
+          <section className="care-sec">
+            <div className="care-sec-head">
+              <h2 className="ds-label" style={{ margin: 0 }}>
+                Переписка и источники
+              </h2>
+              <span className="care-sec-count">{д.источники.length}</span>
+            </div>
+            <div className="ds-card">
+              {д.источники.length === 0 ? (
+                <p style={{ fontSize: 13, color: 'var(--ds-muted)', margin: 0 }}>
+                  Источников нет. Переписка переносится скриптом import-history.
+                </p>
+              ) : (
+                д.источники.map((и) => {
+                  const ссылка = и.ref as { title?: string; count?: number; from?: string; to?: string }
+                  return (
+                    <div key={и.id} className="care-fact">
+                      <div style={{ fontSize: 14, fontWeight: 500 }}>
+                        {ссылка.title ?? (и.kind === 'meeting' ? 'Встреча' : 'Источник')}
+                      </div>
+                      <div style={{ fontSize: 12, color: 'var(--ds-muted)', marginTop: 2 }}>
+                        {ссылка.count != null && `${ссылка.count} сообщений`}
+                        {ссылка.from && ссылка.to && (
+                          <> · {ссылка.from.slice(0, 10)} — {ссылка.to.slice(0, 10)}</>
+                        )}
+                        {!и.available && ' · первоисточник недоступен'}
+                      </div>
+                      {и.note && <div className="care-fact-src">{и.note}</div>}
+                    </div>
+                  )
+                })
               )}
             </div>
           </section>
