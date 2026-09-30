@@ -74,6 +74,10 @@ export async function спроситьПомощника(
       .from('assignments')
       .update({
         status: ответ.отказ ? 'failed' : 'done',
+        // Ответ сохраняется вместе со стоимостью. Без него разговор жил только
+        // в браузере: обновил страницу — и нет ни вопроса, ни ответа, за
+        // который уже заплачено.
+        answer: ответ.текст,
         cost_ledger: {
           модель: ответ.расходы[0]?.модель ?? null,
           шагов: ответ.шагов,
@@ -99,4 +103,49 @@ export async function спроситьПомощника(
     console.error('[care помощник]', текст)
     return { ok: false, ошибка: текст }
   }
+}
+
+export type Реплика = {
+  id: string
+  вопрос: string
+  ответ: string
+  долларов: number
+  когда: string
+}
+
+/**
+ * Последние разговоры с помощником — чтобы панель переживала обновление страницы.
+ *
+ * Берём по области: на карточке дела — разговоры об этом деле, на главной —
+ * те, что задавались обо всех. Смешивать нельзя: ответ про одного клиента,
+ * всплывший в карточке другого, читается как ошибка в данных.
+ */
+export async function историяПомощника(caseId: string | null, сколько = 12): Promise<Реплика[]> {
+  const сессия = await сессияКонтура()
+  if (!сессия?.участник || !сессия.интерфейсОткрыт) return []
+
+  const { data } = await базаCare()
+    .from('assignments')
+    .select('id, prompt, answer, scope, cost_ledger, created_at, status')
+    .eq('initiator_member_id', сессия.участник.id)
+    .eq('status', 'done')
+    .not('answer', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(60)
+
+  const свои = (data ?? []).filter((з) => {
+    const область = (з.scope ?? {}) as { case_ids?: string[]; все_мои?: boolean }
+    return caseId ? область.case_ids?.includes(caseId) : область.все_мои === true
+  })
+
+  return свои
+    .slice(0, сколько)
+    .reverse()
+    .map((з) => ({
+      id: з.id as string,
+      вопрос: з.prompt as string,
+      ответ: (з.answer as string) ?? '',
+      долларов: Number((з.cost_ledger as { итого_долларов?: number })?.итого_долларов ?? 0),
+      когда: з.created_at as string,
+    }))
 }

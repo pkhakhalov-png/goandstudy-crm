@@ -17,6 +17,7 @@ import { подробностиДела, коллегиДляПередачи } 
 import { подписьПоля, подписьЗначения, периодПоля, подписьСтатуса, подписьОжидания, срок, инициалы, склонение } from '@/lib/care/labels'
 import { CaseAssistant, NewTask, TaskActions, FactActions, TransferCase } from './CaseOperations'
 import { AssistantPanel } from '../../AssistantPanel'
+import { историяПомощника } from '../../assistant-actions'
 import { флагВключён } from '@/lib/care/flags'
 
 export const dynamic = 'force-dynamic'
@@ -36,6 +37,11 @@ export default async function ДелоСтраница({ params }: { params: Pro
   if (!д) notFound()
 
   const черновиков = д.факты.filter((ф) => ф.status === 'draft').length
+
+  // Отклонённое и заменённое — это не то, что известно. Куратор уже сказал по
+  // ним «нет»; показывать их в списке сведений значит спорить с его решением
+  // и засорять экран, на котором он ищет текущую картину.
+  const известное = д.факты.filter((ф) => ф.status === 'confirmed' || ф.status === 'draft')
   const открытыхЗадач = д.задачи.filter((з) => з.status !== 'done' && з.status !== 'failed').length
 
   return (
@@ -94,7 +100,7 @@ export default async function ДелоСтраница({ params }: { params: Pro
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span>Что известно</span>
                 <span style={{ fontWeight: 600 }}>
-                  {д.факты.length}
+                  {известное.length}
                   {черновиков > 0 && (
                     <span style={{ color: 'var(--ds-ai)', marginLeft: 5 }} title="не подтверждено">
                       ●{черновиков}
@@ -128,12 +134,12 @@ export default async function ДелоСтраница({ params }: { params: Pro
               </span>
             </div>
             <div className="ds-card">
-              {д.факты.length === 0 ? (
+              {известное.length === 0 ? (
                 <p style={{ fontSize: 13, color: 'var(--ds-muted)', margin: 0 }}>
                   Пока ничего не записано. Факты появятся, когда помощник разберёт встречу.
                 </p>
               ) : (
-                д.факты.map((ф) => (
+                известное.map((ф) => (
                   <div key={ф.id} className="care-fact">
                     <div className="care-fact-name">{подписьПоля(ф.field)}</div>
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
@@ -468,7 +474,8 @@ export default async function ДелоСтраница({ params }: { params: Pro
             caseId={id}
             областьПодпись={д.имяКлиента}
             доступен={помощникВключён}
-            подсказки={['Что здесь требует решения?', 'Чего не хватает по этому делу?', 'Что ближе всего по срокам?']}
+            подсказки={['Сделай подборку программ', 'Что здесь требует решения?', 'Чего не хватает по этому делу?']}
+            история={await историяПомощника(id)}
           />
         </aside>
       </div>

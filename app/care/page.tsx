@@ -15,6 +15,7 @@ import { сводка } from '@/lib/care/ai/summary'
 import { флагВключён } from '@/lib/care/flags'
 import { инициалы, склонение } from '@/lib/care/labels'
 import { AssistantPanel } from './AssistantPanel'
+import { историяПомощника } from './assistant-actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -178,6 +179,7 @@ export default async function ГлавнаяСтраница() {
               областьПодпись="Все мои клиенты"
               доступен={помощникВключён}
               подсказки={['Что сегодня важнее всего?', 'Кто давно молчит?', 'Где мы работаем вслепую?']}
+              история={await историяПомощника(null)}
             />
           </div>
         </>
