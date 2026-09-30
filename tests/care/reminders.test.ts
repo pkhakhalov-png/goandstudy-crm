@@ -23,6 +23,7 @@ import { базаCare } from '@/lib/care/db'
 import { воротаОтправки, поставитьВОчередь, версияДанных, свежесть, получательДела } from '@/lib/care/gate/outbound'
 import { подставить, подготовитьНапоминания } from '@/lib/care/jobs/reminders'
 import { режим } from '@/lib/care/mode'
+import { проверитьТекст } from '@/lib/care/ai/reminder'
 import { флагВключён } from '@/lib/care/flags'
 
 let участникId = ''
@@ -30,6 +31,8 @@ let делоId = ''
 let задачаId = ''
 
 const черезДва = new Date(Date.now() + 2 * 86_400_000).toISOString().slice(0, 10)
+/** Тот же вид даты, что кладёт в текст правило: «2 октября». */
+const новыйСрокСловами = new Date(черезДва).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })
 
 beforeAll(async () => {
   const { data: у } = await базаCare()
@@ -77,6 +80,10 @@ beforeAll(async () => {
 })
 
 afterAll(async () => {
+  // Расход на модель удаляем до дела: у `ai_spend.case_id` внешний ключ с
+  // `set null`, и после удаления дела строку уже не найти по делу. Тестовый
+  // вызов не должен съедать дневной потолок боевого контура.
+  if (делоId) await базаCare().from('ai_spend').delete().eq('case_id', делоId)
   if (делоId) await базаCare().from('cases').delete().eq('id', делоId)
   if (участникId) await базаCare().from('members').delete().eq('id', участникId)
 })
@@ -143,17 +150,36 @@ describe('T06 — напоминание готовится, но не отпр�
     expect((data ?? []).length).toBe(1)
   })
 
-  it('текст содержит имя, документ и дату', async () => {
+  it('текст годен к отправке, кем бы он ни был написан', async () => {
+    // Текст пишет модель, а когда она недоступна или ответила негодно —
+    // шаблон. Проверяем то, что обязано выполняться в обоих случаях, а не
+    // формулировку: сверять текст модели дословно значит проверять её
+    // сегодняшнее настроение.
     const { data } = await базаCare()
       .from('proposals')
       .select('payload')
       .eq('case_id', делоId)
       .eq('kind', 'reminder')
       .limit(1)
-    const текст = (data![0].payload as { текст: string }).текст
+
+    const payload = data![0].payload as { текст: string; чем: 'модель' | 'шаблон' }
+    const текст = payload.текст
+
+    expect(['модель', 'шаблон']).toContain(payload.чем)
     expect(текст).toContain('Иван')
-    expect(текст).toContain('Перевод диплома')
-    expect(текст.length).toBeGreaterThan(20)
+    // Название документа модель склоняет и пишет со строчной — это правильно
+    // внутри фразы. Сверяем без учёта регистра.
+    expect(текст.toLowerCase()).toContain('перевод диплома')
+
+    const проверка = проверитьТекст(текст, {
+      имя: 'Иван Тестов',
+      документ: 'Перевод диплома',
+      датаСловами: новыйСрокСловами,
+      просрочено: false,
+      напоминалиРаз: 0,
+      оКлиенте: {},
+    })
+    expect(проверка.ok).toBe(true)
   })
 })
 

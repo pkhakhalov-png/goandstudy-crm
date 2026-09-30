@@ -34,7 +34,14 @@ export default async function НапоминанияСтраница() {
     const строки = (предложения ?? []) as {
       id: string
       case_id: string
-      payload: { текст?: string; документ?: string; срок?: string; просрочено?: boolean }
+      payload: {
+        текст?: string
+        документ?: string
+        срок?: string
+        просрочено?: boolean
+        чем?: 'модель' | 'шаблон'
+        почему_шаблон?: string
+      }
       created_at: string
     }[]
 
@@ -66,6 +73,10 @@ export default async function НапоминанияСтраница() {
         срок: с.payload.срок ?? null,
         просрочено: с.payload.просрочено === true,
         текст: с.payload.текст ?? '',
+        // Предложения, подготовленные до 30.09, поля «чем» не имеют — они
+        // шаблонные по построению, и показать это честнее, чем промолчать.
+        чем: с.payload.чем === 'модель' ? 'модель' : 'шаблон',
+        почемуШаблон: с.payload.почему_шаблон ?? null,
         подготовлено: с.created_at,
       }))
     }
