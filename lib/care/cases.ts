@@ -52,7 +52,7 @@ type ЗаписьДела = {
 }
 
 /** Имена клиентов одним запросом: по одному на экран, а не на строку. */
-async function клиентыПоId(идентификаторы: number[]) {
+export async function клиентыПоId(идентификаторы: number[]) {
   if (!идентификаторы.length) return new Map<number, { name: string | null; country: string | null; current_stage_code: string | null }>()
   const { data, error } = await базаPublic()
     .from('clients')

@@ -17,6 +17,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { взятьЗадания, закрытьЗадание, сохранитьПрогресс, type Задание } from '@/lib/care/jobs/claim'
 import { подготовитьНапоминания } from '@/lib/care/jobs/reminders'
 import { отправитьОчередь } from '@/lib/care/jobs/send'
+import { разобратьПереписку } from '@/lib/care/jobs/extract'
 import { необязательна } from '@/lib/care/env'
 import { секретГодится, секретыСовпали } from '@/lib/care/secret'
 
@@ -44,6 +45,20 @@ const ОБРАБОТЧИКИ: Record<string, (з: Задание, воркер: 
   /** Подготовить напоминания. Ничего не отправляет — создаёт предложения. */
   async prepare_reminders() {
     const итог = await подготовитьНапоминания()
+    return { ...итог, at: new Date().toISOString() }
+  },
+
+  /**
+   * Разобрать переписку в факты.
+   *
+   * Самое дорогое задание контура — около десяти центов на дело, потому что
+   * модель читает переписку целиком. Поэтому оно ставится раз в сутки, берёт
+   * только то, что пришло с прошлого разбора, и останавливается, упёршись в
+   * дневной потолок, а не доедает его до дна.
+   */
+  async extract_facts(задание) {
+    const дело = (задание.payload as { case_id?: string }).case_id
+    const итог = await разобратьПереписку(дело)
     return { ...итог, at: new Date().toISOString() }
   },
 
