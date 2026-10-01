@@ -183,8 +183,15 @@ export function инструменты(участник: Участник, об�
       // Разные ответы рассказали бы, что оно существует.
       if (!дела.includes(case_id)) return 'Такого дела нет в вашей области.'
 
-      const [{ data: факты }, { data: задачи }, { data: заявки }, { data: источники }] = await Promise.all([
+      const [{ data: факты }, { data: подборки }, { data: задачи }, { data: заявки }, { data: источники }] =
+        await Promise.all([
         базаCare().from('facts').select('field, value, currency, status, is_plan, quote').eq('case_id', case_id),
+        базаCare()
+          .from('shortlists')
+          .select('id, version, status, created_at, share_token')
+          .eq('case_id', case_id)
+          .order('version', { ascending: false })
+          .limit(1),
         базаCare().from('tasks').select('title, status, waiting_on, due_on').eq('case_id', case_id),
         базаCare().from('applications').select('program_ref, status').eq('case_id', case_id),
         базаCare().from('sources').select('kind, ref, note').eq('case_id', case_id),
@@ -207,6 +214,16 @@ export function инструменты(участник: Участник, об�
         })),
         заявки: (заявки ?? []).map((з) => ({ программа: з.program_ref, статус: з.status })),
         источники: (источники ?? []).map((и) => ({ вид: и.kind, что: и.note })),
+        // Без этого помощник предлагает собрать подборку, которая уже собрана
+        // пять минут назад, — и выглядит это как забывчивость.
+        подборка: (подборки ?? [])[0]
+          ? {
+              версия: (подборки ?? [])[0].version,
+              состояние: (подборки ?? [])[0].status,
+              собрана: String((подборки ?? [])[0].created_at).slice(0, 10),
+              отдана_клиенту: Boolean((подборки ?? [])[0].share_token),
+            }
+          : null,
       })
     },
   })
@@ -696,6 +713,95 @@ export function инструменты(участник: Участник, об�
     },
   })
 
+  const написатьСтратегиюДела = betaTool({
+    name: 'write_strategy',
+    description:
+      'Написать стратегию поступления по делу и сохранить её черновиком в карточку. ' +
+      'Используй, когда куратор просит стратегию, план поступления или «что мы делаем по этому клиенту». ' +
+      'Текст в чате живёт только в разговоре — в карточке он остаётся и его видно всей команде.',
+    inputSchema: {
+      type: 'object',
+      properties: { case_id: { type: 'string' } },
+      required: ['case_id'],
+      additionalProperties: false,
+    },
+    run: async ({ case_id }) => {
+      const дела = await список()
+      if (!дела.includes(case_id)) return 'Такого дела нет в вашей области.'
+
+      const { написатьСтратегию } = await import('./strategy')
+      const { можноТратить, записатьРасход } = await import('./budget')
+      const { подписьПоля, подписьЗначения, подписьОжидания, подписьСтатуса } = await import('../labels')
+
+      const потолок = await можноТратить('review')
+      if (!потолок.можно) return `Стратегию сейчас не написать: ${потолок.почему}`
+
+      const [{ data: факты }, { data: задачи }, { data: подборки }] = await Promise.all([
+        базаCare().from('facts').select('field, value, currency, is_plan').eq('case_id', case_id).eq('status', 'confirmed'),
+        базаCare()
+          .from('tasks')
+          .select('title, due_on, waiting_on, status')
+          .eq('case_id', case_id)
+          .not('status', 'in', '("done","failed")'),
+        базаCare().from('shortlists').select('id').eq('case_id', case_id).order('version', { ascending: false }).limit(1),
+      ])
+
+      let подборка: { вуз: string; программа: string; страна: string; стоимость: string; ссылка: string }[] = []
+      if ((подборки ?? [])[0]) {
+        const { data: строки } = await базаCare()
+          .from('shortlist_items')
+          .select('program_ref, tuition_amount, currency')
+          .eq('shortlist_id', (подборки ?? [])[0].id)
+          .order('position')
+        подборка = (строки ?? []).map((с) => {
+          const ref = (с.program_ref ?? {}) as Record<string, string>
+          return {
+            вуз: ref.вуз ?? '',
+            программа: ref.программа ?? '',
+            страна: ref.страна ?? '',
+            стоимость: с.tuition_amount ? `${с.tuition_amount} ${с.currency ?? ''}`.trim() : 'не указана',
+            ссылка: ref.ссылка ?? '',
+          }
+        })
+      }
+
+      const имена = await именаДел([case_id])
+      const итог = await написатьСтратегию({
+        клиент: имена.get(case_id) ?? 'клиент',
+        факты: (факты ?? []).map((ф) => ({
+          поле: подписьПоля(ф.field as string),
+          значение: `${подписьЗначения(ф.field as string, ф.value)}${ф.currency ? ` ${ф.currency}` : ''}`,
+          намерение: ф.is_plan as boolean,
+        })),
+        задачи: (задачи ?? []).map((з) => ({
+          название: з.title as string,
+          срок: (з.due_on as string | null) ?? null,
+          ждём: подписьОжидания(з.waiting_on as string),
+          статус: подписьСтатуса(з.status as string),
+        })),
+        подборка,
+        изПереписки: [],
+      })
+
+      if (итог.расход) await записатьРасход('review', итог.расход, { caseId: case_id, пометка: 'стратегия из чата' })
+      if (итог.ошибка || !итог.текст) return `Не вышло: ${итог.ошибка ?? 'помощник не написал стратегию'}`
+
+      await базаCare().from('proposals').insert({
+        case_id,
+        kind: 'other',
+        payload: { вид: 'strategy', текст: итог.текст },
+        payload_hash: String(итог.текст.length),
+        data_version: new Date().toISOString().slice(0, 10),
+        status: 'pending',
+      })
+
+      return (
+        'Стратегия написана и лежит в карточке, раздел «Подборка и стратегия», черновиком.\n\n' +
+        итог.текст
+      )
+    },
+  })
+
   return [
     делаКратко,
     сводкаДела,
@@ -708,5 +814,6 @@ export function инструменты(участник: Участник, об�
     записатьФакт,
     снятьНамерение,
     завестиЗадачу,
+    написатьСтратегиюДела,
   ]
 }

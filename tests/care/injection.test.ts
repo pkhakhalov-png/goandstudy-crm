@@ -181,6 +181,7 @@ describe('T19 — исполнять просьбу «отправь» помо�
       'mark_decision',
       'pending_decisions',
       'set_fact',
+      'write_strategy',
     ])
   })
 
@@ -218,7 +219,7 @@ describe('T19 — исполнять просьбу «отправь» помо�
     const таблицы = [...исходник.matchAll(/\.from\('([a-z_]+)'\)[\s\S]{0,400}?\.(insert|update)\(/g)].map(
       (м) => м[1]
     )
-    expect([...new Set(таблицы)].sort()).toEqual(['events', 'facts', 'sources', 'tasks'])
+    expect([...new Set(таблицы)].sort()).toEqual(['events', 'facts', 'proposals', 'sources', 'tasks'])
 
     // Удалять нечего и нечем: откатывать ошибку помощника должен человек,
     // а не он сам.
