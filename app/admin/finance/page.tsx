@@ -2,13 +2,14 @@ import Link from 'next/link'
 import { viewer } from '@/lib/auth/viewer'
 import { formatMinor, formatMinorPlain, toRubEquivalent, type Currency } from '@/lib/finance/money'
 import {
-  balances, currentRate, dailyFlow, financeAccess, listAccounts, listCategories,
+  balances, categoryBreakdown, currentRate, dailyFlow, financeAccess, listAccounts, listCategories,
   listCounterparties, listTransactions, periodTotals, KIND_NAMES, type TxRow,
 } from '@/lib/finance/service'
 import { AddOperation } from './AddOperation'
 import { ReverseForm } from './ReverseForm'
 import { CategoryPicker } from './CategoryPicker'
 import { FlowChart } from './FlowChart'
+import { CategoryDonuts } from './CategoryDonuts'
 
 export const dynamic = 'force-dynamic'
 
@@ -66,7 +67,7 @@ export default async function FinancePage(
   // подразумевается.
   const окно = разобратьПериод(period)
 
-  const [bal, totals, rate, txs, categories, counterparties, поток] = await Promise.all([
+  const [bal, totals, rate, txs, categories, counterparties, поток, разрез] = await Promise.all([
     balances(),
     periodTotals(окно.от.toISOString(), окно.до.toISOString()),
     currentRate(),
@@ -75,6 +76,9 @@ export default async function FinancePage(
     listCategories(),
     listCounterparties(),
     dailyFlow(окно.от.toISOString(), окно.до.toISOString()),
+    // Разрез по категориям — пока только по рублям: долларовых операций
+    // немного, и второй набор кругов занял бы экран ради нескольких долей.
+    categoryBreakdown(окно.от.toISOString(), окно.до.toISOString(), 'RUB'),
   ])
 
   const hasUsd = bal.some((b) => b.currency === 'USD' && b.balance_minor !== 0)
@@ -148,6 +152,8 @@ export default async function FinancePage(
         <Период окно={окно} />
 
         <FlowChart данные={поток} />
+
+        <CategoryDonuts разрез={разрез} валюта="RUB" />
 
         <div style={{ margin: '4px 0 14px' }}>
           <AddOperation

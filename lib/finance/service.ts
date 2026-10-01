@@ -274,6 +274,93 @@ export async function dailyFlow(from: string, to: string): Promise<Record<Curren
 }
 
 /**
+ * Разрез по категориям — для круговых диаграмм.
+ *
+ * Доходы и расходы считаются отдельно и рисуются двумя диаграммами. Свести их
+ * в одну нельзя: доля категории в круге отвечает на вопрос «из чего состоит
+ * это целое», а поступления и траты — два разных целых. В общем круге
+ * «Зарплаты» заняли бы долю от суммы всех денег, которая ничего не значит.
+ *
+ * Правило раскладки то же, что в dailyFlow и periodTotals: по виду операции, а
+ * не по знаку суммы, и без переводов между своими счетами.
+ *
+ * Цвет категории не зависит от выбранного периода. Порядок цветов берётся из
+ * оборота ЗА ВСЁ ВРЕМЯ, а не внутри периода: иначе смена месяца перекрашивала
+ * бы категории, которые никуда не делись, и сравнить два месяца глазами стало
+ * бы нельзя.
+ */
+export type CategorySlice = {
+  id: string | null
+  name: string
+  amount: number
+}
+
+export type CategoryBreakdown = {
+  income: CategorySlice[]
+  expense: CategorySlice[]
+  /** Порядок категорий по обороту за всё время — по нему назначаются цвета. */
+  порядок: string[]
+}
+
+export async function categoryBreakdown(
+  from: string, to: string, currency: Currency,
+): Promise<CategoryBreakdown> {
+  const db = await financeDb()
+
+  const собрать = async (от: string | null, до: string | null) => {
+    let q = db.from('movements')
+      .select('amount_minor, currency, transactions!inner(kind, occurred_at, status, category_id)')
+      .eq('currency', currency)
+      .neq('transactions.status', 'superseded')
+    if (от) q = q.gte('transactions.occurred_at', от)
+    if (до) q = q.lte('transactions.occurred_at', до)
+    return readAll<any>(() => q.order('id'), { label: 'movements' })
+  }
+
+  const [вПериоде, заВсёВремя] = await Promise.all([собрать(from, to), собрать(null, null)])
+
+  const имена = new Map<string, string>()
+  const { data: cats } = await db.from('categories').select('id, name')
+  for (const c of (cats ?? []) as any[]) имена.set(c.id, c.name)
+
+  const свернуть = (rows: any[]) => {
+    const доход = new Map<string, number>()
+    const расход = new Map<string, number>()
+    const всего = new Map<string, number>()
+    for (const r of rows) {
+      const kind: TxKind = r.transactions.kind
+      if (kind === 'transfer') continue
+      const ключ = r.transactions.category_id ?? ''
+      const сумма = r.amount_minor as number
+      const куда = (kind === 'income' || kind === 'refund_out') ? доход : расход
+      const вклад = куда === доход ? сумма : -сумма
+      куда.set(ключ, (куда.get(ключ) ?? 0) + вклад)
+      всего.set(ключ, (всего.get(ключ) ?? 0) + Math.abs(вклад))
+    }
+    return { доход, расход, всего }
+  }
+
+  const п = свернуть(вПериоде)
+  const в = свернуть(заВсёВремя)
+
+  const вСписок = (m: Map<string, number>): CategorySlice[] =>
+    [...m.entries()]
+      .filter(([, v]) => v > 0)
+      .map(([id, amount]) => ({
+        id: id || null,
+        name: id ? (имена.get(id) ?? 'Категория удалена') : 'Без категории',
+        amount,
+      }))
+      .sort((a, b) => b.amount - a.amount)
+
+  return {
+    income: вСписок(п.доход),
+    expense: вСписок(п.расход),
+    порядок: [...в.всего.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id || ''),
+  }
+}
+
+/**
  * Текущий справочный курс.
  *
  * Нужен только для строки «всего», где два остатка сводятся в одно число: для
