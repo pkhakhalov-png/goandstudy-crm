@@ -81,7 +81,7 @@ export async function проверитьТребованияПодборки(
     .from('shortlist_items')
     .select('id, program_ref, unresolved, fit_notes')
     .eq('shortlist_id', shortlistId)
-    .order('position')
+    .order('position').order('created_at')
 
   if (!строки?.length) {
     итог.причины.push('в подборке нет строк')

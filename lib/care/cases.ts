@@ -290,7 +290,7 @@ async function последняяПодборка(caseId: string): Promise<По�
     .from('shortlist_items')
     .select('id, program_ref, tuition_amount, currency, fit_notes, unresolved, status, removed_reason')
     .eq('shortlist_id', подборка.id)
-    .order('position')
+    .order('position').order('created_at')
 
   return {
     id: подборка.id as string,
@@ -373,7 +373,7 @@ export async function очередьПодборок(участник: Учас�
     .from('shortlist_items')
     .select('id, shortlist_id, program_ref, tuition_amount, currency, fit_notes, unresolved, position')
     .in('shortlist_id', подборки.map((п) => п.id))
-    .order('position')
+    .order('position').order('created_at')
 
   const { data: дела } = await базаCare()
     .from('cases')

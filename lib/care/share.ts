@@ -63,7 +63,7 @@ export async function страницаПоТокену(токен: string): Prom
     .select('program_ref, tuition_amount, currency, unresolved, status')
     .eq('shortlist_id', подборка.id)
     .neq('status', 'removed')
-    .order('position')
+    .order('position').order('created_at')
 
   return {
     intro: (подборка.intro as string | null) ?? null,

@@ -502,7 +502,7 @@ export async function написатьСтратегиюДела(caseId: string)
         .from('shortlist_items')
         .select('program_ref, tuition_amount, currency')
         .eq('shortlist_id', подборки![0].id)
-        .order('position')
+        .order('position').order('created_at')
       подборка = (строки ?? []).map((с) => {
         const ref = с.program_ref as Record<string, string>
         return {
@@ -614,7 +614,7 @@ export async function опубликоватьПодборку(caseId: string, s
       .from('shortlist_items')
       .select('program_ref, tuition_amount, currency, unresolved')
       .eq('shortlist_id', shortlistId)
-      .order('position')
+      .order('position').order('created_at')
     if (!(строки ?? []).length) return { ok: false, ошибка: 'В подборке нет ни одной программы' }
 
     // Вступление необязательно: без модели страница остаётся полезной, а
@@ -774,7 +774,7 @@ export async function переставитьПрограмму(
       .select('id, position')
       .eq('shortlist_id', строка.shortlist_id)
       .neq('status', 'removed')
-      .order('position')
+      .order('position').order('created_at')
 
     const список = соседи ?? []
     const где = список.findIndex((с) => с.id === itemId)
