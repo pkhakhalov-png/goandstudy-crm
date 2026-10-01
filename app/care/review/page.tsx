@@ -33,6 +33,10 @@ export default async function НаПроверкуСтраница() {
         <Link href="/care/review/reminders" className="ds-link" style={{ fontSize: 14 }}>
           Напоминания клиентам →
         </Link>
+        {'  ·  '}
+        <Link href="/care/review/shortlists" className="ds-link" style={{ fontSize: 14 }}>
+          Подборки программ →
+        </Link>
       </p>
       <p style={{ color: 'var(--ds-muted)', marginBottom: 22, fontSize: 14 }}>
         {всего === 0

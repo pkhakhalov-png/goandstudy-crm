@@ -322,6 +322,108 @@ async function последняяСтратегия(caseId: string): Promise<П�
   }
 }
 
+/** Подборка на проверке — одна карточка очереди. */
+export type ПодборкаНаПроверку = {
+  id: string
+  caseId: string
+  имяКлиента: string
+  контекст: string
+  is_synthetic: boolean
+  version: number
+  собрана: string
+  строки: {
+    id: string
+    вуз: string
+    программа: string
+    город: string | null
+    страна: string | null
+    ссылка: string | null
+    стоимость: string | null
+    почему: string
+    проверено: { вид: string; значение: string; цитата: string }[]
+    сверка: { вид: string; вывод: string; объяснение: string }[]
+    unresolved: string[]
+  }[]
+}
+
+/**
+ * Очередь подборок, ждущих решения куратора.
+ *
+ * Та же мысль, что у напоминаний и фактов: однородная работа проверяется
+ * подряд, а не через открытие двадцати карточек. Подборка на клиента одна,
+ * и без очереди куратор про неё просто забудет — она не напоминает о себе
+ * сроком, как задача.
+ */
+export async function очередьПодборок(участник: Участник): Promise<ПодборкаНаПроверку[]> {
+  const область = await видимыеДела(участник)
+  if (область.пусто) return []
+
+  const { data: подборки, error } = await базаCare()
+    .from('shortlists')
+    .select('id, case_id, version, created_at')
+    .in('case_id', область.дела)
+    .eq('status', 'curator_review')
+    .order('created_at', { ascending: true })
+  if (error) throw new Error(`не удалось прочитать очередь подборок: ${error.message}`)
+  if (!подборки?.length) return []
+
+  const { data: строки } = await базаCare()
+    .from('shortlist_items')
+    .select('id, shortlist_id, program_ref, tuition_amount, currency, fit_notes, unresolved, position')
+    .in('shortlist_id', подборки.map((п) => п.id))
+    .order('position')
+
+  const { data: дела } = await базаCare()
+    .from('cases')
+    .select('id, client_id, intake_year, service_scope, is_synthetic, synthetic_name')
+    .in('id', подборки.map((п) => п.case_id))
+
+  const список = (дела ?? []) as ЗаписьДела[]
+  const клиенты = await клиентыПоId(список.filter((д) => !д.is_synthetic).map((д) => д.client_id))
+
+  return подборки.map((п) => {
+    const дело = список.find((д) => д.id === п.case_id)
+    const клиент = дело && !дело.is_synthetic ? клиенты.get(дело.client_id) : null
+
+    return {
+      id: п.id as string,
+      caseId: п.case_id as string,
+      имяКлиента: дело?.is_synthetic
+        ? (дело.synthetic_name ?? 'тестовое дело')
+        : (клиент?.name ?? `Клиент #${дело?.client_id ?? '?'}`),
+      контекст: [клиент?.country, дело?.service_scope, дело?.intake_year ? `набор ${дело.intake_year}` : null]
+        .filter(Boolean)
+        .join(' · '),
+      is_synthetic: дело?.is_synthetic ?? false,
+      version: п.version as number,
+      собрана: п.created_at as string,
+      строки: (строки ?? [])
+        .filter((с) => с.shortlist_id === п.id)
+        .map((с) => {
+          const ref = (с.program_ref ?? {}) as Record<string, string>
+          const заметки = (с.fit_notes ?? {}) as {
+            почему?: string
+            проверено?: { вид: string; значение: string; цитата: string }[]
+            сверка?: { вид: string; вывод: string; объяснение: string }[]
+          }
+          return {
+            id: с.id as string,
+            вуз: ref.вуз ?? '',
+            программа: ref.программа ?? '',
+            город: ref.город ?? null,
+            страна: ref.страна ?? null,
+            ссылка: ref.ссылка ?? null,
+            стоимость: с.tuition_amount ? `${с.tuition_amount} ${с.currency ?? ''}`.trim() : null,
+            почему: заметки.почему ?? '',
+            проверено: заметки.проверено ?? [],
+            сверка: заметки.сверка ?? [],
+            unresolved: (с.unresolved ?? []) as string[],
+          }
+        }),
+    }
+  })
+}
+
 export type СтрокаКоманды = {
   участникId: string
   имя: string
