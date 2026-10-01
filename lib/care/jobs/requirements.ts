@@ -19,6 +19,7 @@
 import { базаCare } from '../db'
 import { проверитьПрограмму, ПОДПИСЬ_ТРЕБОВАНИЯ, type ВидТребования } from '../ai/requirements'
 import { можноТратить, записатьРасход } from '../ai/budget'
+import { сверитьВсё, type ФактыКлиента } from '../fit'
 
 /** Сколько дней проверенное считается свежим. Меняется строкой в настройках. */
 const СВЕЖЕСТЬ_ДНЕЙ_ПО_УМОЛЧАНИЮ = 60
@@ -26,10 +27,41 @@ const СВЕЖЕСТЬ_ДНЕЙ_ПО_УМОЛЧАНИЮ = 60
 export type ИтогПроверкиТребований = {
   программ: number
   проверено: number
+  /** Сколько проверенного прямо не сходится с фактами клиента. */
+  неПодходит: number
   неНашлось: number
   пропущено: number
   долларов: number
   причины: string[]
+}
+
+/**
+ * Что мы знаем о клиенте — для сверки. Только подтверждённое: сверять
+ * требования вуза с намерением «буду сдавать C1» значит получить вывод,
+ * который развалится при первой же проверке документов.
+ */
+async function фактыКлиента(caseId: string): Promise<ФактыКлиента> {
+  const { data } = await базаCare()
+    .from('facts')
+    .select('field, value, currency, is_plan')
+    .eq('case_id', caseId)
+    .eq('status', 'confirmed')
+    .eq('is_plan', false)
+
+  const поПолю = new Map((data ?? []).map((ф) => [ф.field as string, ф]))
+  const бюджет = поПолю.get('budget.tuition.max')
+
+  return {
+    бюджетВГод: бюджет ? Number(бюджет.value) : null,
+    валютаБюджета: (бюджет?.currency as string | null) ?? null,
+    английский: String(поПолю.get('language.english.level')?.value ?? '') || null,
+    немецкий: String(поПолю.get('language.german.level')?.value ?? '') || null,
+    языки: Object.fromEntries(
+      (data ?? [])
+        .filter((ф) => String(ф.field).startsWith('language.'))
+        .map((ф) => [String(ф.field), String(ф.value)])
+    ),
+  }
 }
 
 export async function проверитьТребованияПодборки(
@@ -38,6 +70,7 @@ export async function проверитьТребованияПодборки(
   const итог: ИтогПроверкиТребований = {
     программ: 0,
     проверено: 0,
+    неПодходит: 0,
     неНашлось: 0,
     пропущено: 0,
     долларов: 0,
@@ -46,7 +79,7 @@ export async function проверитьТребованияПодборки(
 
   const { data: строки } = await базаCare()
     .from('shortlist_items')
-    .select('id, program_ref, unresolved')
+    .select('id, program_ref, unresolved, fit_notes')
     .eq('shortlist_id', shortlistId)
     .order('position')
 
@@ -54,6 +87,13 @@ export async function проверитьТребованияПодборки(
     итог.причины.push('в подборке нет строк')
     return итог
   }
+
+  const { data: подборка } = await базаCare()
+    .from('shortlists')
+    .select('case_id')
+    .eq('id', shortlistId)
+    .maybeSingle()
+  const факты = подборка ? await фактыКлиента(подборка.case_id as string) : null
 
   const { data: настройка } = await базаCare()
     .from('settings')
@@ -147,6 +187,21 @@ export async function проверитьТребованияПодборки(
         источник: т.source_url,
       }))
 
+    // Второй слой плана: сверка найденного с фактами клиента. Считается
+    // кодом, а не моделью: сравнить «обучение на чешском» с «английский B2» —
+    // арифметика, и ответ должен быть один и тот же каждый раз.
+    const выводы = факты
+      ? сверитьВсё(
+          найденные
+            .filter((т) => т.status === 'confirmed')
+            .map((т) => ({ вид: т.requirement_type, значение: (т.value as { текст?: string })?.текст ?? '' })),
+          факты
+        )
+      : []
+
+    const неПодходит = выводы.filter((в) => в.вывод === 'не подходит')
+    итог.неПодходит += неПодходит.length
+
     await базаCare()
       .from('shortlist_items')
       .update({
@@ -154,6 +209,7 @@ export async function проверитьТребованияПодборки(
         fit_notes: {
           ...((строка as { fit_notes?: Record<string, unknown> }).fit_notes ?? {}),
           проверено: подтверждено,
+          сверка: выводы,
           проверено_когда: new Date().toISOString().slice(0, 10),
         },
       })

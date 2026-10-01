@@ -23,6 +23,13 @@ import { флагВключён } from '@/lib/care/flags'
 
 export const dynamic = 'force-dynamic'
 
+/** Выводы сверки проверенного с фактами клиента. */
+function сверка(заметки: Record<string, unknown>): { вид: string; вывод: string; объяснение: string }[] {
+  const список = (заметки as { сверка?: unknown }).сверка
+  if (!Array.isArray(список)) return []
+  return список as { вид: string; вывод: string; объяснение: string }[]
+}
+
 /** Что в строке подборки уже проверено на сайте вуза. */
 function проверенное(
   заметки: Record<string, unknown>
@@ -244,6 +251,34 @@ export default async function ДелоСтраница({ params }: { params: Pro
                             )}
                           </div>
                         )}
+                        {/* Сверка идёт первой: «не подходит» важнее всего
+                            остального в строке, и прятать его под цитатами
+                            значит прятать единственное, ради чего всё это. */}
+                        {сверка(с.fit_notes)
+                          .filter((в) => в.вывод !== 'подходит')
+                          .map((в, i) => (
+                            <div
+                              key={`с${i}`}
+                              style={{
+                                fontSize: 13,
+                                marginTop: 6,
+                                padding: '6px 9px',
+                                borderRadius: 7,
+                                background:
+                                  в.вывод === 'не подходит'
+                                    ? 'var(--ds-error-soft, var(--ds-bg-alt))'
+                                    : 'var(--ds-amber-soft, var(--ds-bg-alt))',
+                                color:
+                                  в.вывод === 'не подходит'
+                                    ? 'var(--ds-error-ink)'
+                                    : 'var(--ds-ink, inherit)',
+                              }}
+                            >
+                              {в.вывод === 'не подходит' ? 'Не подходит: ' : 'Неясно: '}
+                              {в.объяснение}
+                            </div>
+                          ))}
+
                         {/* Проверенное на сайте вуза — с цитатой. Это то, ради
                             чего проверка и затевалась: строка «что проверить»
                             превращается в ответ, который можно показать клиенту. */}
