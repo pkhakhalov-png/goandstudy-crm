@@ -9,15 +9,10 @@
 // какая система ведёт человека: пока `automation_owner = 'legacy'`,
 // автоматика нового контура его не видит вовсе.
 //
-// ЧЕК-ЛИСТ ВКЛЮЧЕНИЯ (раздел 5 плана). Скрипт проверяет и отказывается
-// переключать, если что-то не готово:
-//   1. дело существует, владелец назначен
-//   2. у контакта студента заполнен чат Телеграма
-//   3. история переписки перенесена в care.sources
-//   4. флаги ui и ai включены владельцу дела
-//
-// Для тестовых дел проверки 2 и 3 пропускаются: чата у них нет по построению,
-// и переписываться там не с кем.
+// ЧЕК-ЛИСТ ВКЛЮЧЕНИЯ (раздел 5 плана) живёт в `lib/care/switch.ts` и общий с
+// экраном `/care/admin/switch`. Скрипт его только показывает и исполняет: два
+// списка проверок разъехались бы, и экран однажды перевёл бы клиента, которого
+// скрипт переводить отказался.
 //
 // ВЫКЛЮЧЕНИЕ не удаляет данные. Оно останавливает автоматику: незавершённые
 // задания отменяются, ждущие предложения гасятся, очередь отправки чистится.
@@ -76,90 +71,44 @@ async function показатьСписок() {
 }
 
 async function включить(caseId: string, писать: boolean) {
-  const [дело] = await запрос<Дело>(
-    'care',
-    'GET',
-    `cases?select=id,client_id,automation_owner,owner_member_id,is_synthetic,synthetic_name,switched_at&id=eq.${caseId}`
-  )
-  if (!дело) { console.error('Дела с таким id нет'); process.exit(1) }
+  const { готовность, перевестиНаV2 } = await import('../../lib/care/switch')
 
-  const имя = дело.synthetic_name ?? `клиент #${дело.client_id}`
-  console.log(`\n${писать ? 'ПЕРЕКЛЮЧАЮ' : 'ПРОВЕРКА'}: ${имя}${дело.is_synthetic ? ' (тестовое дело)' : ''}\n`)
+  const г = await готовность(caseId)
+  if (!г) { console.error('Дела с таким id нет'); process.exit(1) }
 
-  if (дело.automation_owner === 'v2') {
-    console.log('  = уже на новом кабинете с ' + (дело.switched_at?.slice(0, 10) ?? 'неизвестной даты'))
+  console.log(`\n${писать ? 'ПЕРЕКЛЮЧАЮ' : 'ПРОВЕРКА'}: ${г.имя}${г.is_synthetic ? ' (тестовое дело)' : ''}\n`)
+
+  if (г.наV2) {
+    console.log('  = уже на новом кабинете с ' + (г.switched_at?.slice(0, 10) ?? 'неизвестной даты'))
     return
   }
 
-  const беды: string[] = []
-
-  if (!дело.owner_member_id) беды.push('у дела не назначен владелец')
-
-  if (!дело.is_synthetic) {
-    const контакты = await запрос<{ tg_chat_id: number | null }>(
-      'care', 'GET', `contacts?select=tg_chat_id&case_id=eq.${caseId}&kind=eq.student`
-    )
-    if (!контакты.some((к) => к.tg_chat_id != null)) {
-      беды.push('у контакта студента не заполнен чат Телеграма — привязать: link-chats.ts')
-    }
-
-    const источники = await запрос<{ id: string }>(
-      'care', 'GET', `sources?select=id&case_id=eq.${caseId}&kind=eq.message`
-    )
-    if (!источники.length) {
-      беды.push('история переписки не перенесена — перенести: import-history.ts')
-    }
-  } else {
-    console.log('  ⓘ тестовое дело: проверки чата и истории пропущены')
+  for (const п of г.пункты) {
+    console.log(`  ${п.ok ? '✓' : '✗'} ${п.пункт}`)
+    if (!п.ok && п.подсказка) console.log(`      ${п.подсказка}`)
   }
 
-  if (дело.owner_member_id) {
-    const флаги = await запрос<{ flag: string; enabled: boolean }>(
-      'care', 'GET', `feature_flags?select=flag,enabled&scope=eq.curator&scope_id=eq.${дело.owner_member_id}`
-    )
-    for (const нужен of ['ui', 'ai']) {
-      if (!флаги.some((ф) => ф.flag === нужен && ф.enabled)) {
-        беды.push(`владельцу дела не включён флаг ${нужен} — setup-team.ts --флаг ${нужен} --кому <id>`)
-      }
-    }
-  }
-
-  if (беды.length) {
-    console.log('  Переключать рано:')
-    for (const б of беды) console.log(`    ✗ ${б}`)
+  if (!г.готово) {
+    console.log('\nПереключать рано.')
     process.exit(1)
   }
-
-  console.log('  ✓ владелец назначен')
-  if (!дело.is_synthetic) console.log('  ✓ чат привязан, история перенесена')
-  console.log('  ✓ флаги ui и ai включены владельцу')
 
   if (!писать) {
     console.log('\nЭто проверка. Чтобы переключить, добавь --применить')
     return
   }
 
-  await запрос('care', 'PATCH', `cases?id=eq.${caseId}`, {
-    automation_owner: 'v2',
-    switched_at: new Date().toISOString(),
-  })
-
-  await запрос('care', 'POST', 'events', {
+  const итог = await перевестиНаV2(caseId, {
     actor_kind: 'system',
-    case_id: caseId,
-    action: 'switched_to_v2',
-    before: { automation_owner: 'legacy' },
-    after: { automation_owner: 'v2' },
-    source: { script: 'scripts/care/switch-client.ts' },
-    reason: 'перевод клиента на новый кабинет',
+    откуда: 'scripts/care/switch-client.ts',
   })
-
-  console.log('\n✓ Переведено на новый кабинет.')
-  console.log('  Старый кабинет для этого клиента теперь только для просмотра — это дисциплина,')
-  console.log('  а не запрет: мы его не меняли. Расхождения будут видны в журнале.')
+  if (!итог.ok) { console.error(`\n✗ ${итог.ошибка}`); process.exit(1) }
+  console.log(`\n✓ ${итог.текст}`)
 }
 
 async function выключить(caseId: string, писать: boolean) {
+  const { вернутьНаLegacy } = await import('../../lib/care/switch')
+
   const [дело] = await запрос<Дело>(
     'care', 'GET', `cases?select=id,client_id,automation_owner,is_synthetic,synthetic_name&id=eq.${caseId}`
   )
@@ -186,32 +135,12 @@ async function выключить(caseId: string, писать: boolean) {
     return
   }
 
-  if (задания.length) {
-    await запрос('care', 'PATCH', `jobs?case_id=eq.${caseId}&status=in.(queued,running)`, { status: 'cancelled' })
-  }
-  if (предложения.length) {
-    await запрос('care', 'PATCH', `proposals?case_id=eq.${caseId}&status=eq.pending`, { status: 'expired' })
-    for (const п of предложения) {
-      await запрос('care', 'PATCH', `outbound_actions?proposal_id=eq.${п.id}&status=eq.queued`, {
-        status: 'cancelled',
-        cancel_reason: 'client_switched_back',
-      })
-    }
-  }
-
-  await запрос('care', 'PATCH', `cases?id=eq.${caseId}`, { automation_owner: 'legacy' })
-  await запрос('care', 'POST', 'events', {
+  const итог = await вернутьНаLegacy(caseId, {
     actor_kind: 'system',
-    case_id: caseId,
-    action: 'switched_to_legacy',
-    before: { automation_owner: 'v2' },
-    after: { automation_owner: 'legacy' },
-    source: { script: 'scripts/care/switch-client.ts' },
-    reason: 'возврат клиента на старый кабинет',
+    откуда: 'scripts/care/switch-client.ts',
   })
-
-  console.log('\n✓ Возвращено старому кабинету.')
-  console.log('  Данные контура не удалены. Уже отправленное остаётся фактом — его не отменить.')
+  if (!итог.ok) { console.error(`\n✗ ${итог.ошибка}`); process.exit(1) }
+  console.log(`\n✓ ${итог.текст}`)
 }
 
 async function main() {

@@ -671,3 +671,21 @@
 @media (max-width: 520px) {
   .care-бс-стрелка { transform: rotate(90deg); align-self: flex-start; }
 }
+
+/* ── Переключение кабинетов ──────────────────────────────────────────── */
+
+.care-перекл {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--ds-border-soft);
+  flex-wrap: wrap;
+}
+.care-перекл:last-child { border-bottom: 0; }
+.care-перекл-лист {
+  padding: 12px 16px 16px 16px;
+  background: var(--ds-bg-alt);
+  border-bottom: 1px solid var(--ds-border-soft);
+}

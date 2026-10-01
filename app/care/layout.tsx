@@ -65,6 +65,9 @@ export default async function CareLayout({ children }: { children: React.ReactNo
   ]
   if (сессия.участник.care_role === 'lead') {
     пункты.push({ href: '/care/team', подпись: 'Команда' })
+    // Переключение кабинетов — решение руководителя, и до него должно быть
+    // видно из меню: иначе оно остаётся тем, что делают через терминал.
+    пункты.push({ href: '/care/admin/switch', подпись: 'Кабинеты' })
   }
 
   return (
