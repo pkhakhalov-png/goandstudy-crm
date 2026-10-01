@@ -29,6 +29,10 @@ import {
   опубликоватьПодборку,
   отозватьСсылку,
   проверитьТребованияДела,
+  убратьПрограмму,
+  вернутьПрограмму,
+  переставитьПрограмму,
+  клиентВыбрал,
   отклонитьФакт,
   передатьДело,
 } from './actions'
@@ -599,6 +603,113 @@ function CheckRequirements({ caseId, shortlistId }: { caseId: string; shortlistI
           Закроет часть строк «проверить»: то, что найдётся на сайте, будет с цитатой.
         </p>
       )}
+      <ErrorLine текст={ошибка} />
+    </div>
+  )
+}
+
+/**
+ * Правка одной программы в подборке: порядок, выбор клиента, убрать.
+ *
+ * Кнопки стоят у самой программы, а не в меню сверху: куратор решает про
+ * конкретный вуз, глядя на него, и переносить взгляд к общему меню — значит
+ * каждый раз вспоминать, о какой строке речь.
+ */
+export function ProgramControls({
+  caseId,
+  itemId,
+  статус,
+  первая,
+  последняя,
+}: {
+  caseId: string
+  itemId: string
+  статус: string
+  первая: boolean
+  последняя: boolean
+}) {
+  const { идёт, ошибка, выполнить } = useAction()
+  const [убираем, убирать] = useState(false)
+  const [причина, установитьПричину] = useState('')
+
+  if (статус === 'removed') {
+    return (
+      <div style={{ marginTop: 6 }}>
+        <button
+          className="ds-btn ds-btn-ghost ds-btn-sm"
+          disabled={идёт}
+          onClick={() => выполнить(() => вернутьПрограмму(caseId, itemId))}
+        >
+          Вернуть в подборку
+        </button>
+        <ErrorLine текст={ошибка} />
+      </div>
+    )
+  }
+
+  if (убираем) {
+    return (
+      <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        {/* Причина не обязательна, но спрашивается: через месяц «почему не
+            Мюнхен» — обычный вопрос, и пустая строка на него не отвечает. */}
+        <input
+          className="ds-input"
+          placeholder="Почему убираем (необязательно)"
+          value={причина}
+          onChange={(e) => установитьПричину(e.target.value)}
+          style={{ flex: '1 1 200px' }}
+          autoFocus
+        />
+        <button
+          className="ds-btn ds-btn-primary ds-btn-sm"
+          disabled={идёт}
+          onClick={() =>
+            выполнить(async () => {
+              const итог = await убратьПрограмму(caseId, itemId, причина)
+              if (итог.ok) убирать(false)
+              return итог
+            })
+          }
+        >
+          Убрать
+        </button>
+        <button className="ds-btn ds-btn-ghost ds-btn-sm" onClick={() => убирать(false)} disabled={идёт}>
+          Отмена
+        </button>
+        <ErrorLine текст={ошибка} />
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ display: 'flex', gap: 4, marginTop: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+      <button
+        className="ds-btn ds-btn-ghost ds-btn-sm"
+        disabled={идёт || первая}
+        title="Выше"
+        onClick={() => выполнить(() => переставитьПрограмму(caseId, itemId, 'вверх'))}
+      >
+        ↑
+      </button>
+      <button
+        className="ds-btn ds-btn-ghost ds-btn-sm"
+        disabled={идёт || последняя}
+        title="Ниже"
+        onClick={() => выполнить(() => переставитьПрограмму(caseId, itemId, 'вниз'))}
+      >
+        ↓
+      </button>
+      <button
+        className={статус === 'chosen' ? 'ds-btn ds-btn-secondary ds-btn-sm' : 'ds-btn ds-btn-ghost ds-btn-sm'}
+        disabled={идёт}
+        onClick={() => выполнить(() => клиентВыбрал(caseId, itemId))}
+        title="Клиент выбрал этот вариант"
+      >
+        {статус === 'chosen' ? '★ выбрано клиентом' : '☆ выбрал клиент'}
+      </button>
+      <button className="ds-btn ds-btn-ghost ds-btn-sm" disabled={идёт} onClick={() => убирать(true)}>
+        Убрать
+      </button>
       <ErrorLine текст={ошибка} />
     </div>
   )

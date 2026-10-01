@@ -692,6 +692,141 @@ export async function отозватьСсылку(caseId: string, shortlistId: 
   }
 }
 
+// ── Правка подборки ──────────────────────────────────────────────────────────
+
+/**
+ * Убрать программу из подборки.
+ *
+ * Не удаление: строка остаётся в деле со статусом `removed` и причиной. Через
+ * месяц возникает вопрос «а почему мы не рассматривали Мюнхен», и ответ
+ * «убрали тогда-то, дорого» лучше, чем отсутствие строки.
+ */
+export async function убратьПрограмму(caseId: string, itemId: string, причина: string): Promise<Итог> {
+  try {
+    const { участник, база } = await подготовить(caseId)
+
+    const { data: строка } = await база
+      .from('shortlist_items')
+      .select('id, shortlist_id, program_ref')
+      .eq('id', itemId)
+      .maybeSingle()
+    if (!строка) return { ok: false, ошибка: 'Программа не найдена' }
+
+    const { error } = await база
+      .from('shortlist_items')
+      .update({ status: 'removed', removed_reason: причина.trim() || null })
+      .eq('id', itemId)
+    if (error) return { ok: false, ошибка: error.message }
+
+    await записатьВЖурнал(caseId, участник.id, 'shortlist_item_removed', строка.program_ref, null, причина.trim() || null)
+    revalidatePath(`/care/cases/${caseId}`)
+    return { ok: true }
+  } catch (e) {
+    return обработать(e)
+  }
+}
+
+/** Вернуть убранную программу обратно в подборку. */
+export async function вернутьПрограмму(caseId: string, itemId: string): Promise<Итог> {
+  try {
+    const { участник, база } = await подготовить(caseId)
+
+    const { error } = await база
+      .from('shortlist_items')
+      .update({ status: 'active', removed_reason: null })
+      .eq('id', itemId)
+    if (error) return { ok: false, ошибка: error.message }
+
+    await записатьВЖурнал(caseId, участник.id, 'shortlist_item_restored', null, { id: itemId })
+    revalidatePath(`/care/cases/${caseId}`)
+    return { ok: true }
+  } catch (e) {
+    return обработать(e)
+  }
+}
+
+/**
+ * Переставить программу выше или ниже.
+ *
+ * Порядок — это высказывание: список, который начинается с четвёртого по
+ * важности варианта, читается как «нам всё равно». Клиент увидит его в том же
+ * порядке, в каком его оставил куратор.
+ */
+export async function переставитьПрограмму(
+  caseId: string,
+  itemId: string,
+  куда: 'вверх' | 'вниз'
+): Promise<Итог> {
+  try {
+    const { участник, база } = await подготовить(caseId)
+
+    const { data: строка } = await база
+      .from('shortlist_items')
+      .select('id, shortlist_id, position')
+      .eq('id', itemId)
+      .maybeSingle()
+    if (!строка) return { ok: false, ошибка: 'Программа не найдена' }
+
+    // Соседа ищем среди непрокинутых: переставлять через убранную строку
+    // значит сделать «вверх» без видимого следствия.
+    const { data: соседи } = await база
+      .from('shortlist_items')
+      .select('id, position')
+      .eq('shortlist_id', строка.shortlist_id)
+      .neq('status', 'removed')
+      .order('position')
+
+    const список = соседи ?? []
+    const где = список.findIndex((с) => с.id === itemId)
+    const сосед = куда === 'вверх' ? список[где - 1] : список[где + 1]
+    if (!сосед) return { ok: true } // край списка — не ошибка, просто некуда
+
+    await база.from('shortlist_items').update({ position: сосед.position }).eq('id', строка.id)
+    await база.from('shortlist_items').update({ position: строка.position }).eq('id', сосед.id)
+
+    await записатьВЖурнал(caseId, участник.id, 'shortlist_reordered', null, { id: itemId, куда })
+    revalidatePath(`/care/cases/${caseId}`)
+    return { ok: true }
+  } catch (e) {
+    return обработать(e)
+  }
+}
+
+/**
+ * Отметить, что клиент выбрал эту программу.
+ *
+ * Сейчас отмечает куратор со слов клиента. Когда появится кабинет клиента,
+ * отмечать будет он сам — поле то же, переносить ничего не придётся.
+ */
+export async function клиентВыбрал(caseId: string, itemId: string): Promise<Итог> {
+  try {
+    const { участник, база } = await подготовить(caseId)
+
+    const { data: строка } = await база
+      .from('shortlist_items')
+      .select('id, status, program_ref')
+      .eq('id', itemId)
+      .maybeSingle()
+    if (!строка) return { ok: false, ошибка: 'Программа не найдена' }
+
+    const новый = строка.status === 'chosen' ? 'active' : 'chosen'
+    const { error } = await база.from('shortlist_items').update({ status: новый }).eq('id', itemId)
+    if (error) return { ok: false, ошибка: error.message }
+
+    await записатьВЖурнал(
+      caseId,
+      участник.id,
+      новый === 'chosen' ? 'shortlist_item_chosen' : 'shortlist_item_unchosen',
+      null,
+      строка.program_ref
+    )
+    revalidatePath(`/care/cases/${caseId}`)
+    return { ok: true }
+  } catch (e) {
+    return обработать(e)
+  }
+}
+
 // ── Передача дела ────────────────────────────────────────────────────────────
 
 /**

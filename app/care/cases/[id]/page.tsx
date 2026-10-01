@@ -16,7 +16,8 @@ import { notFound } from 'next/navigation'
 import { сессияКонтура } from '@/lib/care/session'
 import { подробностиДела, коллегиДляПередачи } from '@/lib/care/cases'
 import { подписьПоля, подписьЗначения, периодПоля, подписьСтатуса, подписьОжидания, срок, инициалы, склонение } from '@/lib/care/labels'
-import { PublishShortlist, CaseAssistant, NewTask, TaskActions, FactActions, FactIsDecision, TransferCase } from './CaseOperations'
+import { буквыВуза, цветВуза } from '@/lib/care/herb'
+import { PublishShortlist, CaseAssistant, NewTask, ProgramControls, TaskActions, FactActions, FactIsDecision, TransferCase } from './CaseOperations'
 import { AssistantPanel } from '../../AssistantPanel'
 import { историяПомощника } from '../../assistant-actions'
 import { флагВключён } from '@/lib/care/flags'
@@ -222,18 +223,51 @@ export default async function ДелоСтраница({ params }: { params: Pro
                     {склонение(д.подборка.строки.length, 'программа', 'программы', 'программ')} · собрана{' '}
                     {new Date(д.подборка.created_at).toLocaleDateString('ru-RU')}
                   </div>
-                  {д.подборка.строки.map((с) => {
+                  {(() => {
+                    const живые = д.подборка.строки.filter((с) => с.status !== 'removed')
+                    return живые
+                  })().map((с, индекс, живые) => {
                     const ref = с.program_ref as Record<string, string>
                     const почему = (с.fit_notes as { почему?: string }).почему
                     return (
-                      <div key={с.id} className="care-fact">
-                        <div style={{ fontSize: 15, fontWeight: 500 }}>
-                          {ref.вуз} — {ref.программа}
-                        </div>
-                        <div style={{ fontSize: 12, color: 'var(--ds-muted)', marginTop: 2 }}>
-                          {[ref.город, ref.страна, с.tuition_amount ? `${с.tuition_amount} ${с.currency ?? ''}`.trim() : 'стоимость не указана']
-                            .filter(Boolean)
-                            .join(' · ')}
+                      <div
+                        key={с.id}
+                        className="care-fact"
+                        style={с.status === 'chosen' ? { borderLeft: '3px solid var(--ds-ai)', paddingLeft: 10 } : undefined}
+                      >
+                        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                          {/* Знак рисуем сами: в справочнике под видом логотипов
+                              лежат ссылки на чужие сервисы фавиконок, а страницу
+                              открывает клиент. */}
+                          <span
+                            aria-hidden
+                            style={{
+                              flex: '0 0 auto',
+                              width: 38,
+                              height: 38,
+                              borderRadius: 10,
+                              background: цветВуза(ref.вуз ?? ''),
+                              color: '#fff',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: буквыВуза(ref.вуз ?? '').length > 2 ? 11 : 13,
+                              fontWeight: 650,
+                              letterSpacing: '.02em',
+                            }}
+                          >
+                            {буквыВуза(ref.вуз ?? '')}
+                          </span>
+                          <div style={{ minWidth: 0, flex: 1 }}>
+                            <div style={{ fontSize: 15, fontWeight: 500 }}>
+                              {ref.вуз} — {ref.программа}
+                            </div>
+                            <div style={{ fontSize: 12, color: 'var(--ds-muted)', marginTop: 2 }}>
+                              {[ref.город, ref.страна, с.tuition_amount ? `${с.tuition_amount} ${с.currency ?? ''}`.trim() : 'стоимость не указана']
+                                .filter(Boolean)
+                                .join(' · ')}
+                            </div>
+                          </div>
                         </div>
                         {почему && (
                           <div style={{ fontSize: 13, marginTop: 5, lineHeight: 1.5 }}>{почему}</div>
@@ -315,9 +349,47 @@ export default async function ДелоСтраница({ params }: { params: Pro
                             Проверить: {с.unresolved.join(' · ')}
                           </div>
                         )}
+
+                        <ProgramControls
+                          caseId={id}
+                          itemId={с.id}
+                          статус={с.status}
+                          первая={индекс === 0}
+                          последняя={индекс === живые.length - 1}
+                        />
                       </div>
                     )
                   })}
+
+                  {/* Убранное не прячем совсем: «почему мы не рассматривали
+                      Мюнхен» — обычный вопрос через месяц. */}
+                  {д.подборка.строки.some((с) => с.status === 'removed') && (
+                    <details style={{ marginTop: 10 }}>
+                      <summary style={{ fontSize: 12, color: 'var(--ds-muted)', cursor: 'pointer' }}>
+                        Убранные ({д.подборка.строки.filter((с) => с.status === 'removed').length})
+                      </summary>
+                      {д.подборка.строки
+                        .filter((с) => с.status === 'removed')
+                        .map((с) => {
+                          const ref = с.program_ref as Record<string, string>
+                          return (
+                            <div key={с.id} style={{ fontSize: 13, color: 'var(--ds-muted)', marginTop: 8 }}>
+                              <span style={{ textDecoration: 'line-through' }}>
+                                {ref.вуз} — {ref.программа}
+                              </span>
+                              {с.removed_reason && <> · {с.removed_reason}</>}
+                              <ProgramControls
+                                caseId={id}
+                                itemId={с.id}
+                                статус={с.status}
+                                первая={false}
+                                последняя={false}
+                              />
+                            </div>
+                          )
+                        })}
+                    </details>
+                  )}
 
                   <PublishShortlist
                     caseId={id}

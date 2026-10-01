@@ -186,6 +186,8 @@ export type ПодробностиДела = {
       currency: string | null
       fit_notes: Record<string, unknown>
       unresolved: string[]
+      status: string
+      removed_reason: string | null
     }[]
   } | null
   /** Последняя написанная стратегия — предложение, ждущее решения. */
@@ -286,7 +288,7 @@ async function последняяПодборка(caseId: string): Promise<По�
 
   const { data: строки } = await базаCare()
     .from('shortlist_items')
-    .select('id, program_ref, tuition_amount, currency, fit_notes, unresolved')
+    .select('id, program_ref, tuition_amount, currency, fit_notes, unresolved, status, removed_reason')
     .eq('shortlist_id', подборка.id)
     .order('position')
 

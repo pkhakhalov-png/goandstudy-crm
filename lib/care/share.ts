@@ -17,6 +17,7 @@
  */
 import { randomBytes } from 'crypto'
 import { базаCare } from './db'
+import { буквыВуза, цветВуза } from './herb'
 
 /** Секрет в адресе. Длинный и из алфавита, который переживает копирование. */
 export function новыйТокен(): string {
@@ -34,6 +35,7 @@ export type СтраницаПодборки = {
     ссылка: string | null
     стоимость: string | null
     проверить: string[]
+    выбрана: boolean
   }[]
 }
 
@@ -55,10 +57,12 @@ export async function страницаПоТокену(токен: string): Prom
 
   if (!подборка || подборка.status !== 'published') return null
 
+  // Убранные куратором клиенту не показываем — он их и не должен был видеть.
   const { data: строки } = await базаCare()
     .from('shortlist_items')
-    .select('program_ref, tuition_amount, currency, unresolved')
+    .select('program_ref, tuition_amount, currency, unresolved, status')
     .eq('shortlist_id', подборка.id)
+    .neq('status', 'removed')
     .order('position')
 
   return {
@@ -74,6 +78,7 @@ export async function страницаПоТокену(токен: string): Prom
         ссылка: ref.ссылка ?? null,
         стоимость: с.tuition_amount ? `${с.tuition_amount} ${с.currency ?? ''}`.trim() : null,
         проверить: (с.unresolved ?? []) as string[],
+        выбрана: с.status === 'chosen',
       }
     }),
   }
@@ -114,9 +119,15 @@ export function собратьСтраницу(с: СтраницаПодбор�
       const ссылка = безопаснаяСсылка(п.ссылка)
       const место = [п.город, п.страна].filter(Boolean).map(э).join(', ')
       return `
-      <article class="p">
-        <h2>${э(п.программа)}</h2>
-        <div class="вуз">${э(п.вуз)}${место ? ` · ${место}` : ''}</div>
+      <article class="p${п.выбрана ? ' выбрана' : ''}">
+        ${п.выбрана ? '<div class="метка">ваш выбор</div>' : ''}
+        <div class="шапка-п">
+          <span class="знак" style="background:${э(цветВуза(п.вуз))}" aria-hidden="true">${э(буквыВуза(п.вуз))}</span>
+          <div>
+            <h2>${э(п.программа)}</h2>
+            <div class="вуз">${э(п.вуз)}${место ? ` · ${место}` : ''}</div>
+          </div>
+        </div>
         <div class="цена">${п.стоимость ? `${э(п.стоимость)} в год` : 'Стоимость уточняется'}</div>
         ${ссылка ? `<a class="ссылка" href="${э(ссылка)}" target="_blank" rel="noopener noreferrer">Страница программы на сайте вуза →</a>` : ''}
         ${
@@ -153,6 +164,17 @@ export function собратьСтраницу(с: СтраницаПодбор�
   }
   .p h2 { font-size: 18px; line-height: 1.35; margin: 0; font-weight: 600; }
   .вуз { margin-top: 4px; color: #4a4550; font-size: 15px; }
+  .шапка-п { display: flex; gap: 12px; align-items: flex-start; }
+  .знак {
+    flex: 0 0 auto; width: 44px; height: 44px; border-radius: 12px;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: #fff; font-weight: 650; font-size: 15px; letter-spacing: .02em;
+  }
+  .p.выбрана { border-color: #b79cf0; box-shadow: 0 0 0 1px #b79cf0; }
+  .метка {
+    display: inline-block; margin-bottom: 8px; padding: 2px 8px; border-radius: 999px;
+    background: #efe7ff; color: #5b3fa0; font-size: 12px; font-weight: 600;
+  }
   .цена { margin-top: 8px; font-weight: 600; }
   .ссылка { display: inline-block; margin-top: 10px; color: #6b4ea8; text-decoration: none; font-size: 15px; }
   .ссылка:hover { text-decoration: underline; }
@@ -169,6 +191,7 @@ export function собратьСтраницу(с: СтраницаПодбор�
     .intro { color: #d6d1dc; }
     .ссылка { color: #b79cf0; }
     .проверить { border-top-color: #2b2733; }
+    .метка { background: #352a52; color: #cdb6ff; }
   }
 </style>
 </head>
