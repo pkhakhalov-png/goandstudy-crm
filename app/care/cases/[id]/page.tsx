@@ -34,6 +34,9 @@ export default async function ДелоСтраница({ params }: { params: Pro
   const хост = заголовки.get('x-forwarded-host') ?? заголовки.get('host') ?? ''
   const схема = заголовки.get('x-forwarded-proto') ?? (хост.startsWith('localhost') ? 'http' : 'https')
   const адресОснования = хост ? `${схема}://${хост}` : ''
+  // Превью закрыто Deployment Protection: ссылка для клиента там не работает,
+  // и куратор должен узнать об этом от нас, а не от клиента.
+  const боевойАдрес = хост.endsWith('crm.goandstudy.com')
   const сессия = await сессияКонтура()
   if (!сессия?.участник) notFound()
 
@@ -248,6 +251,7 @@ export default async function ДелоСтраница({ params }: { params: Pro
                     shortlistId={д.подборка.id}
                     токен={д.подборка.share_token}
                     адресОснования={адресОснования}
+                    боевойАдрес={боевойАдрес}
                   />
                 </>
               ) : (
