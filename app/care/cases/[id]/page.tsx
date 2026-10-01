@@ -16,7 +16,7 @@ import { notFound } from 'next/navigation'
 import { сессияКонтура } from '@/lib/care/session'
 import { подробностиДела, коллегиДляПередачи } from '@/lib/care/cases'
 import { подписьПоля, подписьЗначения, периодПоля, подписьСтатуса, подписьОжидания, срок, инициалы, склонение } from '@/lib/care/labels'
-import { PublishShortlist, CaseAssistant, NewTask, TaskActions, FactActions, TransferCase } from './CaseOperations'
+import { PublishShortlist, CaseAssistant, NewTask, TaskActions, FactActions, FactIsDecision, TransferCase } from './CaseOperations'
 import { AssistantPanel } from '../../AssistantPanel'
 import { историяПомощника } from '../../assistant-actions'
 import { флагВключён } from '@/lib/care/flags'
@@ -183,7 +183,12 @@ export default async function ДелоСтраница({ params }: { params: Pro
                         </span>
                       )}
                       {ф.is_plan && (
-                        <span className="ds-chip ds-chip-warning">намерение, не результат</span>
+                        <>
+                          <span className="ds-chip ds-chip-warning">намерение, не результат</span>
+                          {/* Подбор по намерению не работает — и кнопка стоит
+                              там, где написана причина, а не в меню. */}
+                          {ф.status === 'confirmed' && <FactIsDecision caseId={id} factId={ф.id} />}
+                        </>
                       )}
                     </div>
                     {ф.quote && <div className="care-fact-src">«{ф.quote}»</div>}

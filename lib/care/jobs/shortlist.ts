@@ -67,23 +67,47 @@ export async function собратьПодборку(caseId: string, замеч�
     .eq('status', 'confirmed')
 
   const поПолю = new Map((факты ?? []).map((ф) => [ф.field as string, ф]))
-  const страна = String(поПолю.get('country.target')?.value ?? '').trim()
-  const направление = String(поПолю.get('program.field')?.value ?? '').trim()
-  const уровеньТекст = String(поПолю.get('education.level_target')?.value ?? '').trim()
+
+  // Намерение — не основание для подбора, даже подтверждённое. «Хотелось бы
+  // во Франции» и «едем во Францию» выглядят в базе одинаково, а стоят
+  // по-разному: по первому нельзя потратить семьдесят центов и час куратора.
+  const решение = (поле: string): string => {
+    const ф = поПолю.get(поле)
+    if (!ф || ф.is_plan) return ''
+    return String(ф.value ?? '').trim()
+  }
+
+  const страна = решение('country.target')
+  const направление = решение('program.field')
+  const уровеньТекст = решение('education.level_target')
   const бюджетФакт = поПолю.get('budget.tuition.max')
-  const бюджет = бюджетФакт ? Number(бюджетФакт.value) : null
+  const бюджет = бюджетФакт && !бюджетФакт.is_plan ? Number(бюджетФакт.value) : null
   const валюта = (бюджетФакт?.currency as string | null) ?? null
 
   // Без страны и направления подбор — это гадание. Лучше сказать, чего не
   // хватает, чем принести список наугад: его всё равно выбросят, но сначала
   // потратят на него полчаса.
   const нет: string[] = []
-  if (!страна) нет.push('страна')
-  if (!направление) нет.push('направление')
-  if (нет.length) {
-    итог.причины.push(`не подтверждено: ${нет.join(', ')} — подбирать не по чему`)
-    return итог
+  const намерения: string[] = []
+  for (const [поле, подпись] of [
+    ['country.target', 'страна'],
+    ['program.field', 'направление'],
+  ] as const) {
+    const ф = поПолю.get(поле)
+    if (!ф) нет.push(подпись)
+    else if (ф.is_plan) намерения.push(подпись)
   }
+
+  if (намерения.length) {
+    // Отдельная формулировка: «не подтверждено» тут соврало бы — факт
+    // подтверждён, просто он про желание, а не про решение.
+    итог.причины.push(
+      `${намерения.join(', ')} — пока намерение, а не решение. ` +
+        'Снимите пометку «намерение» в карточке, когда клиент определится.'
+    )
+  }
+  if (нет.length) итог.причины.push(`не подтверждено: ${нет.join(', ')} — подбирать не по чему`)
+  if (нет.length || намерения.length) return итог
 
   const оКлиенте: Record<string, string> = {}
   for (const ф of факты ?? []) {

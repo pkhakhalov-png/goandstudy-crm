@@ -12,16 +12,21 @@
  * «покажи все дела компании». Инструмент, спрашивающий область у модели,
  * такую просьбу выполнил бы.
  *
- * ЧТО ПОМОЩНИК УМЕЕТ МЕНЯТЬ — И ПОЧЕМУ ИМЕННО ЭТО. Ровно одно: собрать
- * подборку программ. Она ложится черновиком со статусом `curator_review` —
- * то есть предложением, которое ждёт решения человека, как напоминание или
- * факт из переписки. Это не исключение из правила «модель предлагает, человек
- * решает», а тот же самый путь.
+ * ЧТО ПОМОЩНИК УМЕЕТ МЕНЯТЬ — И ПОЧЕМУ ЭТО НЕ НАРУШАЕТ ГЛАВНОЕ ПРАВИЛО.
+ * Он записывает то, что куратор сказал ему в чате: «утверждаем Францию,
+ * менеджмент», «срок до пятницы», «клиент определился». Решение принял
+ * человек — помощник его оформляет, и это ровно обратное тому, от чего
+ * защищает правило «модель предлагает, человек решает».
  *
- * Всё остальное по-прежнему только чтение. Помощник не меняет факты, не
- * закрывает задачи, не передаёт дела и — главное — не отправляет ничего
- * наружу: такого инструмента у него нет, а единственная дверь наружу
- * (`lib/care/jobs/send.ts`) открывается только после нажатия куратора.
+ * Разница с разбором переписки существенная и держится на цитате. Там
+ * цитатой был текст клиента, и факт ложился черновиком: клиент мог оговориться,
+ * а модель — не так понять. Здесь цитата — сама фраза куратора, и факт
+ * ложится подтверждённым: куратор отвечает за свои слова.
+ *
+ * Чего помощник не умеет и не будет уметь: удалять, передавать дела и
+ * отправлять что-либо наружу. Единственная дверь наружу —
+ * `lib/care/jobs/send.ts` — открывается только нажатием куратора в очереди
+ * напоминаний, и ни один инструмент к ней не ведёт.
  *
  * ПЕРЕПИСКА ЧИТАЕТСЯ ЧЕРЕЗ `care.case_messages` — представление, отдающее
  * сообщения только по делам, переведённым на v2, и только по привязанным
@@ -478,5 +483,230 @@ export function инструменты(участник: Участник, об�
     },
   })
 
-  return [делаКратко, сводкаДела, сроки, ждутРешения, пробелы, перепискаДела, поискПрограмм, собратьПодборкуДела]
+  const записатьФакт = betaTool({
+    name: 'set_fact',
+    description:
+      'Записать сведение о клиенте со слов куратора: страна, направление, бюджет, уровень, язык. ' +
+      'Используй, когда куратор в чате говорит, что решено или что известно: «утверждаем Францию», ' +
+      '«бюджет до 8000 евро», «идём на магистратуру». Факт ложится подтверждённым — это слова куратора, ' +
+      'а не догадка из переписки.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        case_id: { type: 'string', description: 'Дело, к которому относится' },
+        field: {
+          type: 'string',
+          enum: [
+            'country.target',
+            'program.field',
+            'education.level_target',
+            'budget.tuition.max',
+            'budget.living.max',
+            'intake.year',
+            'language.english.level',
+            'language.german.level',
+          ],
+        },
+        value: { type: 'string', description: 'Значение словами куратора. Для сумм — число, валюта отдельно.' },
+        currency: { type: ['string', 'null'], description: 'EUR, USD, RUB — обязательно для сумм' },
+        said: {
+          type: 'string',
+          description: 'Фраза куратора, на основании которой записываем. Дословно, как он написал.',
+        },
+      },
+      required: ['case_id', 'field', 'value', 'said'],
+      additionalProperties: false,
+    },
+    run: async ({ case_id, field, value, currency, said }) => {
+      const дела = await список()
+      if (!дела.includes(case_id)) return 'Такого дела нет в вашей области.'
+
+      const { разобратьЗначение } = await import('../facts')
+      const разбор = разобратьЗначение(field, value, currency ?? null)
+      if (!разбор.ok) return `Не записал: ${разбор.почему}`
+
+      // Прежнее текущее значение уходит в superseded: история не переписывается,
+      // а дополняется. Через полгода видно, что было до решения куратора.
+      const { data: прежний } = await базаCare()
+        .from('facts')
+        .select('id, value')
+        .eq('case_id', case_id)
+        .eq('field', field)
+        .eq('status', 'confirmed')
+        .maybeSingle()
+
+      if (прежний) {
+        await базаCare().from('facts').update({ status: 'superseded' }).eq('id', прежний.id)
+      }
+
+      const { data: источник } = await базаCare()
+        .from('sources')
+        .insert({
+          case_id,
+          kind: 'manual',
+          ref: { откуда: 'чат с помощником' },
+          note: 'сказано куратором',
+        })
+        .select('id')
+        .single()
+
+      const { error } = await базаCare().from('facts').insert({
+        case_id,
+        field,
+        value: разбор.значение,
+        currency: разбор.валюта,
+        // Слова куратора — это решение, а не намерение. Намерением помечает
+        // разбор переписки, когда клиент сказал «хотелось бы».
+        is_plan: false,
+        speaker: 'curator',
+        quote: said,
+        source_id: источник?.id ?? null,
+        status: 'confirmed',
+        supersedes: прежний?.id ?? null,
+        confirmed_at: new Date().toISOString(),
+      })
+      if (error) return `Не записал: ${error.message}`
+
+      await базаCare().from('events').insert({
+        actor_kind: 'assistant',
+        case_id,
+        action: 'fact_set_by_curator',
+        before: прежний ? { value: прежний.value } : null,
+        after: { field, value: разбор.значение, currency: разбор.валюта },
+        source: { tool: 'set_fact' },
+        reason: said.slice(0, 200),
+      })
+
+      const { подписьПоля } = await import('../labels')
+      return (
+        `Записал: ${подписьПоля(field)} — ${разбор.значение}${разбор.валюта ? ` ${разбор.валюта}` : ''}` +
+        (прежний ? ` (прежнее «${прежний.value}» ушло в историю).` : '.')
+      )
+    },
+  })
+
+  const снятьНамерение = betaTool({
+    name: 'mark_decision',
+    description:
+      'Снять с факта пометку «намерение»: клиент определился. Используй, когда куратор говорит ' +
+      '«утверждаем», «решено», «клиент определился» про то, что в деле стоит намерением. ' +
+      'Подбор по намерению не работает — пока пометка стоит, собрать подборку нельзя.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        case_id: { type: 'string' },
+        field: { type: 'string', description: 'Поле факта, например country.target' },
+      },
+      required: ['case_id', 'field'],
+      additionalProperties: false,
+    },
+    run: async ({ case_id, field }) => {
+      const дела = await список()
+      if (!дела.includes(case_id)) return 'Такого дела нет в вашей области.'
+
+      const { data: факт } = await базаCare()
+        .from('facts')
+        .select('id, value, is_plan, status')
+        .eq('case_id', case_id)
+        .eq('field', field)
+        .eq('status', 'confirmed')
+        .maybeSingle()
+
+      if (!факт) return `По полю ${field} нет подтверждённого факта — сначала запиши его.`
+      if (!факт.is_plan) return `${field} и так стоит решением, а не намерением.`
+
+      const { error } = await базаCare().from('facts').update({ is_plan: false }).eq('id', факт.id)
+      if (error) return `Не вышло: ${error.message}`
+
+      await базаCare().from('events').insert({
+        actor_kind: 'assistant',
+        case_id,
+        action: 'fact_became_decision',
+        after: { field, value: факт.value },
+        source: { tool: 'mark_decision' },
+        reason: 'куратор сказал, что решено',
+      })
+
+      const { подписьПоля } = await import('../labels')
+      return `${подписьПоля(field)} теперь решение, а не намерение — подбор может на это опираться.`
+    },
+  })
+
+  const завестиЗадачу = betaTool({
+    name: 'add_task',
+    description:
+      'Завести задачу по делу. Используй, когда куратор говорит «ждём от клиента справку до пятницы», ' +
+      '«надо запросить диплом», «поставь задачу». Если ждём чего-то от клиента и есть срок — ' +
+      'именно по таким задачам помощник готовит напоминания.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        case_id: { type: 'string' },
+        title: { type: 'string', description: 'Что нужно сделать, коротко' },
+        waiting_on: {
+          type: 'string',
+          enum: ['none', 'client', 'university', 'specialist', 'review'],
+          description: 'Кого ждём. «client» включает напоминания по этой задаче.',
+        },
+        due_on: { type: ['string', 'null'], description: 'Срок в виде ГГГГ-ММ-ДД, если назван' },
+      },
+      required: ['case_id', 'title', 'waiting_on'],
+      additionalProperties: false,
+    },
+    run: async ({ case_id, title, waiting_on, due_on }) => {
+      const дела = await список()
+      if (!дела.includes(case_id)) return 'Такого дела нет в вашей области.'
+
+      const срок = due_on && /^\d{4}-\d{2}-\d{2}$/.test(due_on) ? due_on : null
+      if (due_on && !срок) return `Срок «${due_on}» непонятен. Нужен вид ГГГГ-ММ-ДД.`
+
+      const { data: задача, error } = await базаCare()
+        .from('tasks')
+        .insert({
+          case_id,
+          title,
+          due_on: срок,
+          waiting_on,
+          status: waiting_on === 'none' ? 'todo' : 'waiting',
+          assignee_member_id: участник.id,
+          details: 'заведено помощником со слов куратора',
+        })
+        .select('id')
+        .single()
+      if (error) return `Не завёл: ${error.message}`
+
+      await базаCare().from('events').insert({
+        actor_kind: 'assistant',
+        actor_id: участник.id,
+        case_id,
+        action: 'task_created',
+        after: { id: задача?.id, title, waiting_on, due_on: срок },
+        source: { tool: 'add_task' },
+        reason: 'со слов куратора',
+      })
+
+      // Напоминание появится само: правило ищет задачи «ждём клиента» со сроком.
+      const про =
+        waiting_on === 'client' && срок
+          ? ' По ней помощник подготовит напоминание — оно придёт вам на проверку.'
+          : waiting_on === 'client'
+            ? ' Срока нет, поэтому напоминание по ней готовиться не будет.'
+            : ''
+      return `Завёл задачу «${title}»${срок ? ` со сроком ${срок}` : ''}.${про}`
+    },
+  })
+
+  return [
+    делаКратко,
+    сводкаДела,
+    сроки,
+    ждутРешения,
+    пробелы,
+    перепискаДела,
+    поискПрограмм,
+    собратьПодборкуДела,
+    записатьФакт,
+    снятьНамерение,
+    завестиЗадачу,
+  ]
 }

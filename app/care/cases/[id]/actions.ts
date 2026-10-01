@@ -392,6 +392,47 @@ export async function отклонитьФакт(caseId: string, factId: string,
   }
 }
 
+/**
+ * Снять с факта пометку «намерение»: клиент определился.
+ *
+ * ПОЧЕМУ ЭТО ОТДЕЛЬНАЯ ОПЕРАЦИЯ. «Хотелось бы во Франции» и «едем во Францию»
+ * — разные вещи, и разбор переписки правильно помечает первое намерением.
+ * Но когда клиент решил, кто-то должен это записать: иначе факт остаётся
+ * подтверждённым намерением навсегда, а подбор по нему не работает и работать
+ * не должен.
+ *
+ * Обратной кнопки нет намеренно: пометить решение обратно намерением — это
+ * уже не уточнение, а смена сведений, и для неё есть «Исправить».
+ */
+export async function этоРешение(caseId: string, factId: string): Promise<Итог> {
+  try {
+    const { участник, база } = await подготовить(caseId)
+
+    const { data: было } = await база
+      .from('facts')
+      .select('id, field, value, is_plan, status')
+      .eq('id', factId)
+      .eq('case_id', caseId)
+      .maybeSingle()
+
+    if (!было) return { ok: false, ошибка: 'Факт не найден в этом деле' }
+    if (!было.is_plan) return { ok: false, ошибка: 'Этот факт и так не помечен намерением' }
+
+    const { error } = await база.from('facts').update({ is_plan: false }).eq('id', factId)
+    if (error) return { ok: false, ошибка: error.message }
+
+    await записатьВЖурнал(caseId, участник.id, 'fact_became_decision', было, {
+      id: factId,
+      field: было.field,
+      value: было.value,
+    })
+    revalidatePath(`/care/cases/${caseId}`)
+    return { ok: true }
+  } catch (e) {
+    return обработать(e)
+  }
+}
+
 // ── Подборка и стратегия ─────────────────────────────────────────────────────
 
 /**
