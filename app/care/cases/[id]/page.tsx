@@ -15,8 +15,9 @@ import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 import { сессияКонтура } from '@/lib/care/session'
 import { подробностиДела, коллегиДляПередачи } from '@/lib/care/cases'
+import { состояниеОснования } from '@/lib/care/replace'
 import { подписьПоля, подписьЗначения, периодПоля, подписьСтатуса, подписьОжидания, срок, инициалы, склонение } from '@/lib/care/labels'
-import { PublishShortlist, CaseAssistant, NewTask, ProgramControls, TaskActions, FactActions, FactIsDecision, TransferCase } from './CaseOperations'
+import { PublishShortlist, CaseAssistant, NewTask, ProgramControls, TaskActions, FactActions, FactIsDecision, TransferCase, ReplaceInShortlist } from './CaseOperations'
 import { CaseSection } from '../../CaseSection'
 import { ProgramCard } from '../../ProgramCard'
 import { AssistantPanel } from '../../AssistantPanel'
@@ -32,6 +33,10 @@ export default async function ДелоСтраница({ params }: { params: Pro
   // ничего, а на превью и в бою он разный. Берём из заголовков запроса, а не
   // из переменной окружения: переменную забудут переставить при переезде, а
   // заголовок всегда говорит, откуда пришли на самом деле.
+  // Расхождение основания читается здесь же: подборка могла быть собрана при
+  // другом бюджете, и узнать об этом надо до того, как её отдадут клиенту.
+  const основание = await состояниеОснования(id).catch(() => ({ расхождения: [] as { поле: string; было: string; стало: string }[] }))
+
   const заголовки = await headers()
   const хост = заголовки.get('x-forwarded-host') ?? заголовки.get('host') ?? ''
   const схема = заголовки.get('x-forwarded-proto') ?? (хост.startsWith('localhost') ? 'http' : 'https')
@@ -188,6 +193,7 @@ export default async function ДелоСтраница({ params }: { params: Pro
               <div>
               {д.подборка ? (
                 <>
+                  <ReplaceInShortlist caseId={id} расхождения={основание.расхождения} />
                   <div style={{ fontSize: 12, color: 'var(--ds-muted)', padding: '12px 16px 0' }}>
                     Подборка №{д.подборка.version} · {д.подборка.строки.length}{' '}
                     {склонение(д.подборка.строки.length, 'программа', 'программы', 'программ')} · собрана{' '}

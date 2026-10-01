@@ -445,6 +445,44 @@ export async function этоРешение(caseId: string, factId: string): Prom
  * Расход пишется внутри задания. Здесь остаётся только журнал: через месяц на
  * вопрос «откуда взялась эта подборка» должен быть ответ.
  */
+/**
+ * «Найти замену» — подборка собрана при другом бюджете или другой стране.
+ *
+ * Отдельным действием, а не автоматикой при правке факта: в подборке лежит
+ * работа куратора — что убрано, что первое, что выбрал клиент. Пересобрать её
+ * по изменившемуся факту значит стереть эту работу молча.
+ */
+export async function найтиЗаменуВДеле(caseId: string): Promise<{ ok: boolean; текст: string }> {
+  try {
+    const { участник } = await подготовить(caseId)
+    const { найтиЗамену } = await import('@/lib/care/replace')
+    const итог = await найтиЗамену(caseId)
+
+    await базаCare().from('events').insert({
+      actor_kind: 'member',
+      actor_id: участник.id,
+      case_id: caseId,
+      action: 'shortlist_replace_requested',
+      after: { убрано: итог.убрано, добавлено: итог.добавлено, долларов: итог.долларов },
+      source: { ui: 'app/care/cases/[id]' },
+    })
+
+    revalidatePath(`/care/cases/${caseId}`)
+
+    if (!итог.убрано && !итог.добавлено) {
+      return { ok: true, текст: итог.причины[0] ?? 'Заменять нечего.' }
+    }
+    return {
+      ok: true,
+      текст:
+        `Убрано ${итог.убрано}, добавлено ${итог.добавлено}.` +
+        (итог.причины.length ? ` ${итог.причины.join(' ')}` : ''),
+    }
+  } catch (e) {
+    return { ok: false, текст: e instanceof Error ? e.message : String(e) }
+  }
+}
+
 export async function собратьПодборкуДела(caseId: string): Promise<Итог> {
   try {
     const { участник } = await подготовить(caseId)

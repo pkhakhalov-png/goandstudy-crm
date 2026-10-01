@@ -18,6 +18,7 @@ import { взятьЗадания, закрытьЗадание, сохрани�
 import { подготовитьНапоминания } from '@/lib/care/jobs/reminders'
 import { отправитьОчередь } from '@/lib/care/jobs/send'
 import { разобратьПереписку } from '@/lib/care/jobs/extract'
+import { закрытьЗависшие } from '@/lib/care/jobs/sweep'
 import { необязательна } from '@/lib/care/env'
 import { секретГодится, секретыСовпали } from '@/lib/care/secret'
 
@@ -100,7 +101,18 @@ export async function POST(req: NextRequest) {
 
   const началоМс = Date.now()
   const воркер = имяВоркера()
-  const итог = { взято: 0, сделано: 0, ошибок: 0, отложено: 0, пропущено: 0 }
+  const итог = { взято: 0, сделано: 0, ошибок: 0, отложено: 0, пропущено: 0, прибрано: 0 }
+
+  // Уборка идёт до заданий и не зависит от очереди: поручения помощника в ней
+  // не лежат, а оборваться они могут ровно так же. Падение уборки не должно
+  // мешать работе — это гигиена, а не работа.
+  try {
+    const уборка = await закрытьЗависшие()
+    итог.прибрано = уборка.закрыто
+    for (const п of уборка.причины) console.warn(`[care tick] ${п}`)
+  } catch (err) {
+    console.error('[care tick] уборка не прошла:', err)
+  }
 
   let задания: Задание[]
   try {

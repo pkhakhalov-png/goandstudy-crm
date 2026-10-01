@@ -587,3 +587,17 @@
 .care-ai-отправить:not(:disabled):hover { transform: translateY(-1px); }
 
 .care-ai-внизу { font-size: 11px; color: var(--ds-muted); margin-top: 8px; }
+
+/* ── Основание подборки разошлось ────────────────────────────────────── */
+
+.care-основание {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 14px 16px 0;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--ds-amber-soft, var(--ds-bg-alt));
+  border: 1px solid var(--ds-amber, var(--ds-border-soft));
+}
+.care-основание-текст { font-size: 13px; line-height: 1.55; }

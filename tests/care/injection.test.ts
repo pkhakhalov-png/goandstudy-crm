@@ -184,6 +184,7 @@ describe('T19 — исполнять просьбу «отправь» помо�
       'list_cases',
       'mark_decision',
       'pending_decisions',
+      'replace_in_shortlist',
       'set_fact',
       'show_shortlist',
       'show_tasks',
