@@ -162,7 +162,7 @@ app/api/care/
 
 supabase/migrations/care/   001–021 + парные откаты
 scripts/care/               инструменты (см. ниже)
-tests/care/                 177 тестов
+tests/care/                 178 тестов
 ```
 
 ★ — самые ответственные файлы. Правки в них требуют особого внимания.
@@ -172,7 +172,7 @@ tests/care/                 177 тестов
 ## 4. Команды
 
 ```bash
-npm run test:care                      # 177 тестов (идут против боевой базы, убирают за собой)
+npm run test:care                      # 178 тестов (идут против боевой базы, убирают за собой)
 npx tsx scripts/care/selftest-perms.ts # изоляция прав, 12 проверок
 npx tsx scripts/care/smoke.ts          # отвечают ли все контуры
 npx tsx scripts/care/schedule.ts --состояние   # адрес воркера, секрет, расписание, очередь
@@ -193,6 +193,7 @@ npx tsx scripts/care/schedule.ts --выкл --применить                
 npx tsx scripts/care/switch-client.ts --вкл <case_id> --применить  # дело на новый кабинет
 
 # Миграции — только так
+npx tsx scripts/care/check-migrations.ts   # реестр сходится с репозиторием
 npx tsx scripts/care/check-sql.ts <файл>   # предохранитель, непропускаем
 npx tsx scripts/care/apply.ts <файл>       # применить (сам зовёт check-sql)
 ```
@@ -590,7 +591,7 @@ care-групп (`care.inbound_events`), а не история продаж.
 ```bash
 npx tsx scripts/care/selftest-perms.ts   # 12/12
 npx tsx scripts/care/smoke.ts            # все контуры 200
-npm run test:care                        # 177, пропусков нет
+npm run test:care                        # 178, пропусков нет
 npm run build                            # собирается
 ```
 
