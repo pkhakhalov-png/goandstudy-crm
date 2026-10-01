@@ -38,27 +38,40 @@ import {
   найтиЗаменуВДеле,
 } from './actions'
 
-type Итог = { ok: true } | { ok: false; ошибка: string }
+type Итог = { ok: true; предупреждение?: string } | { ok: false; ошибка: string }
 
 function ErrorLine({ текст }: { текст: string | null }) {
   if (!текст) return null
   return <p style={{ color: 'var(--ds-error-ink)', fontSize: 12, marginTop: 6 }}>{текст}</p>
 }
 
+/** Предупреждение: действие состоялось, но куратор должен знать подробность. */
+function WarnLine({ текст }: { текст: string | null }) {
+  if (!текст) return null
+  return (
+    <p style={{ color: 'var(--ds-amber-ink, var(--ds-muted))', fontSize: 12, marginTop: 6, lineHeight: 1.5 }}>
+      {текст}
+    </p>
+  )
+}
+
 /** Общий приём: выполнить действие, показать отказ, не дать нажать дважды. */
 function useAction() {
   const [идёт, начать] = useTransition()
   const [ошибка, установитьОшибку] = useState<string | null>(null)
+  const [предупреждение, установитьПредупреждение] = useState<string | null>(null)
 
   const выполнить = (что: () => Promise<Итог>) => {
     установитьОшибку(null)
+    установитьПредупреждение(null)
     начать(async () => {
       const итог = await что()
       if (!итог.ok) установитьОшибку(итог.ошибка)
+      else if (итог.предупреждение) установитьПредупреждение(итог.предупреждение)
     })
   }
 
-  return { идёт, ошибка, выполнить }
+  return { идёт, ошибка, предупреждение, выполнить }
 }
 
 export function NewTask({ caseId }: { caseId: string }) {
@@ -476,7 +489,7 @@ export function PublishShortlist({
   /** Кабинет открыт на боевом адресе, а не на закрытом превью. */
   боевойАдрес: boolean
 }) {
-  const { идёт, ошибка, выполнить } = useAction()
+  const { идёт, ошибка, предупреждение, выполнить } = useAction()
   const [скопировано, установитьСкопировано] = useState(false)
 
   const ссылка = токен ? `${адресОснования}/api/care/share/${токен}` : null
@@ -568,6 +581,7 @@ export function PublishShortlist({
         </div>
       )}
       <ErrorLine текст={ошибка} />
+      <WarnLine текст={предупреждение} />
     </div>
   )
 }

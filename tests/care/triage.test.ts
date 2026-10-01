@@ -209,3 +209,72 @@ describe('разбор входящих по делу', () => {
     expect(з!.due_on).toBeTruthy()
   })
 })
+
+describe('изменение условий идёт дальше ярлыка', () => {
+  const КЛИЕНТ = -990_780
+  let дело: string
+
+  beforeEach(async () => {
+    await базаCare().from('cases').delete().eq('client_id', КЛИЕНТ)
+    await базаCare().from('jobs').delete().eq('kind', 'extract_facts').in('status', ['queued', 'running'])
+    const { data: у } = await базаCare().from('members').select('id').eq('care_role', 'lead').single()
+    const { data: д, error } = await базаCare()
+      .from('cases')
+      .insert({
+        client_id: КЛИЕНТ,
+        intake_year: 2027,
+        owner_member_id: у!.id,
+        is_synthetic: true,
+        synthetic_name: 'ТЕСТ условий',
+        automation_owner: 'v2',
+      })
+      .select('id')
+      .single()
+    if (error) throw new Error(error.message)
+    дело = д!.id as string
+  })
+
+  afterEach(async () => {
+    await базаCare().from('cases').delete().eq('client_id', КЛИЕНТ)
+    await базаCare()
+      .from('jobs')
+      .delete()
+      .eq('kind', 'extract_facts')
+      .contains('payload', { case_id: дело })
+  })
+
+  it('разбор фактов ставится по делу и с внятным поводом', async () => {
+    // «Бюджет теперь девять тысяч», сказанное в десять утра, не должно ждать
+    // ночного разбора: за день на старом бюджете успевают собрать подборку и
+    // отдать её клиенту.
+    const { позватьРазборФактов } = await import('@/lib/care/jobs/triage')
+    expect(await позватьРазборФактов(дело)).toBe(true)
+
+    const { data } = await базаCare()
+      .from('jobs')
+      .select('payload, priority, status')
+      .eq('kind', 'extract_facts')
+      .eq('status', 'queued')
+
+    const наше = (data ?? []).find(
+      (з) => (з.payload as { case_id?: string }).case_id === дело
+    )
+    expect(наше).toBeTruthy()
+    expect(String((наше!.payload as { поставлено?: string }).поставлено)).toContain('условие')
+  })
+
+  it('второе сообщение об условиях не ставит второго задания', async () => {
+    // Пять сообщений подряд дали бы пять заданий и пять вызовов модели за одно
+    // и то же.
+    const { позватьРазборФактов } = await import('@/lib/care/jobs/triage')
+    await позватьРазборФактов(дело)
+    expect(await позватьРазборФактов(дело)).toBe(false)
+
+    const { data } = await базаCare()
+      .from('jobs')
+      .select('id')
+      .eq('kind', 'extract_facts')
+      .eq('status', 'queued')
+    expect((data ?? []).length).toBe(1)
+  })
+})
