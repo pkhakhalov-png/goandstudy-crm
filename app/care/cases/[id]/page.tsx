@@ -16,8 +16,9 @@ import { notFound } from 'next/navigation'
 import { сессияКонтура } from '@/lib/care/session'
 import { подробностиДела, коллегиДляПередачи } from '@/lib/care/cases'
 import { состояниеОснования } from '@/lib/care/replace'
+import { знакомыеГруппы } from '@/lib/care/chats'
 import { подписьПоля, подписьЗначения, периодПоля, подписьСтатуса, подписьОжидания, срок, инициалы, склонение } from '@/lib/care/labels'
-import { PublishShortlist, CaseAssistant, NewTask, ProgramControls, TaskActions, FactActions, FactIsDecision, TransferCase, ReplaceInShortlist } from './CaseOperations'
+import { PublishShortlist, CaseAssistant, NewTask, ProgramControls, TaskActions, FactActions, FactIsDecision, TransferCase, ReplaceInShortlist, LinkChat } from './CaseOperations'
 import { CaseSection } from '../../CaseSection'
 import { ProgramCard } from '../../ProgramCard'
 import { AssistantPanel } from '../../AssistantPanel'
@@ -33,6 +34,10 @@ export default async function ДелоСтраница({ params }: { params: Pro
   // ничего, а на превью и в бою он разный. Берём из заголовков запроса, а не
   // из переменной окружения: переменную забудут переставить при переезде, а
   // заголовок всегда говорит, откуда пришли на самом деле.
+  // Группы, которые знает бот: без них привязать чат можно только из
+  // терминала, а без привязанного чата напоминание не уходит никуда.
+  const группыБота = await знакомыеГруппы().catch(() => [])
+
   // Расхождение основания читается здесь же: подборка могла быть собрана при
   // другом бюджете, и узнать об этом надо до того, как её отдадут клиенту.
   const основание = await состояниеОснования(id).catch(() => ({ расхождения: [] as { поле: string; было: string; стало: string }[] }))
@@ -175,6 +180,14 @@ export default async function ДелоСтраница({ params }: { params: Pro
                   </div>
                 ))
               )}
+
+              {/* Привязка здесь же, где видно её отсутствие: отправлять за этим
+                  в другой экран значит, что туда не пойдут. */}
+              <LinkChat
+                caseId={id}
+                группы={группыБота}
+                привязана={д.контакты.some((к) => к.tg_chat_id !== null)}
+              />
             </div>
             }
           />

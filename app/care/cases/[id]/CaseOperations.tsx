@@ -36,6 +36,8 @@ import {
   отклонитьФакт,
   передатьДело,
   найтиЗаменуВДеле,
+  привязатьЧатКДелу,
+  отвязатьЧатОтДела,
 } from './actions'
 
 type Итог = { ok: true; предупреждение?: string } | { ok: false; ошибка: string }
@@ -835,6 +837,101 @@ export function ReplaceInShortlist({
         </button>
         {итог && <span style={{ fontSize: 12, color: 'var(--ds-muted)' }}>{итог}</span>}
       </div>
+    </div>
+  )
+}
+
+/**
+ * Привязка группы Телеграма к делу.
+ *
+ * ПОЧЕМУ ЭТО В КАРТОЧКЕ, А НЕ В НАСТРОЙКАХ. Здесь куратор и замечает, что
+ * группы нет: строка «группа в Телеграме не привязана» стоит рядом с
+ * контактами. Отправлять его за этим в другой экран — значит, что он туда не
+ * пойдёт.
+ *
+ * ПОЧЕМУ СПИСОК, А НЕ ПОЛЕ ДЛЯ НОМЕРА. Номер чата — минусовое число в
+ * тринадцать цифр; набранный руками, он однажды уведёт напоминание чужому
+ * человеку. В списке только те группы, в которых бот действительно побывал.
+ */
+export function LinkChat({
+  caseId,
+  группы,
+  привязана,
+}: {
+  caseId: string
+  группы: { chatId: string; название: string | null; занятаДелом: string | null }[]
+  привязана: boolean
+}) {
+  const { идёт, ошибка, выполнить } = useAction()
+  const [открыто, установитьОткрытое] = useState(false)
+  const [итог, установитьИтог] = useState<string | null>(null)
+
+  const свободные = группы.filter((г) => !г.занятаДелом || г.занятаДелом === caseId)
+
+  const сделать = (что: () => Promise<{ ok: boolean; текст: string }>) =>
+    выполнить(async () => {
+      const о = что()
+      const р = await о
+      установитьИтог(р.текст)
+      if (р.ok) установитьОткрытое(false)
+      return р.ok ? { ok: true } : { ok: false, ошибка: р.текст }
+    })
+
+  if (привязана) {
+    return (
+      <div style={{ marginTop: 8 }}>
+        <button
+          className="ds-btn ds-btn-ghost ds-btn-sm"
+          disabled={идёт}
+          onClick={() => сделать(() => отвязатьЧатОтДела(caseId))}
+        >
+          Отвязать группу
+        </button>
+        {итог && <p style={{ fontSize: 12, color: 'var(--ds-muted)', marginTop: 6 }}>{итог}</p>}
+        <ErrorLine текст={ошибка} />
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ marginTop: 8 }}>
+      {!открыто ? (
+        <button
+          className="ds-btn ds-btn-secondary ds-btn-sm"
+          onClick={() => установитьОткрытое(true)}
+        >
+          Привязать группу
+        </button>
+      ) : свободные.length === 0 ? (
+        <p style={{ fontSize: 13, color: 'var(--ds-muted)', margin: 0, lineHeight: 1.55 }}>
+          Бот пока не знает ни одной свободной группы. Добавьте{' '}
+          <strong>@goandstudy_care_bot</strong> в группу клиента и напишите там что-нибудь —
+          группа появится здесь.
+        </p>
+      ) : (
+        <div style={{ display: 'grid', gap: 6 }}>
+          {свободные.map((г) => (
+            <button
+              key={г.chatId}
+              className="ds-btn ds-btn-ghost ds-btn-sm"
+              style={{ justifyContent: 'flex-start', textAlign: 'left' }}
+              disabled={идёт}
+              onClick={() => сделать(() => привязатьЧатКДелу(caseId, г.chatId))}
+            >
+              {г.название ?? г.chatId}
+            </button>
+          ))}
+          <button
+            className="ds-btn ds-btn-ghost ds-btn-sm"
+            onClick={() => установитьОткрытое(false)}
+            disabled={идёт}
+          >
+            Отмена
+          </button>
+        </div>
+      )}
+      {итог && <p style={{ fontSize: 12, color: 'var(--ds-muted)', marginTop: 6 }}>{итог}</p>}
+      <ErrorLine текст={ошибка} />
     </div>
   )
 }

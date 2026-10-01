@@ -457,6 +457,40 @@ export async function этоРешение(caseId: string, factId: string): Prom
  * работа куратора — что убрано, что первое, что выбрал клиент. Пересобрать её
  * по изменившемуся факту значит стереть эту работу молча.
  */
+/**
+ * Привязать группу Телеграма к делу — из кабинета, а не из терминала.
+ *
+ * До сих пор это делал скрипт, искавший группу по имени и фамилии клиента в
+ * названии. Он работает, пока названия аккуратные, и молча не работает, когда
+ * нет. Здесь куратор говорит прямо, какая группа чья.
+ */
+export async function привязатьЧатКДелу(caseId: string, chatId: string): Promise<{ ok: boolean; текст: string }> {
+  try {
+    const { участник } = await подготовить(caseId)
+    const { привязатьГруппу } = await import('@/lib/care/chats')
+    const итог = await привязатьГруппу(caseId, chatId, участник.id)
+    revalidatePath(`/care/cases/${caseId}`)
+    revalidatePath('/care')
+    return итог.ok ? { ok: true, текст: итог.текст } : { ok: false, текст: итог.ошибка }
+  } catch (e) {
+    return { ok: false, текст: e instanceof Error ? e.message : String(e) }
+  }
+}
+
+/** Отвязать группу — когда привязали не ту. */
+export async function отвязатьЧатОтДела(caseId: string): Promise<{ ok: boolean; текст: string }> {
+  try {
+    const { участник } = await подготовить(caseId)
+    const { отвязатьГруппу } = await import('@/lib/care/chats')
+    const итог = await отвязатьГруппу(caseId, участник.id)
+    revalidatePath(`/care/cases/${caseId}`)
+    revalidatePath('/care')
+    return итог.ok ? { ok: true, текст: итог.текст } : { ok: false, текст: итог.ошибка }
+  } catch (e) {
+    return { ok: false, текст: e instanceof Error ? e.message : String(e) }
+  }
+}
+
 export async function найтиЗаменуВДеле(caseId: string): Promise<{ ok: boolean; текст: string }> {
   try {
     const { участник } = await подготовить(caseId)
