@@ -56,11 +56,24 @@ const TITLE_MIN = 20, TITLE_MAX = 65        // ~200-600px → символьно
 const META_MIN = 70, META_MAX = 160
 const THIN_WORDS = 300                       // seo-content: тонкий контент
 
+/**
+ * Виды находок, которые этот шаг пересчитывает заново.
+ *
+ * Список обязан совпадать с тем, что шаг СОЗДАЁТ: перед вставкой он удаляет
+ * старые находки перечисленных видов, и вид, забытый здесь, не удаляется
+ * никогда — он просто копится по одной строке за прогон.
+ *
+ * Так и случилось с `redirected_with_traffic`: вид создавался, в списке не
+ * стоял, и за 28 прогонов сканера 50 настоящих адресов превратились в 1350
+ * строк. Экран находок показывал 1350 проблем вместо 50, то есть завышал в 27
+ * раз — по таким числам нельзя решать, за что браться.
+ */
 const TECH_KINDS = [
   'technical_critical',
   'missing_title', 'missing_h1', 'missing_meta_desc',
   'title_length', 'meta_desc_length', 'thin_content',
   'missing_schema', 'llms_txt_missing', 'robots_sitemap',
+  'redirected_with_traffic',
 ]
 
 /** Технические находки из инвентаря + один site-wide запрос. Возвращает счётчики. */
@@ -323,7 +336,12 @@ export async function computeGscFindings(seo: any): Promise<Record<string, numbe
   // агрегируем per (url, query): клики/показы/поз + позиции по дням (для std и каннибализации)
   type PQ = { clicks: number; impr: number; posw: number; byDay: Map<string, number> }
   const perPQ = new Map<string, PQ>()
-  const SEP = ' '
+  // Разделитель для составного ключа. Был '\x00' — и из-за одного нулевого
+  // байта grep считал весь файл двоичным и молча пропускал его при поиске.
+  // Поиск по виду находки не находил ничего, хотя он создаётся в этом файле.
+  // Знак-разделитель из управляющего диапазона решает ту же задачу и
+  // оставляет файл текстовым.
+  const SEP = '\u001f'
   let dMin = '9999', dMax = '0'
   for (let from = 0; ; from += 1000) {
     const { data, error } = await seo.from('gsc_daily').select('normalized_url, query, clicks, impressions, position, date').range(from, from + 999)
