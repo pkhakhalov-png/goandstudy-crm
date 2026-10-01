@@ -111,6 +111,19 @@ async function состояние(): Promise<void> {
   const очередь = await sql<{ kind: string; status: string; сколько: number }>(
     `select kind, status, count(*)::int as "сколько" from care.jobs group by kind, status order by kind`
   )
+  const упавшие = await sql<{ kind: string; attempts: number; last_error: string | null; давно: string }>(
+    `select kind, attempts, last_error,
+            case when now() - created_at < interval '1 hour'
+                 then extract(minute from now() - created_at)::int || ' мин назад'
+                 when now() - created_at < interval '1 day'
+                 then extract(hour from now() - created_at)::int || ' ч назад'
+                 else extract(day from now() - created_at)::int || ' дн назад'
+            end as "давно"
+       from care.jobs
+      where status = 'failed'
+      order by created_at desc
+      limit 5`
+  )
   // Последние запуски cron: «расписание стоит» и «расписание работает» — разные
   // утверждения. Второе видно только здесь.
   const запуски = await sql<{ jobname: string; status: string; когда: string; сообщение: string | null }>(
@@ -133,6 +146,18 @@ async function состояние(): Promise<void> {
   console.log('Очередь: ' + (очередь.length
     ? очередь.map((о) => `${о.kind}/${о.status} — ${о.сколько}`).join(', ')
     : 'пусто'))
+
+  // Упавшие — отдельно, с возрастом и ошибкой. «failed — 1» одинаково выглядит
+  // и для задания, которое легло минуту назад, и для вчерашнего, упавшего до
+  // того, как обработчик вообще появился. Разбираться надо с первым, а
+  // привыкаешь не смотреть из-за второго.
+  if (упавшие.length) {
+    console.log('Упавшие:')
+    for (const у of упавшие) {
+      console.log(`  ${у.kind} · ${у.давно} · попыток ${у.attempts}`)
+      console.log(`      ${(у.last_error ?? 'без сообщения').slice(0, 110)}`)
+    }
+  }
   console.log('Последние запуски cron:')
   if (!запуски.length) console.log('  — ни одного')
   for (const з of запуски) {
