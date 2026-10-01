@@ -23,7 +23,6 @@ import { основаниеПодбора, кодыСтран, type Основа
 import { искатьПрограммы } from './programs'
 import { искатьВВебе } from './ai/search'
 import { можноТратить, записатьРасход } from './ai/budget'
-import { суммаИВалюта } from './fit'
 
 export type Расхождение = {
   поле: string
@@ -137,6 +136,57 @@ function поСтране(страна: string | null, основание: Ос�
   return своя.some((к) => нужные.includes(к))
 }
 
+/** Строка подборки, переставшая подходить, и почему именно. */
+export type Негодная = {
+  id: string
+  подпись: string
+  почему: string
+}
+
+/**
+ * Что в подборке перестало подходить под сегодняшнее основание.
+ *
+ * ВЫНЕСЕНО ОТДЕЛЬНО НАРОЧНО. Это решение — чисто счётное: сравнить цену с
+ * бюджетом и страну со страной. Проверять его вместе с поиском замены значит
+ * три минуты ждать веб и платить за него ради проверки арифметики, а потом
+ * ловить случайные обрывы по таймауту. Поиск проверяется отдельно и один раз.
+ *
+ * Ничего не меняет: только отвечает на вопрос. Убирает вызывающий.
+ */
+export async function чтоНеПодходит(
+  shortlistId: string,
+  основание: ОснованиеПодбора
+): Promise<Негодная[]> {
+  const { data: строки } = await базаCare()
+    .from('shortlist_items')
+    .select('id, program_ref, tuition_amount, currency, status')
+    .eq('shortlist_id', shortlistId)
+    .order('position')
+    .order('created_at')
+
+  // Выбранное клиентом не трогаем никогда: отменить чужой выбор может только
+  // человек, который с этим клиентом разговаривает.
+  const живые = (строки ?? []).filter((с) => с.status === 'active')
+  const негодные: Негодная[] = []
+
+  for (const с of живые) {
+    const ref = (с.program_ref ?? {}) as Record<string, string>
+    const подпись = `${ref.вуз ?? ''} — ${ref.программа ?? ''}`.trim()
+
+    if (!поСтране(ref.страна ?? null, основание)) {
+      негодные.push({ id: с.id as string, почему: `страна больше не та: ${основание.страна}`, подпись })
+      continue
+    }
+
+    const сумма = с.tuition_amount ? Number(с.tuition_amount) : null
+    const валюта = (с.currency as string | null) ?? null
+    const бюджет = поБюджету(сумма, валюта, основание)
+    if (!бюджет.подходит) негодные.push({ id: с.id as string, почему: бюджет.почему!, подпись })
+  }
+
+  return негодные
+}
+
 export type ИтогЗамены = {
   убрано: number
   добавлено: number
@@ -164,33 +214,7 @@ export async function найтиЗамену(caseId: string): Promise<ИтогЗ
     return итог
   }
 
-  const { data: строки } = await базаCare()
-    .from('shortlist_items')
-    .select('id, program_ref, tuition_amount, currency, status')
-    .eq('shortlist_id', состояние.shortlistId)
-    .order('position')
-    .order('created_at')
-
-  const живые = (строки ?? []).filter((с) => с.status === 'active')
-  const негодные: { id: string; почему: string; подпись: string }[] = []
-
-  for (const с of живые) {
-    const ref = (с.program_ref ?? {}) as Record<string, string>
-    const подпись = `${ref.вуз ?? ''} — ${ref.программа ?? ''}`.trim()
-
-    if (!поСтране(ref.страна ?? null, основание)) {
-      негодные.push({ id: с.id as string, почему: `страна больше не та: ${основание.страна}`, подпись })
-      continue
-    }
-
-    const { сумма, валюта } = с.tuition_amount
-      ? { сумма: Number(с.tuition_amount), валюта: (с.currency as string | null) ?? null }
-      : суммаИВалюта(null)
-    const бюджет = поБюджету(сумма, валюта, основание)
-    if (!бюджет.подходит) {
-      негодные.push({ id: с.id as string, почему: бюджет.почему!, подпись })
-    }
-  }
+  const негодные = await чтоНеПодходит(состояние.shortlistId, основание)
 
   if (!негодные.length) {
     итог.причины.push('всё в подборке по-прежнему подходит — заменять нечего')
