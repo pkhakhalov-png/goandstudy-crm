@@ -27,6 +27,7 @@ import {
   написатьСтратегиюДела,
   опубликоватьПодборку,
   отозватьСсылку,
+  проверитьТребованияДела,
   отклонитьФакт,
   передатьДело,
 } from './actions'
@@ -465,6 +466,7 @@ export function PublishShortlist({
     <div style={{ marginTop: 12 }}>
       {!ссылка ? (
         <>
+          <CheckRequirements caseId={caseId} shortlistId={shortlistId} />
           <button
             className="ds-btn ds-btn-primary ds-btn-sm"
             disabled={идёт}
@@ -533,6 +535,43 @@ export function PublishShortlist({
             перестанет работать сразу.
           </p>
         </div>
+      )}
+      <ErrorLine текст={ошибка} />
+    </div>
+  )
+}
+
+/**
+ * Проверка требований: закрывает строки «что проверить» в подборке.
+ *
+ * Имя латиницей — не стиль, а правило линтера: `react-hooks/rules-of-hooks`
+ * опознаёт компонент по заглавной латинской букве и кириллическое имя
+ * отвергает. Тексты внутри остаются русскими.
+ *
+ * Стоит дороже подбора и идёт минуты — поэтому отдельная кнопка, а не часть
+ * сборки. Куратор решает, по какой подборке это окупится.
+ */
+function CheckRequirements({ caseId, shortlistId }: { caseId: string; shortlistId: string }) {
+  const { идёт, ошибка, выполнить } = useAction()
+
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <button
+        className="ds-btn ds-btn-secondary ds-btn-sm"
+        disabled={идёт}
+        onClick={() => выполнить(() => проверитьТребованияДела(caseId, shortlistId))}
+      >
+        {идёт ? 'Читаю сайты вузов…' : 'Проверить требования'}
+      </button>
+      {идёт ? (
+        <p style={{ fontSize: 12, color: 'var(--ds-muted)', marginTop: 6 }}>
+          Помощник открывает страницы программ и ищет язык, стоимость, сроки и требования.
+          Это несколько минут.
+        </p>
+      ) : (
+        <p style={{ fontSize: 12, color: 'var(--ds-muted)', marginTop: 6 }}>
+          Закроет часть строк «проверить»: то, что найдётся на сайте, будет с цитатой.
+        </p>
       )}
       <ErrorLine текст={ошибка} />
     </div>

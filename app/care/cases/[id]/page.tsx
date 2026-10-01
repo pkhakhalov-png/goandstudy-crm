@@ -23,6 +23,15 @@ import { флагВключён } from '@/lib/care/flags'
 
 export const dynamic = 'force-dynamic'
 
+/** Что в строке подборки уже проверено на сайте вуза. */
+function проверенное(
+  заметки: Record<string, unknown>
+): { вид: string; значение: string; цитата: string }[] {
+  const список = (заметки as { проверено?: unknown }).проверено
+  if (!Array.isArray(список)) return []
+  return список as { вид: string; значение: string; цитата: string }[]
+}
+
 export default async function ДелоСтраница({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
 
@@ -235,6 +244,30 @@ export default async function ДелоСтраница({ params }: { params: Pro
                             )}
                           </div>
                         )}
+                        {/* Проверенное на сайте вуза — с цитатой. Это то, ради
+                            чего проверка и затевалась: строка «что проверить»
+                            превращается в ответ, который можно показать клиенту. */}
+                        {проверенное(с.fit_notes).map((т, i) => (
+                          <div
+                            key={i}
+                            style={{ fontSize: 12, color: 'var(--ds-success-ink)', marginTop: 5 }}
+                          >
+                            ✓ {т.вид}: {т.значение}
+                            {т.цитата && (
+                              <div
+                                style={{
+                                  color: 'var(--ds-muted)',
+                                  marginTop: 2,
+                                  paddingLeft: 10,
+                                  borderLeft: '2px solid var(--ds-line, var(--ds-muted))',
+                                }}
+                              >
+                                «{т.цитата.length > 160 ? `${т.цитата.slice(0, 160)}…` : т.цитата}»
+                              </div>
+                            )}
+                          </div>
+                        ))}
+
                         {/* Список «что проверить» не прячем под «подробнее»: он и
                             есть честность этой подборки. Пустым он не бывает. */}
                         {с.unresolved.length > 0 && (
