@@ -102,6 +102,10 @@ export type TxRow = {
   note: string | null
   origin: string
   status: string
+  // Идентификатор, а не только имя: по нему экран ставит выбранную категорию в
+  // выпадающем списке и отправляет смену. По имени это пришлось бы искать
+  // обратным поиском по справочнику, и совпадение имён его бы сломало.
+  category_id: string | null
   category: { name: string } | null
   counterparty: { name: string } | null
   client: { name: string } | null
@@ -117,7 +121,7 @@ export async function listTransactions(filter: TxFilter = {}): Promise<TxRow[]> 
   // это один поход до базы, а не по одному на строку.
   let q = db.from('transactions')
     .select(`
-      id, kind, occurred_at, note, origin, status, client_id,
+      id, kind, occurred_at, note, origin, status, client_id, category_id,
       category:categories(name),
       counterparty:counterparties(name),
       movements(account_id, amount_minor, currency)

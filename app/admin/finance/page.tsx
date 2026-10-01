@@ -7,6 +7,7 @@ import {
 } from '@/lib/finance/service'
 import { AddOperation } from './AddOperation'
 import { ReverseForm } from './ReverseForm'
+import { CategoryPicker } from './CategoryPicker'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,7 +18,10 @@ export const dynamic = 'force-dynamic'
  * сколько пришло и ушло за месяц, и что именно двигалось. Остатки берутся из
  * журнала движений, а не из отдельного хранимого числа.
  */
-export default async function FinancePage() {
+export default async function FinancePage(
+  { searchParams }: { searchParams: Promise<{ period?: string }> },
+) {
+  const { period } = await searchParams
   const { user, profile } = await viewer()
   const level = await financeAccess(user?.id)
   const accounts = await listAccounts()
@@ -55,15 +59,18 @@ export default async function FinancePage() {
     )
   }
 
-  const monthStart = new Date()
-  monthStart.setDate(1)
-  monthStart.setHours(0, 0, 0, 0)
+  // Экран показывал только текущий месяц и грузил ленту от его первого числа.
+  // Первого октября это значило один день: все 98 сентябрьских операций были на
+  // месте, но увидеть их на экране было нельзя. Период теперь выбирается, а не
+  // подразумевается.
+  const окно = разобратьПериод(period)
 
   const [bal, totals, rate, txs, categories, counterparties] = await Promise.all([
     balances(),
-    periodTotals(monthStart.toISOString(), new Date().toISOString()),
+    periodTotals(окно.от.toISOString(), окно.до.toISOString()),
     currentRate(),
-    listTransactions({ from: monthStart.toISOString(), limit: 200 }),
+    // Лента за всё время длиннее месячной — предел поднят соответственно.
+    listTransactions({ from: окно.от.toISOString(), to: окно.до.toISOString(), limit: окно.всёВремя ? 1000 : 300 }),
     listCategories(),
     listCounterparties(),
   ])
@@ -123,7 +130,7 @@ export default async function FinancePage() {
             .filter((c) => totals[c].income || totals[c].expense || bal.some((b) => b.currency === c))
             .map((c) => (
               <div key={c} className="kc">
-                <div className="kl">{monthName()} · {c === 'RUB' ? 'рубли' : 'доллары'}</div>
+                <div className="kl">{окно.название} · {c === 'RUB' ? 'рубли' : 'доллары'}</div>
                 <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 4 }}>
                   <Figure label="поступило" value={formatMinorPlain(totals[c].income)} tone="g" />
                   <Figure label="потрачено" value={formatMinorPlain(totals[c].expense)} tone="r" />
@@ -136,6 +143,8 @@ export default async function FinancePage() {
             ))}
         </div>
 
+        <Период окно={окно} />
+
         <div style={{ margin: '4px 0 14px' }}>
           <AddOperation
             accounts={bal.map((b) => ({ id: b.id, name: `${b.name} · ${b.currency}` }))}
@@ -147,8 +156,10 @@ export default async function FinancePage() {
         {/* Лента */}
         {!txs.length ? (
           <Empty
-            title="В этом месяце операций ещё нет"
-            text="Внесите первую — кнопкой выше или сообщением боту, когда он будет подключён."
+            title={окно.всёВремя ? 'Операций ещё нет' : `За ${окно.название} операций нет`}
+            text={окно.всёВремя
+              ? 'Внесите первую — кнопкой выше или сообщением боту.'
+              : 'Выберите другой период выше — возможно, операции были раньше.'}
           />
         ) : (
           byDay.map(([day, rows]) => (
@@ -160,11 +171,96 @@ export default async function FinancePage() {
                 <span style={{ fontWeight: 700, fontSize: 13 }}>{dayLabel(day)}</span>
                 <span style={{ fontSize: 12, color: 'var(--muted)' }}>{dayTotals(rows)}</span>
               </div>
-              {rows.map((t) => <Row key={t.id} tx={t} />)}
+              {rows.map((t) => <Row key={t.id} tx={t} categories={categories} />)}
             </div>
           ))
         )}
       </div>
+    </div>
+  )
+}
+
+
+/* ── Период ───────────────────────────────────────────────────────────────── */
+
+const МЕСЯЦЫ = ['январь', 'февраль', 'март', 'апрель', 'май', 'июнь',
+                'июль', 'август', 'сентябрь', 'октябрь', 'ноябрь', 'декабрь']
+
+type Окно = { от: Date; до: Date; название: string; ключ: string; всёВремя: boolean }
+
+/**
+ * Какой период показываем.
+ *
+ * `period` в адресе: `YYYY-MM` для месяца, `all` для всего времени. Пусто —
+ * текущий месяц, как было раньше.
+ *
+ * Нижняя граница «всего времени» взята заведомо раньше начала учёта, а не
+ * вычисляется из данных: лишний запрос ради даты, которая всё равно статична,
+ * того не стоит.
+ */
+function разобратьПериод(period?: string): Окно {
+  if (period === 'all') {
+    return {
+      от: new Date('2020-01-01T00:00:00Z'),
+      до: конецДня(new Date()),
+      название: 'всё время', ключ: 'all', всёВремя: true,
+    }
+  }
+  const m = /^(\d{4})-(\d{2})$/.exec(period ?? '')
+  const сейчас = new Date()
+  const год = m ? Number(m[1]) : сейчас.getFullYear()
+  const месяц = m ? Number(m[2]) - 1 : сейчас.getMonth()
+  const от = new Date(год, месяц, 1, 0, 0, 0, 0)
+  const до = new Date(год, месяц + 1, 0, 23, 59, 59, 999)
+  return {
+    от, до,
+    название: `${МЕСЯЦЫ[месяц]}${год === сейчас.getFullYear() ? '' : ` ${год}`}`,
+    ключ: `${год}-${String(месяц + 1).padStart(2, '0')}`,
+    всёВремя: false,
+  }
+}
+
+function конецДня(d: Date): Date {
+  const x = new Date(d); x.setHours(23, 59, 59, 999); return x
+}
+
+function сдвинутьМесяц(ключ: string, шаг: number): string {
+  const [г, м] = ключ.split('-').map(Number)
+  const d = new Date(г, м - 1 + шаг, 1)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+/** Переключатель периода: предыдущий месяц, текущий выбор, следующий, всё время. */
+function Период({ окно }: { окно: Окно }) {
+  const сейчас = new Date()
+  const текущий = `${сейчас.getFullYear()}-${String(сейчас.getMonth() + 1).padStart(2, '0')}`
+  // Вперёд дальше текущего месяца не пускаем: операций из будущего не бывает,
+  // а пустой экран с кнопкой «дальше» читается как поломка.
+  const след = окно.всёВремя ? null : сдвинутьМесяц(окно.ключ, 1)
+  const можноВперёд = след !== null && след <= текущий
+
+  const кнопка = (href: string, текст: string, активна: boolean) => (
+    <Link href={href} className="btn-s" style={{
+      padding: '7px 12px', fontSize: 12, textDecoration: 'none',
+      ...(активна ? { background: 'var(--purple)', color: '#fff', borderColor: 'transparent' } : {}),
+    }}>{текст}</Link>
+  )
+
+  return (
+    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', margin: '0 0 14px' }}>
+      {окно.всёВремя
+        ? кнопка(`/admin/finance?period=${текущий}`, '← к месяцам', false)
+        : кнопка(`/admin/finance?period=${сдвинутьМесяц(окно.ключ, -1)}`, '←', false)}
+      <span style={{ fontWeight: 700, fontSize: 13, minWidth: 92, textAlign: 'center' }}>
+        {окно.название}
+      </span>
+      {окно.всёВремя
+        ? <span style={{ width: 34 }} />
+        : можноВперёд
+          ? кнопка(`/admin/finance?period=${след}`, '→', false)
+          : <span style={{ width: 34 }} />}
+      <span style={{ flex: 1 }} />
+      {кнопка('/admin/finance?period=all', 'Всё время', окно.всёВремя)}
     </div>
   )
 }
@@ -180,11 +276,12 @@ function Figure({ label, value, tone }: { label: string; value: string; tone?: s
   )
 }
 
-function Row({ tx }: { tx: TxRow }) {
+function Row({ tx, categories }: { tx: TxRow; categories: { id: string; name: string }[] }) {
   const reversed = tx.status === 'reversed'
   const title = tx.counterparty?.name || tx.client?.name || tx.category?.name || KIND_NAMES[tx.kind]
+  // Категорию из подписи убрали: теперь она стоит отдельным выбором ниже, и
+  // дублировать её текстом значит показать одно и то же дважды.
   const subtitle = [
-    tx.category?.name && tx.category.name !== title ? tx.category.name : null,
     tx.note,
     tx.origin === 'telegram' ? 'из телеграма' : null,
   ].filter(Boolean).join(' · ')
@@ -202,6 +299,11 @@ function Row({ tx }: { tx: TxRow }) {
           {subtitle || KIND_NAMES[tx.kind]}
           {reversed && ' · отменена'}
         </div>
+        {!reversed && (
+          <div style={{ marginTop: 5 }}>
+            <CategoryPicker txId={tx.id} current={tx.category_id ?? null} categories={categories} />
+          </div>
+        )}
       </div>
 
       <div style={{ textAlign: 'right', flexShrink: 0 }}>
@@ -275,10 +377,6 @@ function dayTotals(rows: TxRow[]): string {
     .filter(([, v]) => v !== 0)
     .map(([c, v]) => formatMinor(v, c as Currency, { sign: v > 0 }))
   return parts.join(' · ')
-}
-
-function monthName(): string {
-  return new Date().toLocaleDateString('ru-RU', { month: 'long' })
 }
 
 function plural(n: number, one: string, few: string, many: string): string {
