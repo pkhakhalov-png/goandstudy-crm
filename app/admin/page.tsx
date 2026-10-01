@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { безТестовых } from '@/lib/test-data'
 import { Dashboard } from './Dashboard'
 
 export default async function AdminPage() {
@@ -10,7 +11,7 @@ export default async function AdminPage() {
     { data: salespersons },
     { data: fixedExpenses },
   ] = await Promise.all([
-    supabase.from('clients').select('id, name, country, status, salesperson_id, created_at'),
+    безТестовых(supabase.from('clients').select('id, name, country, status, salesperson_id, created_at')),
     supabase.from('payments_view').select('id, client_id, plan_sum, fact_sum, is_paid, status, plan_date, fact_date'),
     supabase.from('expenses').select('id, client_id, plan_sum, fact_sum, is_paid, article, who, plan_date, fact_date'),
     supabase.from('users').select('id, name, is_active').eq('role', 'salesperson').order('name'),

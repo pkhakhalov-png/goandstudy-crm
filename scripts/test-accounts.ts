@@ -81,6 +81,8 @@ async function создать() {
     if (был) { console.log(`  ${к.имя} — уже есть`); continue }
 
     const { data: клиент, error } = await sb.from('clients').insert({
+    // Отчёты считают без тестовых: см. lib/test-data.ts.
+    is_test: true,
       name: к.имя,
       phone: null,                 // без телефона: чтобы случайно не позвонили
       country: к.страна,

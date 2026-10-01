@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { безТестовых } from '@/lib/test-data'
 import { redirect } from 'next/navigation'
 import { AnalyticsShell } from './AnalyticsShell'
 import { resolvePeriod, type Tab } from './lib/period'
@@ -23,7 +24,7 @@ async function loadCuratorPayouts(supabase: Awaited<ReturnType<typeof createClie
   const ids = [...new Set((expenses ?? []).map(e => e.client_id))]
   const [{ data: clients }, { data: curators }] = await Promise.all([
     ids.length
-      ? supabase.from('clients').select('id, name, country, curator_id, expected_offer_month, status').in('id', ids)
+      ? безТестовых(supabase.from('clients').select('id, name, country, curator_id, expected_offer_month, status').in('id', ids))
       : Promise.resolve({ data: [] as any[] }),
     supabase.from('curators').select('id, name'),
   ])

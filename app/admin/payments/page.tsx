@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { безТестовых, платежиБезТестовых } from '@/lib/test-data'
 import { logout } from '@/app/login/actions'
 import { PaymentsClient } from './PaymentsClient'
 
@@ -12,7 +13,7 @@ export default async function AdminPaymentsPage() {
     { data: salespersons },
     { data: curators },
   ] = await Promise.all([
-    supabase.from('clients').select('id, name, phone, country, status, salesperson_id, curator_id'),
+    безТестовых(supabase.from('clients').select('id, name, phone, country, status, salesperson_id, curator_id')),
     supabase.from('users').select('id, name'),
     supabase.from('curators').select('id, name'),
     supabase.from('payments_view').select('id, client_id, num, plan_date, plan_sum, fact_sum, fact_date, is_paid, status, comment').order('plan_date', { ascending: true }),
@@ -25,7 +26,11 @@ export default async function AdminPaymentsPage() {
   const soonThreshold = new Date(today)
   soonThreshold.setDate(soonThreshold.getDate() + 7)
 
-  const payments = (rawPayments ?? []).map(p => {
+  // Платежи приезжают из payments_view отдельным запросом, и фильтр по
+  // клиентам до них сам не доходит. Без этой строки платёж тестового клиента
+  // остался бы в списке с пустой карточкой — хуже, чем был: сумма в итогах
+  // есть, а чья она, не видно.
+  const payments = платежиБезТестовых(rawPayments ?? [], rawClients ?? []).map(p => {
     const client = rawClients?.find(c => c.id === p.client_id)
 
     // Recompute status client-side: the DB view only knows 'paid'/'overdue'/'soon',
