@@ -16,29 +16,14 @@ import { notFound } from 'next/navigation'
 import { сессияКонтура } from '@/lib/care/session'
 import { подробностиДела, коллегиДляПередачи } from '@/lib/care/cases'
 import { подписьПоля, подписьЗначения, периодПоля, подписьСтатуса, подписьОжидания, срок, инициалы, склонение } from '@/lib/care/labels'
-import { буквыВуза, цветВуза } from '@/lib/care/herb'
 import { PublishShortlist, CaseAssistant, NewTask, ProgramControls, TaskActions, FactActions, FactIsDecision, TransferCase } from './CaseOperations'
+import { CaseSection } from '../../CaseSection'
+import { ProgramCard } from '../../ProgramCard'
 import { AssistantPanel } from '../../AssistantPanel'
 import { историяПомощника } from '../../assistant-actions'
 import { флагВключён } from '@/lib/care/flags'
 
 export const dynamic = 'force-dynamic'
-
-/** Выводы сверки проверенного с фактами клиента. */
-function сверка(заметки: Record<string, unknown>): { вид: string; вывод: string; объяснение: string }[] {
-  const список = (заметки as { сверка?: unknown }).сверка
-  if (!Array.isArray(список)) return []
-  return список as { вид: string; вывод: string; объяснение: string }[]
-}
-
-/** Что в строке подборки уже проверено на сайте вуза. */
-function проверенное(
-  заметки: Record<string, unknown>
-): { вид: string; значение: string; цитата: string }[] {
-  const список = (заметки as { проверено?: unknown }).проверено
-  if (!Array.isArray(список)) return []
-  return список as { вид: string; значение: string; цитата: string }[]
-}
 
 export default async function ДелоСтраница({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -80,90 +65,70 @@ export default async function ДелоСтраница({ params }: { params: Pro
         ← Клиенты
       </Link>
 
-      <div className="care-case" style={{ marginTop: 16 }}>
-        {/* ── Контекст ───────────────────────────────────────────────── */}
-        <aside className="care-case-ctx">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
-            <span className="care-ava" data-size="lg">
-              {инициалы(д.имяКлиента)}
-            </span>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontWeight: 700, fontSize: 19, lineHeight: 1.2 }}>{д.имяКлиента}</div>
-              <div style={{ fontSize: 12, color: 'var(--ds-muted)' }}>
-                Куратор: {сессия.имя ?? 'вы'}
-              </div>
-            </div>
+      {/* ── Шапка дела ─────────────────────────────────────────────────
+          Была левая колонка в 280 пикселей: имя, цикл, четыре счётчика и
+          кнопка. Она занимала четверть ширины и половину высоты экрана
+          пустотой, а читалась за секунду. То же самое в одну строку сверху —
+          и вся ширина уходит работе. */}
+      <div className="care-case-top" style={{ marginTop: 16 }}>
+        <span className="care-ava" data-size="lg">
+          {инициалы(д.имяКлиента)}
+        </span>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontWeight: 700, fontSize: 19, lineHeight: 1.2 }}>{д.имяКлиента}</div>
+          <div style={{ fontSize: 12, color: 'var(--ds-muted)' }}>
+            Куратор: {сессия.имя ?? 'вы'}
+            {' · '}
+            {д.дело.intake_year}
+            {д.дело.intake_term ? ` · ${д.дело.intake_term}` : ''}
+            {д.дело.service_scope ? ` · ${д.дело.service_scope}` : ''}
           </div>
+        </div>
 
-          {д.дело.is_synthetic && (
-            <div className="ds-chip ds-chip-warning" style={{ marginBottom: 12 }}>
-              тестовое дело
-            </div>
-          )}
+        {д.дело.is_synthetic && <span className="ds-chip ds-chip-warning">тестовое дело</span>}
 
-          {/* Цикл поступления показывается всегда, даже когда он один:
-              интерфейс должен приучать, что заявки принадлежат циклу. */}
-          <div className="ds-card" style={{ padding: 14, marginBottom: 12 }}>
-            <div className="ds-label" style={{ marginBottom: 6 }}>
-              Цикл поступления
-            </div>
-            <div style={{ fontWeight: 600 }}>
-              {д.дело.intake_year}
-              {д.дело.intake_term ? ` · ${д.дело.intake_term}` : ''}
-            </div>
-            {д.дело.service_scope && (
-              <div style={{ fontSize: 13, color: 'var(--ds-muted)', marginTop: 2 }}>
-                {д.дело.service_scope}
-              </div>
-            )}
+        <div className="care-case-facts">
+          <div className="care-case-fact">
+            <b>{открытыхЗадач}</b>
+            задачи
           </div>
-
-          <div className="ds-card" style={{ padding: 14, marginBottom: 12 }}>
-            <div className="ds-label" style={{ marginBottom: 8 }}>
-              В деле
-            </div>
-            <div style={{ display: 'grid', gap: 5, fontSize: 13 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>Задачи</span>
-                <span style={{ fontWeight: 600 }}>{открытыхЗадач}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>Что известно</span>
-                <span style={{ fontWeight: 600 }}>
-                  {известное.length}
-                  {черновиков > 0 && (
-                    <span style={{ color: 'var(--ds-ai)', marginLeft: 5 }} title="не подтверждено">
-                      ●{черновиков}
-                    </span>
-                  )}
+          <div className="care-case-fact">
+            <b>
+              {известное.length}
+              {черновиков > 0 && (
+                <span style={{ color: 'var(--ds-ai)', marginLeft: 4 }} title="не подтверждено">
+                  ●{черновиков}
                 </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>Документы</span>
-                <span style={{ fontWeight: 600 }}>{д.документы.length}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>Источники</span>
-                <span style={{ fontWeight: 600 }}>{д.источники.length}</span>
-              </div>
-            </div>
+              )}
+            </b>
+            известно
           </div>
-
+          <div className="care-case-fact">
+            <b>{д.документы.length}</b>
+            документы
+          </div>
+          <div className="care-case-fact">
+            <b>{д.источники.length}</b>
+            источники
+          </div>
           <TransferCase caseId={id} кандидаты={коллеги} />
-        </aside>
+        </div>
+      </div>
 
+      <div className="care-case">
         {/* ── Работа ─────────────────────────────────────────────────── */}
         <div>
-          <section className="care-sec">
-            <div className="care-sec-head">
-              <h2 className="ds-label" style={{ margin: 0 }}>
-                Что известно
-              </h2>
-              <span className="care-sec-count">
-                {черновиков > 0 ? `${черновиков} не подтверждено` : 'всё подтверждено'}
-              </span>
-            </div>
-            <div className="ds-card">
+          <CaseSection
+            ключ="известно"
+            заголовок="Что известно"
+            сводка={
+              известное.length === 0
+                ? 'пока ничего'
+                : `${известное.length} ${склонение(известное.length, 'запись', 'записи', 'записей')} · ${черновиков > 0 ? `${черновиков} не подтверждено` : 'всё подтверждено'}`
+            }
+            поумолчанию
+            дети={
+              <div style={{ padding: '14px 16px 16px' }}>
               {известное.length === 0 ? (
                 <p style={{ fontSize: 13, color: 'var(--ds-muted)', margin: 0 }}>
                   Пока ничего не записано. Факты появятся, когда помощник разберёт встречу.
@@ -206,165 +171,50 @@ export default async function ДелоСтраница({ params }: { params: Pro
                 ))
               )}
             </div>
-          </section>
+            }
+          />
 
-          <section className="care-sec">
-            <div className="care-sec-head">
-              <h2 className="ds-label" style={{ margin: 0 }}>
-                Подборка и стратегия
-              </h2>
-              <CaseAssistant caseId={id} />
-            </div>
-            <div className="ds-card">
+          <CaseSection
+            ключ="подборка"
+            заголовок="Подборка и стратегия"
+            сводка={
+              д.подборка
+                ? `${д.подборка.строки.filter((с) => с.status !== 'removed').length} ${склонение(д.подборка.строки.filter((с) => с.status !== 'removed').length, 'программа', 'программы', 'программ')}${д.стратегия ? ' · стратегия написана' : ' · стратегии нет'}`
+                : 'ещё не собрана'
+            }
+            поумолчанию
+            действие={<CaseAssistant caseId={id} />}
+            дети={
+              <div>
               {д.подборка ? (
                 <>
-                  <div style={{ fontSize: 12, color: 'var(--ds-muted)', marginBottom: 10 }}>
+                  <div style={{ fontSize: 12, color: 'var(--ds-muted)', padding: '12px 16px 0' }}>
                     Подборка №{д.подборка.version} · {д.подборка.строки.length}{' '}
                     {склонение(д.подборка.строки.length, 'программа', 'программы', 'программ')} · собрана{' '}
                     {new Date(д.подборка.created_at).toLocaleDateString('ru-RU')}
                   </div>
                   {(() => {
                     const живые = д.подборка.строки.filter((с) => с.status !== 'removed')
-                    return живые
-                  })().map((с, индекс, живые) => {
-                    const ref = с.program_ref as Record<string, string>
-                    const почему = (с.fit_notes as { почему?: string }).почему
                     return (
-                      <div
-                        key={с.id}
-                        className="care-fact"
-                        style={с.status === 'chosen' ? { borderLeft: '3px solid var(--ds-ai)', paddingLeft: 10 } : undefined}
-                      >
-                        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                          {/* Знак рисуем сами: в справочнике под видом логотипов
-                              лежат ссылки на чужие сервисы фавиконок, а страницу
-                              открывает клиент. */}
-                          <span
-                            aria-hidden
-                            style={{
-                              flex: '0 0 auto',
-                              width: 38,
-                              height: 38,
-                              borderRadius: 10,
-                              background: цветВуза(ref.вуз ?? ''),
-                              color: '#fff',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontSize: буквыВуза(ref.вуз ?? '').length > 2 ? 11 : 13,
-                              fontWeight: 650,
-                              letterSpacing: '.02em',
-                            }}
-                          >
-                            {буквыВуза(ref.вуз ?? '')}
-                          </span>
-                          <div style={{ minWidth: 0, flex: 1 }}>
-                            <div style={{ fontSize: 15, fontWeight: 500 }}>
-                              {ref.вуз} — {ref.программа}
-                            </div>
-                            <div style={{ fontSize: 12, color: 'var(--ds-muted)', marginTop: 2 }}>
-                              {[ref.город, ref.страна, с.tuition_amount ? `${с.tuition_amount} ${с.currency ?? ''}`.trim() : 'стоимость не указана']
-                                .filter(Boolean)
-                                .join(' · ')}
-                            </div>
-                          </div>
-                        </div>
-                        {почему && (
-                          <div style={{ fontSize: 13, marginTop: 5, lineHeight: 1.5 }}>{почему}</div>
-                        )}
-                        {ref.ссылка && (
-                          <div style={{ marginTop: 5 }}>
-                            <a
-                              href={ref.ссылка}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="ds-link"
-                              style={{ fontSize: 12 }}
-                            >
-                              страница программы ↗
-                            </a>
-                            {ref.проверено && (
-                              <span style={{ fontSize: 12, color: 'var(--ds-muted)' }}>
-                                {' '}· проверено {ref.проверено}
-                              </span>
-                            )}
-                          </div>
-                        )}
-                        {/* Сверка идёт первой: «не подходит» важнее всего
-                            остального в строке, и прятать его под цитатами
-                            значит прятать единственное, ради чего всё это. */}
-                        {сверка(с.fit_notes)
-                          .filter((в) => в.вывод !== 'подходит')
-                          .map((в, i) => (
-                            <div
-                              key={`с${i}`}
-                              style={{
-                                fontSize: 13,
-                                marginTop: 6,
-                                padding: '6px 9px',
-                                borderRadius: 7,
-                                background:
-                                  в.вывод === 'не подходит'
-                                    ? 'var(--ds-error-soft, var(--ds-bg-alt))'
-                                    : 'var(--ds-amber-soft, var(--ds-bg-alt))',
-                                color:
-                                  в.вывод === 'не подходит'
-                                    ? 'var(--ds-error-ink)'
-                                    : 'var(--ds-ink, inherit)',
-                              }}
-                            >
-                              {в.вывод === 'не подходит' ? 'Не подходит: ' : 'Неясно: '}
-                              {в.объяснение}
-                            </div>
-                          ))}
-
-                        {/* Проверенное на сайте вуза — с цитатой. Это то, ради
-                            чего проверка и затевалась: строка «что проверить»
-                            превращается в ответ, который можно показать клиенту. */}
-                        {проверенное(с.fit_notes).map((т, i) => (
-                          <div
-                            key={i}
-                            style={{ fontSize: 12, color: 'var(--ds-success-ink)', marginTop: 5 }}
-                          >
-                            ✓ {т.вид}: {т.значение}
-                            {т.цитата && (
-                              <div
-                                style={{
-                                  color: 'var(--ds-muted)',
-                                  marginTop: 2,
-                                  paddingLeft: 10,
-                                  borderLeft: '2px solid var(--ds-line, var(--ds-muted))',
-                                }}
-                              >
-                                «{т.цитата.length > 160 ? `${т.цитата.slice(0, 160)}…` : т.цитата}»
-                              </div>
-                            )}
-                          </div>
+                      <div className="care-progs">
+                        {живые.map((с, индекс) => (
+                          <ProgramCard
+                            key={с.id}
+                            caseId={id}
+                            строка={с}
+                            номер={индекс + 1}
+                            первая={индекс === 0}
+                            последняя={индекс === живые.length - 1}
+                          />
                         ))}
-
-                        {/* Список «что проверить» не прячем под «подробнее»: он и
-                            есть честность этой подборки. Пустым он не бывает. */}
-                        {с.unresolved.length > 0 && (
-                          <div style={{ fontSize: 12, color: 'var(--ds-amber-ink, var(--ds-muted))', marginTop: 5 }}>
-                            Проверить: {с.unresolved.join(' · ')}
-                          </div>
-                        )}
-
-                        <ProgramControls
-                          caseId={id}
-                          itemId={с.id}
-                          статус={с.status}
-                          первая={индекс === 0}
-                          последняя={индекс === живые.length - 1}
-                        />
                       </div>
                     )
-                  })}
+                  })()}
 
                   {/* Убранное не прячем совсем: «почему мы не рассматривали
                       Мюнхен» — обычный вопрос через месяц. */}
                   {д.подборка.строки.some((с) => с.status === 'removed') && (
-                    <details style={{ marginTop: 10 }}>
+                    <details style={{ margin: '0 16px 12px' }}>
                       <summary style={{ fontSize: 12, color: 'var(--ds-muted)', cursor: 'pointer' }}>
                         Убранные ({д.подборка.строки.filter((с) => с.status === 'removed').length})
                       </summary>
@@ -391,6 +241,7 @@ export default async function ДелоСтраница({ params }: { params: Pro
                     </details>
                   )}
 
+                  <div style={{ padding: '0 16px 14px' }}>
                   <PublishShortlist
                     caseId={id}
                     shortlistId={д.подборка.id}
@@ -398,9 +249,10 @@ export default async function ДелоСтраница({ params }: { params: Pro
                     адресОснования={адресОснования}
                     боевойАдрес={боевойАдрес}
                   />
+                  </div>
                 </>
               ) : (
-                <p style={{ fontSize: 13, color: 'var(--ds-muted)', margin: 0 }}>
+                <p style={{ fontSize: 13, color: 'var(--ds-muted)', padding: '14px 16px' }}>
                   Подборки ещё нет. Нужны подтверждённые страна и направление — по ним и
                   подбирается.
                 </p>
@@ -409,31 +261,33 @@ export default async function ДелоСтраница({ params }: { params: Pro
               {д.стратегия && (
                 <div
                   style={{
-                    marginTop: 14,
-                    paddingTop: 14,
-                    borderTop: '1px solid var(--ds-line, var(--ds-muted))',
+                    padding: '14px 16px 16px',
+                    borderTop: '1px solid var(--ds-border-soft)',
                   }}
                 >
                   <div style={{ fontSize: 12, color: 'var(--ds-muted)', marginBottom: 6 }}>
                     Стратегия поступления · черновик от{' '}
                     {new Date(д.стратегия.created_at).toLocaleDateString('ru-RU')}
                   </div>
-                  <div style={{ fontSize: 14, lineHeight: 1.65, whiteSpace: 'pre-line' }}>
+                  {/* Мера строки: стратегия на всю ширину в тысячу пикселей
+                      не читается — глаз теряет начало следующей строки. */}
+                  <div style={{ fontSize: 14, lineHeight: 1.65, whiteSpace: 'pre-line', maxWidth: '68ch' }}>
                     {д.стратегия.текст}
                   </div>
                 </div>
               )}
             </div>
-          </section>
+            }
+          />
 
-          <section className="care-sec">
-            <div className="care-sec-head">
-              <h2 className="ds-label" style={{ margin: 0 }}>
-                План и задачи
-              </h2>
-              <NewTask caseId={id} />
-            </div>
-            <div className="ds-card">
+          <CaseSection
+            ключ="задачи"
+            заголовок="План и задачи"
+            сводка={`${открытыхЗадач} ${склонение(открытыхЗадач, 'открытая', 'открытых', 'открытых')} из ${д.задачи.length}`}
+            поумолчанию
+            действие={<NewTask caseId={id} />}
+            дети={
+              <div style={{ padding: '14px 16px 16px' }}>
               {д.задачи.length === 0 ? (
                 <p style={{ fontSize: 13, color: 'var(--ds-muted)', margin: 0 }}>
                   Задач нет — завести первую.
@@ -475,16 +329,15 @@ export default async function ДелоСтраница({ params }: { params: Pro
                 })
               )}
             </div>
-          </section>
+            }
+          />
 
-          <section className="care-sec">
-            <div className="care-sec-head">
-              <h2 className="ds-label" style={{ margin: 0 }}>
-                Вузы и заявки
-              </h2>
-              <span className="care-sec-count">{д.заявки.length}</span>
-            </div>
-            <div className="ds-card">
+          <CaseSection
+            ключ="заявки"
+            заголовок="Вузы и заявки"
+            сводка={д.заявки.length === 0 ? 'заявок нет' : `${д.заявки.length} ${склонение(д.заявки.length, 'заявка', 'заявки', 'заявок')}`}
+            дети={
+              <div style={{ padding: '14px 16px 16px' }}>
               {д.заявки.length === 0 ? (
                 <p style={{ fontSize: 13, color: 'var(--ds-muted)', margin: 0 }}>
                   Подборки нет — предложить варианты.
@@ -517,16 +370,15 @@ export default async function ДелоСтраница({ params }: { params: Pro
                 })
               )}
             </div>
-          </section>
+            }
+          />
 
-          <section className="care-sec">
-            <div className="care-sec-head">
-              <h2 className="ds-label" style={{ margin: 0 }}>
-                Документы
-              </h2>
-              <span className="care-sec-count">из действующей CRM, только просмотр</span>
-            </div>
-            <div className="ds-card">
+          <CaseSection
+            ключ="документы"
+            заголовок="Документы"
+            сводка={`${д.документы.length} · из действующей CRM, только просмотр`}
+            дети={
+              <div style={{ padding: '14px 16px 16px' }}>
               {д.документы.length === 0 ? (
                 <p style={{ fontSize: 13, color: 'var(--ds-muted)', margin: 0 }}>
                   Документы не загружены — запросить у клиента.
@@ -542,15 +394,15 @@ export default async function ДелоСтраница({ params }: { params: Pro
                 ))
               )}
             </div>
-          </section>
+            }
+          />
 
-          <section className="care-sec">
-            <div className="care-sec-head">
-              <h2 className="ds-label" style={{ margin: 0 }}>
-                Контакты
-              </h2>
-            </div>
-            <div className="ds-card">
+          <CaseSection
+            ключ="контакты"
+            заголовок="Контакты"
+            сводка={д.контакты.length === 0 ? 'никого' : `${д.контакты.length} ${склонение(д.контакты.length, 'человек', 'человека', 'человек')}`}
+            дети={
+              <div style={{ padding: '14px 16px 16px' }}>
               {д.контакты.length === 0 ? (
                 <p style={{ fontSize: 13, color: 'var(--ds-muted)', margin: 0 }}>
                   Контактов нет. Отправлять некому — и это к лучшему, пока их не проверили.
@@ -573,16 +425,15 @@ export default async function ДелоСтраница({ params }: { params: Pro
                 ))
               )}
             </div>
-          </section>
+            }
+          />
 
-          <section className="care-sec">
-            <div className="care-sec-head">
-              <h2 className="ds-label" style={{ margin: 0 }}>
-                Переписка и источники
-              </h2>
-              <span className="care-sec-count">{д.источники.length}</span>
-            </div>
-            <div className="ds-card">
+          <CaseSection
+            ключ="источники"
+            заголовок="Переписка и источники"
+            сводка={д.источники.length === 0 ? 'источников нет' : `${д.источники.length} ${склонение(д.источники.length, 'источник', 'источника', 'источников')}`}
+            дети={
+              <div style={{ padding: '14px 16px 16px' }}>
               {д.источники.length === 0 ? (
                 <p style={{ fontSize: 13, color: 'var(--ds-muted)', margin: 0 }}>
                   Источников нет. Переписка переносится скриптом import-history.
@@ -608,15 +459,15 @@ export default async function ДелоСтраница({ params }: { params: Pro
                 })
               )}
             </div>
-          </section>
+            }
+          />
 
-          <section className="care-sec">
-            <div className="care-sec-head">
-              <h2 className="ds-label" style={{ margin: 0 }}>
-                История дела
-              </h2>
-            </div>
-            <div className="ds-card">
+          <CaseSection
+            ключ="журнал"
+            заголовок="История дела"
+            сводка={д.журнал.length === 0 ? 'записей нет' : `${д.журнал.length} ${склонение(д.журнал.length, 'запись', 'записи', 'записей')}`}
+            дети={
+              <div style={{ padding: '14px 16px 16px' }}>
               {д.журнал.length === 0 ? (
                 <p style={{ fontSize: 13, color: 'var(--ds-muted)', margin: 0 }}>Записей нет.</p>
               ) : (
@@ -631,7 +482,8 @@ export default async function ДелоСтраница({ params }: { params: Pro
                 ))
               )}
             </div>
-          </section>
+            }
+          />
         </div>
 
         {/* ── Помощник ───────────────────────────────────────────────── */}
