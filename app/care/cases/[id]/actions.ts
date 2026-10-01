@@ -511,6 +511,115 @@ export async function написатьСтратегиюДела(caseId: string)
   }
 }
 
+/**
+ * Принять подборку и собрать страницу для клиента.
+ *
+ * ПОЧЕМУ ЭТО ОДНА ОПЕРАЦИЯ, А НЕ ДВЕ. «Принять» и «опубликовать» различались бы
+ * только в голове у того, кто писал код: куратор принимает подборку ровно
+ * затем, чтобы показать её клиенту. Два шага означали бы принятые подборки,
+ * которые никто не показал, и вопрос «а почему он её не отправил».
+ *
+ * Вступление пишет помощник, но названия, цены и ссылки в страницу
+ * подставляются из строк подборки механически. Модель не должна иметь
+ * возможности назвать программу, которой нет: проверять это будет клиент.
+ */
+export async function опубликоватьПодборку(caseId: string, shortlistId: string): Promise<Итог> {
+  try {
+    const { участник, база } = await подготовить(caseId)
+    const { новыйТокен } = await import('@/lib/care/share')
+    const { написатьВступление } = await import('@/lib/care/ai/intro')
+    const { можноТратить, записатьРасход } = await import('@/lib/care/ai/budget')
+
+    const { data: подборка } = await база
+      .from('shortlists')
+      .select('id, case_id, status, share_token')
+      .eq('id', shortlistId)
+      .eq('case_id', caseId)
+      .maybeSingle()
+    if (!подборка) return { ok: false, ошибка: 'Подборка не найдена в этом деле' }
+
+    const { data: строки } = await база
+      .from('shortlist_items')
+      .select('program_ref, tuition_amount, currency, unresolved')
+      .eq('shortlist_id', shortlistId)
+      .order('position')
+    if (!(строки ?? []).length) return { ok: false, ошибка: 'В подборке нет ни одной программы' }
+
+    // Вступление необязательно: без модели страница остаётся полезной, а
+    // список вузов — тем же самым. Падать из-за украшения было бы неверно.
+    let вступление: string | null = null
+    const потолок = await можноТратить('review')
+    if (потолок.можно) {
+      const итог = await написатьВступление(
+        (строки ?? []).map((с) => {
+          const ref = (с.program_ref ?? {}) as Record<string, string>
+          return {
+            вуз: ref.вуз ?? '',
+            программа: ref.программа ?? '',
+            страна: ref.страна ?? '',
+            стоимость: с.tuition_amount ? `${с.tuition_amount} ${с.currency ?? ''}`.trim() : null,
+            проверить: (с.unresolved ?? []) as string[],
+          }
+        })
+      )
+      if (итог.расход) await записатьРасход('review', итог.расход, { caseId, пометка: 'вступление к подборке' })
+      вступление = итог.текст || null
+    }
+
+    // Прежний секрет сохраняем: у клиента ссылка уже может быть на руках, и
+    // новая при каждой правке означала бы, что он однажды откроет мёртвую.
+    const токен = (подборка.share_token as string | null) ?? новыйТокен()
+
+    const { error } = await база
+      .from('shortlists')
+      .update({
+        status: 'published',
+        reviewed_by: участник.id,
+        reviewed_at: new Date().toISOString(),
+        published_at: new Date().toISOString(),
+        share_token: токен,
+        intro: вступление,
+      })
+      .eq('id', shortlistId)
+    if (error) return { ok: false, ошибка: error.message }
+
+    await записатьВЖурнал(caseId, участник.id, 'shortlist_published', null, {
+      shortlist_id: shortlistId,
+      программ: (строки ?? []).length,
+    })
+    revalidatePath(`/care/cases/${caseId}`)
+    return { ok: true }
+  } catch (e) {
+    return обработать(e)
+  }
+}
+
+/**
+ * Отозвать ссылку.
+ *
+ * Нужно ровно тогда, когда ссылка ушла не туда или подборка устарела
+ * настолько, что показывать её нельзя. Следующий запрос по старому адресу
+ * получает «ссылка не действует» — и это честнее, чем оставить страницу жить.
+ */
+export async function отозватьСсылку(caseId: string, shortlistId: string): Promise<Итог> {
+  try {
+    const { участник, база } = await подготовить(caseId)
+
+    const { error } = await база
+      .from('shortlists')
+      .update({ share_token: null, status: 'curator_review', published_at: null })
+      .eq('id', shortlistId)
+      .eq('case_id', caseId)
+    if (error) return { ok: false, ошибка: error.message }
+
+    await записатьВЖурнал(caseId, участник.id, 'shortlist_unpublished', null, { shortlist_id: shortlistId })
+    revalidatePath(`/care/cases/${caseId}`)
+    return { ok: true }
+  } catch (e) {
+    return обработать(e)
+  }
+}
+
 // ── Передача дела ────────────────────────────────────────────────────────────
 
 /**

@@ -25,6 +25,8 @@ import {
   исправитьФакт,
   собратьПодборкуДела,
   написатьСтратегиюДела,
+  опубликоватьПодборку,
+  отозватьСсылку,
   отклонитьФакт,
   передатьДело,
 } from './actions'
@@ -416,6 +418,99 @@ export function CaseAssistant({ caseId }: { caseId: string }) {
             ? 'Помощник ищет программы на сайтах вузов. Это минута-полторы.'
             : 'Помощник читает дело целиком. Это около минуты.'}
         </p>
+      )}
+      <ErrorLine текст={ошибка} />
+    </div>
+  )
+}
+
+/**
+ * Принять подборку и отдать её клиенту ссылкой.
+ *
+ * Ссылка показывается целиком и копируется одним нажатием: куратор отправит её
+ * в Телеграм, а набирать руками секрет из тридцати знаков невозможно.
+ */
+export function PublishShortlist({
+  caseId,
+  shortlistId,
+  токен,
+  адресОснования,
+}: {
+  caseId: string
+  shortlistId: string
+  токен: string | null
+  адресОснования: string
+}) {
+  const { идёт, ошибка, выполнить } = useAction()
+  const [скопировано, установитьСкопировано] = useState(false)
+
+  const ссылка = токен ? `${адресОснования}/api/care/share/${токен}` : null
+
+  const копировать = async () => {
+    if (!ссылка) return
+    try {
+      await navigator.clipboard.writeText(ссылка)
+      установитьСкопировано(true)
+      setTimeout(() => установитьСкопировано(false), 2000)
+    } catch {
+      // Буфер обмена может быть закрыт настройками браузера. Ссылка видна
+      // целиком и выделяется мышью — кнопка тут удобство, а не единственный путь.
+    }
+  }
+
+  return (
+    <div style={{ marginTop: 12 }}>
+      {!ссылка ? (
+        <>
+          <button
+            className="ds-btn ds-btn-primary ds-btn-sm"
+            disabled={идёт}
+            onClick={() => выполнить(() => опубликоватьПодборку(caseId, shortlistId))}
+          >
+            {идёт ? 'Собираю страницу…' : 'Принять и собрать страницу клиенту'}
+          </button>
+          <p style={{ fontSize: 12, color: 'var(--ds-muted)', marginTop: 6 }}>
+            Появится ссылка, которую можно переслать. На странице только список программ —
+            ни имени, ни бюджета, ни переписки.
+          </p>
+        </>
+      ) : (
+        <div>
+          <div style={{ fontSize: 12, color: 'var(--ds-muted)', marginBottom: 6 }}>
+            Страница для клиента готова:
+          </div>
+          <div
+            style={{
+              fontSize: 12,
+              fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+              background: 'var(--ds-bg-alt)',
+              borderRadius: 8,
+              padding: '8px 10px',
+              wordBreak: 'break-all',
+            }}
+          >
+            {ссылка}
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+            <button className="ds-btn ds-btn-secondary ds-btn-sm" onClick={копировать}>
+              {скопировано ? 'Скопировано' : 'Скопировать ссылку'}
+            </button>
+            <a className="ds-btn ds-btn-ghost ds-btn-sm" href={ссылка} target="_blank" rel="noopener noreferrer">
+              Открыть
+            </a>
+            <button
+              className="ds-btn ds-btn-ghost ds-btn-sm"
+              disabled={идёт}
+              onClick={() => выполнить(() => отозватьСсылку(caseId, shortlistId))}
+            >
+              Отозвать
+            </button>
+          </div>
+          <p style={{ fontSize: 12, color: 'var(--ds-muted)', marginTop: 8 }}>
+            Кто знает ссылку — видит страницу. Отозвать можно в любой момент: старый адрес
+            перестанет работать сразу.
+          </p>
+        </div>
       )}
       <ErrorLine текст={ошибка} />
     </div>

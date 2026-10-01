@@ -11,11 +11,12 @@
  * предложение ИИ проверить нельзя, а значит нельзя и принять.
  */
 import Link from 'next/link'
+import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 import { сессияКонтура } from '@/lib/care/session'
 import { подробностиДела, коллегиДляПередачи } from '@/lib/care/cases'
 import { подписьПоля, подписьЗначения, периодПоля, подписьСтатуса, подписьОжидания, срок, инициалы, склонение } from '@/lib/care/labels'
-import { CaseAssistant, NewTask, TaskActions, FactActions, TransferCase } from './CaseOperations'
+import { PublishShortlist, CaseAssistant, NewTask, TaskActions, FactActions, TransferCase } from './CaseOperations'
 import { AssistantPanel } from '../../AssistantPanel'
 import { историяПомощника } from '../../assistant-actions'
 import { флагВключён } from '@/lib/care/flags'
@@ -24,6 +25,15 @@ export const dynamic = 'force-dynamic'
 
 export default async function ДелоСтраница({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
+
+  // Адрес, на котором стоит кабинет: ссылку для клиента нельзя собрать из
+  // ничего, а на превью и в бою он разный. Берём из заголовков запроса, а не
+  // из переменной окружения: переменную забудут переставить при переезде, а
+  // заголовок всегда говорит, откуда пришли на самом деле.
+  const заголовки = await headers()
+  const хост = заголовки.get('x-forwarded-host') ?? заголовки.get('host') ?? ''
+  const схема = заголовки.get('x-forwarded-proto') ?? (хост.startsWith('localhost') ? 'http' : 'https')
+  const адресОснования = хост ? `${схема}://${хост}` : ''
   const сессия = await сессияКонтура()
   if (!сессия?.участник) notFound()
 
@@ -232,6 +242,13 @@ export default async function ДелоСтраница({ params }: { params: Pro
                       </div>
                     )
                   })}
+
+                  <PublishShortlist
+                    caseId={id}
+                    shortlistId={д.подборка.id}
+                    токен={д.подборка.share_token}
+                    адресОснования={адресОснования}
+                  />
                 </>
               ) : (
                 <p style={{ fontSize: 13, color: 'var(--ds-muted)', margin: 0 }}>

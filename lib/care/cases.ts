@@ -177,6 +177,8 @@ export type ПодробностиДела = {
     version: number
     status: string
     created_at: string
+    /** Секрет в адресе страницы для клиента. Пусто — страница не опубликована. */
+    share_token: string | null
     строки: {
       id: string
       program_ref: Record<string, unknown>
@@ -274,7 +276,7 @@ export async function подробностиДела(участник: Учас�
 async function последняяПодборка(caseId: string): Promise<ПодробностиДела['подборка']> {
   const { data: подборки } = await базаCare()
     .from('shortlists')
-    .select('id, version, status, created_at')
+    .select('id, version, status, created_at, share_token')
     .eq('case_id', caseId)
     .order('version', { ascending: false })
     .limit(1)
@@ -293,6 +295,7 @@ async function последняяПодборка(caseId: string): Promise<По�
     version: подборка.version as number,
     status: подборка.status as string,
     created_at: подборка.created_at as string,
+    share_token: (подборка.share_token as string | null) ?? null,
     строки: (строки ?? []) as NonNullable<ПодробностиДела['подборка']>['строки'],
   }
 }
