@@ -146,6 +146,12 @@
 .care-attn[data-level='горит'],
 .care-attn[data-level='сегодня'] { border-left-color: var(--ds-amber); }
 .care-attn[data-level='ждёт'] { border-left-color: var(--ds-purple); }
+/* Неполное — не оттенок срочности, а другое состояние: дело не работает.
+   Поэтому полоса толще и своего цвета, а не «очень красная». */
+.care-attn[data-level='неполное'] {
+  border-left-color: var(--ds-ink);
+  border-left-width: 4px;
+}
 
 /* Причины — строки с точкой, а не чипы. Чип читается как статус, а
    причина это предложение: «документ ждём 6 дней». */
