@@ -12,7 +12,7 @@
  */
 import { базаCare, базаPublic } from './db'
 import { видимыеДела, делоДоступно, type Участник } from './access'
-import { склонение, подписьОжидания, срок } from './labels'
+import { склонение, подписьОжидания, срок, подписьПоля, подписьЗначения } from './labels'
 
 export type ДелоВСписке = {
   id: string
@@ -356,6 +356,94 @@ export type ПодборкаНаПроверку = {
  * и без очереди куратор про неё просто забудет — она не напоминает о себе
  * сроком, как задача.
  */
+/**
+ * Расхождение: по полю есть подтверждённое значение, а клиент сказал другое.
+ *
+ * Собирается из трёх кусков, и все три обязательны. Без прежнего значения
+ * непонятно, что меняется. Без цитаты и источника решение принимается на веру
+ * — а здесь переписывается то, что куратор уже однажды подтвердил. Без имени
+ * говорящего непонятно, чьё это слово: «девять тысяч» от родителя и от
+ * студента весят по-разному.
+ */
+export type РасхождениеНаПроверку = {
+  proposalId: string
+  caseId: string
+  имяКлиента: string
+  контекст: string
+  is_synthetic: boolean
+  поле: string
+  подписьПоля: string
+  было: string
+  стало: string
+  цитата: string | null
+  ктоСказал: string | null
+  /** Намерение, а не решение: «буду сдавать C1» — не то же, что «сдал». */
+  этоНамерение: boolean
+  когда: string
+}
+
+export async function очередьРасхождений(участник: Участник): Promise<РасхождениеНаПроверку[]> {
+  const область = await видимыеДела(участник)
+  if (область.пусто) return []
+
+  const { data: предложения, error } = await базаCare()
+    .from('proposals')
+    .select('id, case_id, payload, created_at')
+    .in('case_id', область.дела)
+    .eq('kind', 'fact_update')
+    .eq('status', 'pending')
+    .order('created_at', { ascending: true })
+  if (error) throw new Error(`не удалось прочитать очередь расхождений: ${error.message}`)
+  if (!предложения?.length) return []
+
+  const { data: дела } = await базаCare()
+    .from('cases')
+    .select('id, client_id, intake_year, service_scope, is_synthetic, synthetic_name')
+    .in('id', предложения.map((п) => п.case_id))
+
+  const список = (дела ?? []) as ЗаписьДела[]
+  const клиенты = await клиентыПоId(список.filter((д) => !д.is_synthetic).map((д) => д.client_id))
+
+  // Черновик, из-за которого всё затевалось: в нём говорящий и пометка
+  // «намерение». В предложении их нет, а решение без них принимать нельзя.
+  const { data: черновики } = await базаCare()
+    .from('facts')
+    .select('case_id, field, value, speaker, is_plan, quote, status')
+    .in('case_id', предложения.map((п) => п.case_id))
+    .eq('status', 'draft')
+
+  return предложения.map((п) => {
+    const дело = список.find((д) => д.id === п.case_id)
+    const клиент = дело && !дело.is_synthetic ? клиенты.get(дело.client_id) : null
+    const груз = (п.payload ?? {}) as Record<string, unknown>
+    const поле = String(груз.field ?? '')
+
+    const черновик = (черновики ?? []).find(
+      (ч) => ч.case_id === п.case_id && ч.field === поле && String(ч.value) === String(груз.стало)
+    )
+
+    return {
+      proposalId: п.id as string,
+      caseId: п.case_id as string,
+      имяКлиента: дело?.is_synthetic
+        ? (дело.synthetic_name ?? 'тестовое дело')
+        : (клиент?.name ?? `Клиент #${дело?.client_id ?? '?'}`),
+      контекст: [клиент?.country, дело?.service_scope, дело?.intake_year ? `набор ${дело.intake_year}` : null]
+        .filter(Boolean)
+        .join(' · '),
+      is_synthetic: дело?.is_synthetic ?? false,
+      поле,
+      подписьПоля: подписьПоля(поле),
+      было: подписьЗначения(поле, груз.было),
+      стало: подписьЗначения(поле, груз.стало),
+      цитата: (груз.цитата as string | null) ?? черновик?.quote ?? null,
+      ктоСказал: (черновик?.speaker as string | null) ?? null,
+      этоНамерение: черновик?.is_plan === true,
+      когда: п.created_at as string,
+    }
+  })
+}
+
 export async function очередьПодборок(участник: Участник): Promise<ПодборкаНаПроверку[]> {
   const область = await видимыеДела(участник)
   if (область.пусто) return []

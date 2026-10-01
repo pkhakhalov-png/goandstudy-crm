@@ -5,8 +5,9 @@
  * карточек. Куратор физически не может проверять всё, если каждая мелочь
  * требует навигации.
  *
- * Сейчас здесь черновики фактов. Предложения помощника встанут сюда же на
- * следующем этапе — форма у них одна, и куратор учит её один раз.
+ * Здесь черновики фактов, а рядом три очереди с одной формой «1 из N»:
+ * напоминания, подборки и расхождения. Форма одна нарочно — куратор учит её
+ * один раз.
  */
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
@@ -36,6 +37,10 @@ export default async function НаПроверкуСтраница() {
         {'  ·  '}
         <Link href="/care/review/shortlists" className="ds-link" style={{ fontSize: 14 }}>
           Подборки программ →
+        </Link>
+        {'  ·  '}
+        <Link href="/care/review/facts" className="ds-link" style={{ fontSize: 14 }}>
+          Расхождения в сведениях →
         </Link>
       </p>
       <p style={{ color: 'var(--ds-muted)', marginBottom: 22, fontSize: 14 }}>

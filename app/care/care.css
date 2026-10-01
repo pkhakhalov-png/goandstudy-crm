@@ -601,3 +601,67 @@
   border: 1px solid var(--ds-amber, var(--ds-border-soft));
 }
 .care-основание-текст { font-size: 13px; line-height: 1.55; }
+
+/* ── Очередь решений ─────────────────────────────────────────────────── */
+
+.care-оч-шапка {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--ds-border-soft);
+  background: var(--ds-bg-alt);
+}
+
+/* Было → стало: два значения рядом и стрелка между ними. Это и есть решение;
+   цитата и говорящий — опоры под него, а не равные по весу сведения. */
+.care-было-стало {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.care-бс-часть {
+  flex: 1 1 180px;
+  min-width: 0;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--ds-bg-alt);
+  border: 1px solid var(--ds-border-soft);
+}
+.care-бс-часть[data-новое='1'] {
+  background: var(--ds-ai-soft, var(--ds-bg-alt));
+  border-color: var(--ds-ai);
+}
+.care-бс-метка {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ds-muted);
+  margin-bottom: 4px;
+}
+.care-бс-значение {
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+}
+.care-бс-стрелка {
+  align-self: center;
+  color: var(--ds-muted);
+  font-size: 18px;
+}
+
+.care-цитата {
+  margin: 14px 0 0;
+  padding: 10px 14px;
+  border-left: 2px solid var(--ds-border);
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--ds-ink);
+}
+
+@media (max-width: 520px) {
+  .care-бс-стрелка { transform: rotate(90deg); align-self: flex-start; }
+}
