@@ -20,6 +20,7 @@ import { отправитьОчередь } from '@/lib/care/jobs/send'
 import { разобратьПереписку } from '@/lib/care/jobs/extract'
 import { разобратьВходящие } from '@/lib/care/jobs/triage'
 import { закрытьЗависшие } from '@/lib/care/jobs/sweep'
+import { проверитьКаналы } from '@/lib/care/channels'
 import { необязательна } from '@/lib/care/env'
 import { секретГодится, секретыСовпали } from '@/lib/care/secret'
 
@@ -48,6 +49,18 @@ const ОБРАБОТЧИКИ: Record<string, (з: Задание, воркер: 
   async prepare_reminders() {
     const итог = await подготовитьНапоминания()
     return { ...итог, at: new Date().toISOString() }
+  },
+
+  /**
+   * Можем ли мы написать клиентам.
+   *
+   * Модель не зовёт и денег не стоит: два запроса Bot API на чат. Раз в сутки
+   * достаточно — бота из группы удаляют не каждую минуту, — но знать об этом
+   * надо до отправки, а не в момент, когда напоминание со сроком не ушло.
+   */
+  async check_channels() {
+    const итог = await проверитьКаналы()
+    return { ...итог, строки: итог.строки.length, at: new Date().toISOString() }
   },
 
   /**

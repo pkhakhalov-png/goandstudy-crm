@@ -272,10 +272,20 @@ describe('T19 — исполнять просьбу «отправь» помо�
   })
 
   it('отправкой наружу занят один файл, и это не помощник', () => {
-    // Bot API вызывается только из lib/care/jobs/send.ts. Если вызов
-    // появится ещё где-то — это и будет второй дверью наружу.
+    // ЧТО ИМЕННО СТЕРЕЖЁМ. Не «кто ходит в Телеграм», а «кто может отправить».
+    // Сначала проверка ловила любое упоминание api.telegram.org — и покраснела
+    // на `lib/care/channels.ts`, который спрашивает, состоит ли бот в группе,
+    // и отправить не может ничем. Запрет на чтение состояния ничего не
+    // защищает, а мешает проверять доступность перед отправкой — то есть
+    // ровно тому, ради чего строгость и нужна.
+    //
+    // Отправляющие методы Bot API: всё, что начинается на send, плюс пересылка
+    // и копирование. Появится вызов любого из них вне send.ts — это и будет
+    // вторая дверь наружу.
+    const ОТПРАВЛЯЮЩИЕ = /\b(sendMessage|sendPhoto|sendDocument|sendVideo|sendAudio|sendVoice|sendMediaGroup|sendSticker|forwardMessage|copyMessage)\b/
     const каталоги = ['lib/care', 'app/care', 'app/api/care']
     const виновные: string[] = []
+    let просмотрено = 0
 
     const обойти = (каталог: string) => {
       for (const запись of fs.readdirSync(каталог, { withFileTypes: true })) {
@@ -285,12 +295,16 @@ describe('T19 — исполнять просьбу «отправь» помо�
           continue
         }
         if (!/\.tsx?$/.test(запись.name)) continue
+        просмотрено += 1
         const текст = fs.readFileSync(полный, 'utf8')
-        if (текст.includes('api.telegram.org')) виновные.push(path.relative(process.cwd(), полный))
+        if (ОТПРАВЛЯЮЩИЕ.test(текст)) виновные.push(path.relative(process.cwd(), полный))
       }
     }
 
     for (const к of каталоги) обойти(path.resolve(process.cwd(), к))
+
+    // Счётчик — чтобы пустой обход не выдавал себя за пройденную проверку.
+    expect(просмотрено).toBeGreaterThan(20)
     expect(виновные).toEqual(['lib/care/jobs/send.ts'])
   })
 })
