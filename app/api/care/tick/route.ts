@@ -19,7 +19,7 @@ import { подготовитьНапоминания } from '@/lib/care/jobs/re
 import { отправитьОчередь } from '@/lib/care/jobs/send'
 import { разобратьПереписку } from '@/lib/care/jobs/extract'
 import { разобратьВходящие } from '@/lib/care/jobs/triage'
-import { закрытьЗависшие } from '@/lib/care/jobs/sweep'
+import { закрытьЗависшие, закрытьДогнанные } from '@/lib/care/jobs/sweep'
 import { проверитьКаналы } from '@/lib/care/channels'
 import { необязательна } from '@/lib/care/env'
 import { секретГодится, секретыСовпали } from '@/lib/care/secret'
@@ -137,6 +137,14 @@ export async function POST(req: NextRequest) {
     const уборка = await закрытьЗависшие()
     итог.прибрано = уборка.закрыто
     for (const п of уборка.причины) console.warn(`[care tick] ${п}`)
+
+    // Падения «нет обработчика» по видам, которые этот код уже умеет: между
+    // миграцией расписания и выкладкой проходят минуты, и в этот промежуток
+    // задание нового вида падает трижды. Список видов берём отсюда же —
+    // чего нет в обработчиках, то и останется красным.
+    const догнанные = await закрытьДогнанные(Object.keys(ОБРАБОТЧИКИ))
+    итог.прибрано += догнанные.закрыто
+    for (const п of догнанные.причины) console.warn(`[care tick] ${п}`)
   } catch (err) {
     console.error('[care tick] уборка не прошла:', err)
   }

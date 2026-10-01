@@ -12,7 +12,7 @@
  */
 import { describe, it, expect, afterEach } from 'vitest'
 import { базаCare } from '@/lib/care/db'
-import { закрытьЗависшие, ПРИЧИНА_ОБРЫВА } from '@/lib/care/jobs/sweep'
+import { закрытьЗависшие, закрытьДогнанные, ПРИЧИНА_ОБРЫВА } from '@/lib/care/jobs/sweep'
 
 const свои: string[] = []
 
@@ -89,5 +89,71 @@ describe('уборка зависших поручений', () => {
     const итог = await закрытьЗависшие(15)
     expect(итог.причины).toEqual(итог.закрыто ? итог.причины : [])
     if (итог.закрыто === 0) expect(итог.причины).toHaveLength(0)
+  })
+})
+
+describe('падения «нет обработчика» закрываются, когда код догнал', () => {
+  const свои2: string[] = []
+
+  afterEach(async () => {
+    for (const id of свои2.splice(0)) await базаCare().from('jobs').delete().eq('id', id)
+  })
+
+  async function упавшее(kind: string, ошибка: string) {
+    const { data, error } = await базаCare()
+      .from('jobs')
+      .insert({ kind, payload: { тест: true }, status: 'failed', attempts: 3, last_error: ошибка })
+      .select('id')
+      .single()
+    if (error) throw new Error(error.message)
+    свои2.push(data!.id as string)
+    return data!.id as string
+  }
+
+  async function состояние(id: string) {
+    const { data } = await базаCare().from('jobs').select('status').eq('id', id).single()
+    return data!.status as string
+  }
+
+  it('вид, который код уже умеет, закрывается', async () => {
+    // Между миграцией расписания и выкладкой проходят минуты, и в этот
+    // промежуток задание нового вида падает трижды. Через десять минут то же
+    // самое проходит — значит красным оно висит зря.
+    const id = await упавшее('echo', 'нет обработчика для вида «echo»')
+
+    const итог = await закрытьДогнанные(['echo', 'triage_messages'])
+
+    expect(итог.закрыто).toBeGreaterThanOrEqual(1)
+    expect(await состояние(id)).toBe('cancelled')
+  })
+
+  it('вид, которого код не умеет, остаётся красным', async () => {
+    // Это настоящая недоделка, и прятать её нельзя: задание ставится, а
+    // исполнять его нечем.
+    const id = await упавшее('выдуманный_вид', 'нет обработчика для вида «выдуманный_вид»')
+
+    await закрытьДогнанные(['echo'])
+
+    expect(await состояние(id)).toBe('failed')
+  })
+
+  it('падение по другой причине не трогается', async () => {
+    // Уборка закрывает ровно один класс. Закрыть заодно настоящую ошибку
+    // значило бы спрятать её — и именно ту, которую надо чинить.
+    const id = await упавшее('echo', 'Телеграм ответил 403')
+
+    await закрытьДогнанные(['echo'])
+
+    expect(await состояние(id)).toBe('failed')
+  })
+
+  it('пустой список видов ничего не закрывает', async () => {
+    // Иначе сбой чтения обработчиков закрывал бы всё подряд.
+    const id = await упавшее('echo', 'нет обработчика для вида «echo»')
+
+    const итог = await закрытьДогнанные([])
+
+    expect(итог.закрыто).toBe(0)
+    expect(await состояние(id)).toBe('failed')
   })
 })
