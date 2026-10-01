@@ -194,6 +194,46 @@ export async function reverseOperation(formData: FormData): Promise<{ error?: st
 }
 
 /**
+ * Сменить категорию операции.
+ *
+ * Зачем отдельное действие, а не правка операции целиком. Сумма, счёт и дата —
+ * это сам факт движения денег, и менять их задним числом нельзя: для этого
+ * есть сторно. Категория фактом не является, она про то, КАК мы этот факт
+ * читаем, и уточнять её можно сколько угодно.
+ *
+ * Без этого разобрать накопленное было нечем: шестьдесят операций лежали в
+ * «Прочих расходах», десять вовсе без категории, и единственным способом
+ * исправить был запрос к базе руками.
+ *
+ * Отменённые операции не трогаем: их место в истории, а не в отчёте, и
+ * переклассификация ничего не изменит, кроме путаницы при разборе.
+ */
+export async function setCategory(formData: FormData): Promise<{ error?: string }> {
+  try { await requireOwner() } catch (e) { return { error: (e as Error).message } }
+
+  const id = String(formData.get('transaction_id') || '')
+  const categoryId = String(formData.get('category_id') || '')
+  if (!id) return { error: 'не указана операция' }
+
+  const db = await financeDb()
+
+  const { data: tx, error: readErr } = await db.from('transactions')
+    .select('status').eq('id', id).maybeSingle()
+  if (readErr) return { error: `операция: ${readErr.message}` }
+  if (!tx) return { error: 'операция не найдена' }
+  if (tx.status === 'reversed' || tx.status === 'superseded') {
+    return { error: 'операция отменена — категорию менять незачем' }
+  }
+
+  const { error } = await db.from('transactions')
+    .update({ category_id: categoryId || null }).eq('id', id)
+  if (error) return { error: `категория: ${error.message}` }
+
+  revalidatePath('/admin/finance')
+  return {}
+}
+
+/**
  * Справочный курс рубля к доллару.
  *
  * Курс вводится руками и только на дату: автоматического источника в первой
