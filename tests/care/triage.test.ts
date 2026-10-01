@@ -278,3 +278,79 @@ describe('изменение условий идёт дальше ярлыка',
     expect((data ?? []).length).toBe(1)
   })
 })
+
+describe('сообщение, показанное модели, не возвращается в разбор', () => {
+  const КЛИЕНТ = -990_782
+  let дело: string
+
+  beforeEach(async () => {
+    await базаCare().from('cases').delete().eq('client_id', КЛИЕНТ)
+    const { data: у } = await базаCare().from('members').select('id').eq('care_role', 'lead').single()
+    const { data: д, error } = await базаCare()
+      .from('cases')
+      .insert({
+        client_id: КЛИЕНТ,
+        intake_year: 2027,
+        owner_member_id: у!.id,
+        is_synthetic: true,
+        synthetic_name: 'ТЕСТ молчания',
+        automation_owner: 'v2',
+      })
+      .select('id')
+      .single()
+    if (error) throw new Error(error.message)
+    дело = д!.id as string
+  })
+
+  afterEach(async () => {
+    await базаCare().from('cases').delete().eq('client_id', КЛИЕНТ)
+  })
+
+  it('отметка «нечего делать» ложится без цитаты', async () => {
+    // Так отмечается сообщение, по которому модель промолчала: чужое,
+    // служебное, пустое. Цитаты у него нет и быть не должно — приводить
+    // нечего, а пустая строка выглядела бы как цитата.
+    const { error } = await базаCare().from('message_triage').insert({
+      case_id: дело,
+      message_id: randomUUID(),
+      kind: 'other',
+      about: 'не от клиента или без действия',
+      quote: null,
+    })
+    expect(error).toBeNull()
+  })
+
+  it('отметка исключает сообщение из следующего разбора', async () => {
+    // Весь смысл: без неё задание возвращается к тем же сообщениям каждые пять
+    // минут и платит за них снова. Проверяем тем же запросом, каким отбирает
+    // задание.
+    const сообщение = randomUUID()
+    await базаCare().from('message_triage').insert({
+      case_id: дело,
+      message_id: сообщение,
+      kind: 'other',
+      about: 'не от клиента или без действия',
+      quote: null,
+    })
+
+    const { data } = await базаCare()
+      .from('message_triage')
+      .select('message_id')
+      .eq('case_id', дело)
+      .in('message_id', [сообщение])
+
+    expect((data ?? []).map((с) => с.message_id)).toContain(сообщение)
+  })
+
+  it('в сводке разбора есть счётчик «без действия»', async () => {
+    // Иначе прогон, целиком ушедший в молчание, в журнале выглядит как
+    // прогон, который ничего не делал, — а он потратил деньги.
+    const итог = await разобратьВходящие(дело)
+    expect(итог).toHaveProperty('безДействия')
+    expect(типЧисла(итог.безДействия)).toBe(true)
+  })
+})
+
+function типЧисла(з: unknown): boolean {
+  return typeof з === 'number' && Number.isFinite(з)
+}
