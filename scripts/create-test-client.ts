@@ -46,6 +46,8 @@ async function main() {
 
   // 4. clients row
   const { data: client, error } = await sb.from('clients').insert({
+    // Отчёты считают без тестовых: см. lib/test-data.ts.
+    is_test: true,
     name: NAME,
     email: EMAIL,
     phone: '+79999999999',

@@ -89,6 +89,8 @@ async function ensureClient(curatorId: string): Promise<{ clientId: number; user
   } else {
     const salespersonId = await ensureSalesperson()
     const { data: newClient, error } = await sb.from('clients').insert({
+    // Отчёты считают без тестовых: см. lib/test-data.ts.
+    is_test: true,
       name: CLIENT_NAME,
       email: CLIENT_EMAIL,
       phone: '+79000000001',

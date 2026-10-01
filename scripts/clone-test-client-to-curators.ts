@@ -58,7 +58,9 @@ async function cloneFor(curator: { id: string; name: string }, source: any): Pro
   // salesperson_id оставляем как у источника (колонка NOT NULL)
   insertRow.curator_assigned_at = new Date().toISOString()
 
-  const { data: inserted, error } = await sb.from('clients').insert(insertRow).select('id').single()
+  // Отчёты считают без тестовых: см. lib/test-data.ts.
+  const { data: inserted, error } = await sb
+    .from('clients').insert({ ...insertRow, is_test: true }).select('id').single()
   if (error || !inserted) throw new Error(`insert clients: ${error?.message}`)
   const newId = inserted.id as number
 
