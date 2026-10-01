@@ -2,12 +2,13 @@ import Link from 'next/link'
 import { viewer } from '@/lib/auth/viewer'
 import { formatMinor, formatMinorPlain, toRubEquivalent, type Currency } from '@/lib/finance/money'
 import {
-  balances, currentRate, financeAccess, listAccounts, listCategories,
+  balances, currentRate, dailyFlow, financeAccess, listAccounts, listCategories,
   listCounterparties, listTransactions, periodTotals, KIND_NAMES, type TxRow,
 } from '@/lib/finance/service'
 import { AddOperation } from './AddOperation'
 import { ReverseForm } from './ReverseForm'
 import { CategoryPicker } from './CategoryPicker'
+import { FlowChart } from './FlowChart'
 
 export const dynamic = 'force-dynamic'
 
@@ -65,7 +66,7 @@ export default async function FinancePage(
   // подразумевается.
   const окно = разобратьПериод(period)
 
-  const [bal, totals, rate, txs, categories, counterparties] = await Promise.all([
+  const [bal, totals, rate, txs, categories, counterparties, поток] = await Promise.all([
     balances(),
     periodTotals(окно.от.toISOString(), окно.до.toISOString()),
     currentRate(),
@@ -73,6 +74,7 @@ export default async function FinancePage(
     listTransactions({ from: окно.от.toISOString(), to: окно.до.toISOString(), limit: окно.всёВремя ? 1000 : 300 }),
     listCategories(),
     listCounterparties(),
+    dailyFlow(окно.от.toISOString(), окно.до.toISOString()),
   ])
 
   const hasUsd = bal.some((b) => b.currency === 'USD' && b.balance_minor !== 0)
@@ -144,6 +146,8 @@ export default async function FinancePage(
         </div>
 
         <Период окно={окно} />
+
+        <FlowChart данные={поток} />
 
         <div style={{ margin: '4px 0 14px' }}>
           <AddOperation

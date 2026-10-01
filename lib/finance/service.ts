@@ -186,9 +186,89 @@ export async function periodTotals(from: string, to: string): Promise<PeriodTota
     if (kind === 'transfer') continue
     const cur = r.currency as Currency
     const amount = r.amount_minor as number
-    if (amount > 0) out[cur].income += amount
-    else out[cur].expense += -amount
+
+    // По ВИДУ операции, а не по знаку суммы — то же правило, что в dailyFlow.
+    // По знаку отмена расхода (сумма положительная, деньги вернулись) попадала
+    // в поступления, хотя несостоявшаяся трата приходом не является. Обороты
+    // от этого росли с обеих сторон: 15 сентября показывало по 1 218 000 ₽
+    // туда и обратно, хотя в тот день не осталось ни одной живой операции.
+    //
+    // Итог (net) правило не меняет: он и был суммой со знаком.
+    if (kind === 'income' || kind === 'refund_out') out[cur].income += amount
+    else out[cur].expense -= amount
+
     out[cur].net += amount
+  }
+  return out
+}
+
+/**
+ * Движение денег по дням — для графика.
+ *
+ * Считается по тем же правилам, что и итоги периода, и это важнее удобства:
+ * если график и карточка месяца разойдутся хоть на рубль, верить перестанут
+ * обоим. Поэтому переводы между своими счетами исключаются здесь так же, как
+ * там, — перемещение своих денег не приход и не расход.
+ *
+ * Накопительный остаток считается внутри периода, от нуля: это «сколько
+ * набежало за выбранное окно», а не остаток на счетах. Остаток на счетах
+ * показан карточками выше и включает начальные суммы, которых в движениях нет.
+ */
+export type DayFlow = {
+  day: string
+  income: number
+  expense: number
+  net: number
+  cumulative: number
+}
+
+export async function dailyFlow(from: string, to: string): Promise<Record<Currency, DayFlow[]>> {
+  const db = await financeDb()
+  const rows = await readAll<any>(() => db
+    .from('movements')
+    .select('amount_minor, currency, transactions!inner(kind, occurred_at, status)')
+    .gte('transactions.occurred_at', from)
+    .lte('transactions.occurred_at', to)
+    .neq('transactions.status', 'superseded')
+    .order('id'), { label: 'movements' })
+
+  const поДням: Record<string, Map<string, { income: number; expense: number }>> = { RUB: new Map(), USD: new Map() }
+
+  for (const r of rows) {
+    const kind: TxKind = r.transactions.kind
+    if (kind === 'transfer') continue
+    const cur = r.currency as Currency
+    const день = String(r.transactions.occurred_at).slice(0, 10)
+    const узел = поДням[cur].get(день) ?? { income: 0, expense: 0 }
+    const сумма = r.amount_minor as number
+
+    // Раскладываем по ВИДУ операции, а не по знаку суммы.
+    //
+    // По знаку выходило так: отмена расхода имеет положительную сумму — деньги
+    // вернулись на счёт, — и попадала в поступления. Но отмена траты это не
+    // приход, это несостоявшаяся трата. На живых данных 15 сентября давало
+    // +1 218 000 и −1 218 000 ₽ в один день: сторно удваивало обе стороны и
+    // вчетверо задирало шкалу, расплющивая остальные двенадцать дней.
+    //
+    // По виду отмена уменьшает ту сторону, к которой относилась: расход со
+    // знаком плюс вычитается из расходов. Обороты перестают расти на пустом
+    // месте, а итог остаётся прежним.
+    if (kind === 'income' || kind === 'refund_out') узел.income += сумма
+    else узел.expense -= сумма
+
+    поДням[cur].set(день, узел)
+  }
+
+  const out = {} as Record<Currency, DayFlow[]>
+  for (const cur of ['RUB', 'USD'] as Currency[]) {
+    let накоплено = 0
+    out[cur] = [...поДням[cur].entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([day, v]) => {
+        const net = v.income - v.expense
+        накоплено += net
+        return { day, income: v.income, expense: v.expense, net, cumulative: накоплено }
+      })
   }
   return out
 }
