@@ -78,7 +78,7 @@ export type Сообщение = {
  * «по смыслу» значит не сверять вовсе. Середина: убираем то, что не несёт
  * смысла, и требуем точного совпадения оставшегося.
  */
-function длясверки(т: string): string {
+export function длясверки(т: string): string {
   return т
     .toLowerCase()
     .replace(/[«»"'`„“”]/g, '')

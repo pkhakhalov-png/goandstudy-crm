@@ -18,6 +18,7 @@ import { взятьЗадания, закрытьЗадание, сохрани�
 import { подготовитьНапоминания } from '@/lib/care/jobs/reminders'
 import { отправитьОчередь } from '@/lib/care/jobs/send'
 import { разобратьПереписку } from '@/lib/care/jobs/extract'
+import { разобратьВходящие } from '@/lib/care/jobs/triage'
 import { закрытьЗависшие } from '@/lib/care/jobs/sweep'
 import { необязательна } from '@/lib/care/env'
 import { секретГодится, секретыСовпали } from '@/lib/care/secret'
@@ -46,6 +47,19 @@ const ОБРАБОТЧИКИ: Record<string, (з: Задание, воркер: 
   /** Подготовить напоминания. Ничего не отправляет — создаёт предложения. */
   async prepare_reminders() {
     const итог = await подготовитьНапоминания()
+    return { ...итог, at: new Date().toISOString() }
+  },
+
+  /**
+   * Разобрать входящие: чем было каждое сообщение клиента.
+   *
+   * Дешевле разбора фактов на порядок — ярлыки, а не извлечение, — и потому
+   * ставится при каждом проходе расписания, а не раз в сутки. Вопрос клиента,
+   * пролежавший сутки, это сутки молчания в ответ на прямой вопрос.
+   */
+  async triage_messages(задание) {
+    const дело = (задание.payload as { case_id?: string }).case_id
+    const итог = await разобратьВходящие(дело)
     return { ...итог, at: new Date().toISOString() }
   },
 
