@@ -416,3 +416,174 @@
 @media (max-width: 760px) {
   .care-progs { grid-template-columns: 1fr; }
 }
+
+/* ── Помощник ────────────────────────────────────────────────────────── */
+
+.care-ai-panel[data-wide='1'] {
+  position: fixed;
+  top: 76px;
+  right: 20px;
+  bottom: 20px;
+  width: min(720px, calc(100vw - 40px));
+  z-index: 40;
+  box-shadow: 0 24px 80px -24px rgba(29,29,31,0.28);
+  display: flex;
+  flex-direction: column;
+}
+
+.care-ai-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.care-ai-wide {
+  margin-left: auto;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ds-muted);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  transition: background 120ms, color 120ms;
+}
+.care-ai-wide:hover { background: var(--ds-bg-alt); color: var(--ds-ink); }
+
+.care-ai-lenta {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-height: 460px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.care-ai-panel[data-wide='1'] .care-ai-lenta { max-height: none; flex: 1; }
+
+.care-ai-пусто { font-size: 13px; color: var(--ds-muted); margin: 0; line-height: 1.6; }
+
+.care-ai-пара { display: flex; flex-direction: column; gap: 10px; }
+
+/* Вопрос куратора — компактным пузырём справа; ответ — обычным текстом во всю
+   ширину. Так видно, где чья реплика, без подписей и аватаров. */
+.care-ai-вопрос {
+  align-self: flex-end;
+  max-width: 85%;
+  background: var(--ds-bg-alt);
+  border-radius: 14px 14px 4px 14px;
+  padding: 9px 12px;
+  font-size: 13px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+.care-ai-ответ {
+  font-size: 13.5px;
+  line-height: 1.65;
+  white-space: pre-line;
+}
+.care-ai-ответ[data-сорвалось='1'] { color: var(--ds-error-ink); }
+.care-ai-цена { font-size: 11px; color: var(--ds-muted); margin-top: 7px; }
+
+/* ── Ход работы ──────────────────────────────────────────────────────── */
+
+.care-ai-ход { display: flex; flex-direction: column; gap: 5px; }
+.care-ai-шаг-было { font-size: 12px; color: var(--ds-muted); opacity: .65; }
+.care-ai-шаг { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+
+.care-ai-пульс {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--ds-ai);
+  animation: care-пульс 1.4s ease-in-out infinite;
+}
+@keyframes care-пульс {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: .35; transform: scale(.75); }
+}
+
+/* Блик бежит по тексту шага: движение показывает, что работа идёт, не говоря
+   об этом словами и не изображая живого человека за печатью. */
+.care-ai-блик {
+  background: linear-gradient(
+    90deg,
+    var(--ds-muted) 0%,
+    var(--ds-ink) 35%,
+    var(--ds-muted) 70%
+  );
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: care-блик 2.1s linear infinite;
+}
+@keyframes care-блик {
+  from { background-position: 180% 0; }
+  to { background-position: -40% 0; }
+}
+
+.care-ai-таймер {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--ds-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .care-ai-пульс, .care-ai-блик { animation: none; }
+  .care-ai-блик { color: var(--ds-ink); background: none; -webkit-text-fill-color: currentColor; }
+}
+
+/* ── Ввод ────────────────────────────────────────────────────────────── */
+
+.care-ai-беда { color: var(--ds-error-ink); font-size: 12px; margin: 10px 0 0; }
+.care-ai-подсказки { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+
+.care-ai-форма {
+  margin-top: 12px;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  background: var(--ds-bg-alt);
+  border: 1px solid var(--ds-border-soft);
+  border-radius: 18px;
+  padding: 6px 6px 6px 14px;
+  transition: border-color 150ms;
+}
+.care-ai-форма:focus-within { border-color: var(--ds-ai); }
+
+.care-ai-поле {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  resize: none;
+  outline: none;
+  font: inherit;
+  font-size: 13.5px;
+  line-height: 1.5;
+  padding: 7px 0;
+  color: var(--ds-ink);
+  max-height: 180px;
+}
+.care-ai-поле::placeholder { color: var(--ds-muted); }
+
+.care-ai-отправить {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--ds-ai);
+  color: #fff;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  transition: opacity 150ms, transform 120ms;
+}
+.care-ai-отправить:disabled { opacity: .3; cursor: default; }
+.care-ai-отправить:not(:disabled):hover { transform: translateY(-1px); }
+
+.care-ai-внизу { font-size: 11px; color: var(--ds-muted); margin-top: 8px; }
