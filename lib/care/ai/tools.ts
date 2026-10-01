@@ -95,6 +95,44 @@ function какТекст(строки: Строка[], пусто: string): str
  * Создаётся на каждый запрос. Переиспользовать между запросами нельзя: в
  * замыкании лежат права, и чужой набор дал бы чужие данные.
  */
+/** Последняя подборка дела со строками — общая для всех правок. */
+async function строкиПодборки(caseId: string) {
+  const { data: подборки } = await базаCare()
+    .from('shortlists')
+    .select('id')
+    .eq('case_id', caseId)
+    .order('version', { ascending: false })
+    .limit(1)
+
+  const подборка = (подборки ?? [])[0]
+  if (!подборка) return null
+
+  const { data: строки } = await базаCare()
+    .from('shortlist_items')
+    .select('id, program_ref, tuition_amount, currency, fit_notes, position, status')
+    .eq('shortlist_id', подборка.id)
+    .order('position')
+
+  return { id: подборка.id as string, список: строки ?? [] }
+}
+
+/** Строка в журнал на каждую правку: кто правил и что именно. */
+async function журналПравки(
+  caseId: string,
+  действие: string,
+  программа: Record<string, unknown>,
+  причина: string | null | undefined
+) {
+  await базаCare().from('events').insert({
+    actor_kind: 'assistant',
+    case_id: caseId,
+    action: действие,
+    after: { вуз: программа.вуз, программа: программа.программа },
+    source: { tool: 'edit_program' },
+    reason: причина?.trim() || 'по просьбе куратора',
+  })
+}
+
 export function инструменты(участник: Участник, область: ОбластьЗапроса) {
   const список = () => разрешённыеДела(участник, область)
 
@@ -713,6 +751,239 @@ export function инструменты(участник: Участник, об�
     },
   })
 
+  /**
+   * Строки подборки с номерами — чтобы правка была адресной.
+   *
+   * Модель видит названия, а не идентификаторы, поэтому правка принимает номер
+   * из этого списка или кусок названия. Без него каждая правка начиналась бы с
+   * «какую именно программу вы имеете в виду».
+   */
+  const показатьПодборку = betaTool({
+    name: 'show_shortlist',
+    description:
+      'Показать строки подборки с номерами: что в ней сейчас, что убрано, что выбрал клиент. ' +
+      'Вызови это перед любой правкой подборки — номера оттуда нужны, чтобы править адресно.',
+    inputSchema: {
+      type: 'object',
+      properties: { case_id: { type: 'string' } },
+      required: ['case_id'],
+      additionalProperties: false,
+    },
+    run: async ({ case_id }) => {
+      const дела = await список()
+      if (!дела.includes(case_id)) return 'Такого дела нет в вашей области.'
+
+      const строки = await строкиПодборки(case_id)
+      if (!строки) return 'Подборки по этому делу ещё нет.'
+      if (!строки.список.length) return 'Подборка пуста.'
+
+      return строки.список
+        .map((с, i) => {
+          const ref = с.program_ref as Record<string, string>
+          const пометка =
+            с.status === 'removed' ? ' [убрана]' : с.status === 'chosen' ? ' [выбрана клиентом]' : ''
+          return (
+            `${i + 1}. ${ref.вуз ?? ''} — ${ref.программа ?? ''}${пометка}\n` +
+            `   ${[ref.страна, с.tuition_amount ? `${с.tuition_amount} ${с.currency ?? ''}`.trim() : 'стоимость не указана']
+              .filter(Boolean)
+              .join(' · ')}`
+          )
+        })
+        .join('\n')
+    },
+  })
+
+  const добавитьПрограмму = betaTool({
+    name: 'add_program',
+    description:
+      'Добавить программу в подборку по делу. Используй, когда куратор говорит «добавь такой-то вуз» ' +
+      'или ты нашёл подходящую программу поиском и куратор согласился её добавить. ' +
+      'Нужна прямая ссылка на страницу программы на сайте вуза — без неё добавлять нельзя.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        // Ключи схемы латиницей: API принимает только [a-zA-Z0-9_.-] и
+        // отвергает кириллицу четырёхсотым. Описания остаются русскими.
+        case_id: { type: 'string' },
+        university: { type: 'string', description: 'Название вуза' },
+        program: { type: 'string', description: 'Название программы' },
+        country: { type: 'string', description: 'Страна' },
+        city: { type: ['string', 'null'], description: 'Город' },
+        url: { type: 'string', description: 'Страница программы на сайте вуза, не агрегатор' },
+        tuition: { type: ['number', 'null'], description: 'Стоимость за год, числом' },
+        currency: { type: ['string', 'null'], description: 'EUR, USD — обязательно при стоимости' },
+        why: { type: 'string', description: 'Одна-две фразы, почему подходит именно этому клиенту' },
+      },
+      required: ['case_id', 'university', 'program', 'country', 'url', 'why'],
+      additionalProperties: false,
+    },
+    run: async (вход) => {
+      const дела = await список()
+      if (!дела.includes(вход.case_id)) return 'Такого дела нет в вашей области.'
+
+      const { проверитьПрограмму } = await import('./search')
+      const проверка = проверитьПрограмму({
+        вуз: вход.university,
+        город: вход.city ?? null,
+        страна: вход.country,
+        программа: вход.program,
+        уровень: '',
+        язык: null,
+        стоимость_в_год: вход.tuition ?? null,
+        валюта: вход.currency ?? null,
+        ссылка: вход.url,
+        почему_подходит: вход.why,
+        что_проверить: [],
+      })
+      if (!проверка.ok) return `Не добавил: ${проверка.почему}`
+
+      const строки = await строкиПодборки(вход.case_id)
+      if (!строки) return 'Подборки по этому делу ещё нет — сначала собери её.'
+
+      const следующая = Math.max(0, ...строки.список.map((с) => Number(с.position ?? 0))) + 1
+
+      const { error } = await базаCare().from('shortlist_items').insert({
+        shortlist_id: строки.id,
+        program_ref: {
+          вуз: вход.university,
+          программа: вход.program,
+          страна: вход.country,
+          город: вход.city ?? null,
+          ссылка: вход.url,
+          добавлено: new Date().toISOString().slice(0, 10),
+        },
+        tuition_amount: вход.tuition ?? null,
+        currency: вход.currency ?? null,
+        fit_notes: { почему: вход.why },
+        // Добавленное руками не проверялось на сайте: честно говорим об этом,
+        // иначе оно выглядит надёжнее найденного поиском.
+        unresolved: ['требования и стоимость не проверены'],
+        position: следующая,
+        status: 'active',
+      })
+      if (error) return `Не добавил: ${error.message}`
+
+      await базаCare().from('events').insert({
+        actor_kind: 'assistant',
+        case_id: вход.case_id,
+        action: 'shortlist_item_added',
+        after: { вуз: вход.university, программа: вход.program },
+        source: { tool: 'add_program' },
+        reason: 'добавлено по просьбе куратора',
+      })
+
+      return `Добавил в подборку: ${вход.university} — ${вход.program}. Требования по ней ещё не проверены.`
+    },
+  })
+
+  const правитьПрограмму = betaTool({
+    name: 'edit_program',
+    description:
+      'Поправить строку подборки: убрать, вернуть, переставить выше или ниже, отметить выбор клиента, ' +
+      'переписать объяснение «почему подходит». Программу называй номером из show_shortlist ' +
+      'или куском названия вуза.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        case_id: { type: 'string' },
+        program: { type: 'string', description: 'Номер из show_shortlist или часть названия вуза' },
+        action: {
+          type: 'string',
+          enum: ['убрать', 'вернуть', 'выше', 'ниже', 'выбрано', 'заметка'],
+        },
+        text: {
+          type: 'string',
+          description: 'Для «убрать» — причина; для «заметка» — новое объяснение. Иначе не нужен.',
+        },
+      },
+      required: ['case_id', 'program', 'action'],
+      additionalProperties: false,
+    },
+    run: async ({ case_id, program, action, text }) => {
+      const дела = await список()
+      if (!дела.includes(case_id)) return 'Такого дела нет в вашей области.'
+
+      const строки = await строкиПодборки(case_id)
+      if (!строки) return 'Подборки по этому делу ещё нет.'
+
+      const найти = () => {
+        const номер = Number(String(program).trim())
+        if (Number.isInteger(номер) && номер >= 1 && номер <= строки.список.length) {
+          return [строки.список[номер - 1]]
+        }
+        const искомое = String(program).toLowerCase()
+        return строки.список.filter((с) => {
+          const ref = с.program_ref as Record<string, string>
+          return `${ref.вуз ?? ''} ${ref.программа ?? ''}`.toLowerCase().includes(искомое)
+        })
+      }
+
+      const совпадения = найти()
+      if (!совпадения.length) return `Не нашёл «${program}» в подборке. Посмотри show_shortlist.`
+      if (совпадения.length > 1) {
+        // Угадывать нельзя: не та убранная программа — это молчаливая потеря
+        // варианта, который куратор считал оставленным.
+        return (
+          `Под «${program}» подходит несколько: ` +
+          совпадения
+            .map((с) => (с.program_ref as Record<string, string>).вуз)
+            .join(', ') +
+          '. Назови номер из show_shortlist.'
+        )
+      }
+
+      const строка = совпадения[0]
+      const ref = строка.program_ref as Record<string, string>
+      const подпись = `${ref.вуз ?? ''} — ${ref.программа ?? ''}`
+
+      if (action === 'убрать') {
+        await базаCare()
+          .from('shortlist_items')
+          .update({ status: 'removed', removed_reason: text?.trim() || null })
+          .eq('id', строка.id)
+        await журналПравки(case_id, 'shortlist_item_removed', ref, text)
+        return `Убрал: ${подпись}. Остаётся в деле под «Убранными» — вернуть можно в любой момент.`
+      }
+
+      if (action === 'вернуть') {
+        await базаCare()
+          .from('shortlist_items')
+          .update({ status: 'active', removed_reason: null })
+          .eq('id', строка.id)
+        await журналПравки(case_id, 'shortlist_item_restored', ref, null)
+        return `Вернул в подборку: ${подпись}.`
+      }
+
+      if (action === 'выбрано') {
+        const новый = строка.status === 'chosen' ? 'active' : 'chosen'
+        await базаCare().from('shortlist_items').update({ status: новый }).eq('id', строка.id)
+        await журналПравки(case_id, новый === 'chosen' ? 'shortlist_item_chosen' : 'shortlist_item_unchosen', ref, null)
+        return новый === 'chosen' ? `Отметил выбор клиента: ${подпись}.` : `Снял отметку выбора с ${подпись}.`
+      }
+
+      if (action === 'заметка') {
+        if (!text?.trim()) return 'Для заметки нужен текст.'
+        await базаCare()
+          .from('shortlist_items')
+          .update({ fit_notes: { ...((строка.fit_notes ?? {}) as object), почему: text.trim() } })
+          .eq('id', строка.id)
+        await журналПравки(case_id, 'shortlist_item_note', ref, text)
+        return `Переписал объяснение у ${подпись}.`
+      }
+
+      // выше / ниже
+      const живые = строки.список.filter((с) => с.status !== 'removed')
+      const где = живые.findIndex((с) => с.id === строка.id)
+      const сосед = action === 'выше' ? живые[где - 1] : живые[где + 1]
+      if (!сосед) return `${подпись} и так ${action === 'выше' ? 'первая' : 'последняя'}.`
+
+      await базаCare().from('shortlist_items').update({ position: сосед.position }).eq('id', строка.id)
+      await базаCare().from('shortlist_items').update({ position: строка.position }).eq('id', сосед.id)
+      await журналПравки(case_id, 'shortlist_reordered', ref, action)
+      return `Переставил ${подпись} ${action === 'выше' ? 'выше' : 'ниже'}.`
+    },
+  })
+
   const написатьСтратегиюДела = betaTool({
     name: 'write_strategy',
     description:
@@ -815,5 +1086,8 @@ export function инструменты(участник: Участник, об�
     снятьНамерение,
     завестиЗадачу,
     написатьСтратегиюДела,
+    показатьПодборку,
+    добавитьПрограмму,
+    правитьПрограмму,
   ]
 }

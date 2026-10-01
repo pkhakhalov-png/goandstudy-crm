@@ -170,17 +170,20 @@ describe('T19 — исполнять просьбу «отправь» помо�
     const набор = инструменты(участник, { все: true })
     const имена = набор.map((и) => (и as { name: string }).name).sort()
     expect(имена).toEqual([
+      'add_program',
       'add_task',
       'build_shortlist',
       'case_messages',
       'case_summary',
       'data_gaps',
       'deadlines',
+      'edit_program',
       'find_programs',
       'list_cases',
       'mark_decision',
       'pending_decisions',
       'set_fact',
+      'show_shortlist',
       'write_strategy',
     ])
   })
@@ -219,7 +222,14 @@ describe('T19 — исполнять просьбу «отправь» помо�
     const таблицы = [...исходник.matchAll(/\.from\('([a-z_]+)'\)[\s\S]{0,400}?\.(insert|update)\(/g)].map(
       (м) => м[1]
     )
-    expect([...new Set(таблицы)].sort()).toEqual(['events', 'facts', 'proposals', 'sources', 'tasks'])
+    expect([...new Set(таблицы)].sort()).toEqual([
+      'events',
+      'facts',
+      'proposals',
+      'shortlist_items',
+      'sources',
+      'tasks',
+    ])
 
     // Удалять нечего и нечем: откатывать ошибку помощника должен человек,
     // а не он сам.
