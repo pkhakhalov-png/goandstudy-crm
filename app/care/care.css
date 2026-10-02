@@ -702,3 +702,31 @@
   flex-wrap: wrap;
 }
 .care-отпр:last-child { border-bottom: 0; }
+
+/* ── Расход на модель ────────────────────────────────────────────────── */
+
+.care-расход {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--ds-border-soft);
+}
+.care-расход:last-child { border-bottom: 0; }
+
+/* Полоса потолка: длина сравнивается глазом сразу, число — нет. */
+.care-полоса {
+  margin-top: 6px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--ds-bg-alt);
+  overflow: hidden;
+  max-width: 320px;
+}
+.care-полоса span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  transition: width 280ms cubic-bezier(.25,.1,.25,1);
+}
