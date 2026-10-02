@@ -26,6 +26,8 @@ export type Account = {
   opening_at: string
   opening_minor: number
   is_active: boolean
+  /** Куда записывать, если счёт в сообщении не назван. По одному на валюту. */
+  is_default: boolean
   archived_at: string | null
 }
 

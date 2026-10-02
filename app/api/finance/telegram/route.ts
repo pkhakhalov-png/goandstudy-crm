@@ -383,16 +383,30 @@ async function postFromText(
       ? (cats ?? []).find((x: any) => x.name === c.categoryHint)?.id ?? null
       : null
 
+    // Трата, в которой назван другой наш счёт, — это перевод, а не расход.
+    // Категория переводу не нужна: он не доход и не расход, и в итогах периода
+    // не участвует вовсе.
+    const куда = c.kind === 'expense'
+      ? detectTransferTarget(c.note, account, accounts as СчётДляВыбора[])
+      : null
+
+    const движения = куда
+      ? [
+        { accountId: account.id, amountMinor: -c.amountMinor!, currency: account.currency as Currency },
+        { accountId: куда.id, amountMinor: c.amountMinor!, currency: куда.currency as Currency },
+      ]
+      : [{
+        accountId: account.id,
+        amountMinor: signedAmount(c.kind, c.amountMinor!),
+        currency: account.currency as Currency,
+      }]
+
     try {
       const res = await postTransaction({
-        kind: c.kind,
+        kind: куда ? 'transfer' : c.kind,
         occurredAt: c.occurredAt,
-        movements: [{
-          accountId: account.id,
-          amountMinor: signedAmount(c.kind, c.amountMinor!),
-          currency: account.currency as Currency,
-        }],
-        categoryId,
+        movements: движения,
+        categoryId: куда ? null : categoryId,
         note: c.note,
         origin: 'telegram',
         sourceEventId: eventId,
@@ -418,11 +432,15 @@ async function postFromText(
       // даже если человек не вчитывается в слово «расход».
       const signed = signedAmount(c.kind, c.amountMinor!)
 
-      results.push(
-        `${kindIcon(c.kind)} ${KIND_NAMES[c.kind]}: <b>${formatMinor(signed, account.currency as Currency, { sign: true })}</b>`
-        + `${c.categoryHint ? ` · ${c.categoryHint}` : ''}`
-        + `\n${account.name}${after ? ` · остаток ${formatMinor(after.balance_minor, account.currency as Currency)}` : ''}`
-        + guessed,
+      // Перевод подтверждаем как перевод. Сказать «расход» про деньги, которые
+      // остались у компании, — значит приучить не доверять подтверждению.
+      results.push(куда
+        ? `🔄 Перевод: <b>${formatMinor(c.amountMinor!, account.currency as Currency)}</b>`
+          + `\n${account.name} → ${куда.name}`
+        : `${kindIcon(c.kind)} ${KIND_NAMES[c.kind]}: <b>${formatMinor(signed, account.currency as Currency, { sign: true })}</b>`
+          + `${c.categoryHint ? ` · ${c.categoryHint}` : ''}`
+          + `\n${account.name}${after ? ` · остаток ${formatMinor(after.balance_minor, account.currency as Currency)}` : ''}`
+          + guessed,
       )
 
       await tgSend(msg.chat.id, results[results.length - 1], [[
@@ -453,10 +471,47 @@ async function postFromText(
  * Счёт по правилу: валюта определяет счёт, пока счёт один на валюту. Если
  * счетов с такой валютой несколько, угадывать нельзя — вернём null и спросим.
  */
-function pickAccount(c: Candidate, accounts: { id: string; name: string; currency: string }[]) {
+/**
+ * Куда записать, если счёт в сообщении не назван.
+ *
+ * Было: «единственный счёт этой валюты». Пока рублёвый счёт был один, правило
+ * работало незаметно. Появилась «Копилка» — тоже рублёвая, — и бот на четыре
+ * операции подряд ответил «Записано 0 из 4. На какой счёт записать?».
+ *
+ * Стало: единственный, а если их несколько — основной (`is_default`). Вопрос
+ * остаётся только там, где основного нет вовсе: угадывать за человека, куда
+ * положить деньги, нельзя.
+ */
+function pickAccount(c: Candidate, accounts: СчётДляВыбора[]) {
   const currency = c.currency ?? 'RUB'
   const matching = accounts.filter((a) => a.currency === currency)
-  return matching.length === 1 ? matching[0] : null
+  if (matching.length === 1) return matching[0]
+  return matching.find((a) => a.is_default) ?? null
+}
+
+type СчётДляВыбора = { id: string; name: string; currency: string; is_default: boolean }
+
+/**
+ * Назван ли в тексте ДРУГОЙ наш счёт — тогда это перевод, а не трата.
+ *
+ * «Расход 8649 рублей копилка» — деньги не ушли из компании, они переехали с
+ * основного счёта в копилку. Записать это тратой значит завысить расходы и
+ * занизить остаток копилки: на живых данных так накопилось 553 484 ₽ мнимых
+ * трат.
+ *
+ * Условия нарочно узкие. Счёт должен быть не тем же, с которого списываем, и
+ * той же валюты: «расход 71000 TBC» — это рубли в долларовый счёт, перевода из
+ * этого не выйдет, и такое лучше оставить вопросом, чем тихо провести не то.
+ */
+function detectTransferTarget(
+  note: string, source: СчётДляВыбора, accounts: СчётДляВыбора[],
+): СчётДляВыбора | null {
+  const текст = note.toLowerCase()
+  return accounts.find((a) =>
+    a.id !== source.id
+    && a.currency === source.currency
+    && текст.includes(a.name.toLowerCase())
+  ) ?? null
 }
 
 async function handleCallback(fin: any, update: TgUpdate, eventId: string) {
