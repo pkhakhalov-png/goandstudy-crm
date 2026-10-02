@@ -27,7 +27,17 @@ function label(verdict: string | null, coverage: string | null): { text: string;
   if (verdict === 'FAIL') return { text: 'ошибка на странице', color: 'var(--red)' }
   if (coverage && /переадресац|redirect/i.test(coverage)) return { text: 'переадресация', color: 'var(--muted)' }
   if (coverage && /неизвестен|not found|URL is unknown/i.test(coverage)) return { text: 'Google не видел адрес', color: 'var(--red)' }
-  if (coverage && /Обнаружен|Discovered|Просканирован|Crawled/i.test(coverage)) return { text: 'знает, но не взял', color: 'var(--purple)' }
+  // Два состояния Google, которые раньше назывались одной фразой «знает, но не
+  // взял». Разница в том, что делать дальше, и она противоположная.
+  //
+  // «Обнаружена» — адрес в очереди, но Google до него ещё не дошёл. Это не
+  // приговор содержанию: он его не читал. Лечится тем, чтобы на статью вели
+  // ссылки с тех страниц, куда Google ходит часто.
+  //
+  // «Просканирована» — прочитал и решил не брать. Вот это приговор
+  // содержанию: ссылками делу не поможешь, нужно менять саму статью.
+  if (coverage && /Обнаружен|Discovered/i.test(coverage)) return { text: 'нашёл, но не читал', color: 'var(--purple)' }
+  if (coverage && /Просканирован|Crawled/i.test(coverage)) return { text: 'прочитал и не взял', color: 'var(--red)' }
   return { text: 'не в индексе', color: 'var(--purple)' }
 }
 
