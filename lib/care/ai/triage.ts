@@ -19,7 +19,7 @@
  * сказать: она говорит, что вопрос был, и приводит слова. Отвечает человек.
  */
 import { betaTool } from '@anthropic-ai/sdk/helpers/beta/json-schema'
-import { модель, МОДЕЛЬ_ПО_УМОЛЧАНИЮ, расход, type Расход } from './client'
+import { модель, МОДЕЛЬ_МЕХАНИКИ, глубина, расход, type Расход } from './client'
 import { длясверки, type Сообщение } from './extract'
 
 export const ВИДЫ = ['question', 'document', 'terms', 'other'] as const
@@ -155,11 +155,9 @@ export async function разобратьСообщения(
 
   try {
     const бегун = модель().beta.messages.toolRunner({
-      model: МОДЕЛЬ_ПО_УМОЛЧАНИЮ,
+      model: МОДЕЛЬ_МЕХАНИКИ,
       max_tokens: 8000,
-      // Разбор по ярлыкам — работа неглубокая, и платить за размышление здесь
-      // не за что: решение видно из самого сообщения.
-      output_config: { effort: 'low' },
+      ...глубина(МОДЕЛЬ_МЕХАНИКИ, 'low'),
       system: ПРАВИЛА,
       tools: [запись],
       messages: [{ role: 'user', content: `Клиент: ${клиент}\n\nСообщения:\n${текст}` }],
@@ -168,7 +166,7 @@ export async function разобратьСообщения(
 
     let вход = 0
     let выход = 0
-    let модельId = МОДЕЛЬ_ПО_УМОЛЧАНИЮ
+    let модельId = МОДЕЛЬ_МЕХАНИКИ
     for await (const сообщение of бегун) {
       вход += сообщение.usage.input_tokens
       выход += сообщение.usage.output_tokens

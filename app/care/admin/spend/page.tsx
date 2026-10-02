@@ -17,6 +17,7 @@ import { картинаРасхода } from '@/lib/care/spend'
 export const dynamic = 'force-dynamic'
 
 const ПОДПИСЬ: Record<string, string> = {
+  assistant: 'помощник куратора',
   outbound: 'сообщения клиентам',
   extraction: 'разбор переписки',
   research: 'подбор и справки',

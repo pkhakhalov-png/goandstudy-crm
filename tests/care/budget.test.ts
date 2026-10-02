@@ -19,6 +19,8 @@
  * возврат к общему счёту заметен только по сломанной кнопке у куратора.
  */
 import { describe, it, expect } from 'vitest'
+import fs from 'fs'
+import path from 'path'
 import { базаCare } from '@/lib/care/db'
 import { можноТратить } from '@/lib/care/ai/budget'
 
@@ -141,5 +143,122 @@ describe('подмена счёта не ослабляет словарь ви�
         .update({ daily_budget_usd: было!.daily_budget_usd })
         .eq('kind', 'review')
     }
+  })
+})
+
+describe('цена считается по той модели, которой платили', () => {
+  it('имя с датой выпуска находит свою цену', async () => {
+    // API возвращает `claude-haiku-4-5-20251001`. Точный ключ его не ловит, и
+    // первая версия брала цену по умолчанию — считала Haiku по цене Опуса,
+    // впятеро дороже. Расход при этом выглядел правдой и показывался в
+    // кабинете: по нему решают, что дорого, а что нет.
+    const { расход } = await import('@/lib/care/ai/client')
+
+    const haiku = расход('claude-haiku-4-5-20251001', 1_000_000, 0)
+    const opus = расход('claude-opus-5', 1_000_000, 0)
+
+    expect(haiku.долларов).toBeLessThan(opus.долларов)
+    expect(haiku.долларов).toBeCloseTo(1, 5)
+  })
+
+  it('неизвестная модель считается по самой дорогой', async () => {
+    // Ошибиться в сторону «дороже, чем на самом деле» безопаснее: потолок
+    // сработает раньше, а не позже.
+    const { расход } = await import('@/lib/care/ai/client')
+
+    const неизвестная = расход('claude-будущая-9', 1_000_000, 0)
+    const самая = расход('claude-opus-5', 1_000_000, 0)
+
+    expect(неизвестная.долларов).toBeGreaterThanOrEqual(самая.долларов)
+  })
+
+  it('глубина не передаётся модели, которая её не принимает', async () => {
+    // Haiku отвечает на `effort` четырёхсотым. Забытое правило ломается не при
+    // сборке и не в типах, а при первом же обращении к модели.
+    const { глубина, МОДЕЛЬ_МЕХАНИКИ, МОДЕЛЬ_ПО_УМОЛЧАНИЮ } = await import('@/lib/care/ai/client')
+
+    expect(глубина(МОДЕЛЬ_МЕХАНИКИ, 'low')).toEqual({})
+    expect(глубина(МОДЕЛЬ_ПО_УМОЛЧАНИЮ, 'low')).toEqual({ output_config: { effort: 'low' } })
+  })
+
+  it('потолок проверок меньше рабочего потолка подбора', async () => {
+    // Иначе повторяется то, что уже было: прогон тратит за сутки больше, чем
+    // вся работа кабинета, и это выглядит нормой.
+    const { data } = await базаCare()
+      .from('job_kinds_budget')
+      .select('kind, daily_budget_usd')
+      .in('kind', ['tests', 'research'])
+
+    const по = new Map((data ?? []).map((с) => [с.kind as string, Number(с.daily_budget_usd)]))
+    expect(по.get('tests')!).toBeLessThan(по.get('research')!)
+  })
+})
+
+describe('прогон проверок не ходит в сеть за деньги', () => {
+  it('в прогоне веб закрыт и объясняет почему', async () => {
+    // Поиск в сети стоит около тридцати центов за вызов. Один забытый вызов в
+    // проверке — это 51 вызов и 16.58 $ за двое суток, и узнают об этом по
+    // счёту, а не по красному прогону.
+    const { вебРазрешён } = await import('@/lib/care/ai/client')
+
+    const р = вебРазрешён()
+    expect(р.можно).toBe(false)
+    if (!р.можно) expect(р.почему).toContain('CARE_TEST_ALLOW_WEB')
+  })
+
+  it('поиск программ в прогоне возвращает отказ, а не результат', async () => {
+    // Правило должно действовать в самих вызовах, а не только в проверке выше:
+    // забытый флаг не ломается, он просто стоит денег.
+    const { искатьВВебе } = await import('@/lib/care/ai/search')
+
+    const итог = await искатьВВебе({
+      страны: 'Германия',
+      направление: 'анализ данных',
+      уровень: 'магистратура',
+      бюджетВГод: '9000 EUR',
+      оКлиенте: {},
+      сколько: 1,
+    })
+
+    expect(итог.программы).toHaveLength(0)
+    expect(итог.расход).toBeNull()
+    expect(String(итог.ошибка)).toContain('проверок')
+  })
+
+  it('справка из интернета в прогоне тоже закрыта', async () => {
+    const { справкаИзИнтернета } = await import('@/lib/care/ai/lookup')
+
+    const итог = await справкаИзИнтернета('когда дедлайн в TUM')
+
+    expect(итог.расход).toBeNull()
+    expect(String(итог.ошибка)).toContain('проверок')
+  })
+})
+
+describe('помощник под учётом', () => {
+  it('у помощника есть свой потолок', async () => {
+    // До этого он был единственным путём в кабинете, который ничем не
+    // ограничивался, — и при этом самым дорогим: один вопрос с подбором
+    // программ стоил 0.37 $.
+    const { data } = await базаCare()
+      .from('job_kinds_budget')
+      .select('daily_budget_usd')
+      .eq('kind', 'assistant')
+      .maybeSingle()
+
+    expect(data, 'вид «assistant» не заведён в потолках').toBeTruthy()
+    expect(Number(data!.daily_budget_usd)).toBeGreaterThan(0)
+  })
+
+  it('расход помощника пишется в общий журнал', async () => {
+    // Он писался только в поручение — рядом с ответом, для истории. Потолок и
+    // экран расхода читают ai_spend, и пока записи там не было, оба отвечали
+    // меньше правды ровно про ту часть, которая дороже всех.
+    const исходник = fs.readFileSync(
+      path.resolve(process.cwd(), 'app/care/assistant-actions.ts'),
+      'utf8'
+    )
+    expect(исходник).toContain("записатьРасход('assistant'")
+    expect(исходник).toContain("можноТратить('assistant')")
   })
 })
