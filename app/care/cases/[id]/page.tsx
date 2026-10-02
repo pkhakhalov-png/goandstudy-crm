@@ -17,8 +17,9 @@ import { сессияКонтура } from '@/lib/care/session'
 import { подробностиДела, коллегиДляПередачи } from '@/lib/care/cases'
 import { состояниеОснования } from '@/lib/care/replace'
 import { знакомыеГруппы } from '@/lib/care/chats'
+import { состояниеПаузы } from '@/lib/care/pause'
 import { подписьПоля, подписьЗначения, периодПоля, подписьСтатуса, подписьОжидания, срок, инициалы, склонение } from '@/lib/care/labels'
-import { PublishShortlist, CaseAssistant, NewTask, ProgramControls, TaskActions, FactActions, FactIsDecision, TransferCase, ReplaceInShortlist, LinkChat } from './CaseOperations'
+import { PublishShortlist, CaseAssistant, NewTask, ProgramControls, TaskActions, FactActions, FactIsDecision, TransferCase, ReplaceInShortlist, LinkChat, AnsweredMyself } from './CaseOperations'
 import { CaseSection } from '../../CaseSection'
 import { ProgramCard } from '../../ProgramCard'
 import { AssistantPanel } from '../../AssistantPanel'
@@ -37,6 +38,10 @@ export default async function ДелоСтраница({ params }: { params: Pro
   // Группы, которые знает бот: без них привязать чат можно только из
   // терминала, а без привязанного чата напоминание не уходит никуда.
   const группыБота = await знакомыеГруппы().catch(() => [])
+
+  // Стоит ли пауза автонапоминаний: кнопка должна показывать состояние, а не
+  // предлагать нажать второй раз то, что уже нажато.
+  const пауза = await состояниеПаузы(id).catch(() => ({ наПаузе: false, до: null, когдаОтметили: null }))
 
   // Расхождение основания читается здесь же: подборка могла быть собрана при
   // другом бюджете, и узнать об этом надо до того, как её отдадут клиенту.
@@ -307,6 +312,11 @@ export default async function ДелоСтраница({ params }: { params: Pro
             действие={<NewTask caseId={id} />}
             дети={
               <div style={{ padding: '14px 16px 16px' }}>
+              {/* Пауза живёт рядом с задачами: напоминания готовятся по ним,
+                  и решение «я уже ответил» принимается, глядя на тот же
+                  список. */}
+              <AnsweredMyself caseId={id} наПаузе={пауза.наПаузе} до={пауза.до} />
+
               {д.задачи.length === 0 ? (
                 <p style={{ fontSize: 13, color: 'var(--ds-muted)', margin: 0 }}>
                   Задач нет — завести первую.

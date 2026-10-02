@@ -464,6 +464,40 @@ export async function этоРешение(caseId: string, factId: string): Prom
  * названии. Он работает, пока названия аккуратные, и молча не работает, когда
  * нет. Здесь куратор говорит прямо, какая группа чья.
  */
+/**
+ * «Я ответил сам» — пауза автонапоминаний по делу.
+ *
+ * Куратор написал клиенту руками, и через час правило готовит то же самое от
+ * имени системы. Два сообщения об одном от разных отправителей читаются как
+ * давление, а не как забота.
+ */
+export async function ответилСам(caseId: string): Promise<{ ok: boolean; текст: string }> {
+  try {
+    const { участник } = await подготовить(caseId)
+    const { отметитьОтвет } = await import('@/lib/care/pause')
+    const итог = await отметитьОтвет(caseId, участник.id)
+    revalidatePath(`/care/cases/${caseId}`)
+    revalidatePath('/care/review/reminders')
+    return итог.ok ? { ok: true, текст: итог.текст } : { ok: false, текст: итог.ошибка }
+  } catch (e) {
+    return { ok: false, текст: e instanceof Error ? e.message : String(e) }
+  }
+}
+
+/** Снять паузу раньше срока — ответ не закрыл вопрос. */
+export async function вернутьНапоминания(caseId: string): Promise<{ ok: boolean; текст: string }> {
+  try {
+    const { участник } = await подготовить(caseId)
+    const { снятьПаузу } = await import('@/lib/care/pause')
+    const итог = await снятьПаузу(caseId, участник.id)
+    revalidatePath(`/care/cases/${caseId}`)
+    revalidatePath('/care/review/reminders')
+    return итог.ok ? { ok: true, текст: итог.текст } : { ok: false, текст: итог.ошибка }
+  } catch (e) {
+    return { ok: false, текст: e instanceof Error ? e.message : String(e) }
+  }
+}
+
 export async function привязатьЧатКДелу(caseId: string, chatId: string): Promise<{ ok: boolean; текст: string }> {
   try {
     const { участник } = await подготовить(caseId)

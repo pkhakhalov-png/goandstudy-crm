@@ -38,6 +38,8 @@ import {
   найтиЗаменуВДеле,
   привязатьЧатКДелу,
   отвязатьЧатОтДела,
+  ответилСам,
+  вернутьНапоминания,
 } from './actions'
 
 type Итог = { ok: true; предупреждение?: string } | { ok: false; ошибка: string }
@@ -929,6 +931,68 @@ export function LinkChat({
             Отмена
           </button>
         </div>
+      )}
+      {итог && <p style={{ fontSize: 12, color: 'var(--ds-muted)', marginTop: 6 }}>{итог}</p>}
+      <ErrorLine текст={ошибка} />
+    </div>
+  )
+}
+
+/**
+ * Пауза автонапоминаний: «я ответил сам».
+ *
+ * ПОЧЕМУ КНОПКА ВИДНА ВСЕГДА, А НЕ ТОЛЬКО КОГДА ЕСТЬ ЧТО ПАУЗИТЬ. Куратор
+ * нажимает её сразу после того, как написал клиенту, — то есть до того, как
+ * правило соберётся напомнить. Прятать её, пока напоминания нет, значит
+ * показывать ровно тогда, когда поздно.
+ *
+ * ПОЧЕМУ СОСТОЯНИЕ НАЗВАНО СРОКОМ. «На паузе» без «до когда» заставляет
+ * гадать, вернутся ли напоминания вообще.
+ */
+export function AnsweredMyself({
+  caseId,
+  наПаузе,
+  до,
+}: {
+  caseId: string
+  наПаузе: boolean
+  до: string | null
+}) {
+  const { идёт, ошибка, выполнить } = useAction()
+  const [итог, установитьИтог] = useState<string | null>(null)
+
+  const сделать = (что: () => Promise<{ ok: boolean; текст: string }>) =>
+    выполнить(async () => {
+      const р = await что()
+      установитьИтог(р.текст)
+      return р.ok ? { ok: true } : { ok: false, ошибка: р.текст }
+    })
+
+  return (
+    <div style={{ marginTop: 10 }}>
+      {наПаузе ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 12, color: 'var(--ds-muted)' }}>
+            Автонапоминания молчат
+            {до ? ` до ${new Date(до).toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}` : ''}
+          </span>
+          <button
+            className="ds-btn ds-btn-ghost ds-btn-sm"
+            disabled={идёт}
+            onClick={() => сделать(() => вернутьНапоминания(caseId))}
+          >
+            Вернуть напоминания
+          </button>
+        </div>
+      ) : (
+        <button
+          className="ds-btn ds-btn-ghost ds-btn-sm"
+          disabled={идёт}
+          onClick={() => сделать(() => ответилСам(caseId))}
+          title="Автонапоминания по делу замолчат на срок из настроек"
+        >
+          Я ответил сам
+        </button>
       )}
       {итог && <p style={{ fontSize: 12, color: 'var(--ds-muted)', marginTop: 6 }}>{итог}</p>}
       <ErrorLine текст={ошибка} />

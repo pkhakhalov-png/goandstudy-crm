@@ -172,6 +172,7 @@ describe('T19 — исполнять просьбу «отправь» помо�
     expect(имена).toEqual([
       'add_program',
       'add_task',
+      'answered_myself',
       'build_shortlist',
       'case_messages',
       'case_summary',
