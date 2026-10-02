@@ -42,6 +42,10 @@ export default async function НаПроверкуСтраница() {
         <Link href="/care/review/facts" className="ds-link" style={{ fontSize: 14 }}>
           Расхождения в сведениях →
         </Link>
+        {'  ·  '}
+        <Link href="/care/review/sends" className="ds-link" style={{ fontSize: 14 }}>
+          Что ушло клиентам →
+        </Link>
       </p>
       <p style={{ color: 'var(--ds-muted)', marginBottom: 22, fontSize: 14 }}>
         {всего === 0

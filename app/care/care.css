@@ -689,3 +689,16 @@
   background: var(--ds-bg-alt);
   border-bottom: 1px solid var(--ds-border-soft);
 }
+
+/* ── Журнал отправок ─────────────────────────────────────────────────── */
+
+.care-отпр {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--ds-border-soft);
+  flex-wrap: wrap;
+}
+.care-отпр:last-child { border-bottom: 0; }
