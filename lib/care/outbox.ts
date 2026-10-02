@@ -45,6 +45,7 @@ type Запись = {
   external_id: string | null
   attempts: number
   last_error: string | null
+  cancel_reason: string | null
   sent_at: string | null
   created_at: string
 }
@@ -59,9 +60,11 @@ function разобрать(з: Запись, делоПоПредложению
     когда: з.created_at,
     отправлено: з.sent_at,
     ошибка: з.last_error,
-    // Причина отмены лежит там же, где ошибка: отдельного поля у неё нет, и
-    // заводить его ради одной строки незачем.
-    причинаОтмены: з.status === 'cancelled' ? з.last_error : null,
+    // У причины отмены свой столбец (миграция 010), и читать её надо оттуда.
+    // Сначала я читал `last_error` — экран молчал бы о каждой отмене, а
+    // вчерашняя проверка это пропустила: фикстура подыгрывала коду, записывая
+    // причину туда же, откуда он её брал.
+    причинаОтмены: з.cancel_reason,
     попыток: з.attempts,
   }
 }
@@ -82,7 +85,7 @@ export async function отправки(дела: string[], сколько = 30):
 
   const { data } = await базаCare()
     .from('outbound_actions')
-    .select('id, proposal_id, recipient, payload, status, external_id, attempts, last_error, sent_at, created_at')
+    .select('id, proposal_id, recipient, payload, status, external_id, attempts, last_error, cancel_reason, sent_at, created_at')
     .in('proposal_id', [...делоПоПредложению.keys()])
     .order('created_at', { ascending: false })
     .limit(сколько * 3)
