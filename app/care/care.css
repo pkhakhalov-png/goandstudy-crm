@@ -730,3 +730,113 @@
   border-radius: 999px;
   transition: width 280ms cubic-bezier(.25,.1,.25,1);
 }
+
+/* ── Подборка таблицей ───────────────────────────────────────────────── */
+
+/* Своя прокрутка у таблицы, а не у страницы: горизонтальная прокрутка всего
+   экрана ломает чтение всего остального. */
+.care-таб-обёртка { overflow-x: auto; padding: 0 2px 4px; }
+
+.care-таб {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  min-width: 720px;
+}
+.care-таб th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ds-muted);
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--ds-border-soft);
+  white-space: nowrap;
+}
+.care-таб td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--ds-border-soft);
+  vertical-align: top;
+}
+.care-таб-строка { cursor: pointer; transition: background 120ms; }
+.care-таб-строка:hover { background: var(--ds-bg-alt); }
+.care-таб-строка[data-выбрана='1'] td:first-child { box-shadow: inset 2px 0 0 var(--ds-ai); }
+
+.care-таб-знак {
+  flex: 0 0 auto;
+  width: 30px; height: 30px;
+  border-radius: 8px;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: #fff; font-weight: 650; letter-spacing: .02em;
+}
+.care-таб-тихо { color: var(--ds-muted); font-size: 12px; }
+.care-таб-число { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* Метка состояния — словом, а не цветом: цвет один не читается дальтоником и
+   не читается в распечатке. */
+.care-метка {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.care-метка-плохо { background: var(--ds-error-soft, var(--ds-bg-alt)); color: var(--ds-error-ink); }
+.care-метка-неясно { background: var(--ds-amber-soft, var(--ds-bg-alt)); color: var(--ds-amber-ink, inherit); }
+.care-метка-ждём { background: var(--ds-bg-alt); color: var(--ds-muted); }
+
+.care-таб-подробно td { background: var(--ds-bg-alt); padding: 12px 16px 16px 54px; }
+.care-таб-почему { margin: 0 0 8px; font-size: 13px; line-height: 1.55; max-width: 72ch; }
+.care-таб-вывод {
+  font-size: 12px;
+  padding: 6px 9px;
+  border-radius: 7px;
+  margin-bottom: 6px;
+  background: var(--ds-amber-soft, var(--ds-bg));
+}
+.care-таб-вывод[data-плохо='1'] {
+  background: var(--ds-error-soft, var(--ds-bg));
+  color: var(--ds-error-ink);
+}
+.care-таб-ждём { font-size: 12px; color: var(--ds-amber-ink, var(--ds-muted)); margin-bottom: 8px; }
+.care-таб-факт { font-size: 12px; color: var(--ds-success-ink); margin-top: 6px; }
+.care-таб-цитата {
+  color: var(--ds-muted);
+  margin-top: 2px;
+  padding-left: 10px;
+  border-left: 2px solid var(--ds-border-soft);
+}
+
+/* ── Профиль компактной сеткой ───────────────────────────────────────── */
+
+.care-профиль {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 2px 24px;
+}
+.care-пара { padding: 7px 0; border-bottom: 1px solid var(--ds-border-soft); }
+.care-пара-имя { font-size: 12px; color: var(--ds-muted); }
+.care-пара-знач { font-size: 14px; font-weight: 600; margin-top: 1px; }
+.care-пара-ещё {
+  font-size: 11px;
+  color: var(--ds-muted);
+  background: none;
+  border: 0;
+  padding: 2px 0 0;
+  cursor: pointer;
+}
+.care-пара-ещё:hover { color: var(--ds-ink); text-decoration: underline; }
+.care-пара-цитата {
+  font-size: 12px;
+  color: var(--ds-muted);
+  margin-top: 4px;
+  padding-left: 9px;
+  border-left: 2px solid var(--ds-border-soft);
+  line-height: 1.5;
+}
+
+@media (max-width: 640px) {
+  .care-таб { min-width: 560px; }
+}

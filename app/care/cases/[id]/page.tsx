@@ -20,8 +20,9 @@ import { знакомыеГруппы } from '@/lib/care/chats'
 import { состояниеПаузы } from '@/lib/care/pause'
 import { подписьПоля, подписьЗначения, периодПоля, подписьСтатуса, подписьОжидания, срок, инициалы, склонение } from '@/lib/care/labels'
 import { PublishShortlist, CaseAssistant, NewTask, ProgramControls, TaskActions, FactActions, FactIsDecision, TransferCase, ReplaceInShortlist, LinkChat, AnsweredMyself } from './CaseOperations'
+import { FactGrid } from '../../FactGrid'
+import { ProgramTable } from '../../ProgramTable'
 import { CaseSection } from '../../CaseSection'
-import { ProgramCard } from '../../ProgramCard'
 import { AssistantPanel } from '../../AssistantPanel'
 import { историяПомощника } from '../../assistant-actions'
 import { флагВключён } from '@/lib/care/flags'
@@ -144,47 +145,40 @@ export default async function ДелоСтраница({ params }: { params: Pro
             поумолчанию
             дети={
               <div style={{ padding: '14px 16px 16px' }}>
-              {известное.length === 0 ? (
-                <p style={{ fontSize: 13, color: 'var(--ds-muted)', margin: 0 }}>
-                  Пока ничего не записано. Факты появятся, когда помощник разберёт встречу.
-                </p>
-              ) : (
-                известное.map((ф) => (
-                  <div key={ф.id} className="care-fact">
-                    <div className="care-fact-name">{подписьПоля(ф.field)}</div>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
-                      <span className="care-fact-value" data-state={ф.status}>
-                        {подписьЗначения(ф.field, ф.value)}
-                        {ф.currency ? ` ${ф.currency}` : ''}
-                        {периодПоля(ф.field) ? ` ${периодПоля(ф.field)}` : ''}
-                      </span>
-                      {ф.status === 'confirmed' && (
-                        <span style={{ fontSize: 12, color: 'var(--ds-success-ink)' }}>
-                          ✓ подтверждено
-                        </span>
+              {/* Сетка пар вместо анкеты: одиннадцать фактов занимали два
+                  экрана, а меняются раз в месяц. Цитата — по запросу, зелёное
+                  «подтверждено» убрано: когда им помечено всё, оно перестаёт
+                  значить что-либо и неподтверждённое теряется среди него. */}
+              <FactGrid
+                пары={известное.map((ф) => ({
+                  id: ф.id,
+                  имя: подписьПоля(ф.field),
+                  значение: `${подписьЗначения(ф.field, ф.value)}${ф.currency ? ` ${ф.currency}` : ''}`,
+                  период: периодПоля(ф.field) || null,
+                  цитата: ф.quote ?? null,
+                  подтверждён: ф.status === 'confirmed',
+                  намерение: ф.is_plan === true,
+                }))}
+                действия={Object.fromEntries(
+                  известное.map((ф) => [
+                    ф.id,
+                    <div key={ф.id} style={{ marginTop: 4 }}>
+                      {ф.is_plan && ф.status === 'confirmed' && (
+                        <FactIsDecision caseId={id} factId={ф.id} />
                       )}
-                      {ф.is_plan && (
-                        <>
-                          <span className="ds-chip ds-chip-warning">намерение, не результат</span>
-                          {/* Подбор по намерению не работает — и кнопка стоит
-                              там, где написана причина, а не в меню. */}
-                          {ф.status === 'confirmed' && <FactIsDecision caseId={id} factId={ф.id} />}
-                        </>
+                      {ф.status === 'draft' && (
+                        <FactActions
+                          caseId={id}
+                          factId={ф.id}
+                          значение={подписьЗначения(ф.field, ф.value)}
+                          валюта={ф.currency}
+                          деньги={ф.field.startsWith('budget.')}
+                        />
                       )}
-                    </div>
-                    {ф.quote && <div className="care-fact-src">«{ф.quote}»</div>}
-                    {ф.status === 'draft' && (
-                      <FactActions
-                        caseId={id}
-                        factId={ф.id}
-                        значение={подписьЗначения(ф.field, ф.value)}
-                        валюта={ф.currency}
-                        деньги={ф.field.startsWith('budget.')}
-                      />
-                    )}
-                  </div>
-                ))
-              )}
+                    </div>,
+                  ])
+                )}
+              />
 
               {/* Привязка здесь же, где видно её отсутствие: отправлять за этим
                   в другой экран значит, что туда не пойдут. */}
@@ -220,17 +214,43 @@ export default async function ДелоСтраница({ params }: { params: Pro
                   {(() => {
                     const живые = д.подборка.строки.filter((с) => с.status !== 'removed')
                     return (
-                      <div className="care-progs">
-                        {живые.map((с, индекс) => (
-                          <ProgramCard
-                            key={с.id}
-                            caseId={id}
-                            строка={с}
-                            номер={индекс + 1}
-                            первая={индекс === 0}
-                            последняя={индекс === живые.length - 1}
-                          />
-                        ))}
+                      <div style={{ padding: '4px 10px 12px' }}>
+                        <ProgramTable
+                          caseId={id}
+                          строки={живые.map((с) => {
+                            const ref = (с.program_ref ?? {}) as Record<string, string>
+                            const заметки = (с.fit_notes ?? {}) as Record<string, unknown>
+                            const проверено = Array.isArray(заметки.проверено)
+                              ? (заметки.проверено as { вид: string; значение: string; цитата: string }[])
+                              : []
+                            const сверка = Array.isArray(заметки.сверка)
+                              ? (заметки.сверка as { вид: string; вывод: string; объяснение: string }[])
+                              : []
+                            return {
+                              id: с.id,
+                              вуз: ref.вуз ?? '',
+                              программа: ref.программа ?? '',
+                              место: [ref.город, ref.страна].filter(Boolean).join(', '),
+                              ссылка: ref.ссылка ?? null,
+                              // Своя цена, а если её нет — та, что нашлась на
+                              // странице вуза при проверке требований. Пустая
+                              // клетка там, где ответ известен, — хуже, чем
+                              // отсутствие проверки.
+                              стоимость: с.tuition_amount
+                                ? `${с.tuition_amount} ${с.currency ?? ''}`.trim()
+                                : (проверено.find((т) => т.вид === 'стоимость за год')?.значение ?? null),
+                              // Срок подачи — из проверенного на странице вуза,
+                              // а не из нашей догадки: по нему клиент подаёт.
+                              срокПодачи:
+                                проверено.find((т) => т.вид === 'срок подачи')?.значение ?? null,
+                              почему: String((заметки as { почему?: string }).почему ?? ''),
+                              несходится: сверка.filter((в) => в.вывод !== 'подходит'),
+                              проверено,
+                              проверить: с.unresolved ?? [],
+                              выбрана: с.status === 'chosen',
+                            }
+                          })}
+                        />
                       </div>
                     )
                   })()}
