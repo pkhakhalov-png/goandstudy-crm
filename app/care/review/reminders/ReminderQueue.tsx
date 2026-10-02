@@ -13,7 +13,9 @@
  */
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
-import { отправитьНапоминание, пропуститьНапоминание, ответилСам } from './actions'
+import { отправитьНапоминание, пропуститьНапоминание, ответилСам,
+  исправитьНапоминание,
+} from './actions'
 
 export type Напоминание = {
   id: string
@@ -34,6 +36,11 @@ export function ReminderQueue({ очередь, отправкиВключены
   const [номер, установитьНомер] = useState(0)
   const [причина, установитьПричину] = useState('')
   const [пропускаем, пропускать] = useState(false)
+  // Правленый текст держим здесь: страница серверная, и после сохранения она
+  // перерисуется, но куратор должен увидеть своё исправление сразу.
+  const [правим, править] = useState(false)
+  const [черновик, установитьЧерновик] = useState('')
+  const [правленые, установитьПравленые] = useState<Record<string, string>>({})
   const [сообщение, установитьСообщение] = useState<string | null>(null)
   const [ошибка, установитьОшибку] = useState<string | null>(null)
   const [идёт, начать] = useTransition()
@@ -141,7 +148,7 @@ export function ReminderQueue({ очередь, отправкиВключены
             whiteSpace: 'pre-line',
           }}
         >
-          {текущее.текст}
+          {правленые[текущее.id] ?? текущее.текст}
         </div>
 
         {/* Откуда текст — это не мелкий шрифт для порядка. Написанное моделью
@@ -156,7 +163,43 @@ export function ReminderQueue({ очередь, отправкиВключены
             : ''}
         </p>
 
-        {!пропускаем ? (
+        {правим ? (
+          <div style={{ marginTop: 14 }}>
+            <textarea
+              className="ds-input"
+              rows={5}
+              value={черновик}
+              onChange={(e) => установитьЧерновик(e.target.value)}
+              style={{ width: '100%', resize: 'vertical', fontSize: 15, lineHeight: 1.6 }}
+              autoFocus
+            />
+            <p style={{ fontSize: 12, color: 'var(--ds-muted)', marginTop: 6 }}>
+              Получателя правка не меняет: адрес берётся из карточки дела в момент отправки.
+            </p>
+            <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+              <button
+                className="ds-btn ds-btn-primary ds-btn-sm"
+                disabled={идёт || !черновик.trim()}
+                onClick={() =>
+                  начать(async () => {
+                    const о = await исправитьНапоминание(текущее.id, черновик)
+                    if (о.ok) {
+                      установитьПравленые((п) => ({ ...п, [текущее.id]: о.текст }))
+                      править(false)
+                    } else {
+                      установитьОшибку(о.ошибка)
+                    }
+                  })
+                }
+              >
+                Сохранить
+              </button>
+              <button className="ds-btn ds-btn-ghost ds-btn-sm" disabled={идёт} onClick={() => править(false)}>
+                Отмена
+              </button>
+            </div>
+          </div>
+        ) : !пропускаем ? (
           <div style={{ display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap' }}>
             <button
               className="ds-btn ds-btn-primary ds-btn-sm"
@@ -164,6 +207,19 @@ export function ReminderQueue({ очередь, отправкиВключены
               onClick={() => выполнить(() => отправитьНапоминание(текущее.id))}
             >
               {идёт ? 'Отправляю…' : 'Отправить и дальше'}
+            </button>
+            {/* Между «отправить неточное» и «не отправить ничего» должен быть
+                третий ответ. Без него куратор пишет сам, и контур перестаёт
+                экономить время, ради чего он и строится. */}
+            <button
+              className="ds-btn ds-btn-secondary ds-btn-sm"
+              disabled={идёт}
+              onClick={() => {
+                установитьЧерновик(правленые[текущее.id] ?? текущее.текст)
+                править(true)
+              }}
+            >
+              Исправить
             </button>
             <button className="ds-btn ds-btn-ghost ds-btn-sm" disabled={идёт} onClick={() => пропускать(true)}>
               Пропустить

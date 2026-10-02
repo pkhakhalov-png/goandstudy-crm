@@ -16,6 +16,7 @@ import { базаCare } from '@/lib/care/db'
 import { требуетсяДоступ } from '@/lib/care/access'
 import { сессияКонтура } from '@/lib/care/session'
 import { поставитьВОчередь } from '@/lib/care/gate/outbound'
+import { исправитьТекст, type ИтогПравки } from '@/lib/care/reminder-edit'
 
 export type Итог =
   | { ok: true; вОчереди: true }
@@ -47,6 +48,26 @@ export async function отправитьНапоминание(proposalId: strin
     // Отказ ворот — штатный исход, а не сбой. Возвращаем объяснение, а не
     // сообщение об ошибке: человек должен понять, что делать дальше.
     return { ok: true, вОчереди: false, объяснение: итог.объяснение }
+  } catch (e) {
+    return { ok: false, ошибка: e instanceof Error ? e.message : String(e) }
+  }
+}
+
+/**
+ * Поправить текст перед отправкой.
+ *
+ * Отдельным действием, а не частью отправки: куратор должен перечитать то, что
+ * исправил, прежде чем это уйдёт человеку.
+ */
+export async function исправитьНапоминание(
+  proposalId: string,
+  текст: string
+): Promise<ИтогПравки> {
+  try {
+    const { участник } = await подготовить(proposalId)
+    const итог = await исправитьТекст(proposalId, текст, участник.id)
+    revalidatePath('/care/review/reminders')
+    return итог
   } catch (e) {
     return { ok: false, ошибка: e instanceof Error ? e.message : String(e) }
   }
