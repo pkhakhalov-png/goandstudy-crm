@@ -21,6 +21,7 @@ import { разобратьПереписку } from '@/lib/care/jobs/extract'
 import { разобратьВходящие } from '@/lib/care/jobs/triage'
 import { закрытьЗависшие, закрытьДогнанные } from '@/lib/care/jobs/sweep'
 import { проверитьКаналы } from '@/lib/care/channels'
+import { сверитьПрежнийКабинет } from '@/lib/care/legacy'
 import { необязательна } from '@/lib/care/env'
 import { секретГодится, секретыСовпали } from '@/lib/care/secret'
 
@@ -48,6 +49,18 @@ const ОБРАБОТЧИКИ: Record<string, (з: Задание, воркер: 
   /** Подготовить напоминания. Ничего не отправляет — создаёт предложения. */
   async prepare_reminders() {
     const итог = await подготовитьНапоминания()
+    return { ...итог, at: new Date().toISOString() }
+  },
+
+  /**
+   * Правили ли переведённого клиента в прежнем кабинете.
+   *
+   * Модель не зовёт и денег не стоит: чтение девяти полей на клиента и
+   * сравнение хэшей. Раз в сутки — правка в старом окне не требует реакции в
+   * ту же минуту, но и узнавать о ней через месяц поздно.
+   */
+  async detect_legacy_writes() {
+    const итог = await сверитьПрежнийКабинет()
     return { ...итог, at: new Date().toISOString() }
   },
 
