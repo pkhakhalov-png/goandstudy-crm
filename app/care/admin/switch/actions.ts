@@ -16,6 +16,7 @@ import { revalidatePath } from 'next/cache'
 import { сессияКонтура } from '@/lib/care/session'
 import { делоДоступно } from '@/lib/care/access'
 import { перевестиНаV2, вернутьНаLegacy, готовность, type ИтогПеревода, type Готовность } from '@/lib/care/switch'
+import { разрешитьОтправки, type ИтогФлага } from '@/lib/care/sends'
 
 async function руководитель() {
   const сессия = await сессияКонтура()
@@ -60,5 +61,24 @@ export async function выключитьДело(caseId: string): Promise<Ито
   revalidatePath('/care/admin/switch')
   revalidatePath(`/care/cases/${caseId}`)
   revalidatePath('/care')
+  return итог
+}
+
+/**
+ * Разрешить или запретить отправки клиенту.
+ *
+ * Руководителю — как и перевод: это решение о живом человеке, а не настройка
+ * вида. Рубильник контура здесь не трогается вовсе: он меняется миграцией, и
+ * это осознанно — предохранитель, который переключается нажатием, однажды
+ * переключится по ошибке.
+ */
+export async function переключитьОтправки(caseId: string, включить: boolean): Promise<ИтогФлага> {
+  const кто = await руководитель()
+  if (!кто) return { ok: false, ошибка: 'Отправки может разрешать только руководитель контура' }
+  if (!(await делоДоступно(кто, caseId))) return { ok: false, ошибка: 'Нет доступа к этому делу' }
+
+  const итог = await разрешитьОтправки(caseId, включить, кто.id)
+  revalidatePath('/care/admin/switch')
+  revalidatePath(`/care/cases/${caseId}`)
   return итог
 }

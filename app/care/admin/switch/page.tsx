@@ -14,7 +14,9 @@ import { notFound } from 'next/navigation'
 import { сессияКонтура } from '@/lib/care/session'
 import { видимыеДела } from '@/lib/care/access'
 import { ктоГде } from '@/lib/care/switch'
+import { картинаОтправок } from '@/lib/care/sends'
 import { SwitchList } from './SwitchList'
+import { SendsList } from '../SendsList'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,12 +27,15 @@ export default async function ПереключениеСтраница() {
   if (сессия.участник.care_role !== 'lead') notFound()
 
   const область = await видимыеДела(сессия.участник)
-  const строки = область.пусто ? [] : await ктоГде(область.дела)
+  const [строки, отправки] = await Promise.all([
+    область.пусто ? Promise.resolve([]) : ктоГде(область.дела),
+    картинаОтправок(область.пусто ? [] : область.дела),
+  ])
 
   return (
     <>
       <h1 className="ds-hero-h1" style={{ fontSize: 30, marginBottom: 4 }}>
-        Кто на каком кабинете
+        Кабинеты и отправки
       </h1>
       <p style={{ marginBottom: 10 }}>
         <Link href="/care/team" className="ds-link" style={{ fontSize: 14 }}>
@@ -44,6 +49,10 @@ export default async function ПереключениеСтраница() {
       </p>
 
       <SwitchList строки={строки} />
+
+      <div style={{ marginTop: 28 }}>
+        <SendsList картина={отправки} />
+      </div>
     </>
   )
 }
