@@ -1556,3 +1556,66 @@ registerStep('yandex_sync', async (_job: Job, seo: any): Promise<StepOutcome> =>
     },
   }
 })
+
+/**
+ * Поставить входящие ссылки статьям-сиротам.
+ *
+ * Почему это понадобилось. Планировщик ссылок отрабатывал на каждой статье и
+ * складывал предложения в `link_suggestions` — их накопилось 110. Ставил их
+ * только человек кнопкой в админке и нажал дважды, последний раз 10 сентября.
+ * Двадцать четыре статьи остались без единой входящей ссылки.
+ *
+ * Чем это кончается, видно на экране индексации: шесть статей неделями висят в
+ * состоянии «обнаружена, не проиндексирована» — Google знает адрес из карты
+ * сайта и не дошёл. Карта сайта это заявка, а ходит он по ссылкам.
+ *
+ * Шаг берёт по одной статье за прогон. Не из экономии: каждая вставка правит
+ * живой файл темы через агента на сервере, и десяток правок подряд — это
+ * десяток шансов уронить чужую страницу разом. По одной в час хватает: сирот
+ * двадцать четыре, то есть сутки работы.
+ */
+registerStep('links_apply', async (_job: Job, seo: any): Promise<StepOutcome> => {
+  const { applyIncomingLinks } = await import('./links-apply')
+
+  // Сироты по данным находок: у них ноль входящих ссылок. Берём только наши
+  // опубликованные статьи — чужие страницы этот шаг не трогает.
+  const { data: сироты } = await seo.from('findings')
+    .select('evidence').eq('kind', 'orphan').eq('status', 'open').limit(200)
+  const адреса = new Set(
+    (сироты ?? []).map((f: any) => String(f.evidence?.url ?? '')).filter((u: string) => u.includes('/blog/')),
+  )
+  if (!адреса.size) return { outcome: 'done', result: { skipped: 'сирот нет', cost: 0 } }
+
+  const { data: статьи } = await seo.from('articles')
+    .select('id, topic_id, current_version_id').eq('status', 'published').order('published_at', { ascending: false })
+  if (!статьи?.length) return { outcome: 'done', result: { skipped: 'опубликованных статей нет', cost: 0 } }
+
+  const { data: версии } = await seo.from('article_versions')
+    .select('id, slug_pub:meta->publish->>slug, slug_flat:meta->>slug')
+    .in('id', статьи.map((a: any) => a.current_version_id).filter(Boolean))
+  const поВерсии = new Map<number, any>((версии ?? []).map((v: any) => [v.id, v]))
+
+  for (const a of статьи) {
+    const v = поВерсии.get(a.current_version_id)
+    const slug = v?.slug_pub ?? v?.slug_flat
+    if (!slug || !адреса.has(`https://goandstudy.com/blog/${slug}`)) continue
+
+    // Уже стоит в очереди у агента — второй раз не ставим: та же ссылка в тот
+    // же файл дважды это не «надёжнее», это дубль в тексте.
+    const { data: вОчереди } = await seo.from('jobs').select('id')
+      .eq('step', 'link_insert_theme').eq('article_id', a.id)
+      .in('status', ['pending', 'running', 'waiting']).limit(1)
+    if (вОчереди?.length) continue
+
+    const r: any = await applyIncomingLinks(seo, a.id, false)
+    if (r?.error) continue   // плана ссылок нет — не беда, берём следующую
+
+    const поставлено = (r.report ?? []).filter((x: any) => x.ok).length
+    return {
+      outcome: 'done',
+      result: { статья: a.id, слаг: slug, поставлено, отчёт: (r.report ?? []).slice(0, 5), cost: 0 },
+    }
+  }
+
+  return { outcome: 'done', result: { skipped: 'сиротам ставить нечего: планов ссылок нет', cost: 0 } }
+})

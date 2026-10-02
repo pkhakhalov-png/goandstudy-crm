@@ -147,6 +147,16 @@ export async function POST(req: NextRequest) {
         await seo.from('jobs').insert({ step: 'vk_autopost', lane: 'production', priority: 14, payload: {} }).throwOnError()
       }
 
+      // Внутренние ссылки сиротам. Шаг берёт одну статью за прогон и молча
+      // выходит, если сирот нет. Раз в час — потому что каждая вставка правит
+      // живой файл темы через агента, и торопиться тут нечем: сирот два
+      // десятка, то есть сутки работы.
+      const { data: la } = await seo.from('jobs').select('id')
+        .eq('step', 'links_apply').in('status', ['pending', 'running', 'waiting']).limit(1)
+      if (!la?.length) {
+        await seo.from('jobs').insert({ step: 'links_apply', lane: 'production', priority: 11, payload: {} }).throwOnError()
+      }
+
       // Сбор подтверждений. Шаг сам смотрит, остались ли неподтверждённые
       // утверждения, и молча выходит, если не осталось. Раз в час, потому что
       // неподтверждённый факт — это не «когда-нибудь поправим», а стоящая
