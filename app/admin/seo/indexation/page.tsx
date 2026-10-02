@@ -123,6 +123,7 @@ export default async function IndexationPage({ searchParams }: { searchParams: P
     id: number; keyword: string; url: string; publishedAt: string | null
     verdict: string | null; coverage: string | null; firstIndexed: string | null; days: number | null
     checkedAt: string | null; nextCheckAt: string | null; inInventory: boolean
+    clicks: number; impressions: number; position: number
   }[] = []
 
   // Единый источник — `index_status`: из него же считается сводка по сайту.
@@ -138,7 +139,12 @@ export default async function IndexationPage({ searchParams }: { searchParams: P
     const page = pageByUrl.get(url)
     const st = page ? byPage.get(page.id) : null
     const firstIndexed = st?.first_indexed_at ?? a.indexed_at ?? null
+    // Трафик за то же окно в 28 дней, что и сортировка списка ниже. Берётся по
+    // адресу без завершающей косой черты — в gsc_page_daily адреса приведены
+    // именно так, и совпадение по строке с хвостовым слешем не находилось бы.
+    const t = traffic.get(url) ?? { clicks: 0, impressions: 0, position: 0 }
     ourArticles.push({
+      clicks: t.clicks, impressions: t.impressions, position: t.position,
       id: a.id, keyword: a.primary_keyword, url, publishedAt: a.published_at,
       verdict: st?.verdict ?? (m?.verdict ?? null),
       coverage: st?.coverage_state ?? (m?.coverage ?? null),
@@ -238,6 +244,9 @@ export default async function IndexationPage({ searchParams }: { searchParams: P
                 {' '}Google приходит по sitemap и заявок на индексацию не принимает; пока статья не в
                 индексе, спрашиваем про неё раз в сутки, после попадания — раз в две недели.
                 {' '}Яндекс заявки принимает, и после публикации мы его просим.
+                {' '}Показы и клики — за 28 дней из Search Console; она отдаёт данные с задержкой в два-три
+                дня, поэтому у вчерашней статьи там честный прочерк, а не ноль. Прочерк стоит и у страниц вне
+                индекса: ноль у страницы, которой нет в поиске, значил бы «её не читают», хотя её негде читать.
                 {yandex?.computedAt && ` Данные Яндекса от ${new Date(yandex.computedAt).toLocaleString('ru')}.`}
               </div>
             </div>
@@ -254,6 +263,8 @@ export default async function IndexationPage({ searchParams }: { searchParams: P
                   <th style={th}>Яндекс</th>
                   <th style={th}>В индексе с</th>
                   <th style={{ ...th, textAlign: 'right' }}>Дней</th>
+                  <th style={{ ...th, textAlign: 'right' }}>Показы</th>
+                  <th style={{ ...th, textAlign: 'right' }}>Клики</th>
                 </tr>
               </thead>
               <tbody>
@@ -302,6 +313,27 @@ export default async function IndexationPage({ searchParams }: { searchParams: P
                       </td>
                       <td style={{ ...td, textAlign: 'right', color: a.firstIndexed ? 'var(--muted)' : 'var(--purple)' }}>
                         {a.days === null ? '—' : a.firstIndexed ? a.days : `ждёт ${a.days}`}
+                      </td>
+                      {/* Трафик за 28 дней. Прочерк вместо нуля там, где
+                          страницы ещё нет в индексе: ноль у неиндексируемой
+                          страницы — это не «её не читают», а «её негде читать»,
+                          и ставить одно вместо другого значит врать цифрой.
+                          Search Console отдаёт данные с задержкой в два-три дня,
+                          поэтому у вчерашней статьи прочерк — нормальный ответ. */}
+                      <td style={{ ...td, textAlign: 'right', whiteSpace: 'nowrap', color: 'var(--muted)' }}>
+                        {!a.firstIndexed ? '—' : a.impressions ? a.impressions.toLocaleString('ru') : '0'}
+                      </td>
+                      <td style={{
+                        ...td, textAlign: 'right', whiteSpace: 'nowrap',
+                        fontWeight: a.clicks ? 700 : 400,
+                        color: a.clicks ? 'var(--green)' : 'var(--muted)',
+                      }}>
+                        {!a.firstIndexed ? '—' : a.clicks ? a.clicks.toLocaleString('ru') : '0'}
+                        {a.clicks > 0 && a.position > 0 && (
+                          <div style={{ fontSize: 10, fontWeight: 400, color: 'var(--muted)' }}>
+                            поз. {a.position.toFixed(1)}
+                          </div>
+                        )}
                       </td>
                     </tr>
                   )
