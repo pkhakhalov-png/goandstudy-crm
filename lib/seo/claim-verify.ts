@@ -234,30 +234,73 @@ export async function autoverifyClaims(
 
   const отступы = opts.subject ? {} : await загрузитьОтступы(seo)
 
-  // Берём с запасом и отсеиваем ждущие предметы здесь, а не в запросе: условие
-  // «предмет не в отступе» в базе не выразить, а limit там применяется раньше
-  // фильтра — тогда пачка снова состояла бы из одних и тех же двадцати.
-  let q = seo.from('claims')
-    .select('id, subject_key, kind, statement, value, value_num, unit')
-    .is('verified_at', null).order('id').limit(opts.subject ? (opts.limit ?? 20) : 400)
-  if (opts.subject) q = q.eq('subject_key', opts.subject)
-  const { data: claims } = await q
-  if (!claims?.length) return report
+  // Отсеиваем ждущие предметы здесь, а не в запросе: условие «предмет не в
+  // отступе» в базе не выразить, а limit там применяется раньше фильтра.
+  //
+  // Поэтому идём страницами, а не одной выборкой «первые четыреста по номеру».
+  // Одной выборкой окно целиком заняли утверждения пятидесяти трёх предметов, у
+  // которых счётчик неудач упёрся в потолок — то есть «больше не пробуем
+  // вовсе». Шаг каждый час честно откладывал все четыреста и до свежих статей
+  // не доходил никогда: их утверждения стоят в конце по номеру. Ворота фактов
+  // не открывались, выпуск стоял, и в отчёте это выглядело как обычная работа.
+  const ПАЧКА = 400
+  const СТРАНИЦ = 6            // потолок обхода: при семистах утверждениях хватает двух
+  const ПРЕДМЕТОВ_ЗА_ПРОГОН = 3
 
+  const поля = 'id, subject_key, kind, statement, value, value_num, unit'
   const bySubject = new Map<string, VerifyClaim[]>()
   let отложено = 0
-  for (const c of claims as VerifyClaim[]) {
-    if (ждёт(отступы[c.subject_key])) { отложено++; continue }
-    const list = bySubject.get(c.subject_key) ?? []
-    list.push(c)
-    bySubject.set(c.subject_key, list)
+
+  // Первая выборка и постраничный обход пересекаются — считаем каждое
+  // утверждение один раз, иначе и пачка, и счётчик отложенных задвоятся
+  const виденные = new Set<number>()
+
+  const разложить = (list: VerifyClaim[]) => {
+    for (const c of list) {
+      if (виденные.has(c.id)) continue
+      виденные.add(c.id)
+      if (ждёт(отступы[c.subject_key])) { отложено++; continue }
+      const у = bySubject.get(c.subject_key) ?? []
+      у.push(c)
+      bySubject.set(c.subject_key, у)
+    }
   }
+
+  if (opts.subject) {
+    const { data } = await seo.from('claims').select(поля)
+      .is('verified_at', null).eq('subject_key', opts.subject).order('id').limit(opts.limit ?? 20)
+    разложить((data ?? []) as VerifyClaim[])
+  } else {
+    // Сначала утверждения статей, которые ждут выпуска: именно их держат ворота
+    // фактов. Порядок «по номеру» ставил их последними — статья, написанная
+    // вчера, оказывалась в конце очереди за архивом годовой давности и ждала бы
+    // своего часа неделями.
+    const { data: готовые } = await seo.from('articles').select('id')
+      .in('status', ['ready_for_review', 'approved', 'in_production'])
+    const ids = (готовые ?? []).map((a: any) => a.id)
+    if (ids.length) {
+      const { data } = await seo.from('claims').select(поля)
+        .is('verified_at', null).in('article_id', ids).order('id').limit(ПАЧКА)
+      разложить((data ?? []) as VerifyClaim[])
+    }
+
+    for (let страница = 0; bySubject.size < ПРЕДМЕТОВ_ЗА_ПРОГОН && страница < СТРАНИЦ; страница++) {
+      const от = страница * ПАЧКА
+      const { data } = await seo.from('claims').select(поля)
+        .is('verified_at', null).order('id').range(от, от + ПАЧКА - 1)
+      разложить((data ?? []) as VerifyClaim[])
+      // Набрали на прогон или страница неполная — дальше читать незачем
+      if (bySubject.size >= ПРЕДМЕТОВ_ЗА_ПРОГОН || (data?.length ?? 0) < ПАЧКА) break
+    }
+  }
+
   if (отложено) report.notes.push(`отложено по отступу: ${отложено} утверждений`)
+  if (!bySubject.size) return report
 
   // Предметов за прогон — не больше трёх. Каждый это вызов модели с поиском в
   // сети, а шаг поднимается раз в час: без предела один прогон разбирал десять
   // предметов, то есть до сорока поисков, и так круглые сутки.
-  const предметы = [...bySubject.entries()].slice(0, 3)
+  const предметы = [...bySubject.entries()].slice(0, ПРЕДМЕТОВ_ЗА_ПРОГОН)
   let разобрано = 0
 
   for (const [subject, list] of предметы) {

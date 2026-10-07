@@ -1060,11 +1060,30 @@ registerStep('article_autostart', async (_job: Job, seo: any): Promise<StepOutco
     return { outcome: 'done', result: { started: false, why: st.blocker ?? 'нет темы', cost: 0 } }
   }
 
+  // Ключ с меткой времени, а не постоянный `...:auto`.
+  //
+  // Постоянный ключ держал тему вечно. Задача по теме 121 упала 25 сентября на
+  // пустом счёте модели; такая ошибка считается окончательной, повтора нет, и
+  // строка осталась в базе вместе со своим ключом. Тема оставалась первой в
+  // очереди, поэтому каждый следующий час автозапуск выбирал её снова и падал
+  // на уникальном индексе `jobs_dedup_key_key`. Двенадцать дней, около трёхсот
+  // падений, ни одной новой статьи — и пополнение счёта этого не чинило.
+  //
+  // От дублей теперь защищает проверка активных задач, а не уникальность ключа:
+  // мёртвая задача ничего не держит, живая держит. Так же сделан ручной запуск.
+  const ключ = `article:topic:${st.nextTopic.id}`
+  const { data: вработе } = await seo.from('jobs').select('id')
+    .like('step', 'article_%').in('status', ['pending', 'running', 'waiting'])
+    .like('dedup_key', `${ключ}:%`).limit(1)
+  if (вработе?.length) {
+    return { outcome: 'done', result: { started: false, why: `тема «${st.nextTopic.query}» уже в работе`, cost: 0 } }
+  }
+
   await seo.from('jobs').insert({
     step: 'article_brief', lane: 'production', priority: 40,
     topic_id: st.nextTopic.id,
     payload: { topic_id: st.nextTopic.id, auto: true },
-    dedup_key: `article:topic:${st.nextTopic.id}:auto`,
+    dedup_key: `${ключ}:auto:${Date.now()}`,
   }).throwOnError()
   await markAutoRun(seo)
 
