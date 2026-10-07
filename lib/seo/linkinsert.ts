@@ -3,7 +3,7 @@
 // Это правка живого работающего контента, поэтому здесь только механика, а решение
 // принимает человек: §13.1 требует одного изменения за раз, §13.5 — чтобы страницы
 // из топ-10 правил человек даже на высшем уровне автономности.
-import { wp } from './wp'
+import { wp, wpConfigured } from './wp'
 
 export type InsertPlan = {
   donorUrl: string
@@ -57,6 +57,12 @@ export function buildInsertion(html: string, anchor: string, targetUrl: string):
 
 /** Подготовить вставку: прочитать донора через мост и найти место. Ничего не пишет. */
 export async function planInsertion(donorUrl: string, anchor: string, targetUrl: string): Promise<InsertResult & { newHtml?: string }> {
+  // Без настроек моста запрос падал внутри `wp.call` на `WP_BASE_URL!.replace`,
+  // то есть шаг простановки ссылок разваливался с «Cannot read properties of
+  // undefined» — сто семнадцать раз подряд, по разу в час, и по этой записи
+  // невозможно догадаться, что речь о незаданной переменной окружения.
+  if (!wpConfigured()) return { ok: false, reason: 'мост WordPress не настроен: нет WP_BASE_URL или WP_BRIDGE_SECRET' }
+
   const resolved = await wp.resolve(donorUrl)
   if (!resolved.found || !resolved.post_id) return { ok: false, reason: 'страницы нет в WordPress' }
 

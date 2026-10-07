@@ -58,6 +58,22 @@ export async function applyIncomingLinks(seo: any, articleId: number, dryRun = t
         .in('status', ['pending', 'running']).contains('payload', { slug: donorSlug }).limit(1)
       if (exists?.length) { report.push({ url: donorUrl, ok: true, note: 'уже в очереди у агента' }); continue }
 
+      // Агент уже ответил, что ссылка со страницы стоит. Это не отказ, а
+      // «сделано до нас»: предложение выполнено, и ставить задачу снова незачем.
+      //
+      // Без этой ветки предложение навсегда оставалось в статусе proposed, и
+      // шаг ставил агенту ту же задачу каждый час. За две недели — двести
+      // тридцать два падения на двух одних и тех же ссылках.
+      const { data: стояла } = await seo.from('jobs').select('id, last_error')
+        .eq('step', 'link_insert_theme').eq('article_id', articleId).eq('status', 'failed')
+        .contains('payload', { slug: donorSlug }).limit(1)
+      if (стояла?.length && /ссылка на эту страницу уже есть/i.test(String(стояла[0].last_error ?? ''))) {
+        await seo.from('link_suggestions').update({ status: 'applied' }).eq('id', l.id)
+          .then(warnOnError('link_suggestions · lib/seo/links-apply.ts'))
+        report.push({ url: donorUrl, ok: true, note: 'ссылка уже стоит на странице — предложение закрыто' })
+        continue
+      }
+
       await enqueueJob(seo, {
         step: 'link_insert_theme', lane: 'production', priority: 15, runner: 'agent',
         article_id: articleId, topic_id: article.topic_id,
