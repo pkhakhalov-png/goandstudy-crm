@@ -59,7 +59,7 @@ function registry_line(array $e): string {
 }
 
 function seed_flag(): string {
-    $out = shell_exec('grep -o "goandstudy_seed_v[0-9]*" ' . THEME . '/functions.php | sort -u | tail -1');
+    $out = shell_exec('grep -o "goandstudy_seed_v[0-9]*" ' . THEME . '/functions.php | sort -uV | tail -1');
     return trim((string) $out);
 }
 

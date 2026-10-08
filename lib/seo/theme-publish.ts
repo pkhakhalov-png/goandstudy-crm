@@ -93,7 +93,7 @@ export async function publishToTheme(
   }
 
   // Текущий номер сид-флага
-  const seedRaw = await ssh(`grep -o "goandstudy_seed_v[0-9]*" ${THEME}/functions.php | sort -u | tail -1`)
+  const seedRaw = await ssh(`grep -o "goandstudy_seed_v[0-9]*" ${THEME}/functions.php | sort -uV | tail -1`)
   const seedFrom = seedRaw.trim()
   const seedNum = Number(seedFrom.replace('goandstudy_seed_v', '')) || 0
   const seedTo = `goandstudy_seed_v${seedNum + 1}`
