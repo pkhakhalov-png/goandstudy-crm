@@ -55,11 +55,15 @@ export async function middleware(request: NextRequest) {
 
   // Авторизован — редирект с /login на нужный кабинет
   if (user && pathname === '/login') {
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from('users')
       .select('role')
       .eq('id', user.id)
       .single()
+
+    // Роль не прочиталась — не угадываем кабинет. Раньше сбой базы отправлял
+    // админа в кабинет продажника, и это выглядело как взлом.
+    if (profileError && profileError.code !== 'PGRST116') return dbUnavailable()
 
     if (profile?.role === 'admin') {
       return NextResponse.redirect(new URL('/admin', request.url))
@@ -76,11 +80,13 @@ export async function middleware(request: NextRequest) {
 
   // Role-scoped redirects for non-staff paths
   if (user && (pathname.startsWith('/admin') || pathname.startsWith('/sales') || pathname.startsWith('/rop') || pathname.startsWith('/curator'))) {
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from('users')
       .select('role')
       .eq('id', user.id)
       .single()
+
+    if (profileError && profileError.code !== 'PGRST116') return dbUnavailable()
 
     if (profile?.role === 'curator' && (pathname.startsWith('/admin') || pathname.startsWith('/sales') || pathname.startsWith('/rop'))) {
       return NextResponse.redirect(new URL('/curator', request.url))
@@ -99,6 +105,16 @@ export async function middleware(request: NextRequest) {
   }
 
   return supabaseResponse
+}
+
+function dbUnavailable() {
+  return new NextResponse(
+    '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width">' +
+    '<title>CRM недоступна</title><body style="font-family:system-ui;max-width:32rem;margin:15vh auto;padding:0 1rem">' +
+    '<h1 style="font-size:1.3rem">База CRM сейчас не отвечает</h1>' +
+    '<p>Не получилось проверить ваши права доступа. Обновите страницу через минуту-две.</p></body>',
+    { status: 503, headers: { 'content-type': 'text/html; charset=utf-8', 'retry-after': '60', 'cache-control': 'no-store' } },
+  )
 }
 
 export const config = {
