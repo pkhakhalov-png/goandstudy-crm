@@ -31,6 +31,11 @@ CONF=/etc/gs-backup.env
 CRM_URL="${CRM_URL:-https://crm.goandstudy.com}"
 DEST="${DEST:-/root/backups/gs}"
 KEEP_DAYS="${KEEP_DAYS:-30}"
+# Порция и пауза между запросами. База на самом маленьком сервере Supabase:
+# 9 октября порция в 1000 строк тяжёлой таблицы совпала по минуте с полуторачасовой
+# остановкой базы. Мелкие порции с паузой копию не ускоряют, зато не давят.
+PAGE="${PAGE:-200}"
+PAUSE="${PAUSE:-0.3}"
 WP_ROOT="${WP_ROOT:-/var/www/html/wordpress}"
 
 DAY=$(date +%Y-%m-%d)
@@ -80,7 +85,15 @@ for entry in $TABLES; do
   offset=0; total=0
   : > "$OUT/tables/$schema.$table.jsonl"
   while :; do
-    resp=$(call "{\"kind\":\"table\",\"schema\":\"$schema\",\"table\":\"$table\",\"offset\":$offset,\"limit\":1000}")
+    req="{\"kind\":\"table\",\"schema\":\"$schema\",\"table\":\"$table\",\"offset\":$offset,\"limit\":$PAGE}"
+    # Таймаут одного запроса не должен обрывать всю копию (set -e): раньше
+    # так терялись и остальные таблицы, и файлы клиентов. Одна повторная
+    # попытка после паузы, потом — к следующей таблице.
+    resp=$(call "$req") || resp=""
+    if ! echo "$resp" | jq -e '.rows' >/dev/null 2>&1; then
+      sleep 10
+      resp=$(call "$req") || resp=""
+    fi
     if ! echo "$resp" | jq -e '.rows' >/dev/null 2>&1; then
       log "  $schema.$table — не отдалась: $(echo "$resp" | head -c 160)"
       break
@@ -89,7 +102,8 @@ for entry in $TABLES; do
     got=$(echo "$resp" | jq -r '.count')
     total=$((total + got))
     [ "$(echo "$resp" | jq -r '.done')" = "true" ] && break
-    offset=$((offset + 1000))
+    offset=$((offset + PAGE))
+    sleep "$PAUSE"
   done
   gzip -f "$OUT/tables/$schema.$table.jsonl"
   [ "$total" -gt 0 ] && log "  $schema.$table — $total строк"
