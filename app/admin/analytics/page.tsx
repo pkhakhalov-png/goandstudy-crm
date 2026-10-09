@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { безТестовых } from '@/lib/test-data'
 import { redirect } from 'next/navigation'
 import { AnalyticsShell } from './AnalyticsShell'
@@ -74,7 +74,10 @@ export default async function AdminAnalyticsPage({ searchParams }: { searchParam
       : tab === 'curators' ? 'analytics_curators'
       : 'analytics_forecast'
     const args = tab === 'forecast' ? {} : { p_from: period.from, p_to: period.to }
-    const res = await supabase.rpc(rpcName, args)
+    // Служебным ключом: функции отдают деньги всей компании, и вызывать их
+    // напрямую из браузера нельзя никому. Право админа проверено выше.
+    const admin = await createAdminClient()
+    const res = await admin.rpc(rpcName, args)
     data = res.data
     error = res.error
   }
