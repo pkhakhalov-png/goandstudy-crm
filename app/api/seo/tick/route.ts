@@ -8,7 +8,8 @@ import '@/lib/seo/steps-freshness'   // наблюдение за источни
 import '@/lib/seo/steps-legacy'      // правка опубликованного архива
 import '@/lib/seo/steps-vk'          // самостоятельный выпуск в VK
 
-// Воркер SEO-очереди (PRD 10.3). Вызывается pg_cron через pg_net раз в минуту.
+// Воркер SEO-очереди (PRD 10.3). Вызывается pg_cron через pg_net раз в 10 минут
+// (с 9.10.2026, было раз в минуту — см. миграцию 20261009110000).
 // Тики МОГУТ пересекаться — конкуренция регулируется в БД (claim_jobs, SKIP LOCKED).
 export const runtime = 'nodejs'
 export const maxDuration = 300
