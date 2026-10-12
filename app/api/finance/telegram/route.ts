@@ -362,6 +362,9 @@ async function postFromText(
   }
 
   const results: string[] = []
+  // Вопросы и ошибки — отдельно от подтверждений: подтверждение каждой
+  // записанной операции уже ушло своим сообщением, повторять его нельзя.
+  const pending: string[] = []
   let posted = 0
 
   for (const [i, c] of candidates.entries()) {
@@ -376,6 +379,7 @@ async function postFromText(
         question,
       })
       results.push(`❓ «${short(c.note)}» — ${question}`)
+      pending.push(results[results.length - 1])
       continue
     }
 
@@ -448,6 +452,7 @@ async function postFromText(
       ]])
     } catch (e) {
       results.push(`⚠️ «${short(c.note)}» — не записал: ${(e as Error).message}`)
+      pending.push(results[results.length - 1])
     }
   }
 
@@ -458,13 +463,17 @@ async function postFromText(
 
   // Про уже отправленные подтверждения второй раз не пишем: дублировать
   // сообщения о деньгах — верный способ запутать.
-  const pending = results.filter((r) => !r.startsWith('✅'))
   if (pending.length) {
     await tgSend(msg.chat.id,
       candidates.length > 1
         ? `Записано ${posted} из ${candidates.length}.\n\n${pending.join('\n')}`
         : pending.join('\n'))
   }
+
+  // Последним сообщением — остатки по всем счетам. После пачки операций
+  // подтверждения уходят вверх по ленте, и итог иначе приходится собирать
+  // глазами или просить командой /balance.
+  if (posted) await sendBalances(fin, msg)
 }
 
 /**
