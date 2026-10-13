@@ -158,7 +158,7 @@ export default async function FinancePage(
                   <Figure label="поступило" value={formatMinorPlain(totals[c].income)} tone="g" />
                   <Figure label="потрачено" value={formatMinorPlain(totals[c].expense)} tone="r" />
                   {totals[c].dividends !== 0 && (
-                    <Figure label="дивиденды" value={formatMinorPlain(totals[c].dividends)} />
+                    <Figure label="дивиденды" value={formatMinorPlain(totals[c].dividends)} tone="o" />
                   )}
                   <Figure label="итого" value={formatMinorPlain(totals[c].net)} tone={totals[c].net < 0 ? 'r' : ''} />
                 </div>
@@ -345,7 +345,10 @@ function Row({ tx, categories }: { tx: TxRow; categories: { id: string; name: st
             // Приход зелёным, расход красным — как в подтверждениях бота.
             // Одинаковый цвет у всех сумм заставлял вчитываться в подпись.
             fontSize: 14, fontWeight: 700,
-            color: m.amount_minor > 0 ? 'var(--green)' : 'var(--red)',
+            // Дивиденды золотом: это не трата бизнеса, и в ленте их надо
+            // отличать от расходов с одного взгляда.
+            color: isDividendCategory(tx.category?.name) ? 'var(--gold)'
+              : m.amount_minor > 0 ? 'var(--green)' : 'var(--red)',
           }}>
             {formatMinor(m.amount_minor, m.currency, { sign: m.amount_minor > 0 })}
           </div>
@@ -367,10 +370,13 @@ function Дивиденды({ операции, период }: { операци
   const итог: Record<string, number> = {}
   for (const o of операции) итог[o.currency] = (итог[o.currency] ?? 0) - o.amount
   return (
-    <div className="kc" style={{ marginBottom: 18, padding: 16 }}>
+    <div className="kc" style={{
+      marginBottom: 18, padding: 16,
+      border: '1px solid rgba(201,125,0,.45)', background: 'rgba(201,125,0,.06)',
+    }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
-        <div style={{ fontWeight: 700, fontSize: 14 }}>Дивиденды · {период}</div>
-        <div style={{ fontWeight: 700, fontSize: 14 }}>
+        <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--gold)' }}>Дивиденды · {период}</div>
+        <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--gold)' }}>
           {Object.entries(итог).map(([c, v]) => formatMinor(v, c as Currency)).join(' · ')}
         </div>
       </div>
@@ -381,7 +387,7 @@ function Дивиденды({ операции, период }: { операци
         <div key={o.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 12.5, padding: '4px 0', borderTop: '1px solid var(--bor)' }}>
           <span style={{ color: 'var(--muted)', minWidth: 54 }}>{dayLabel(o.day)}</span>
           <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.title}</span>
-          <span style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{formatMinor(-o.amount, o.currency)}</span>
+          <span style={{ fontWeight: 600, whiteSpace: 'nowrap', color: 'var(--gold)' }}>{formatMinor(-o.amount, o.currency)}</span>
         </div>
       ))}
     </div>

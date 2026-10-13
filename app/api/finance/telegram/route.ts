@@ -441,7 +441,7 @@ async function postFromText(
       results.push(куда
         ? `🔄 Перевод: <b>${formatMinor(c.amountMinor!, account.currency as Currency)}</b>`
           + `\n${account.name} → ${куда.name}`
-        : `${kindIcon(c.kind)} ${KIND_NAMES[c.kind]}: <b>${formatMinor(signed, account.currency as Currency, { sign: true })}</b>`
+        : `${/дивиденд/i.test(c.categoryHint ?? '') ? '🟡' : kindIcon(c.kind)} ${KIND_NAMES[c.kind]}: <b>${formatMinor(signed, account.currency as Currency, { sign: true })}</b>`
           + `${c.categoryHint ? ` · ${c.categoryHint}` : ''}`
           + `\n${account.name}${after ? ` · остаток ${formatMinor(after.balance_minor, account.currency as Currency)}` : ''}`
           + guessed,
