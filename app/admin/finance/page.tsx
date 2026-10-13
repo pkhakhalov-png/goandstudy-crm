@@ -3,13 +3,13 @@ import { viewer } from '@/lib/auth/viewer'
 import { formatMinor, formatMinorPlain, toRubEquivalent, type Currency } from '@/lib/finance/money'
 import {
   balances, categoryBreakdown, currentRate, dailyFlow, financeAccess, listAccounts, listCategories,
-  listCounterparties, listTransactions, periodTotals, KIND_NAMES, type TxRow,
+  listCounterparties, listTransactions, periodTotals, isDividendCategory, KIND_NAMES, type TxRow,
 } from '@/lib/finance/service'
 import { AddOperation } from './AddOperation'
 import { ReverseForm } from './ReverseForm'
 import { CategoryPicker } from './CategoryPicker'
 import { FlowChart } from './FlowChart'
-import { CategoryDonuts } from './CategoryDonuts'
+import { CategoryDonuts, type ОперацияКатегории } from './CategoryDonuts'
 
 export const dynamic = 'force-dynamic'
 
@@ -92,6 +92,23 @@ export default async function FinancePage(
 
   const byDay = groupByDay(txs)
 
+  // Живые операции периода для раскрытия категорий и блока дивидендов.
+  // Отменённые и сами отмены не показываем: вместе они дают ноль, и в списке
+  // «что было в месяце» это два лишних шума вместо ничего.
+  const живые: ОперацияКатегории[] = txs
+    .filter((t) => t.kind !== 'transfer' && t.status !== 'reversed' && !t.reverses_id)
+    .flatMap((t) => t.movements.map((m) => ({
+      id: `${t.id}:${m.account_id}`,
+      categoryId: t.category_id,
+      categoryName: t.category?.name ?? null,
+      day: t.occurred_at.slice(0, 10),
+      title: t.counterparty?.name || t.client?.name || t.note || KIND_NAMES[t.kind],
+      note: t.counterparty?.name || t.client?.name ? t.note : null,
+      amount: m.amount_minor,
+      currency: m.currency,
+    })))
+  const дивиденды = живые.filter((o) => isDividendCategory(o.categoryName))
+
   return (
     <div className="main">
       <div className="topbar">
@@ -140,10 +157,14 @@ export default async function FinancePage(
                 <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 4 }}>
                   <Figure label="поступило" value={formatMinorPlain(totals[c].income)} tone="g" />
                   <Figure label="потрачено" value={formatMinorPlain(totals[c].expense)} tone="r" />
+                  {totals[c].dividends !== 0 && (
+                    <Figure label="дивиденды" value={formatMinorPlain(totals[c].dividends)} />
+                  )}
                   <Figure label="итого" value={formatMinorPlain(totals[c].net)} tone={totals[c].net < 0 ? 'r' : ''} />
                 </div>
                 <div className="ks" style={{ marginTop: 8 }}>
                   переводы между своими счетами в эти цифры не входят
+                  {totals[c].dividends !== 0 && '; дивиденды — не расход, показаны отдельно, но в итоге учтены'}
                 </div>
               </div>
             ))}
@@ -153,7 +174,9 @@ export default async function FinancePage(
 
         <FlowChart данные={поток} />
 
-        <CategoryDonuts разрез={разрез} валюта="RUB" />
+        <CategoryDonuts разрез={разрез} валюта="RUB" операции={живые.filter((o) => o.currency === 'RUB')} />
+
+        <Дивиденды операции={дивиденды} период={окно.название} />
 
         <div style={{ margin: '4px 0 14px' }}>
           <AddOperation
@@ -331,6 +354,36 @@ function Row({ tx, categories }: { tx: TxRow; categories: { id: string; name: st
             операция остаётся видимой. Поэтому спрашиваем причину. */}
         {!reversed && <ReverseForm transactionId={tx.id} />}
       </div>
+    </div>
+  )
+}
+
+/**
+ * Дивиденды отдельным блоком: это деньги, которые забрали владельцы, а не
+ * траты бизнеса. Суммы по валютам раздельно — рубли с долларами не складываем.
+ */
+function Дивиденды({ операции, период }: { операции: ОперацияКатегории[]; период: string }) {
+  if (!операции.length) return null
+  const итог: Record<string, number> = {}
+  for (const o of операции) итог[o.currency] = (итог[o.currency] ?? 0) - o.amount
+  return (
+    <div className="kc" style={{ marginBottom: 18, padding: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
+        <div style={{ fontWeight: 700, fontSize: 14 }}>Дивиденды · {период}</div>
+        <div style={{ fontWeight: 700, fontSize: 14 }}>
+          {Object.entries(итог).map(([c, v]) => formatMinor(v, c as Currency)).join(' · ')}
+        </div>
+      </div>
+      <div style={{ fontSize: 11.5, color: 'var(--muted)', marginBottom: 8 }}>
+        выплаты владельцам — в траты бизнеса не входят
+      </div>
+      {операции.map((o) => (
+        <div key={o.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 12.5, padding: '4px 0', borderTop: '1px solid var(--bor)' }}>
+          <span style={{ color: 'var(--muted)', minWidth: 54 }}>{dayLabel(o.day)}</span>
+          <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.title}</span>
+          <span style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{formatMinor(-o.amount, o.currency)}</span>
+        </div>
+      ))}
     </div>
   )
 }

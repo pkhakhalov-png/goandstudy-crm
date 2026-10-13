@@ -104,6 +104,8 @@ export type TxRow = {
   note: string | null
   origin: string
   status: string
+  /** Чью отмену запись представляет. У самой отмены не null. */
+  reverses_id: string | null
   // Идентификатор, а не только имя: по нему экран ставит выбранную категорию в
   // выпадающем списке и отправляет смену. По имени это пришлось бы искать
   // обратным поиском по справочнику, и совпадение имён его бы сломало.
@@ -123,7 +125,7 @@ export async function listTransactions(filter: TxFilter = {}): Promise<TxRow[]> 
   // это один поход до базы, а не по одному на строку.
   let q = db.from('transactions')
     .select(`
-      id, kind, occurred_at, note, origin, status, client_id, category_id,
+      id, kind, occurred_at, note, origin, status, reverses_id, client_id, category_id,
       category:categories(name),
       counterparty:counterparties(name),
       movements(account_id, amount_minor, currency)
@@ -166,21 +168,37 @@ export async function listTransactions(filter: TxFilter = {}): Promise<TxRow[]> 
  * счетами — не поступление и не расход, иначе оборот компании раздувается на
  * пустом месте (PRD §4).
  */
-export type PeriodTotals = Record<Currency, { income: number; expense: number; net: number }>
+export type PeriodTotals = Record<Currency, { income: number; expense: number; dividends: number; net: number }>
+
+/**
+ * Дивиденды — не трата бизнеса, а деньги, которые владельцы забрали себе. В
+ * одной куче с рекламой и сервисами они делали «потрачено» вдвое больше
+ * настоящих расходов. Поэтому считаются отдельно везде, где есть расходы.
+ *
+ * Категорию узнаём по имени, а не по зашитому id: справочник ведётся в базе,
+ * и id у копии базы другой.
+ */
+export const isDividendCategory = (name: string | null | undefined) => /дивиденд/i.test(name ?? '')
+
+async function dividendCategoryIds(db: any): Promise<Set<string>> {
+  const { data } = await db.from('categories').select('id, name')
+  return new Set(((data ?? []) as any[]).filter((c) => isDividendCategory(c.name)).map((c) => c.id))
+}
 
 export async function periodTotals(from: string, to: string): Promise<PeriodTotals> {
   const db = await financeDb()
+  const дивиденды = await dividendCategoryIds(db)
   const rows = await readAll<any>(() => db
     .from('movements')
-    .select('amount_minor, currency, transactions!inner(kind, occurred_at, status)')
+    .select('amount_minor, currency, transactions!inner(kind, occurred_at, status, category_id)')
     .gte('transactions.occurred_at', from)
     .lte('transactions.occurred_at', to)
     .neq('transactions.status', 'superseded')
     .order('id'), { label: 'movements' })
 
   const out: PeriodTotals = {
-    RUB: { income: 0, expense: 0, net: 0 },
-    USD: { income: 0, expense: 0, net: 0 },
+    RUB: { income: 0, expense: 0, dividends: 0, net: 0 },
+    USD: { income: 0, expense: 0, dividends: 0, net: 0 },
   }
 
   for (const r of rows) {
@@ -197,6 +215,7 @@ export async function periodTotals(from: string, to: string): Promise<PeriodTota
     //
     // Итог (net) правило не меняет: он и был суммой со знаком.
     if (kind === 'income' || kind === 'refund_out') out[cur].income += amount
+    else if (дивиденды.has(r.transactions.category_id)) out[cur].dividends -= amount
     else out[cur].expense -= amount
 
     out[cur].net += amount
@@ -324,6 +343,8 @@ export async function categoryBreakdown(
   const имена = new Map<string, string>()
   const { data: cats } = await db.from('categories').select('id, name')
   for (const c of (cats ?? []) as any[]) имена.set(c.id, c.name)
+  // Дивиденды показываются своим блоком, в круге трат им не место.
+  const дивиденды = new Set(((cats ?? []) as any[]).filter((c) => isDividendCategory(c.name)).map((c) => c.id))
 
   const свернуть = (rows: any[]) => {
     const доход = new Map<string, number>()
@@ -332,6 +353,7 @@ export async function categoryBreakdown(
     for (const r of rows) {
       const kind: TxKind = r.transactions.kind
       if (kind === 'transfer') continue
+      if (дивиденды.has(r.transactions.category_id)) continue
       const ключ = r.transactions.category_id ?? ''
       const сумма = r.amount_minor as number
       const куда = (kind === 'income' || kind === 'refund_out') ? доход : расход

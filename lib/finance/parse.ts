@@ -323,7 +323,10 @@ export function parseOne(text: string, ctx: ParseContext): Candidate {
   }
 
   const currency = amount?.currency ?? null
+  // Трата без узнаваемой категории идёт в «Прочие расходы» — так было и раньше,
+  // только раньше туда же по ошибке попадало и узнаваемое.
   const categoryHint = matchCategory(lower, ctx.categories)
+    ?? (kind === 'expense' ? ctx.categories.find((c) => /^прочие расходы$/i.test(c)) ?? null : null)
   const counterpartyHint = matchAlias(lower, ctx.aliases)
 
   return {
@@ -364,10 +367,24 @@ function stem(w: string): string {
  * должен попасть в «Профориентация». Выбор только из существующих категорий —
  * новых не заводим.
  */
+/**
+ * Слова, которые называют тип операции или ничего не уточняют. «Прочие расходы»
+ * совпадали по основе «расход» с самим словом «Расход» в начале сообщения — и
+ * почти всё, включая дивиденды, уходило в «Прочие», раньше чем очередь доходила
+ * до верной категории.
+ */
+const ОБЩИЕ_ОСНОВЫ = new Set(['расход', 'доход', 'проч', 'прочи', 'трат', 'поступлен', 'обязательн'])
+
+/** Частые описки, которые основой не ловятся: «девиденды» вместо «дивиденды». */
+const ОПИСКИ: [RegExp, string][] = [[/девиденд/gu, 'дивиденд']]
+
 function matchCategory(lower: string, categories: string[]): string | null {
-  const words = lower.split(/[^\p{L}]+/u).filter((w) => w.length >= 4).map(stem)
+  const fixed = ОПИСКИ.reduce((t, [re, to]) => t.replace(re, to), lower)
+  const words = fixed.split(/[^\p{L}]+/u).filter((w) => w.length >= 4).map(stem)
+    .filter((w) => !ОБЩИЕ_ОСНОВЫ.has(w))
   for (const name of categories) {
-    const catStems = name.toLowerCase().split(/[\s,]+/).map(stem).filter((x) => x.length >= 4)
+    const catStems = name.toLowerCase().split(/[\s,]+/).map(stem)
+      .filter((x) => x.length >= 4 && !ОБЩИЕ_ОСНОВЫ.has(x))
     for (const cs of catStems) {
       if (words.some((w) => w.startsWith(cs) || cs.startsWith(w.slice(0, 5)) && w.length >= 5)) return name
     }
