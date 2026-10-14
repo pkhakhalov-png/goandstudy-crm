@@ -1095,7 +1095,7 @@ export function FunnelClient({ stages: serverStages, deals: serverDeals, salespe
               Ссылка для активации кабинета
             </h2>
             <p style={{ fontSize: 13, color: '#8a8796', textAlign: 'center', margin: '0 0 20px', lineHeight: 1.5 }}>
-              Срок 30 дней, одноразовая. Отправь клиенту через TG/WhatsApp если email не настроен.
+              Срок 90 дней, одноразовая. Отправь клиенту через TG/WhatsApp если email не настроен.
             </p>
 
             <div style={{

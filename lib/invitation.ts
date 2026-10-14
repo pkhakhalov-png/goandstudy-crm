@@ -4,14 +4,15 @@
  *   - sendInvitationEmail(): отправляет email через Resend (опционально, если ключ
  *     не настроен — просто пропускаем).
  *
- * Сама инвайт-ссылка работает 30 дней, одноразовая (used_at).
+ * Сама инвайт-ссылка работает 90 дней, одноразовая (used_at). Было 30 — клиенты
+ * не успевали: ссылку открывали, когда вспоминали про кабинет, а она уже сгорела.
  */
 
 import { createAdminClient } from './supabase/server'
 import { randomBytes } from 'crypto'
 import { warnOnError } from '@/lib/supabase/write-guard'
 
-const INVITE_TTL_DAYS = 30
+export const INVITE_TTL_DAYS = 90
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://crm.goandstudy.com'
 
 export type InviteResult = {
@@ -232,7 +233,7 @@ async function sendInvitationEmail(params: {
     </a>
   </p>
   <p style="font-size: 13px; color: #8a8796; line-height: 1.5;">
-    Ссылка действует 30 дней. Если кнопка не открывается, скопируй адрес:
+    Ссылка действует ${INVITE_TTL_DAYS} дней. Если кнопка не открывается, скопируй адрес:
     <br><span style="word-break: break-all;">${params.url}</span>
   </p>
 </body>
@@ -336,6 +337,6 @@ export async function lookupInvitation(token: string): Promise<LookupResult> {
     .maybeSingle()
   if (error || !data) return { ok: false, error: 'Ссылка недействительна' }
   if (data.used_at) return { ok: false, error: 'Эта ссылка уже использована' }
-  if (new Date(data.expires_at) < new Date()) return { ok: false, error: 'Срок действия ссылки истёк (30 дней)' }
+  if (new Date(data.expires_at) < new Date()) return { ok: false, error: `Срок действия ссылки истёк (${INVITE_TTL_DAYS} дней)` }
   return { ok: true, invitation: data as LookupResult extends { ok: true; invitation: infer I } ? I : never }
 }

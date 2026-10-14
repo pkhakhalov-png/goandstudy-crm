@@ -181,7 +181,7 @@ export function SalesInviteButton({ clientId, clientEmail, fallbackEmail, client
               Ссылка для активации кабинета
             </h2>
             <p style={{ fontSize: 13, color: '#8a8796', textAlign: 'center', margin: '0 0 20px', lineHeight: 1.5 }}>
-              {clientName ? `Для ${clientName}. ` : ''}Срок 30 дней.
+              {clientName ? `Для ${clientName}. ` : ''}Срок 90 дней.
             </p>
 
             <div style={{

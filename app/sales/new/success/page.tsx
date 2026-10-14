@@ -48,7 +48,7 @@ export default async function NewClientSuccessPage({
               fontSize: 11, fontWeight: 700, letterSpacing: '0.06em',
               textTransform: 'uppercase', color: '#8a8796', marginBottom: 8,
             }}>
-              Ссылка для активации кабинета (срок 30 дней)
+              Ссылка для активации кабинета (срок 90 дней)
             </div>
             <CopyInviteLink url={invite.url} />
 
