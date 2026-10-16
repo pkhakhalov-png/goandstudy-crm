@@ -23,6 +23,9 @@ import { wp, wpConfigured } from './wp'
 import { postPublishVerify, type PublishInput } from './publish'
 
 const MAX_REVISIONS = 2   // §12.2
+// Точечных правок фактов перед выпуском. Каждая только убирает, поэтому их
+// хватает с запасом; предел — страховка от бесконечного круга, а не норма
+const MAX_TRIMS = 4
 
 /* ── Общие загрузчики ─────────────────────────────────────────────────────── */
 
@@ -460,7 +463,7 @@ registerStep('article_cover', async (job: Job, seo: any): Promise<StepOutcome> =
     await seo.from('article_versions').update({
       meta: { ...meta, cover: { format: 'jpeg', width: cover.width, height: cover.height, bytes: cover.bytes, base64: cover.buffer.toString('base64'), placeholder: true } },
     }).eq('id', version.id).throwOnError()
-    await next(seo, 'article_linkplan', articleId, job.topic_id!, { brief: job.payload.brief })
+    if (!job.payload?.cover_only) await next(seo, 'article_linkplan', articleId, job.topic_id!, { brief: job.payload.brief })
     return { outcome: 'done', result: { cover: `${cover.width}×${cover.height}`, placeholder: true, why, cost: 0 } }
   }
 
@@ -546,7 +549,9 @@ registerStep('article_cover', async (job: Job, seo: any): Promise<StepOutcome> =
   // иначе один сбой выбивал бы вариант из обращения на четыре статьи вперёд.
   await rememberScene(seo, scenes.shot, scenes.inline_alt)
 
-  await next(seo, 'article_linkplan', articleId, job.topic_id!, { brief: job.payload.brief })
+  // cover_only — дорисовка обложки у готовой статьи по просьбе ворот выпуска.
+  // План ссылок у неё уже есть, и вести её заново по конвейеру нельзя.
+  if (!job.payload?.cover_only) await next(seo, 'article_linkplan', articleId, job.topic_id!, { brief: job.payload.brief })
   return {
     outcome: 'done',
     result: {
@@ -790,11 +795,23 @@ function isMetadataCheck(id: string): boolean {
 registerStep('article_fix', async (job: Job, seo: any): Promise<StepOutcome> => {
   const articleId = job.article_id!
 
-  const { data: article } = await seo.from('articles').select('current_version_id, topic_id').eq('id', articleId).single()
+  const { data: article } = await seo.from('articles').select('current_version_id, topic_id, primary_keyword').eq('id', articleId).single()
   const { data: version } = await seo.from('article_versions')
     .select('id, version_no, title, body, meta, qa_report').eq('id', article.current_version_id).single()
   const meta: any = version.meta ?? {}
   if (!meta.brief) return { outcome: 'failed', result: { error: 'у версии нет брифа' } }
+
+  // Что держит ворота выпуска по фактам: замечания модели (пункт 4 ворот) и
+  // блокирующие находки factGate (пункт 3). Это одно и то же по сути — в тексте
+  // стоит утверждение, которое нечем подтвердить, — и закрывается одинаково.
+  const { factGate } = await import('./fact-gate')
+  const gateBefore = await factGate(seo, `${version.title} ${version.body}`, subjectKeysFor(article.primary_keyword ?? ''))
+  const gateFacts = [
+    ...((version.qa_report as any)?.issues ?? [])
+      .filter((i: any) => (i.kind === 'facts' || i.kind === 'promise') && i.severity !== 'minor' && i.quote)
+      .map((i: any) => ({ quote: String(i.quote), why: String(i.why ?? '') })),
+    ...gateBefore.blocking.map((b) => ({ quote: b.quote ?? b.statement, why: b.why, claimId: b.claimId })),
+  ] as { quote: string; why: string; claimId?: number }[]
 
   // Сколько раз эту статью уже переписывали перед выпуском.
   //
@@ -809,11 +826,17 @@ registerStep('article_fix', async (job: Job, seo: any): Promise<StepOutcome> => 
   // проверке качества, у неё свой предел на тех же двух попытках: складывать их
   // в один счёт значило бы, что статья, честно прошедшая проверку, приходит к
   // воротам уже без права на исправление.
-  const { count: переписей } = await seo.from('article_versions')
+  const { count: правокВсего } = await seo.from('article_versions')
     .select('*', { count: 'exact', head: true })
     .eq('article_id', articleId).eq('origin', 'gate_fixed')
+  // Точечные правки (meta.trimmed) считаются отдельно: они не переписывают
+  // статью и не должны съедать её две попытки целой переписи
+  const { count: подрезок } = await seo.from('article_versions')
+    .select('*', { count: 'exact', head: true })
+    .eq('article_id', articleId).eq('origin', 'gate_fixed').contains('meta', { trimmed: true })
+  const переписей = (правокВсего ?? 0) - (подрезок ?? 0)
 
-  if ((переписей ?? 0) >= MAX_REVISIONS) {
+  if (переписей >= MAX_REVISIONS && !(gateFacts.length && (подрезок ?? 0) < MAX_TRIMS)) {
     return {
       outcome: 'done',
       result: {
@@ -851,6 +874,87 @@ registerStep('article_fix', async (job: Job, seo: any): Promise<StepOutcome> => 
   }, { id: job.id, article_id: articleId })
 
   const html = String(version.body)
+
+  // Точечная правка того, что держит ворота по фактам.
+  //
+  // Целая перепись тут не сходится: проверяющая модель каждый раз читает новый
+  // текст заново и находит в нём новое — у #34 16 октября два закрытых факта
+  // сменились третьим, и на этом кончились обе попытки. Поэтому правим только
+  // абзацы с названными фразами, остальной текст побайтово прежний, и заново
+  // всю статью модели не показываем. Замечаний от такой правки может стать
+  // только меньше — значит, она доводит статью до выпуска сама, без человека.
+  if (gateFacts.length && (подрезок ?? 0) < MAX_TRIMS) {
+    const { блоки, блокНаходки, заменить, встречается } = await import('./steps-legacy')
+    const { reviseFragment } = await import('./generate')
+    const всеБлоки = блоки(html)
+    const поБлокам = new Map<number, { quote: string; why: string }[]>()
+    // Утверждение реестра — пересказ, а не цитата: дословно в тексте его нет.
+    // Абзац ищем тем же способом, каким его нашли ворота, — по числу, дате или
+    // ключевому слову
+    const { isUsedInText } = await import('./fact-gate')
+    const claimIds = gateFacts.map((f) => f.claimId).filter(Boolean)
+    const { data: claimRows } = claimIds.length
+      ? await seo.from('claims').select('id, statement, value_num, value_date').in('id', claimIds)
+      : { data: [] }
+    const claimById = new Map<number, any>((claimRows ?? []).map((c: any) => [c.id, c]))
+
+    for (const f of gateFacts) {
+      let { блок: i, цитата } = блокНаходки(всеБлоки, f.quote)
+      const claim = f.claimId ? claimById.get(f.claimId) : null
+      if (i < 0 && claim) {
+        i = всеБлоки.findIndex((b) => !b.html.includes('wp:heading') && isUsedInText(claim, b.html))
+        цитата = f.quote
+      }
+      if (i >= 0) поБлокам.set(i, [...(поБлокам.get(i) ?? []), { ...f, quote: цитата }])
+    }
+
+    const замены: { блок: (typeof всеБлоки)[number]; на: string }[] = []
+    for (const [i, list] of поБлокам) {
+      const блок = всеБлоки[i]
+      const ответ = (await reviseFragment(ctx, блок.html, list.map((f) => ({
+        detail: `«${f.quote}» — ${f.why || 'утверждение не подтверждено источником'}. Убрать утверждение `
+          + 'или заменить обобщением без конкретики: требования различаются по странам и вузам, уточнять на официальном сайте.',
+      })))).trim()
+      // Выросший блок — дописали, а не починили. Такой не берём
+      if (ответ.length > блок.html.length * 1.3) continue
+      замены.push({ блок, на: ответ })
+    }
+
+    const fixed = normalizeBody(заменить(html, замены))
+    const gateAfter = await factGate(seo, `${version.title} ${fixed}`, subjectKeysFor(article.primary_keyword ?? ''))
+    const issues: any[] = (version.qa_report as any)?.issues ?? []
+    const resolved = issues.filter((i) => (i.kind === 'facts' || i.kind === 'promise') && i.quote && !встречается(fixed, String(i.quote)))
+
+    if (fixed !== html && gateAfter.blocking.length <= gateBefore.blocking.length) {
+      const writer = await writerConfig(seo)
+      const nv = await insertVersion(seo, articleId, {
+        origin: 'gate_fixed', title: version.title, body: fixed,
+        meta: { ...meta, trimmed: true, trimmed_from: version.id },
+        qa_report: {
+          ...(version.qa_report ?? {}),
+          issues: issues.filter((i) => !resolved.includes(i)),
+          resolved_by_trim: [...((version.qa_report as any)?.resolved_by_trim ?? []), ...resolved],
+        },
+        qa_version: 'v1',
+        prompt_version: writer.promptVersion ?? PROMPT_VERSION, model: writer.model,
+      })
+      await seo.from('articles').update({ current_version_id: nv.id, status: 'ready_for_review' }).eq('id', articleId).throwOnError()
+      return {
+        outcome: 'done',
+        result: {
+          version_id: nv.id, точечно: true, абзацев: замены.length,
+          было: { факты: gateFacts.length, блок_ворот: gateBefore.blocking.length },
+          стало: { закрыто_замечаний: resolved.length, блок_ворот: gateAfter.blocking.length },
+          cost: 0,
+        },
+      }
+    }
+    // Не нашли, где править, или правка не помогла — ниже обычный путь
+  }
+  if (переписей >= MAX_REVISIONS) {
+    return { outcome: 'done', result: { nothing_to_fix: true, cost: 0, переписей, why: 'точечно править нечего, а целые переписи исчерпаны' } }
+  }
+
   const det = await qaDeterministic(ctx, brief, html, {
     pageEmbeddings: await pageEmbeddings(seo),
     ...(await loadSiteTargets(seo)),
@@ -864,13 +968,6 @@ registerStep('article_fix', async (job: Job, seo: any): Promise<StepOutcome> => 
   // при неизменном числе блокеров.
   const textFixable = failedB.filter((c) => !isMetadataCheck(c.id))
 
-  // Непроверенные факты и обещания из отчёта модели. Для ворот выпуска это
-  // блокер (см. article_autopublish, пункт 4), а проверки стандарта их не
-  // видят. Без этого счёта выход ниже отвечал «блокеров нет» и ничего не
-  // правил, ворота снова ставили починку — и так по кругу: статьи #26 и #34
-  // простояли так весь день 16 октября.
-  const gateFacts = ((version.qa_report as any)?.issues ?? [])
-    .filter((i: any) => (i.kind === 'facts' || i.kind === 'promise') && i.severity !== 'minor')
 
   // Выход ДО обращения к модели.
   //
@@ -889,7 +986,7 @@ registerStep('article_fix', async (job: Job, seo: any): Promise<StepOutcome> => 
   // Блокеров нет вовсе, но статью уже правили — замер показал, что число
   // замечаний от правки к правке гуляет в обе стороны (9 → 13 → 9 → 10) и не
   // сходится. Первую попытку оставляем: на ней правка иногда помогает.
-  if (!textFixable.length && !gateFacts.length && (failedB.length > 0 || (переписей ?? 0) >= 1)) {
+  if (!textFixable.length && (failedB.length > 0 || переписей >= 1)) {
     return {
       outcome: 'done',
       result: {
@@ -1404,7 +1501,15 @@ registerStep('article_autopublish', async (_job: Job, seo: any): Promise<StepOut
     const report: any = v.qa_report ?? {}
 
     // 1. Обложка. Без неё карточка в блоге выйдет битой
-    if (!meta.cover?.base64 && !meta.images?.cover?.url) { rejected.push(`#${a.id}: нет обложки`); continue }
+    if (!meta.cover?.base64 && !meta.images?.cover?.url) {
+      // Дорисовать, а не ждать человека. Только обложку: статья уже готова,
+      // и вести её заново по конвейеру нельзя
+      const { data: drawing } = await seo.from('jobs').select('id')
+        .eq('step', 'article_cover').eq('article_id', a.id).in('status', ['pending', 'running', 'waiting']).limit(1)
+      if (!drawing?.length) await enqueueJob(seo, { step: 'article_cover', lane: 'production', priority: 40, article_id: a.id, topic_id: a.topic_id, payload: { cover_only: true, brief: meta.brief } })
+      rejected.push(`#${a.id}: нет обложки — дорисовывается`)
+      continue
+    }
 
     // 2. Проверки стандарта — считаем заново по текущему телу, а не по отчёту:
     // отчёт мог устареть после починки
@@ -1429,7 +1534,17 @@ registerStep('article_autopublish', async (_job: Job, seo: any): Promise<StepOut
     // 3. Существенные утверждения. Это то, из-за чего вообще стоит держать
     // человека в цепочке: ошибка в цене или дедлайне стоит читателю денег
     const gate = await factGate(seo, `${v.title} ${v.body}`, subjectKeysFor(a.primary_keyword ?? ''))
-    if (gate.blocking.length) { rejected.push(`#${a.id}: ${gate.blocking.length} неподтверждённых существенных утверждений`); continue }
+    if (gate.blocking.length) {
+      // Источник может найти claims_autoverify, но может и не найти. Ждать его
+      // вечно нельзя: точечная правка обобщает утверждение, и статья выходит
+      if (flow.autoFix) {
+        const { data: fixing } = await seo.from('jobs').select('id')
+          .eq('step', 'article_fix').eq('article_id', a.id).in('status', ['pending', 'running', 'waiting']).limit(1)
+        if (!fixing?.length) await enqueueJob(seo, { step: 'article_fix', lane: 'production', priority: 40, article_id: a.id, topic_id: a.topic_id, payload: {} })
+      }
+      rejected.push(`#${a.id}: ${gate.blocking.length} неподтверждённых существенных утверждений`)
+      continue
+    }
 
     // 4. Модель могла пометить выдуманные факты и обещания — их тоже не пускаем
     const invented = (report.issues ?? []).filter((i: any) => (i.kind === 'facts' || i.kind === 'promise') && i.severity !== 'minor')
