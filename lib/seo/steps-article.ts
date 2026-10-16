@@ -864,6 +864,14 @@ registerStep('article_fix', async (job: Job, seo: any): Promise<StepOutcome> => 
   // при неизменном числе блокеров.
   const textFixable = failedB.filter((c) => !isMetadataCheck(c.id))
 
+  // Непроверенные факты и обещания из отчёта модели. Для ворот выпуска это
+  // блокер (см. article_autopublish, пункт 4), а проверки стандарта их не
+  // видят. Без этого счёта выход ниже отвечал «блокеров нет» и ничего не
+  // правил, ворота снова ставили починку — и так по кругу: статьи #26 и #34
+  // простояли так весь день 16 октября.
+  const gateFacts = ((version.qa_report as any)?.issues ?? [])
+    .filter((i: any) => (i.kind === 'facts' || i.kind === 'promise') && i.severity !== 'minor')
+
   // Выход ДО обращения к модели.
   //
   // Прежний выход стоял после qaWithModel и требовал, чтобы замечаний не
@@ -881,7 +889,7 @@ registerStep('article_fix', async (job: Job, seo: any): Promise<StepOutcome> => 
   // Блокеров нет вовсе, но статью уже правили — замер показал, что число
   // замечаний от правки к правке гуляет в обе стороны (9 → 13 → 9 → 10) и не
   // сходится. Первую попытку оставляем: на ней правка иногда помогает.
-  if (!textFixable.length && (failedB.length > 0 || (переписей ?? 0) >= 1)) {
+  if (!textFixable.length && !gateFacts.length && (failedB.length > 0 || (переписей ?? 0) >= 1)) {
     return {
       outcome: 'done',
       result: {
