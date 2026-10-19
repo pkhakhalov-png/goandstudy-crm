@@ -21,6 +21,7 @@ const COUNTRY_LABEL: Record<string, string> = {
   ca: 'Канада', au: 'Австралия', gb: 'Великобритания', de: 'Германия', us: 'США',
   pt: 'Португалия', si: 'Словения', tr: 'Турция', sk: 'Словакия', cn: 'Китай',
   cz: 'Чехия', pl: 'Польша', lt: 'Литва',
+  kr: 'Южная Корея',
 }
 
 export default async function SchoolPage({

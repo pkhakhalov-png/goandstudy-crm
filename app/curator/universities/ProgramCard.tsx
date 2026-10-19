@@ -8,6 +8,7 @@ const COUNTRY_LABEL: Record<string, string> = {
   us: 'США', ie: 'Ирландия', pt: 'Португалия', si: 'Словения', tr: 'Турция',
   it: 'Италия', se: 'Швеция', fi: 'Финляндия', sk: 'Словакия', cn: 'Китай',
   cz: 'Чехия', pl: 'Польша', lt: 'Литва',
+  kr: 'Южная Корея',
 }
 
 interface Props {
