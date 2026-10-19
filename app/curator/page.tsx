@@ -2,6 +2,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { CuratorSidebar } from './CuratorSidebar'
 import { CuratorDashboard } from './CuratorDashboard'
+import { CURATOR_VISIBLE } from '@/lib/curator-visible'
 
 export default async function CuratorHomePage() {
   const supabase = await createClient()
@@ -28,7 +29,7 @@ export default async function CuratorHomePage() {
     .from('clients')
     .select('id, name, country, status, curator_id, current_stage_code, created_at')
     .eq('curator_id', curatorId || '')
-    .eq('status', 'active')
+    .in('status', CURATOR_VISIBLE)
   const clientIdList = (myClients ?? []).map(c => c.id)
 
   const [

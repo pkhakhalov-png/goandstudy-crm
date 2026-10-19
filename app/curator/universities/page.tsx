@@ -6,6 +6,7 @@ import { searchPrograms } from '@/lib/catalog-search'
 import { CuratorSidebar } from '../CuratorSidebar'
 import { UniversityFilters } from './UniversityFilters'
 import { ProgramCardInteractive } from './ProgramCard'
+import { CURATOR_VISIBLE } from '@/lib/curator-visible'
 
 const PAGE_SIZE = 24
 
@@ -142,7 +143,7 @@ export default async function UniversitiesPage({
         .from('clients')
         .select('id, name, country')
         .eq('curator_id', curatorId)
-        .eq('status', 'active')
+        .in('status', CURATOR_VISIBLE)
         .order('name')
     : { data: [] as { id: number; name: string; country?: string | null }[] }
 

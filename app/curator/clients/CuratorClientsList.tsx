@@ -113,10 +113,10 @@ export function CuratorClientsList({ clients, stages, universities }: Props) {
                   <td style={{ padding: '14px 12px', textAlign: 'center' }}>
                     <span style={{
                       padding: '3px 10px', borderRadius: 8, fontSize: 10, fontWeight: 600,
-                      background: c.status === 'active' ? 'rgba(22,163,97,.1)' : 'rgba(142,142,147,.1)',
-                      color: c.status === 'active' ? 'var(--green)' : 'var(--muted)',
+                      background: c.status === 'active' || c.status === 'completed' ? 'rgba(22,163,97,.1)' : 'rgba(142,142,147,.1)',
+                      color: c.status === 'active' || c.status === 'completed' ? 'var(--green)' : 'var(--muted)',
                     }}>
-                      {c.status === 'active' ? 'Активен' : 'Завершён'}
+                      {c.status === 'active' ? 'Активен' : c.status === 'completed' ? 'Оплачен' : 'Завершён'}
                     </span>
                   </td>
                 </tr>

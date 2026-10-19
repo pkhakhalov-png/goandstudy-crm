@@ -6,6 +6,7 @@ import { CuratorSidebar } from '../CuratorSidebar'
 import { AddScholarshipButton } from './AddScholarshipButton'
 import { ScholarshipLogo } from './ScholarshipLogo'
 import { VerifyScholarshipButton } from './VerifyScholarshipButton'
+import { CURATOR_VISIBLE } from '@/lib/curator-visible'
 
 type IdpRow = {
   id: number
@@ -157,7 +158,7 @@ export default async function ScholarshipsCatalogPage({
         .from('clients')
         .select('id, name')
         .eq('curator_id', curator.id)
-        .eq('status', 'active')
+        .in('status', CURATOR_VISIBLE)
         .order('name')
     : { data: [] as { id: number; name: string }[] }
 

@@ -24,7 +24,7 @@ export default async function CuratorProfilePage() {
     .select('id, status')
     .eq('curator_id', curator?.id || '')
 
-  const activeClients = (clients ?? []).filter(c => c.status === 'active').length
+  const activeClients = (clients ?? []).filter(c => c.status === 'active' || c.status === 'completed').length
   const completedClients = (clients ?? []).filter(c => c.status === 'completed').length
 
   const initials = (profile?.name || user.email || 'КР')
@@ -67,7 +67,7 @@ export default async function CuratorProfilePage() {
             </div>
             <div style={cardStyle}>
               <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--green)' }}>{completedClients}</div>
-              <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase' }}>Завершённых</div>
+              <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase' }}>Оплачено полностью</div>
             </div>
             <div style={cardStyle}>
               <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--text)' }}>{curator?.max_clients || 20}</div>

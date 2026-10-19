@@ -13,6 +13,7 @@ import { EditModeProvider, EditModeToggle } from '@/app/_shared/CuratorEdit/Edit
 import { CoverPhotoUploader } from '@/app/_shared/CuratorEdit/CoverPhotoUploader'
 import { SchoolEditPanel } from './SchoolEditPanel'
 import { getCoverPhoto, getEffective, applyOverrides } from '@/lib/curator-overrides'
+import { CURATOR_VISIBLE } from '@/lib/curator-visible'
 
 export const dynamic = 'force-dynamic'
 
@@ -84,7 +85,7 @@ export default async function SchoolPage({
         .from('clients')
         .select('id, name, country')
         .eq('curator_id', curatorId)
-        .eq('status', 'active')
+        .in('status', CURATOR_VISIBLE)
         .order('name')
     : { data: [] as any[] }
 

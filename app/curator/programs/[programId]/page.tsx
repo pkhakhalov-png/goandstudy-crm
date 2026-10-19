@@ -9,6 +9,7 @@ import { BackButton } from '../../universities/[schoolId]/BackButton'
 import { EditModeProvider, EditModeToggle } from '@/app/_shared/CuratorEdit/EditMode'
 import { ProgramEditPanel } from './ProgramEditPanel'
 import { applyOverrides } from '@/lib/curator-overrides'
+import { CURATOR_VISIBLE } from '@/lib/curator-visible'
 
 export const dynamic = 'force-dynamic'
 
@@ -79,7 +80,7 @@ export default async function ProgramPage({
   const curatorId = curatorRec?.id
   const [{ data: myClients }, { data: curatorDataDb }] = await Promise.all([
     curatorId
-      ? admin.from('clients').select('id, name, country').eq('curator_id', curatorId).eq('status', 'active').order('name')
+      ? admin.from('clients').select('id, name, country').eq('curator_id', curatorId).in('status', CURATOR_VISIBLE).order('name')
       : Promise.resolve({ data: [] as { id: number; name: string; country?: string | null }[] }),
     admin.from('program_curator_data').select('*').eq('program_id', id).maybeSingle(),
   ])

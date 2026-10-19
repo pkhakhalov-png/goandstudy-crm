@@ -10,6 +10,7 @@ import { BackButton } from '../../../universities/[schoolId]/BackButton'
 import { EditModeProvider, EditModeToggle } from '@/app/_shared/CuratorEdit/EditMode'
 import { IdpScholarshipEditPanel } from './IdpScholarshipEditPanel'
 import { applyOverrides } from '@/lib/curator-overrides'
+import { CURATOR_VISIBLE } from '@/lib/curator-visible'
 
 export const dynamic = 'force-dynamic'
 
@@ -79,7 +80,7 @@ export default async function IdpScholarshipDetailPage({
         .from('clients')
         .select('id, name')
         .eq('curator_id', curator.id)
-        .eq('status', 'active')
+        .in('status', CURATOR_VISIBLE)
         .order('name')
     : { data: [] as { id: number; name: string }[] }
 
