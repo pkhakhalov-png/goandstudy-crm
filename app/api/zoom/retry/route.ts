@@ -27,7 +27,8 @@ export async function POST(req: NextRequest) {
     while (Date.now() - начало < 120_000) {
       const итог = await повторитьОдну(admin)
       console.log(`[zoom retry] ${итог}`)
-      if (!итог.endsWith('доведена')) break
+      // Упала одна — берём следующую: сбой разбора не повод не расшифровать остальные.
+      if (итог === 'нечего повторять' || итог === 'запись уже взял другой') break
     }
   })
 
