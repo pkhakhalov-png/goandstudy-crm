@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { runStep, hasStep, registeredSteps } from '@/lib/seo/steps'
 import { outcomeFor } from '@/lib/seo/failure'
@@ -72,6 +72,12 @@ export async function POST(req: NextRequest) {
   if (!secret || req.headers.get('x-seo-tick-secret') !== secret) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   }
+
+  // Звонки: упавшие записи доводит свой маршрут, тик лишь будит его. Свой —
+  // чтобы часовая расшифровка не съедала бюджет времени статей.
+  after(() => fetch(`${req.nextUrl.origin}/api/zoom/retry`, {
+    method: 'POST', headers: { 'x-seo-tick-secret': secret }, signal: AbortSignal.timeout(20_000),
+  }).catch(e => console.warn('[tick] звонки не разбудились:', e?.message ?? e)))
 
   const started = Date.now()
   const workerId = `w_${Math.random().toString(36).slice(2, 10)}`

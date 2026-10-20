@@ -20,6 +20,12 @@
 
 const БАЗА = 'https://generativelanguage.googleapis.com'
 const МОДЕЛЬ = process.env.GEMINI_STT_MODEL || 'gemini-3.6-flash'
+/**
+ * Запасные модели. Основная регулярно отвечает 503 «перегружена» по полчаса
+ * подряд — в октябре так упала половина консультаций. Ждать её дальше трёх
+ * попыток бессмысленно, а соседняя модель в тот же момент свободна.
+ */
+const ЗАПАСНЫЕ = ['gemini-3.8-flash', 'gemini-3.5-flash', 'gemini-2.5-pro']
 
 export type Расшифровка = {
   текст: string
@@ -122,56 +128,59 @@ export async function расшифровать(audio: Buffer, mimeType = 'audio/
   try {
     await дождаться(файл.name, ключ)
 
-    // Пауза растёт: 5, 15, 45 секунд. Дольше ждать смысла нет — если
-    // распознаватель лежит минуту, он полежит и десять, а у функции есть
-    // предел времени. Не вышло за три попытки — запись остаётся у нас со
-    // статусом failed, и её можно переразобрать отдельно.
-    const паузы = [5_000, 15_000, 45_000]
+    // На каждую модель — две паузы, 5 и 15 секунд. Не вышло — следующая
+    // модель. Не вышло ни у одной — запись остаётся у нас со статусом failed,
+    // и её через десять минут повторит /api/zoom/retry.
+    const паузы = [5_000, 15_000]
     let последняя = ''
 
-    for (let попытка = 0; попытка <= паузы.length; попытка++) {
-      const res = await fetch(`${БАЗА}/v1beta/models/${МОДЕЛЬ}:generateContent?key=${ключ}`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{
-            parts: [
-              { text: ЗАДАНИЕ },
-              { file_data: { mime_type: mimeType, file_uri: файл.uri } },
-            ],
-          }],
-          // Ноль температуры: расшифровка — не творчество, и разные ответы на одну
-          // запись здесь были бы прямым вредом.
-          generationConfig: { temperature: 0, maxOutputTokens: 65536 },
-        }),
-        signal: AbortSignal.timeout(600_000),
-      })
+    for (const модель of [МОДЕЛЬ, ...ЗАПАСНЫЕ.filter(m => m !== МОДЕЛЬ)]) {
+      for (let попытка = 0; попытка <= паузы.length; попытка++) {
+        const res = await fetch(`${БАЗА}/v1beta/models/${модель}:generateContent?key=${ключ}`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{
+              parts: [
+                { text: ЗАДАНИЕ },
+                { file_data: { mime_type: mimeType, file_uri: файл.uri } },
+              ],
+            }],
+            // Ноль температуры: расшифровка — не творчество, и разные ответы на одну
+            // запись здесь были бы прямым вредом.
+            generationConfig: { temperature: 0, maxOutputTokens: 65536 },
+          }),
+          signal: AbortSignal.timeout(600_000),
+        })
 
-      const data: any = await res.json().catch(() => ({}))
+        const data: any = await res.json().catch(() => ({}))
 
-      if (!res.ok) {
-        последняя = `${res.status}: ${String(data?.error?.message ?? '').slice(0, 160)}`
-        if (временная(res.status) && попытка < паузы.length) {
-          console.warn(`[расшифровка] ${последняя} — повтор через ${паузы[попытка] / 1000} с`)
-          await new Promise(r => setTimeout(r, паузы[попытка]))
-          continue
+        if (!res.ok) {
+          последняя = `${модель} ${res.status}: ${String(data?.error?.message ?? '').slice(0, 160)}`
+          if (!временная(res.status)) throw new Error(`распознаватель ответил ошибкой (${последняя})`)
+          if (попытка < паузы.length) {
+            console.warn(`[расшифровка] ${последняя} — повтор через ${паузы[попытка] / 1000} с`)
+            await new Promise(r => setTimeout(r, паузы[попытка]))
+            continue
+          }
+          console.warn(`[расшифровка] ${последняя} — переходим на запасную модель`)
+          break
         }
-        throw new Error(`распознаватель ответил ошибкой (${последняя})`)
+
+        const текст = (data?.candidates?.[0]?.content?.parts ?? [])
+          .map((p: any) => p.text ?? '')
+          .join('')
+          .trim()
+
+        // Пустая расшифровка неотличима от «все молчали» — молча вернуть пустоту
+        // значит потерять разговор без следа.
+        if (!текст) throw new Error('в записи не разобрать слов')
+
+        return { текст, модель, мс: Date.now() - начало }
       }
-
-      const текст = (data?.candidates?.[0]?.content?.parts ?? [])
-        .map((p: any) => p.text ?? '')
-        .join('')
-        .trim()
-
-      // Пустая расшифровка неотличима от «все молчали» — молча вернуть пустоту
-      // значит потерять разговор без следа.
-      if (!текст) throw new Error('в записи не разобрать слов')
-
-      return { текст, модель: МОДЕЛЬ, мс: Date.now() - начало }
     }
 
-    throw new Error(`распознаватель не ответил за три попытки (${последняя})`)
+    throw new Error(`распознаватель перегружен на всех моделях (${последняя})`)
   } finally {
     await удалить(файл.name, ключ)
   }
