@@ -25,7 +25,7 @@ const МОДЕЛЬ = process.env.GEMINI_STT_MODEL || 'gemini-3.6-flash'
  * подряд — в октябре так упала половина консультаций. Ждать её дальше трёх
  * попыток бессмысленно, а соседняя модель в тот же момент свободна.
  */
-const ЗАПАСНЫЕ = ['gemini-3.8-flash', 'gemini-3.5-flash', 'gemini-2.5-pro']
+const ЗАПАСНЫЕ = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.5-flash']
 
 export type Расшифровка = {
   текст: string
@@ -157,6 +157,8 @@ export async function расшифровать(audio: Buffer, mimeType = 'audio/
 
         if (!res.ok) {
           последняя = `${модель} ${res.status}: ${String(data?.error?.message ?? '').slice(0, 160)}`
+          // 404 — модель сняли с раздачи: это повод взять следующую, а не ронять запись.
+          if (res.status === 404) { console.warn(`[расшифровка] ${последняя} — модели нет, следующая`); break }
           if (!временная(res.status)) throw new Error(`распознаватель ответил ошибкой (${последняя})`)
           if (попытка < паузы.length) {
             console.warn(`[расшифровка] ${последняя} — повтор через ${паузы[попытка] / 1000} с`)
