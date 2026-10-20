@@ -36,6 +36,12 @@ const МАКС_ПОПЫТОК = 12
 /** Ошибки, которые повтором не лечатся: тратить на них распознаватель незачем. */
 const НЕИСПРАВИМО = /не разобрать слов|модель отказалась|разбирать нечего/i
 
+/**
+ * Кончились деньги или ключ недействителен. Запись тут ни при чём: после
+ * пополнения она должна разобраться сама, поэтому попытку такой сбой не съедает.
+ */
+const ОПЛАТА = /credit balance|no credits|insufficient_quota|x-api-key|authentication_error/i
+
 type Запись = {
   id: string
   deal_id: string | null
@@ -186,7 +192,7 @@ function попыток(error: string | null | undefined): number {
 
 async function упала(admin: SupabaseClient, запись: Запись, e: any): Promise<void> {
   const причина = String(e?.message ?? e).replace(/^\[попытка \d+\]\s*/, '').slice(0, 400)
-  const n = попыток(запись.error) + 1
+  const n = попыток(запись.error) + (ОПЛАТА.test(причина) ? 0 : 1)
   console.error(`[запись ${запись.id}] упала (попытка ${n}): ${причина}`)
   await отметчик(admin, запись.id)({
     status: НЕИСПРАВИМО.test(причина) ? 'skipped' : 'failed',
