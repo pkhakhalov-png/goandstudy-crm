@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
     const admin = await createAdminClient()
     // Пока есть время — следующую: после простоя распознавателя их бывает много.
     const начало = Date.now()
-    while (Date.now() - начало < 120_000) {
+    while (Date.now() - начало < 60_000) {   // расшифровка часа — до 3 минут, начинать позже нельзя
       const итог = await повторитьОдну(admin)
       console.log(`[zoom retry] ${итог}`)
       // Упала одна — берём следующую: сбой разбора не повод не расшифровать остальные.
