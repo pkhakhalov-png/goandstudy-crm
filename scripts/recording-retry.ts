@@ -62,7 +62,7 @@ async function main() {
   }
   const { повторитьОдну } = await import('../lib/zoom/process-recording')
   for (let i = 0; i < записи.length; i++) {
-    const итог = await повторитьОдну(sb)
+    const итог = await повторитьОдну(sb, один)
     console.log(итог)
     if (итог === 'нечего повторять' || один) break
   }

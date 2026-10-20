@@ -251,15 +251,17 @@ export async function обработатьЗапись(
  * посреди расшифровки — статус так и остался `transcribing`). Захват — через
  * условное обновление по `updated_at`: два тика подряд одну запись не возьмут.
  */
-export async function повторитьОдну(admin: SupabaseClient): Promise<string> {
+export async function повторитьОдну(admin: SupabaseClient, толькоId?: string): Promise<string> {
   const давно = new Date(Date.now() - 20 * 60_000).toISOString()
-  const { data: кандидаты } = await admin.from('call_recordings')
+  let запрос = admin.from('call_recordings')
     .select(`${ПОЛЯ}, updated_at`)
     .in('status', ['failed', 'ingested', 'transcribing', 'analyzing'])
     .not('storage_path', 'is', null)
     .lt('updated_at', давно)
     .order('created_at', { ascending: true })
     .limit(20)
+  if (толькоId) запрос = запрос.eq('id', толькоId)
+  const { data: кандидаты } = await запрос
 
   const запись = (кандидаты ?? []).find(з => попыток(з.error) < МАКС_ПОПЫТОК)
   if (!запись) return 'нечего повторять'
