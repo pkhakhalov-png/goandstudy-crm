@@ -30,6 +30,15 @@ const БАКЕТ = 'call-recordings'
 /** Короче — разговора не было: клиент не пришёл, менеджер подождал и вышел. */
 const МИН_СЕК = 120
 
+/**
+ * Байт звука в секунду, ниже которых в записи тишина. Zoom сжимает молчание
+ * почти в ноль: настоящий разговор — 6–9 КБ/с, ожидание неявившегося клиента —
+ * меньше 1 КБ/с. Распознаватель на тишине не молчит, а **сочиняет** правдоподобный
+ * разговор: так в профиле клиента оказывались чужие звонки про ВШЭ и ЕГЭ.
+ * Поэтому тишина отсекается до распознавания, по размеру файла.
+ */
+const МИН_БАЙТ_В_СЕК = 2000
+
 /** Сколько раз повторять упавшую запись, прежде чем оставить её в failed. */
 const МАКС_ПОПЫТОК = 12
 
@@ -51,10 +60,11 @@ type Запись = {
   duration_sec: number | null
   started_at: string | null
   storage_path: string | null
+  file_size?: number | null
   error?: string | null
 }
 
-const ПОЛЯ = 'id, deal_id, booking_id, meeting_id, external_id, duration_sec, started_at, storage_path, error'
+const ПОЛЯ = 'id, deal_id, booking_id, meeting_id, external_id, duration_sec, started_at, storage_path, file_size, error'
 
 function отметчик(admin: SupabaseClient, id: string) {
   return async (поля: Record<string, unknown>) => {
@@ -110,6 +120,12 @@ async function разобрать(admin: SupabaseClient, запись: Запи�
 
   if ((запись.duration_sec ?? 0) < МИН_СЕК) {
     await отметить({ status: 'skipped', error: `запись короче ${МИН_СЕК / 60} минут — разговора не было` })
+    return
+  }
+
+  const байтВСек = (запись.file_size ?? 0) / Math.max(1, запись.duration_sec ?? 1)
+  if (запись.file_size && байтВСек < МИН_БАЙТ_В_СЕК) {
+    await отметить({ status: 'skipped', error: `в записи тишина (${Math.round(байтВСек)} байт/с) — клиент, похоже, не пришёл` })
     return
   }
 
@@ -244,7 +260,7 @@ export async function обработатьЗапись(
       }
     }
 
-    await разобрать(admin, { ...запись, storage_path: путь }, файл)
+    await разобрать(admin, { ...запись, storage_path: путь, file_size: файл.byteLength }, файл)
   } catch (e: any) {
     await упала(admin, запись, e)
   }
