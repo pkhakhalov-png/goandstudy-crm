@@ -10,7 +10,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { сессияКонтура } from '@/lib/care/session'
-import { главная } from '@/lib/care/cases'
+import { главная, лидыПослеКонсультации } from '@/lib/care/cases'
 import { сводка } from '@/lib/care/ai/summary'
 import { флагВключён } from '@/lib/care/flags'
 import { инициалы, склонение } from '@/lib/care/labels'
@@ -62,7 +62,7 @@ export default async function ГлавнаяСтраница() {
   const сессия = await сессияКонтура()
   if (!сессия?.участник) notFound()
 
-  const д = await главная(сессия.участник)
+  const [д, лиды] = await Promise.all([главная(сессия.участник), лидыПослеКонсультации(сессия.участник)])
   // Помощник включается отдельно от кабинета: смотреть на данные и тратить на
   // них деньги — разные решения.
   const помощникВключён = await флагВключён('ai', { memberId: сессия.участник.id })
@@ -120,6 +120,40 @@ export default async function ГлавнаяСтраница() {
           <Стат число={д.ошибокОпераций} подпись="ошибка операции" />
         </div>
       </div>
+
+      {лиды.length > 0 && (
+        <section style={{ marginBottom: 28 }}>
+          <h2 className="ds-label" style={{ marginBottom: 12 }}>
+            После консультации · {лиды.length} {склонение(лиды.length, 'лид', 'лида', 'лидов')}
+          </h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 12 }}>
+            {лиды.map((л) => (
+              <Link key={л.caseId} href={`/care/cases/${л.caseId}`} className="care-attn" data-level="ждёт">
+                <span className="care-ava">{инициалы(л.имя)}</span>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+                    <span style={{ fontWeight: 700, fontSize: 16 }}>{л.имя}</span>
+                    {л.температура && <span className="ds-chip">{л.температура}</span>}
+                  </div>
+                  <div style={{ fontSize: 13, color: 'var(--ds-muted)', marginTop: 4 }}>
+                    {л.минутЗвонка ? `звонок ${л.минутЗвонка} мин` : 'звонка не было — только анкета'}
+                    {л.фактовНаПроверке > 0 && ` · ${л.фактовНаПроверке} ${склонение(л.фактовНаПроверке, 'факт', 'факта', 'фактов')} на проверку`}
+                  </div>
+                  {л.итог && <p style={{ fontSize: 14, lineHeight: 1.5, margin: '8px 0 0', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{л.итог}</p>}
+                  {л.следующийШаг && (
+                    <div style={{ marginTop: 8 }}>
+                      <span className="care-reason" data-kind="ai">
+                        Дальше: {л.следующийШаг}
+                        {л.срокШага && ` · до ${new Date(л.срокШага).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}`}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
 
       {д.лента.length === 0 ? (
         <div className="ds-empty">

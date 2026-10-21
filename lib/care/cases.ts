@@ -697,6 +697,71 @@ export type СтрокаВнимания = {
   is_synthetic: boolean
 }
 
+export type ЛидНаГлавной = {
+  caseId: string
+  имя: string
+  /** Как оценили по звонку («тёплый», «холодный»); null, если звонка не было. */
+  температура: string | null
+  /** Первая фраза итога звонка. */
+  итог: string
+  фактовНаПроверке: number
+  минутЗвонка: number | null
+  следующийШаг: string | null
+  срокШага: string | null
+}
+
+/**
+ * Лиды после консультации продаж — отдельным блоком главной. В ленте внимания
+ * они тонут среди просрочек действующих клиентов, а смысл у них свой: человек
+ * ещё не купил, и решает скорость следующего шага.
+ */
+export async function лидыПослеКонсультации(участник: Участник): Promise<ЛидНаГлавной[]> {
+  const область = await видимыеДела(участник)
+  if (область.пусто) return []
+
+  const { data: дела } = await базаCare()
+    .from('cases')
+    .select('id, lead_name, notes, created_at')
+    .in('id', область.дела)
+    .eq('status', 'lead')
+    .order('created_at', { ascending: false })
+  if (!дела?.length) return []
+  const ids = дела.map((д) => д.id as string)
+
+  const [{ data: задачи }, { data: черновики }, { data: звонки }] = await Promise.all([
+    базаCare()
+      .from('tasks')
+      .select('case_id, title, due_on, created_at')
+      .in('case_id', ids)
+      .not('status', 'in', '("done","failed")')
+      .order('created_at', { ascending: true }),
+    базаCare().from('facts').select('case_id').in('case_id', ids).eq('status', 'draft'),
+    базаCare().from('sources').select('case_id, ref').in('case_id', ids).eq('kind', 'meeting'),
+  ])
+
+  return дела.map((д) => {
+    const заметка = (д.notes as string | null) ?? ''
+    // Заметку пишет импорт лидов: вторым абзацем итог звонка, ниже строка
+    // «Температура: …» (scripts/care/import-call-leads.ts).
+    const итог = (заметка.split('\n\n')[1] ?? '').split(/(?<=[.!?])\s/)[0] ?? ''
+    const температура = /^Температура: ([^—\n]+)/m.exec(заметка)?.[1]?.trim() ?? null
+    const шаг = (задачи ?? []).find((з) => з.case_id === д.id)
+    const минуты = (звонки ?? [])
+      .filter((з) => з.case_id === д.id)
+      .reduce((n, з) => n + Number((з.ref as { duration_min?: number } | null)?.duration_min ?? 0), 0)
+    return {
+      caseId: д.id as string,
+      имя: (д.lead_name as string | null) ?? 'Лид',
+      температура,
+      итог,
+      фактовНаПроверке: (черновики ?? []).filter((ф) => ф.case_id === д.id).length,
+      минутЗвонка: минуты || null,
+      следующийШаг: (шаг?.title as string | undefined) ?? null,
+      срокШага: (шаг?.due_on as string | null | undefined) ?? null,
+    }
+  })
+}
+
 export type Главная = {
   всегоДел: number
   требуютВас: number
