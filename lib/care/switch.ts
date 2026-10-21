@@ -47,20 +47,21 @@ type ЗаписьДела = {
   owner_member_id: string | null
   is_synthetic: boolean
   synthetic_name: string | null
+  lead_name?: string | null
   switched_at: string | null
 }
 
 async function дело(caseId: string): Promise<ЗаписьДела | null> {
   const { data } = await базаCare()
     .from('cases')
-    .select('id, client_id, automation_owner, owner_member_id, is_synthetic, synthetic_name, switched_at')
+    .select('id, client_id, automation_owner, owner_member_id, is_synthetic, synthetic_name, lead_name, switched_at')
     .eq('id', caseId)
     .maybeSingle()
   return (data as ЗаписьДела | null) ?? null
 }
 
 function имяДела(д: ЗаписьДела): string {
-  return д.synthetic_name ?? `клиент #${д.client_id}`
+  return д.synthetic_name ?? (д.lead_name ?? `клиент #${д.client_id}`)
 }
 
 /** Чек-лист включения. Ничего не меняет — только отвечает. */
@@ -267,7 +268,7 @@ export async function ктоГде(дела: string[]): Promise<СтрокаПе
   if (!дела.length) return []
   const { data } = await базаCare()
     .from('cases')
-    .select('id, client_id, automation_owner, is_synthetic, synthetic_name, switched_at')
+    .select('id, client_id, automation_owner, is_synthetic, synthetic_name, lead_name, switched_at')
     .in('id', дела)
     .order('automation_owner')
 

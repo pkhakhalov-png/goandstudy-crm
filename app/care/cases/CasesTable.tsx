@@ -99,6 +99,7 @@ export function CasesTable({ дела }: { дела: ДелоВСписке[] })
                           {д.имяКлиента}
                         </Link>
                         {д.is_synthetic && <span className="ds-chip ds-chip-warning">тест</span>}
+                        {д.status === 'lead' && <span className="ds-chip ds-chip-purple">лид · после консультации</span>}
                         <div style={{ fontSize: 12, color: 'var(--ds-muted)' }}>
                           {[д.страна, д.service_scope, `набор ${д.intake_year}`].filter(Boolean).join(' · ')}
                         </div>

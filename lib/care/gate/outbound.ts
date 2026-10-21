@@ -73,7 +73,7 @@ export async function версияДанных(caseId: string, taskId: string | 
   ])
 
   let документы: unknown = []
-  if (дело && !дело.is_synthetic) {
+  if (дело && !дело.is_synthetic && дело.client_id != null) {
     const { data } = await базаPublic()
       .from('client_documents')
       .select('id, doc_type, status, uploaded_at')
@@ -211,6 +211,10 @@ export async function воротаОтправки(proposalId: string): Promise<
     .eq('id', предложение.case_id)
     .maybeSingle()
   if (!дело) return { разрешено: false, причина: 'no_recipient', объяснение: 'Дело не найдено.' }
+  // Лид после консультации — ещё не клиент: писать ему от имени куратора рано.
+  if (дело.client_id == null) {
+    return { разрешено: false, причина: 'no_recipient', объяснение: 'Это лид, а не клиент: сообщения из кабинета ему не отправляются.' }
+  }
 
   // 2. Флаг именно этого клиента. Пилот идёт по одному человеку.
   if (!(await флагВключён('outbound', { clientId: дело.client_id }))) {

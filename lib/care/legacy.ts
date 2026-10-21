@@ -96,7 +96,7 @@ export async function сверитьПрежнийКабинет(): Promise<Ит
     .eq('status', 'active')
 
   // Тестовые дела в прежнем кабинете не существуют: у них выдуманный клиент.
-  const свои = (дела ?? []).filter((д) => !д.is_synthetic)
+  const свои = (дела ?? []).filter((д) => !д.is_synthetic && д.client_id != null)
   if (!свои.length) {
     итог.причины.push('переведённых настоящих клиентов нет')
     return итог

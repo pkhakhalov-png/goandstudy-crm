@@ -102,6 +102,9 @@ export default async function ДелоСтраница({ params }: { params: Pro
         </div>
 
         {д.дело.is_synthetic && <span className="ds-chip ds-chip-warning">тестовое дело</span>}
+        {д.дело.status === 'lead' && (
+          <span className="ds-chip ds-chip-purple" title="Профиль собран по записи консультации продаж. Клиентом CRM станет после оплаты.">лид · после консультации</span>
+        )}
 
         <div className="care-case-facts">
           <div className="care-case-fact">

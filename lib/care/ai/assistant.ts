@@ -196,12 +196,12 @@ export const ПОДПИСЬ_ШАГА: Record<string, string> = {
 async function справкаОДеле(caseId: string): Promise<string> {
   const { data: дело } = await базаCare()
     .from('cases')
-    .select('id, client_id, intake_year, service_scope, is_synthetic, synthetic_name, status')
+    .select('id, client_id, intake_year, service_scope, is_synthetic, synthetic_name, lead_name, status')
     .eq('id', caseId)
     .maybeSingle()
   if (!дело) return ''
 
-  let имя = дело.is_synthetic ? (дело.synthetic_name ?? 'тестовое дело') : `клиент #${дело.client_id}`
+  let имя = дело.is_synthetic ? (дело.synthetic_name ?? 'тестовое дело') : (дело.lead_name ?? `клиент #${дело.client_id}`)
   let страна: string | null = null
   if (!дело.is_synthetic) {
     const { data: клиент } = await базаPublic()

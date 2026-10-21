@@ -45,6 +45,7 @@ type ЗаписьДела = {
   client_id: number
   is_synthetic: boolean
   synthetic_name: string | null
+  lead_name?: string | null
 }
 
 /** Картина целиком: рубильник, флаги по клиентам, доступность групп. */
@@ -56,7 +57,7 @@ export async function картинаОтправок(дела: string[]): Promis
 
   const { data: записи } = await базаCare()
     .from('cases')
-    .select('id, client_id, is_synthetic, synthetic_name')
+    .select('id, client_id, is_synthetic, synthetic_name, lead_name')
     .in('id', дела)
     .eq('automation_owner', 'v2')
     .eq('status', 'active')
@@ -86,7 +87,7 @@ export async function картинаОтправок(дела: string[]): Promis
 
   // Имена берём из старой CRM — те же, что видит куратор везде.
   const { клиентыПоId } = await import('./cases')
-  const клиенты = await клиентыПоId(список.filter((д) => !д.is_synthetic).map((д) => д.client_id))
+  const клиенты = await клиентыПоId(список.filter((д) => !д.is_synthetic && д.client_id != null).map((д) => д.client_id as number))
 
   const строки: СтрокаОтправок[] = список.map((д) => {
     const канал = поДелу.get(д.id)
@@ -95,7 +96,7 @@ export async function картинаОтправок(дела: string[]): Promis
       clientId: д.client_id,
       имя: д.is_synthetic
         ? (д.synthetic_name ?? 'тестовое дело')
-        : (клиенты.get(д.client_id)?.name ?? `Клиент #${д.client_id}`),
+        : (клиенты.get(д.client_id)?.name ?? (д.lead_name ?? `Клиент #${д.client_id}`)),
       is_synthetic: д.is_synthetic,
       разрешено: поКлиенту.get(String(д.client_id)) === true,
       // Нет записи о канале — не «доступен»: проверка по этому делу ещё не

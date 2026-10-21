@@ -16,7 +16,7 @@ import { склонение, подписьОжидания, срок, подп�
 
 export type ДелоВСписке = {
   id: string
-  client_id: number
+  client_id: number | null
   intake_year: number
   intake_term: string | null
   status: string
@@ -38,7 +38,7 @@ export type ДелоВСписке = {
 
 type ЗаписьДела = {
   id: string
-  client_id: number
+  client_id: number | null
   intake_year: number
   intake_term: string | null
   status: string
@@ -49,17 +49,30 @@ type ЗаписьДела = {
   created_at: string
   is_synthetic: boolean
   synthetic_name: string | null
+  lead_name?: string | null
+}
+
+/**
+ * У дела нет клиента в рабочей CRM: тестовое или лид после консультации.
+ * В таблицы клиентов за такими делами не ходим — там их нет по построению.
+ */
+export function безКлиентаCRM(д: { is_synthetic: boolean; client_id: number | null }): boolean {
+  return д.is_synthetic || д.client_id == null
 }
 
 /** Имена клиентов одним запросом: по одному на экран, а не на строку. */
-export async function клиентыПоId(идентификаторы: number[]) {
-  if (!идентификаторы.length) return new Map<number, { name: string | null; country: string | null; current_stage_code: string | null }>()
+export async function клиентыПоId(список: (number | null)[]) {
+  // У дела-лида клиента в CRM ещё нет: client_id пуст, спрашивать не о ком.
+  const идентификаторы = список.filter((id): id is number => id != null)
+  if (!идентификаторы.length) return new Map<number | null, { name: string | null; country: string | null; current_stage_code: string | null }>()
   const { data, error } = await базаPublic()
     .from('clients')
     .select('id, name, country, current_stage_code')
     .in('id', идентификаторы)
   if (error) throw new Error(`не удалось прочитать клиентов: ${error.message}`)
-  return new Map((data ?? []).map((к) => [к.id as number, к]))
+  return new Map<number | null, { name: string | null; country: string | null; current_stage_code: string | null }>(
+    (data ?? []).map((к) => [к.id as number, к]),
+  )
 }
 
 export async function списокДел(участник: Участник): Promise<ДелоВСписке[]> {
@@ -68,7 +81,7 @@ export async function списокДел(участник: Участник): Pr
 
   const { data: дела, error } = await базаCare()
     .from('cases')
-    .select('id, client_id, intake_year, intake_term, status, automation_owner, service_scope, owner_member_id, notes, created_at, is_synthetic, synthetic_name')
+    .select('id, client_id, intake_year, intake_term, status, automation_owner, service_scope, owner_member_id, notes, created_at, is_synthetic, synthetic_name, lead_name')
     .in('id', область.дела)
   if (error) throw new Error(`не удалось прочитать дела: ${error.message}`)
 
@@ -86,7 +99,7 @@ export async function списокДел(участник: Участник): Pr
   // У синтетических дел клиента в рабочей таблице нет и быть не должно:
   // имя лежит в самом деле. Спрашивать про них public.clients значит искать
   // заведомо отсутствующее.
-  const клиенты = await клиентыПоId(список.filter((д) => !д.is_synthetic).map((д) => д.client_id))
+  const клиенты = await клиентыПоId(список.filter((д) => !д.is_synthetic && д.client_id != null).map((д) => д.client_id as number))
 
   const строки = список.map((д) => {
     const свои = (задачи ?? []).filter((з) => з.case_id === д.id)
@@ -124,7 +137,7 @@ export async function списокДел(участник: Участник): Pr
       is_synthetic: д.is_synthetic,
       // Клиента может не быть видно, если его удалили в CRM. Показываем номер,
       // а не пустоту: строка без подписи выглядит как ошибка отрисовки.
-      имяКлиента: д.is_synthetic ? (д.synthetic_name ?? 'тестовое дело') : (клиент?.name ?? `Клиент #${д.client_id}`),
+      имяКлиента: д.is_synthetic ? (д.synthetic_name ?? 'тестовое дело') : (клиент?.name ?? (д.lead_name ?? `Клиент #${д.client_id}`)),
       страна: клиент?.country ?? null,
       этапCRM: клиент?.current_stage_code ?? null,
       задачОткрыто: свои.length,
@@ -206,7 +219,7 @@ export async function подробностиДела(участник: Учас�
 
   const { data: дело, error } = await базаCare()
     .from('cases')
-    .select('id, client_id, intake_year, intake_term, status, automation_owner, service_scope, owner_member_id, notes, created_at, is_synthetic, synthetic_name')
+    .select('id, client_id, intake_year, intake_term, status, automation_owner, service_scope, owner_member_id, notes, created_at, is_synthetic, synthetic_name, lead_name')
     .eq('id', caseId)
     .maybeSingle()
   if (error) throw new Error(`не удалось прочитать дело: ${error.message}`)
@@ -219,14 +232,14 @@ export async function подробностиДела(участник: Учас�
     базаCare().from('facts').select('id, field, value, unit, currency, status, is_plan, quote, version, created_at').eq('case_id', caseId).order('field'),
     базаCare().from('tasks').select('id, title, details, status, waiting_on, due_on, next_check_on').eq('case_id', caseId).order('due_on', { nullsFirst: false }),
     базаCare().from('events').select('id, action, actor_kind, created_at, reason').eq('case_id', caseId).order('created_at', { ascending: false }).limit(20),
-    запись.is_synthetic ? Promise.resolve(new Map()) : клиентыПоId([запись.client_id]),
+    клиентыПоId(запись.is_synthetic ? [] : [запись.client_id]),
     // Документы читаются из рабочей таблицы как есть: своих мы не заводим до
     // решения владельца по обработке персональных документов (п. 0.7 плана).
     // Синтетика в рабочих таблицах не ищется: там её нет по построению.
-    запись.is_synthetic
+    безКлиентаCRM(запись)
       ? Promise.resolve({ data: [] })
       : базаPublic().from('client_documents').select('id, doc_type, file_name, status, uploaded_at').eq('client_id', запись.client_id).order('uploaded_at', { nullsFirst: false }),
-    запись.is_synthetic
+    безКлиентаCRM(запись)
       ? Promise.resolve({ data: [] })
       : базаPublic().from('client_tg_messages').select('id').eq('client_id', запись.client_id),
     базаCare()
@@ -241,7 +254,7 @@ export async function подробностиДела(участник: Учас�
       .order('created_at'),
   ])
 
-  const { data: полныйКлиент } = запись.is_synthetic
+  const { data: полныйКлиент } = безКлиентаCRM(запись)
     ? { data: null }
     : await базаPublic()
         .from('clients')
@@ -253,7 +266,7 @@ export async function подробностиДела(участник: Учас�
     дело: запись,
     имяКлиента: запись.is_synthetic
       ? (запись.synthetic_name ?? 'тестовое дело')
-      : (клиенты.get(запись.client_id)?.name ?? `Клиент #${запись.client_id}`),
+      : (клиенты.get(запись.client_id)?.name ?? (запись.lead_name ?? `Клиент #${запись.client_id}`)),
     клиент: полныйКлиент ?? null,
     контакты: (контакты.data ?? []) as ПодробностиДела['контакты'],
     факты: (факты.data ?? []) as ПодробностиДела['факты'],
@@ -398,11 +411,11 @@ export async function очередьРасхождений(участник: У�
 
   const { data: дела } = await базаCare()
     .from('cases')
-    .select('id, client_id, intake_year, service_scope, is_synthetic, synthetic_name')
+    .select('id, client_id, intake_year, service_scope, is_synthetic, synthetic_name, lead_name')
     .in('id', предложения.map((п) => п.case_id))
 
   const список = (дела ?? []) as ЗаписьДела[]
-  const клиенты = await клиентыПоId(список.filter((д) => !д.is_synthetic).map((д) => д.client_id))
+  const клиенты = await клиентыПоId(список.filter((д) => !д.is_synthetic && д.client_id != null).map((д) => д.client_id as number))
 
   // Черновик, из-за которого всё затевалось: в нём говорящий и пометка
   // «намерение». В предложении их нет, а решение без них принимать нельзя.
@@ -427,7 +440,7 @@ export async function очередьРасхождений(участник: У�
       caseId: п.case_id as string,
       имяКлиента: дело?.is_synthetic
         ? (дело.synthetic_name ?? 'тестовое дело')
-        : (клиент?.name ?? `Клиент #${дело?.client_id ?? '?'}`),
+        : (клиент?.name ?? (дело?.lead_name ?? `Клиент #${дело?.client_id ?? '?'}`)),
       контекст: [клиент?.country, дело?.service_scope, дело?.intake_year ? `набор ${дело.intake_year}` : null]
         .filter(Boolean)
         .join(' · '),
@@ -465,11 +478,11 @@ export async function очередьПодборок(участник: Учас�
 
   const { data: дела } = await базаCare()
     .from('cases')
-    .select('id, client_id, intake_year, service_scope, is_synthetic, synthetic_name')
+    .select('id, client_id, intake_year, service_scope, is_synthetic, synthetic_name, lead_name')
     .in('id', подборки.map((п) => п.case_id))
 
   const список = (дела ?? []) as ЗаписьДела[]
-  const клиенты = await клиентыПоId(список.filter((д) => !д.is_synthetic).map((д) => д.client_id))
+  const клиенты = await клиентыПоId(список.filter((д) => !д.is_synthetic && д.client_id != null).map((д) => д.client_id as number))
 
   return подборки.map((п) => {
     const дело = список.find((д) => д.id === п.case_id)
@@ -480,7 +493,7 @@ export async function очередьПодборок(участник: Учас�
       caseId: п.case_id as string,
       имяКлиента: дело?.is_synthetic
         ? (дело.synthetic_name ?? 'тестовое дело')
-        : (клиент?.name ?? `Клиент #${дело?.client_id ?? '?'}`),
+        : (клиент?.name ?? (дело?.lead_name ?? `Клиент #${дело?.client_id ?? '?'}`)),
       контекст: [клиент?.country, дело?.service_scope, дело?.intake_year ? `набор ${дело.intake_year}` : null]
         .filter(Boolean)
         .join(' · '),
@@ -718,7 +731,7 @@ export async function главная(участник: Участник): Promis
   const [{ data: дела }, { data: задачи }, { data: предложения }, { data: факты }] = await Promise.all([
     базаCare()
       .from('cases')
-      .select('id, client_id, intake_year, service_scope, is_synthetic, synthetic_name, notes, automation_owner')
+      .select('id, client_id, intake_year, service_scope, is_synthetic, synthetic_name, lead_name, notes, automation_owner')
       .in('id', область.дела),
     базаCare()
       .from('tasks')
@@ -759,7 +772,7 @@ export async function главная(участник: Участник): Promis
   const правкиВСтаром = await недавниеПравки(область.дела)
 
   const список = (дела ?? []) as (ЗаписьДела & { notes: string | null; automation_owner: string | null })[]
-  const клиенты = await клиентыПоId(список.filter((д) => !д.is_synthetic).map((д) => д.client_id))
+  const клиенты = await клиентыПоId(список.filter((д) => !д.is_synthetic && д.client_id != null).map((д) => д.client_id as number))
 
   const сегодня = new Date().toISOString().slice(0, 10)
   const через14 = new Date(Date.now() + 14 * 86_400_000).toISOString().slice(0, 10)
@@ -862,7 +875,7 @@ export async function главная(участник: Участник): Promis
 
     лента.push({
       caseId: д.id,
-      имя: д.is_synthetic ? (д.synthetic_name ?? 'тестовое дело') : (клиенты.get(д.client_id)?.name ?? `Клиент #${д.client_id}`),
+      имя: д.is_synthetic ? (д.synthetic_name ?? 'тестовое дело') : (клиенты.get(д.client_id)?.name ?? (д.lead_name ?? `Клиент #${д.client_id}`)),
       контекст: [
         д.is_synthetic ? (д.notes ?? '').replace(/^Тестовое дело\.\s*Страна:\s*/, '').replace(/\.$/, '') : клиенты.get(д.client_id)?.country,
         д.service_scope,
@@ -957,17 +970,17 @@ export async function очередьПроверки(участник: Учас�
   )
   const { data: дела } = await базаCare()
     .from('cases')
-    .select('id, client_id, intake_year, service_scope, is_synthetic, synthetic_name')
+    .select('id, client_id, intake_year, service_scope, is_synthetic, synthetic_name, lead_name')
     .in('id', идентификаторы)
 
   const список = (дела ?? []) as ЗаписьДела[]
-  const клиенты = await клиентыПоId(список.filter((д) => !д.is_synthetic).map((д) => д.client_id))
+  const клиенты = await клиентыПоId(список.filter((д) => !д.is_synthetic && д.client_id != null).map((д) => д.client_id as number))
 
   return список.map((д) => ({
     caseId: д.id,
     имяКлиента: д.is_synthetic
       ? (д.synthetic_name ?? 'тестовое дело')
-      : (клиенты.get(д.client_id)?.name ?? `Клиент #${д.client_id}`),
+      : (клиенты.get(д.client_id)?.name ?? (д.lead_name ?? `Клиент #${д.client_id}`)),
     контекст: [клиенты.get(д.client_id)?.country, д.service_scope, `набор ${д.intake_year}`]
       .filter(Boolean)
       .join(' · '),

@@ -117,7 +117,7 @@ export async function собратьПодборку(caseId: string, замеч�
 
   const { data: дело } = await базаCare()
     .from('cases')
-    .select('id, client_id, is_synthetic, synthetic_name, intake_year')
+    .select('id, client_id, is_synthetic, synthetic_name, lead_name, intake_year')
     .eq('id', caseId)
     .maybeSingle()
   if (!дело) {
@@ -338,7 +338,7 @@ function уровеньИзТекста(текст: string): ReturnType<typeof �
 export async function имяКлиентаДела(caseId: string): Promise<string> {
   const { data: дело } = await базаCare()
     .from('cases')
-    .select('client_id, is_synthetic, synthetic_name')
+    .select('client_id, is_synthetic, synthetic_name, lead_name')
     .eq('id', caseId)
     .maybeSingle()
   if (!дело) return 'дело не найдено'
@@ -348,5 +348,5 @@ export async function имяКлиентаДела(caseId: string): Promise<stri
     .select('name')
     .eq('id', дело.client_id)
     .maybeSingle()
-  return (клиент?.name as string | null) ?? `клиент #${дело.client_id}`
+  return (клиент?.name as string | null) ?? (дело.lead_name ?? `клиент #${дело.client_id}`)
 }

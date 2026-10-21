@@ -48,11 +48,11 @@ export default async function НапоминанияСтраница() {
     if (строки.length) {
       const { data: дела } = await базаCare()
         .from('cases')
-        .select('id, client_id, is_synthetic, synthetic_name')
+        .select('id, client_id, is_synthetic, synthetic_name, lead_name')
         .in('id', [...new Set(строки.map((с) => с.case_id))])
 
-      const записи = (дела ?? []) as { id: string; client_id: number; is_synthetic: boolean; synthetic_name: string | null }[]
-      const настоящие = записи.filter((д) => !д.is_synthetic)
+      const записи = (дела ?? []) as { id: string; client_id: number; is_synthetic: boolean; synthetic_name: string | null; lead_name?: string | null }[]
+      const настоящие = записи.filter((д) => !д.is_synthetic && д.client_id != null)
       const { data: клиенты } = настоящие.length
         ? await базаPublic().from('clients').select('id, name').in('id', настоящие.map((д) => д.client_id))
         : { data: [] }
@@ -61,7 +61,7 @@ export default async function НапоминанияСтраница() {
       const имяДела = new Map(
         записи.map((д) => [
           д.id,
-          д.is_synthetic ? (д.synthetic_name ?? 'тестовое дело') : (имена.get(д.client_id) ?? `клиент #${д.client_id}`),
+          д.is_synthetic ? (д.synthetic_name ?? 'тестовое дело') : (имена.get(д.client_id) ?? (д.lead_name ?? `клиент #${д.client_id}`)),
         ])
       )
 

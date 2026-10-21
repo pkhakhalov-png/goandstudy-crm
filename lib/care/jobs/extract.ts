@@ -55,7 +55,7 @@ export async function разобратьПереписку(толькоДело?
 
   let запрос = базаCare()
     .from('cases')
-    .select('id, client_id, is_synthetic, synthetic_name, facts_extracted_at')
+    .select('id, client_id, is_synthetic, synthetic_name, lead_name, facts_extracted_at')
     .eq('automation_owner', 'v2')
     .eq('status', 'active')
   if (толькоДело) запрос = запрос.eq('id', толькоДело)
@@ -70,7 +70,7 @@ export async function разобратьПереписку(толькоДело?
     return итог
   }
 
-  const имена = await клиентыПоId(дела.filter((д) => !д.is_synthetic).map((д) => д.client_id))
+  const имена = await клиентыПоId(дела.filter((д) => !д.is_synthetic && д.client_id != null).map((д) => д.client_id as number))
 
   for (const дело of дела) {
     // Потолок проверяем перед каждым делом, а не один раз на прогон: разбор
@@ -98,7 +98,7 @@ export async function разобратьПереписку(толькоДело?
     // именно не вышло, приходится по идентификаторам.
     const клиент = дело.is_synthetic
       ? (дело.synthetic_name ?? 'тестовое дело')
-      : (имена.get(дело.client_id)?.name ?? `клиент #${дело.client_id}`)
+      : (имена.get(дело.client_id)?.name ?? (дело.lead_name ?? `клиент #${дело.client_id}`))
 
     const разбор = await извлечьФакты(список as Сообщение[], клиент)
 

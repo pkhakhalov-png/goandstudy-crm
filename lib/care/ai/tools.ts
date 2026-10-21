@@ -66,11 +66,11 @@ async function именаДел(идентификаторы: string[]): Promise
   if (!идентификаторы.length) return new Map()
   const { data: дела } = await базаCare()
     .from('cases')
-    .select('id, client_id, is_synthetic, synthetic_name')
+    .select('id, client_id, is_synthetic, synthetic_name, lead_name')
     .in('id', идентификаторы)
 
-  const записи = (дела ?? []) as { id: string; client_id: number; is_synthetic: boolean; synthetic_name: string | null }[]
-  const настоящие = записи.filter((д) => !д.is_synthetic)
+  const записи = (дела ?? []) as { id: string; client_id: number; is_synthetic: boolean; synthetic_name: string | null; lead_name?: string | null }[]
+  const настоящие = записи.filter((д) => !д.is_synthetic && д.client_id != null)
   const { data: клиенты } = настоящие.length
     ? await базаPublic().from('clients').select('id, name').in('id', настоящие.map((д) => д.client_id))
     : { data: [] }
@@ -79,7 +79,7 @@ async function именаДел(идентификаторы: string[]): Promise
   return new Map(
     записи.map((д) => [
       д.id,
-      д.is_synthetic ? (д.synthetic_name ?? 'тестовое дело') : (поId.get(д.client_id) ?? `клиент #${д.client_id}`),
+      д.is_synthetic ? (д.synthetic_name ?? 'тестовое дело') : (поId.get(д.client_id) ?? (д.lead_name ?? `клиент #${д.client_id}`)),
     ])
   )
 }
@@ -197,7 +197,7 @@ export function инструменты(участник: Участник, об�
       const [{ data: записи }, { data: задачи }] = await Promise.all([
         базаCare()
           .from('cases')
-          .select('id, client_id, intake_year, service_scope, is_synthetic, synthetic_name')
+          .select('id, client_id, intake_year, service_scope, is_synthetic, synthetic_name, lead_name')
           .in('id', дела),
         базаCare()
           .from('tasks')
@@ -206,7 +206,7 @@ export function инструменты(участник: Участник, об�
           .not('status', 'in', '("done","failed")'),
       ])
 
-      const настоящие = (записи ?? []).filter((д) => !д.is_synthetic)
+      const настоящие = (записи ?? []).filter((д) => !д.is_synthetic && д.client_id != null)
       const { data: клиенты } = настоящие.length
         ? await базаPublic()
             .from('clients')
@@ -222,7 +222,7 @@ export function инструменты(участник: Участник, об�
         const просрочено = свои.filter((з) => з.due_on && з.due_on < сегодня).length
         return {
           case_id: д.id,
-          клиент: д.is_synthetic ? д.synthetic_name : (имена.get(д.client_id)?.name ?? `#${д.client_id}`),
+          клиент: д.is_synthetic ? д.synthetic_name : (имена.get(д.client_id)?.name ?? (д.lead_name ?? `#${д.client_id}`)),
           страна: д.is_synthetic ? null : (имена.get(д.client_id)?.country ?? null),
           услуга: д.service_scope,
           набор: д.intake_year,
@@ -403,7 +403,7 @@ export function инструменты(участник: Участник, об�
 
       const [{ data: записи }, { data: контакты }, { data: факты }, { data: задачи }, { data: источники }] =
         await Promise.all([
-          базаCare().from('cases').select('id, client_id, is_synthetic, synthetic_name').in('id', дела),
+          базаCare().from('cases').select('id, client_id, is_synthetic, synthetic_name, lead_name').in('id', дела),
           базаCare().from('contacts').select('case_id, tg_chat_id').in('case_id', дела),
           базаCare().from('facts').select('case_id').in('case_id', дела),
           базаCare().from('tasks').select('case_id').in('case_id', дела),
