@@ -59,8 +59,8 @@ export function FactGrid({ пары, действия }: { пары: Пара[];
             {/* Не подтверждено и намерение — видны всегда: по ним принимают
                 другие решения, чем по подтверждённому факту. */}
             {!п.подтверждён && (
-              <span className="ds-chip ds-chip-neutral" style={{ marginLeft: 8, fontSize: 11 }}>
-                не подтверждено
+              <span className="ds-chip ds-chip-warning" style={{ marginLeft: 8, fontSize: 11 }}>
+                уточнить
               </span>
             )}
             {п.намерение && (

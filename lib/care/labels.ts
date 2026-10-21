@@ -32,6 +32,31 @@ const ПОЛЯ: Record<string, string> = {
 }
 
 /**
+ * Поля, которые можно вписать в профиль руками, — в порядке показа.
+ * Устаревшие синонимы (`education.degree`, `intake.start_text`) сюда не
+ * входят: их читаем из старых дел, но новых не заводим.
+ */
+export const ПОЛЯ_ПРОФИЛЯ: Record<string, string> = Object.fromEntries(
+  [
+    'country.target',
+    'education.level_target',
+    'program.field',
+    'intake.year',
+    'intake.term',
+    'education.current',
+    'gpa.value',
+    'language.english.level',
+    'language.ielts.overall',
+    'language.toefl.overall',
+    'language.german.level',
+    'budget.tuition.max',
+    'budget.living.max',
+    'budget.fees.max',
+    'profile.notes',
+  ].map((п) => [п, ПОЛЯ[п]])
+)
+
+/**
  * Значения-коды в человеческий вид.
  *
  * `full` в карточке клиента — это «полное сопровождение». Показывать код

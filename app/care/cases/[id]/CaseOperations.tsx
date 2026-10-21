@@ -23,6 +23,7 @@ import {
   изменитьОжидание,
   подтвердитьФакт,
   исправитьФакт,
+  записатьЗначение,
   этоРешение,
   собратьПодборкуДела,
   написатьСтратегиюДела,
@@ -289,6 +290,158 @@ export function FactIsDecision({ caseId, factId }: { caseId: string; factId: str
       </button>
       <ErrorLine текст={ошибка} />
     </>
+  )
+}
+
+/**
+ * Поле значения: одна строка, для денег — ещё валюта. Общее у правки и
+ * добавления, чтобы обе формы вели себя одинаково.
+ */
+function ValueForm({
+  поле,
+  значение,
+  валюта,
+  деньги,
+  заметка,
+  готово,
+}: {
+  поле: string
+  значение?: string
+  валюта?: string | null
+  деньги: boolean
+  заметка: boolean
+  готово: (данные: FormData) => void
+}) {
+  return (
+    <form action={готово} style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }} key={поле}>
+      {заметка ? (
+        <textarea
+          className="ds-input"
+          name="value"
+          defaultValue={значение ?? ''}
+          rows={3}
+          style={{ flex: '1 1 100%' }}
+          autoFocus
+          required
+        />
+      ) : (
+        <input
+          className="ds-input"
+          name="value"
+          defaultValue={значение ?? ''}
+          placeholder={деньги ? 'Сумма' : 'Значение'}
+          style={{ flex: '1 1 200px' }}
+          autoFocus
+          required
+        />
+      )}
+      {деньги && (
+        <input
+          className="ds-input"
+          name="currency"
+          defaultValue={валюта ?? 'EUR'}
+          placeholder="EUR"
+          style={{ flex: '0 0 80px' }}
+          maxLength={3}
+          required
+        />
+      )}
+      <button className="ds-btn ds-btn-primary ds-btn-sm" type="submit">
+        Сохранить
+      </button>
+    </form>
+  )
+}
+
+/**
+ * Поправить действующее значение. Профиль из разговора не подтверждают —
+ * его правят, когда услышали не так или клиент передумал.
+ */
+export function FactEdit({
+  caseId,
+  поле,
+  значение,
+  валюта,
+}: {
+  caseId: string
+  поле: string
+  значение: string
+  валюта: string | null
+}) {
+  const { идёт, ошибка, выполнить } = useAction()
+  const [открыта, открыть] = useState(false)
+
+  return (
+    <>
+      {!открыта ? (
+        <button type="button" className="care-пара-ещё" onClick={() => открыть(true)} disabled={идёт}>
+          изменить
+        </button>
+      ) : (
+        <>
+          <ValueForm
+            поле={поле}
+            значение={значение}
+            валюта={валюта}
+            деньги={поле.startsWith('budget.')}
+            заметка={поле === 'profile.notes'}
+            готово={(данные) =>
+              выполнить(async () => {
+                const итог = await записатьЗначение(caseId, поле, данные)
+                if (итог.ok) открыть(false)
+                return итог
+              })
+            }
+          />
+          <button type="button" className="care-пара-ещё" onClick={() => открыть(false)}>
+            отмена
+          </button>
+        </>
+      )}
+      <ErrorLine текст={ошибка} />
+    </>
+  )
+}
+
+/** Дополнить профиль полем, о котором в разговоре не было или его не услышали. */
+export function FactAdd({ caseId, пустые }: { caseId: string; пустые: { поле: string; имя: string }[] }) {
+  const { идёт, ошибка, выполнить } = useAction()
+  const [поле, выбрать] = useState<string>('')
+
+  if (!пустые.length) return null
+
+  return (
+    <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--ds-border)' }}>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+        <span style={{ fontSize: 13, color: 'var(--ds-muted)' }}>Дополнить:</span>
+        {пустые.map((п) => (
+          <button
+            key={п.поле}
+            type="button"
+            className={`ds-btn ds-btn-sm ${поле === п.поле ? 'ds-btn-secondary' : 'ds-btn-ghost'}`}
+            onClick={() => выбрать(поле === п.поле ? '' : п.поле)}
+            disabled={идёт}
+          >
+            + {п.имя}
+          </button>
+        ))}
+      </div>
+      {поле && (
+        <ValueForm
+          поле={поле}
+          деньги={поле.startsWith('budget.')}
+          заметка={поле === 'profile.notes'}
+          готово={(данные) =>
+            выполнить(async () => {
+              const итог = await записатьЗначение(caseId, поле, данные)
+              if (итог.ok) выбрать('')
+              return итог
+            })
+          }
+        />
+      )}
+      <ErrorLine текст={ошибка} />
+    </div>
   )
 }
 

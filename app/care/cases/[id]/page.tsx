@@ -18,8 +18,8 @@ import { подробностиДела, коллегиДляПередачи } 
 import { состояниеОснования } from '@/lib/care/replace'
 import { знакомыеГруппы } from '@/lib/care/chats'
 import { состояниеПаузы } from '@/lib/care/pause'
-import { подписьПоля, подписьЗначения, периодПоля, подписьСтатуса, подписьОжидания, срок, инициалы, склонение } from '@/lib/care/labels'
-import { PublishShortlist, CaseAssistant, NewTask, ProgramControls, TaskActions, FactActions, FactIsDecision, TransferCase, ReplaceInShortlist, LinkChat, AnsweredMyself } from './CaseOperations'
+import { ПОЛЯ_ПРОФИЛЯ, подписьПоля, подписьЗначения, периодПоля, подписьСтатуса, подписьОжидания, срок, инициалы, склонение } from '@/lib/care/labels'
+import { PublishShortlist, CaseAssistant, NewTask, ProgramControls, TaskActions, FactActions, FactIsDecision, FactEdit, FactAdd, TransferCase, ReplaceInShortlist, LinkChat, AnsweredMyself } from './CaseOperations'
 import { FactGrid } from '../../FactGrid'
 import { ProgramTable } from '../../ProgramTable'
 import { CaseSection } from '../../CaseSection'
@@ -143,7 +143,7 @@ export default async function ДелоСтраница({ params }: { params: Pro
             сводка={
               известное.length === 0
                 ? 'пока ничего'
-                : `${известное.length} ${склонение(известное.length, 'запись', 'записи', 'записей')} · ${черновиков > 0 ? `${черновиков} не подтверждено` : 'всё подтверждено'}`
+                : `${известное.length} ${склонение(известное.length, 'запись', 'записи', 'записей')}${черновиков > 0 ? ` · ${черновиков} уточнить` : ''}`
             }
             поумолчанию
             дети={
@@ -169,6 +169,14 @@ export default async function ДелоСтраница({ params }: { params: Pro
                       {ф.is_plan && ф.status === 'confirmed' && (
                         <FactIsDecision caseId={id} factId={ф.id} />
                       )}
+                      {ф.status === 'confirmed' && ф.field in ПОЛЯ_ПРОФИЛЯ && (
+                        <FactEdit
+                          caseId={id}
+                          поле={ф.field}
+                          значение={typeof ф.value === 'object' ? JSON.stringify(ф.value) : String(ф.value)}
+                          валюта={ф.currency}
+                        />
+                      )}
                       {ф.status === 'draft' && (
                         <FactActions
                           caseId={id}
@@ -181,6 +189,15 @@ export default async function ДелоСтраница({ params }: { params: Pro
                     </div>,
                   ])
                 )}
+              />
+
+              {/* Пустые поля — кнопками рядом с профилем: дописать то, о чём
+                  на звонке не говорили, должно быть в одно нажатие. */}
+              <FactAdd
+                caseId={id}
+                пустые={Object.entries(ПОЛЯ_ПРОФИЛЯ)
+                  .filter(([поле]) => !известное.some((ф) => ф.field === поле))
+                  .map(([поле, имя]) => ({ поле, имя }))}
               />
 
               {/* Привязка здесь же, где видно её отсутствие: отправлять за этим

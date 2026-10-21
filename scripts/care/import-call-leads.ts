@@ -10,7 +10,7 @@
  * `<имя>.profile.json` (разбор звонка: факты с цитатами, резюме, шаги).
  *
  * Правила те же, что у помощника кабинета (lib/care/ai/extract.ts):
- *   · факт ложится черновиком — подтверждает куратор;
+ *   · факт из звонка сразу действующий — его не подтверждают, а правят;
  *   · цитата обязана найтись в расшифровке дословно, иначе факт выброшен;
  *   · источник факта — конкретный звонок, а не «консультация вообще».
  *
@@ -139,6 +139,14 @@ async function main() {
       годные.push({ ...ф, speaker: ['student', 'parent', 'curator', 'other'].includes(ф.speaker) ? ф.speaker : 'other', recordingId: звонок.recordingId })
     }
 
+    // Стран клиент обычно называет несколько, а действующее значение у поля
+    // одно. Склеиваем в список: первой — та, что прозвучала первой.
+    const страны = годные.filter((ф) => ф.field === 'country.target')
+    if (страны.length > 1) {
+      страны[0].value = [...new Set(страны.map((ф) => String(ф.value)))].join(', ')
+      for (const ф of страны.slice(1)) годные.splice(годные.indexOf(ф), 1)
+    }
+
     console.log(`\n── ${п.name} · сделка ${сделка.deal_id.slice(0, 8)} · набор ${годНабора(п, сделка)}`)
     console.log(`   звонков ${списокЗвонков.length}, фактов ${годные.length}${отброшено.length ? `, отброшено ${отброшено.length} (${отброшено.join('; ')})` : ''}, шагов ${п.next_steps.length}`)
 
@@ -190,6 +198,7 @@ async function main() {
     }
 
     let фактов = 0
+    const принятые = new Set<string>()
     for (const ф of годные) {
       const { error } = await care.from('facts').insert({
         case_id: дело.id,
@@ -201,10 +210,13 @@ async function main() {
         speaker: ф.speaker,
         quote: ф.quote,
         source_id: источникЗвонка.get(ф.recordingId) ?? null,
-        status: 'draft',
+        // Одно действующее значение на поле (индекс care_facts_current_uniq):
+        // если модель дала поле дважды, второе остаётся спорным.
+        status: принятые.has(ф.field) ? 'draft' : 'confirmed',
+        confirmed_at: принятые.has(ф.field) ? null : new Date().toISOString(),
       })
       if (error) console.log(`   ! факт ${ф.field}: ${error.message}`)
-      else фактов++
+      else { фактов++; принятые.add(ф.field) }
     }
 
     let задач = 0

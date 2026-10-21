@@ -370,6 +370,90 @@ export async function исправитьФакт(
   }
 }
 
+/**
+ * Вписать значение поля руками — поправить записанное или дополнить пустое.
+ *
+ * ПОЧЕМУ НЕ ЧЕРЕЗ «ИСПРАВИТЬ ЧЕРНОВИК». Профиль из разговора теперь сразу
+ * действующий, черновиков почти нет, а править нужно как раз действующее:
+ * модель услышала «Чехия», клиент имел в виду «Чехия или Венгрия». Или поля
+ * нет вовсе — о нём на звонке не говорили, а куратор знает из переписки.
+ *
+ * Прежнее значение не удаляется, а уходит в `superseded`; спорный черновик по
+ * этому полю — в `rejected`, его расхождение закрыто: человек решил сам.
+ */
+export async function записатьЗначение(caseId: string, поле: string, данные: FormData): Promise<Итог> {
+  try {
+    const { участник, база } = await подготовить(caseId)
+
+    const { ПОЛЯ_ПРОФИЛЯ } = await import('@/lib/care/labels')
+    if (!(поле in ПОЛЯ_ПРОФИЛЯ)) return { ok: false, ошибка: `Поля «${поле}» в профиле нет` }
+
+    const разбор = разобратьЗначение(поле, String(данные.get('value') ?? ''), String(данные.get('currency') ?? ''))
+    if (!разбор.ok) return { ok: false, ошибка: разбор.почему }
+
+    const { data: было } = await база
+      .from('facts')
+      .select('id, value, currency, period, is_plan, status')
+      .eq('case_id', caseId)
+      .eq('field', поле)
+      .in('status', ['confirmed', 'draft'])
+    const прежний = (было ?? []).find((ф) => ф.status === 'confirmed') ?? null
+    const спорные = (было ?? []).filter((ф) => ф.status === 'draft')
+
+    if (прежний && String(прежний.value) === String(разбор.значение) && (прежний.currency ?? null) === разбор.валюта && !спорные.length) {
+      return { ok: true }
+    }
+
+    if (прежний) {
+      const { error } = await база.from('facts').update({ status: 'superseded' }).eq('id', прежний.id)
+      if (error) return { ok: false, ошибка: `не удалось снять прежнее значение: ${error.message}` }
+    }
+
+    const { data: новый, error } = await база
+      .from('facts')
+      .insert({
+        case_id: caseId,
+        field: поле,
+        value: разбор.значение,
+        currency: разбор.валюта,
+        period: прежний?.period ?? null,
+        is_plan: прежний?.is_plan ?? false,
+        speaker: 'curator',
+        status: 'confirmed',
+        confirmed_by: участник.id,
+        confirmed_at: new Date().toISOString(),
+        supersedes: прежний?.id ?? null,
+      })
+      .select('id, field, value, currency')
+      .single()
+    if (error) return { ok: false, ошибка: error.message }
+
+    if (спорные.length) {
+      const ids = спорные.map((ф) => ф.id)
+      await база.from('facts').update({ status: 'rejected', reject_reason: 'вписали значение вручную' }).in('id', ids)
+      await база
+        .from('fact_conflicts')
+        .update({ resolved_by: участник.id, resolved_at: new Date().toISOString(), note: 'вписали значение вручную' })
+        .eq('case_id', caseId)
+        .eq('field', поле)
+        .is('resolved_at', null)
+      await база
+        .from('proposals')
+        .update({ status: 'expired' })
+        .eq('case_id', caseId)
+        .eq('kind', 'fact_update')
+        .eq('status', 'pending')
+        .filter('payload->>field', 'eq', поле)
+    }
+
+    await записатьВЖурнал(caseId, участник.id, прежний ? 'fact_edited' : 'fact_added', прежний, новый)
+    revalidatePath(`/care/cases/${caseId}`)
+    return { ok: true }
+  } catch (e) {
+    return обработать(e)
+  }
+}
+
 export async function отклонитьФакт(caseId: string, factId: string, причина: string): Promise<Итог> {
   try {
     const { участник, база } = await подготовить(caseId)
