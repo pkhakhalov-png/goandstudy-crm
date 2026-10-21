@@ -86,6 +86,14 @@ async function найтиСделку(admin: SupabaseClient, запись: За�
   if (запись.deal_id) return запись.deal_id
   if (!запись.booking_id) return null
 
+  // Повторный созвон из карточки сделки: бронь знает сделку сама.
+  const { data: своя } = await admin.from('bookings')
+    .select('deal_id').eq('id', запись.booking_id).maybeSingle()
+  if (своя?.deal_id) {
+    await admin.from('call_recordings').update({ deal_id: своя.deal_id }).eq('id', запись.id)
+    return своя.deal_id
+  }
+
   const { data: поБрони } = await admin.from('deals')
     .select('id').eq('booking_id', запись.booking_id).is('deleted_at', null)
     .limit(1).maybeSingle()

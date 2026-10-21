@@ -81,6 +81,14 @@ export default async function SalesDealPage({ params }: { params: Promise<{ id: 
     .maybeSingle()
 
 
+  // Повторные созвоны: брони, назначенные из карточки, знают свою сделку.
+  const { data: followUps } = await (await createAdminClient())
+    .from('bookings')
+    .select('id, booking_date, start_time, end_time, status, zoom_join_url')
+    .eq('deal_id', id)
+    .order('booking_date')
+    .order('start_time')
+
   return (
     <DealCard
       analysis={analysis}
@@ -90,6 +98,7 @@ export default async function SalesDealPage({ params }: { params: Promise<{ id: 
       salespersons={allSalespersons ?? [{ id: user.id, name: profile?.name || '' }]}
       clientData={clientData}
       bookingData={bookingData}
+      followUps={followUps ?? []}
       files={files ?? []}
       messages={messages ?? []}
       tasks={tasks ?? []}

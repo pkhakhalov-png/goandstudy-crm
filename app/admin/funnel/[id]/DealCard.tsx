@@ -9,6 +9,7 @@ import { createClient } from '@/lib/supabase/client'
 import { SalesInviteButton } from '@/app/sales/SalesInviteButton'
 import { DealAnalysis } from './DealAnalysis'
 import { ZoomLinkRow } from '@/app/_shared/ZoomLinkRow'
+import { FollowUpCalls, type ПовторныйСозвон } from './FollowUpCalls'
 
 interface Stage { id: string; name: string; color: string; position: number; stage_type: string }
 
@@ -19,6 +20,7 @@ interface Props {
   salespersons: { id: string; name: string }[]
   clientData: any
   bookingData: any
+  followUps?: ПовторныйСозвон[]
   files: any[]
   messages: any[]
   tasks: any[]
@@ -64,7 +66,7 @@ function colorForSender(name: string | null | undefined): string {
 }
 const activityIcon: Record<string, string> = { note: '📝', stage_change: '→', system: '⚙️', call: '📞', message: '💬', file_upload: '📎', task_done: '✅' }
 
-export function DealCard({ deal, stages, activities, salespersons, clientData, bookingData, files, messages, tasks, userId, curators, availableGroups, backUrl = '/admin/funnel', analysis,
+export function DealCard({ deal, stages, activities, salespersons, clientData, bookingData, followUps = [], files, messages, tasks, userId, curators, availableGroups, backUrl = '/admin/funnel', analysis,
 }: Props) {
   const router = useRouter()
   const [tab, setTab] = useState<'main' | 'activity' | 'files' | 'messages' | 'tasks'>('main')
@@ -550,6 +552,8 @@ export function DealCard({ deal, stages, activities, salespersons, clientData, b
               {bookingData.zoom_join_url && <ZoomLinkRow url={bookingData.zoom_join_url} />}
             </div>
           )}
+
+          <FollowUpCalls dealId={deal.id} calls={followUps} />
 
           {/* Linked client */}
           <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--bor2)' }}>

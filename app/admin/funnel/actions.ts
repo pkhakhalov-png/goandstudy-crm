@@ -1078,3 +1078,91 @@ export async function analyzeDealConversation(formData: FormData) {
   revalidatePath('/rop/hot')
   return { success: true }
 }
+
+/**
+ * Повторный созвон из карточки сделки.
+ *
+ * Первая консультация приходит бронью с сайта. Второй разговор продажник
+ * раньше заводил в своём Zoom — и запись терялась: встреча ни с чем не
+ * связана, автоматика её не узнаёт. Здесь созвон — такая же бронь со своей
+ * встречей, но с `deal_id`: запись ложится в эту сделку без угадывания.
+ *
+ * Время московское, как у всех броней. Бронь попадает в расписание продажника
+ * и в панель «чем закончилась встреча» — это настоящий разговор, а не служебная
+ * запись.
+ */
+export async function scheduleFollowUpCall(formData: FormData): Promise<{ joinUrl: string } | { error: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Не авторизован' }
+
+  const dealId = String(formData.get('deal_id') ?? '')
+  const date = String(formData.get('date') ?? '')
+  const time = String(formData.get('time') ?? '')
+  const minutes = Math.min(120, Math.max(15, Number(formData.get('minutes') ?? 45) || 45))
+  if (!dealId) return { error: 'Не указана сделка' }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(time)) return { error: 'Укажите дату и время' }
+
+  const admin = await createAdminClient()
+  const [{ data: me }, { data: deal }] = await Promise.all([
+    admin.from('users').select('name, role').eq('id', user.id).single(),
+    admin.from('deals').select('id, salesperson_id, contact_name, contact_phone, contact_telegram, contact_email, title').eq('id', dealId).is('deleted_at', null).single(),
+  ])
+  if (!deal) return { error: 'Сделка не найдена' }
+  const свой = deal.salesperson_id === user.id
+  if (!свой && me?.role !== 'admin' && me?.role !== 'rop') return { error: 'Это не ваша сделка' }
+
+  const ведущий = deal.salesperson_id ?? user.id
+  const { data: продажник } = await admin.from('users').select('name').eq('id', ведущий).single()
+
+  const [ч, м] = time.split(':').map(Number)
+  const конецМин = ч * 60 + м + minutes
+  if (конецМин >= 24 * 60) return { error: 'Созвон должен закончиться до полуночи' }
+  const end = `${String(Math.floor(конецМин / 60)).padStart(2, '0')}:${String(конецМин % 60).padStart(2, '0')}:00`
+  const имя = deal.contact_name || deal.title || 'Клиент'
+
+  const { data: бронь, error } = await admin.from('bookings').insert({
+    salesperson_id: ведущий,
+    booking_date: date,
+    start_time: `${time}:00`,
+    end_time: end,
+    client_name: имя,
+    client_phone: deal.contact_phone || '',
+    client_telegram: deal.contact_telegram || null,
+    client_email: deal.contact_email || null,
+    client_message: 'Повторный созвон из карточки сделки',
+    deal_id: dealId,
+  }).select('id').single()
+  if (error || !бронь) {
+    if (error?.code === '23505') return { error: 'На это время у продажника уже есть встреча' }
+    return { error: error?.message ?? 'Бронь не создалась' }
+  }
+
+  const { создатьВстречуДляБрони } = await import('@/lib/zoom/meeting-for-booking')
+  const встреча = await создатьВстречуДляБрони(admin, {
+    bookingId: бронь.id,
+    date,
+    startTime: `${time}:00`,
+    endTime: end,
+    clientName: `${имя} (повторный)`,
+    salespersonName: продажник?.name ?? '',
+  })
+  if (!встреча.создана) {
+    // Без встречи бронь бесполезна: ссылки нет, запись не узнается.
+    await admin.from('bookings').delete().eq('id', бронь.id).then(warnOnError('bookings · scheduleFollowUpCall rollback'))
+    return { error: `Ссылка не создалась: ${встреча.почему}` }
+  }
+
+  await admin.from('deal_activities').insert({
+    deal_id: dealId,
+    user_id: user.id,
+    activity_type: 'system',
+    content: `Назначен повторный созвон: ${date.split('-').reverse().join('.')} ${time}`,
+    metadata: { booking_id: бронь.id, zoom_meeting_id: встреча.meetingId },
+  }).then(warnOnError('deal_activities · scheduleFollowUpCall'))
+
+  revalidatePath(`/admin/funnel/${dealId}`)
+  revalidatePath(`/sales/funnel/${dealId}`)
+  revalidatePath(`/rop/funnel/${dealId}`)
+  return { joinUrl: встреча.joinUrl }
+}

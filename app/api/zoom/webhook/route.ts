@@ -129,7 +129,7 @@ async function принятьЗапись(body: any) {
   // ── Чья это запись ────────────────────────────────────────────────────────
   const { data: booking } = await admin
     .from('bookings')
-    .select('id, salesperson_id, booking_date, start_time, client_name, zoom_host_email')
+    .select('id, salesperson_id, booking_date, start_time, client_name, zoom_host_email, deal_id')
     .eq('zoom_meeting_id', meetingId)
     .maybeSingle()
 
@@ -199,8 +199,11 @@ async function принятьЗапись(body: any) {
 
   if (error) { console.error('[zoom webhook] не записалось:', error.message); return }
 
-  // Сделка находится через бронь: у неё есть booking_id.
-  if (booking) {
+  // Сделка находится через бронь. У повторного созвона бронь сама знает
+  // сделку (deal_id); у первой консультации сделка ссылается на бронь.
+  if (booking?.deal_id) {
+    await admin.from('call_recordings').update({ deal_id: booking.deal_id }).eq('id', созданная.id)
+  } else if (booking) {
     const { data: deal } = await admin
       .from('deals')
       .select('id')
