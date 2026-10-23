@@ -3,6 +3,7 @@
 import { createAdminClient, createClient as createSsrClient } from '@/lib/supabase/server'
 import { lookupCuratorInvitation, sendCuratorWelcomeEmail } from '@/lib/curator-invitation'
 import { warnOnError } from '@/lib/supabase/write-guard'
+import { assignRole } from '@/lib/auth/assign-role'
 
 export type ActivateResult = { ok: true } | { ok: false; error: string }
 
@@ -65,18 +66,10 @@ export async function activateCuratorAccount(params: {
     authUserId = created.user.id
   }
 
-  // public.users — role='curator'
-  const { data: existingPublic } = await admin
-    .from('users').select('id').eq('email', inv.email).maybeSingle()
-  if (existingPublic) {
-    if (existingPublic.id !== authUserId) {
-      await admin.from('users').update({ id: authUserId, role: 'curator', is_active: true }).eq('id', existingPublic.id).then(warnOnError('users · app/invite/curator/[token]/actions.ts:72'))
-    } else {
-      await admin.from('users').update({ role: 'curator', is_active: true }).eq('id', authUserId).then(warnOnError('users · app/invite/curator/[token]/actions.ts:74'))
-    }
-  } else {
-    await admin.from('users').insert({ id: authUserId, email: inv.email, role: 'curator', is_active: true }).then(warnOnError('users · app/invite/curator/[token]/actions.ts:77'))
-  }
+  // public.users — role='curator'. По id, а не по email с учётом регистра:
+  // см. lib/auth/assign-role.ts, на этом клиенты попадали в CRM продажниками.
+  const role = await assignRole(admin, { authUserId, email: inv.email, role: 'curator', extra: { is_active: true } })
+  if (!role.ok) return { ok: false, error: role.error }
 
   // Привязываем curators.user_id (если ещё не привязан)
   if (!curatorRow?.user_id) {

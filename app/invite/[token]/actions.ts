@@ -3,6 +3,7 @@
 import { createAdminClient, createClient as createSsrClient } from '@/lib/supabase/server'
 import { lookupInvitation, sendClientWelcomeEmail } from '@/lib/invitation'
 import { warnOnError } from '@/lib/supabase/write-guard'
+import { assignRole } from '@/lib/auth/assign-role'
 
 export type ActivateResult = { ok: true } | { ok: false; error: string }
 
@@ -45,23 +46,14 @@ export async function activateClientAccount(params: {
   }
   const authUserId = created.user.id
 
-  // 3. Создаём row в public.users с role='client', привязываем к existing auth.users.id
-  const { data: existingPublic } = await admin
-    .from('users').select('id').eq('email', inv.email).maybeSingle()
-  if (existingPublic) {
-    // Уже был row (например seed) — подменяем id на новый authUserId
-    await admin.from('users').update({ id: authUserId, role: 'client' }).eq('id', existingPublic.id).then(warnOnError('users · app/invite/[token]/actions.ts:52'))
-  } else {
-    const { error: pubErr } = await admin.from('users').insert({
-      id: authUserId,
-      email: inv.email,
-      role: 'client',
-    })
-    if (pubErr) {
-      // Не критично — клиент сможет войти через auth.users
-      console.error('[activateClientAccount] users insert failed:', pubErr.message)
-    }
-  }
+  // 3. Роль клиента. Запись в public.users к этому моменту уже создал триггер
+  //    на auth.users — с ролью продажника по умолчанию и email в нижнем
+  //    регистре. Раньше её искали по email с учётом регистра: у клиентов с
+  //    заглавной буквой в адресе (Astashkina03@…) запись не находилась, вставка
+  //    падала на дубле, и клиент входил в CRM продажником — семь человек с июня,
+  //    и распределение заявок отдавало им чужие сделки. Роль ставим по id.
+  const role = await assignRole(admin, { authUserId, email: inv.email, role: 'client' })
+  if (!role.ok) return { ok: false, error: role.error }
 
   // 4. Помечаем invitation как использованный
   await admin.from('client_invitations')
