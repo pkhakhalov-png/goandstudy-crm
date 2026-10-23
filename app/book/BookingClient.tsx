@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createBooking, createLowBudgetDeal } from './actions'
 import { mskTodayStr } from '@/lib/time'
 import { reachGoal } from './Metrika'
@@ -48,6 +48,9 @@ const QUIZ_STEPS = [
 ]
 
 const TOTAL_STEPS = QUIZ_STEPS.length + 2
+
+/** Ключ, под которым форма из статьи блога передаёт имя и телефон. */
+const BLOG_PREFILL_KEY = 'gs_book_prefill'
 
 const cardStyle: React.CSSProperties = {
   background: 'rgba(255,255,255,.55)', backdropFilter: 'blur(20px) saturate(180%)', WebkitBackdropFilter: 'blur(20px) saturate(180%)',
@@ -99,6 +102,32 @@ export function BookingClient({ availableSlots, managerId, managerName }: Props)
   }
 
   function setAnswer(key: string, value: any) { setAnswers(prev => ({ ...prev, [key]: value })) }
+
+  // Человек пришёл из формы в статье блога: имя и телефон он там уже ввёл.
+  // Форма кладёт их в sessionStorage — /book отдаётся с того же домена
+  // goandstudy.com, — и анкета продолжается со второго шага. Дальше всё как
+  // обычно: вопросы, дата, время, та же запись в CRM. В адрес данные не кладём:
+  // телефону нечего делать в истории браузера и в Метрике.
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(BLOG_PREFILL_KEY)
+      if (!raw) return
+      sessionStorage.removeItem(BLOG_PREFILL_KEY)
+      const p = JSON.parse(raw) as { name?: string; phone?: string; country?: string; at?: number }
+      if (!p.name || !p.phone || !p.at || Date.now() - p.at > 60 * 60 * 1000) return
+      // sessionStorage есть только в браузере, поэтому читаем после гидрации,
+      // иначе разметка сервера и клиента разойдётся на первом шаге.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setAnswers(prev => ({
+        ...prev,
+        client_name: p.name,
+        client_phone: p.phone,
+        ...(p.country ? { country: p.country } : {}),
+      }))
+      setStep(1)
+      reachGoal('booking_prefill_from_blog')
+    } catch { /* нет хранилища — анкета просто начнётся с контактов */ }
+  }, [])
 
   function toggleCheckbox(key: string, value: string) {
     setAnswers(prev => {

@@ -162,6 +162,9 @@ function describeContent(content?: string): string | null {
   if (onPage) return `${onPage[1]}-я кнопка на странице`
   if (content === 'cta-hero') return 'кнопка в начале страницы'
   if (content === 'cta-steps') return 'кнопка после шагов'
+  // Блок заявки в статье блога и кнопки, которые к нему ведут
+  if (content === 'cta-form') return 'форма заявки в середине статьи'
+  if (content === 'cta-bar') return 'кнопка в полосе чтения'
   return content
 }
 

@@ -193,7 +193,13 @@ export const AVOID = [
   'glossy commercial lighting, uniform orange or sepia cast, oversaturated colors, HDR halos,',
   'crushed shadow detail, blown highlights, plastic skin, excessive blur, artificial heavy grain,',
   'decorative clutter, CGI, 3D render, illustration, added headline, quote overlay, watermark,',
-  'prominent brand logos.',
+  'prominent brand logos, university crests or names on printed materials.',
+  // Модель путает, чьи руки в кадре: в статье «Университеты в кино» у одного
+  // человека вышло три руки. Лишние конечности — самый частый брак, а заметить
+  // его потом некому, поэтому запрещаем явно и уводим руки из кадра совсем.
+  'Anatomy must be correct: every visible person has exactly two arms and two hands with five fingers,',
+  'no extra, duplicated, floating or merged hands, limbs or fingers.',
+  'Prefer scenes where hands are out of frame or clearly belong to one person.',
 ].join(' ')
 
 /**
