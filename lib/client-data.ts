@@ -31,7 +31,7 @@ export async function getClientForUser(userEmail: string) {
   const { data: client } = await admin
     .from('clients')
     .select('*')
-    .eq('email', userEmail)
+    .ilike('email', emailPattern(userEmail))
     .maybeSingle()
   return client
 }
@@ -329,6 +329,7 @@ export type { RoadmapData, RoadmapStage, RoadmapItem } from './roadmap-types'
 
 import type { StudentProjectData } from './student-project-types'
 import type { RoadmapData } from './roadmap-types'
+import { emailPattern } from '@/lib/email-match'
 
 export async function getClientProject(clientId: number): Promise<StudentProjectData> {
   const admin = await createAdminClient()

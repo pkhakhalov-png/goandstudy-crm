@@ -73,8 +73,12 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/curator', request.url))
     } else if (profile?.role === 'client') {
       return NextResponse.redirect(new URL('/client', request.url))
-    } else {
+    } else if (profile?.role === 'salesperson') {
       return NextResponse.redirect(new URL('/sales', request.url))
+    } else {
+      // Роли нет или она неизвестна — раньше это вело в раздел продаж, и клиент
+      // без правильной роли видел чужие сделки. Теперь — отказ.
+      return noAccess()
     }
   }
 
@@ -87,6 +91,9 @@ export async function middleware(request: NextRequest) {
       .single()
 
     if (profileError && profileError.code !== 'PGRST116') return dbUnavailable()
+
+    // Без роли в служебные разделы не пускаем: доступ по умолчанию — отказ
+    if (!profile?.role || !['admin', 'rop', 'curator', 'salesperson', 'client'].includes(profile.role)) return noAccess()
 
     if (profile?.role === 'curator' && (pathname.startsWith('/admin') || pathname.startsWith('/sales') || pathname.startsWith('/rop'))) {
       return NextResponse.redirect(new URL('/curator', request.url))
@@ -105,6 +112,16 @@ export async function middleware(request: NextRequest) {
   }
 
   return supabaseResponse
+}
+
+function noAccess() {
+  return new NextResponse(
+    '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width">' +
+    '<title>Нет доступа</title><body style="font-family:system-ui;max-width:32rem;margin:15vh auto;padding:0 1rem">' +
+    '<h1 style="font-size:1.3rem">У вашего аккаунта нет доступа к этому разделу</h1>' +
+    '<p>Напишите куратору или администратору goandstudy — мы проверим настройки аккаунта.</p></body>',
+    { status: 403, headers: { 'content-type': 'text/html; charset=utf-8' } },
+  )
 }
 
 function dbUnavailable() {

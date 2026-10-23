@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createAdminClient, createClient as createSsrClient } from '@/lib/supabase/server'
 import { autoLinkGlobalDocs } from '@/app/client/applications/[id]/wizard/auto-link-helper'
 import { warnOnError } from '@/lib/supabase/write-guard'
+import { emailPattern } from '@/lib/email-match'
 
 type ApplyResult =
   | { ok: true; applicationId: string; hasWizard: boolean }
@@ -34,7 +35,7 @@ export async function applyFromShortlist(opts: {
   let clientId: number | null = null
   if (role === 'client') {
     const { data: client } = await admin
-      .from('clients').select('id').eq('email', user.email!).maybeSingle()
+      .from('clients').select('id').ilike('email', emailPattern(user.email)).maybeSingle()
     clientId = client?.id ?? null
   }
   if (!clientId) return { ok: false, error: 'Клиент не определён' }

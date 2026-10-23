@@ -13,6 +13,7 @@
  * вход не выполняется — молчать здесь нельзя.
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { emailPattern } from '@/lib/email-match'
 
 type Role = 'client' | 'curator'
 
@@ -30,7 +31,7 @@ export async function assignRole(
   if (!byId?.length) {
     // 2. Триггера нет: старая строка с этим email (сид, прежний вход) или новая
     const { data: old } = await admin
-      .from('users').select('id').ilike('email', p.email).maybeSingle()
+      .from('users').select('id').ilike('email', emailPattern(p.email)).maybeSingle()
     const { error } = old
       ? await admin.from('users').update({ id: p.authUserId, ...fields }).eq('id', old.id)
       : await admin.from('users').insert({ id: p.authUserId, email: p.email.toLowerCase(), ...fields })

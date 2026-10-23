@@ -3,6 +3,7 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { warnOnError } from '@/lib/supabase/write-guard'
+import { emailPattern } from '@/lib/email-match'
 
 type EssayType = 'resume' | 'motivation'
 
@@ -18,7 +19,7 @@ async function getViewer() {
 async function resolveClient(requestedClientId: number | null, email: string, role: string | null) {
   const admin = await createAdminClient()
   if (role === 'client' || !role) {
-    const { data } = await admin.from('clients').select('id, curator_id').eq('email', email).maybeSingle()
+    const { data } = await admin.from('clients').select('id, curator_id').ilike('email', emailPattern(email)).maybeSingle()
     return data
   }
   if (requestedClientId) {

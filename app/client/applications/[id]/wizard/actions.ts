@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createAdminClient, createClient as createSsrClient } from '@/lib/supabase/server'
 import { warnOnError } from '@/lib/supabase/write-guard'
+import { emailPattern } from '@/lib/email-match'
 
 type AccessResult =
   | { ok: false; error: string }
@@ -26,7 +27,7 @@ async function checkAccess(applicationId: string): Promise<AccessResult> {
 
   if (role === 'client') {
     const { data: client } = await admin
-      .from('clients').select('id').eq('email', user.email!).maybeSingle()
+      .from('clients').select('id').ilike('email', emailPattern(user.email)).maybeSingle()
     if (!client || client.id !== app.client_id) return { ok: false, error: 'Нет доступа' }
   } else if (role !== 'admin' && role !== 'curator' && role !== 'rop') {
     return { ok: false, error: 'Нет доступа' }

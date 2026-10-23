@@ -4,6 +4,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { logActivity } from '@/lib/client-activity'
 import { warnOnError } from '@/lib/supabase/write-guard'
+import { emailPattern } from '@/lib/email-match'
 
 const BUCKET = 'client-docs'
 const MAX_BYTES = 15 * 1024 * 1024
@@ -49,7 +50,7 @@ async function resolveContext(opts: { clientId?: number; applicationId?: string 
 
   let client: { id: number; curator_id: string | null } | null = null
   if (role === 'client') {
-    const { data } = await admin.from('clients').select('id, curator_id').eq('email', user.email || '').maybeSingle()
+    const { data } = await admin.from('clients').select('id, curator_id').ilike('email', emailPattern(user.email)).maybeSingle()
     client = data
   } else if (clientId) {
     const { data } = await admin.from('clients').select('id, curator_id').eq('id', clientId).maybeSingle()

@@ -44,15 +44,9 @@ export async function activateCuratorAccount(params: {
     if (upErr) return { ok: false, error: `auth: ${upErr.message}` }
     authUserId = curatorRow.user_id
   } else {
-    // Новый куратор: проверяем нет ли auth.users с этим email
-    const { data: list } = await admin.auth.admin.listUsers()
-    const dup = list?.users?.find(u => u.email?.toLowerCase() === inv.email.toLowerCase())
-    if (dup) {
-      return {
-        ok: false,
-        error: 'Аккаунт с этим email уже существует. Если забыл пароль — напиши админу.',
-      }
-    }
+    // Проверку «такой аккаунт уже есть» делает сам createUser. Раньше её делал
+    // listUsers(), но он отдаёт только первую страницу (50 человек) — при
+    // 55 пользователях дубли дальше первой страницы проходили мимо.
 
     // Создаём auth.users
     const { data: created, error: createErr } = await admin.auth.admin.createUser({
@@ -61,6 +55,9 @@ export async function activateCuratorAccount(params: {
       email_confirm: true,
     })
     if (createErr || !created?.user) {
+      if (createErr && /already|exists|registered/i.test(createErr.message)) {
+        return { ok: false, error: 'Аккаунт с этим email уже существует. Если забыли пароль — напишите администратору.' }
+      }
       return { ok: false, error: createErr?.message || 'Не удалось создать аккаунт' }
     }
     authUserId = created.user.id

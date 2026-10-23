@@ -22,17 +22,9 @@ export async function activateClientAccount(params: {
 
   const admin = await createAdminClient()
 
-  // 1. Проверяем не зарегистрирован ли уже auth.users с этим email.
-  // Если да — возможно клиент пытается зарегистрироваться повторно (или email
-  // совпал с другим юзером). Лучше отказать с понятной ошибкой.
-  const { data: existingAuth } = await admin.auth.admin.listUsers()
-  const dup = existingAuth?.users?.find(u => u.email?.toLowerCase() === inv.email.toLowerCase())
-  if (dup) {
-    return {
-      ok: false,
-      error: 'Аккаунт с этим email уже существует. Если забыл пароль — напиши куратору.',
-    }
-  }
+  // Проверку «такой аккаунт уже есть» делает сам createUser. Раньше её делал
+  // listUsers(), но он отдаёт только первую страницу (50 человек) — при
+  // 55 пользователях дубли дальше первой страницы проходили мимо.
 
   // 2. Создаём auth.users + email confirmed (мы доверяем что email верный,
   //    т.к. продажник сам его вбил при оформлении продажи).
@@ -42,6 +34,9 @@ export async function activateClientAccount(params: {
     email_confirm: true,
   })
   if (createErr || !created?.user) {
+    if (createErr && /already|exists|registered/i.test(createErr.message)) {
+      return { ok: false, error: 'Аккаунт с этим email уже существует. Если забыли пароль — напишите куратору.' }
+    }
     return { ok: false, error: createErr?.message || 'Не удалось создать аккаунт' }
   }
   const authUserId = created.user.id

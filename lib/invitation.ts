@@ -11,6 +11,7 @@
 import { createAdminClient } from './supabase/server'
 import { randomBytes } from 'crypto'
 import { warnOnError } from '@/lib/supabase/write-guard'
+import { emailPattern } from '@/lib/email-match'
 
 export const INVITE_TTL_DAYS = 90
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://crm.goandstudy.com'
@@ -45,7 +46,7 @@ export async function createClientInvitation(
   // Проверяем не активирован ли уже клиент (есть public.users с role=client и этим email)
   const { data: existingUser } = await admin
     .from('users').select('id, role')
-    .ilike('email', client.email)
+    .ilike('email', emailPattern(client.email))
     .eq('role', 'client')
     .maybeSingle()
   if (existingUser) {
@@ -143,7 +144,7 @@ export async function resendClientInvitation(
 
   // Если кабинет уже активирован — переотправлять нечего
   const { data: existingUser } = await admin
-    .from('users').select('id').ilike('email', email).eq('role', 'client').maybeSingle()
+    .from('users').select('id').ilike('email', emailPattern(email)).eq('role', 'client').maybeSingle()
   if (existingUser) {
     return { ok: false, error: 'Кабинет уже активирован. Если клиент забыл пароль — сбросить может только админ.' }
   }
