@@ -90,6 +90,7 @@ function publish(array $job): array {
                     ($isUpdate ? 'перезапись тела → ' : 'тело → ') . $bodyFile,
                     ($isUpdate ? 'перезапись обложки → ' : 'обложка → ') . $coverFile,
                     count($job['inline_images'] ?? []) . ' картинок внутри статьи → ' . THEME . '/assets/img/blog/',
+                    !empty($job['landing_json']) ? 'настройки лендинга → ' . THEME . "/inc/blog-meta/$slug.json" : 'без настроек лендинга — прежний вид статьи',
                     $isUpdate ? 'обновление строки реестра, дата правки на сегодня' : 'строка в начало реестра',
                     "сид-флаг $seedFrom → $seedTo",
                     'прогрев главной',
@@ -114,6 +115,17 @@ function publish(array $job): array {
         $steps[] = 'картинка → ' . THEME . "/assets/img/blog/$name";
     }
 
+    // Статья-лендинг: настройки блока заявки. Кладём до реестра — как только сид
+    // создаст страницу, она сразу выйдет в новом виде. Пересобираем JSON у себя,
+    // а не пишем пришедшую строку как есть: в тему попадает только валидный файл.
+    if (!empty($job['landing_json'])) {
+        $landing = json_decode((string) $job['landing_json'], true);
+        if (!is_array($landing)) throw new RuntimeException('настройки лендинга пришли не JSON');
+        if (!is_dir(THEME . '/inc/blog-meta')) mkdir(THEME . '/inc/blog-meta', 0755, true);
+        file_put_contents(THEME . "/inc/blog-meta/$slug.json",
+            json_encode($landing, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT) . "\n");
+        $steps[] = 'настройки лендинга → ' . THEME . "/inc/blog-meta/$slug.json";
+    }
     // Реестр правим с резервной копией и проверкой синтаксиса: сломанный PHP положит весь сайт
     $registry = THEME . '/inc/blog-data.php';
     $backup = $registry . '.bak.' . time();

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { normalizeBody, sanitizeBody } from '@/lib/seo/blog-style'
+import { buildLanding, landingJson } from '@/lib/seo/landing'
 
 // Выдача задания агенту публикации, который живёт на сервере сайта.
 //
@@ -9,6 +10,8 @@ import { normalizeBody, sanitizeBody } from '@/lib/seo/blog-style'
 // уже ломали. Поэтому агент знает один узкий токен и не имеет доступа ни к чему,
 // кроме очереди публикаций.
 export const runtime = 'nodejs'
+// Вызов модели за текстами блока заявки — секунды, но не миллисекунды
+export const maxDuration = 60
 
 export async function GET(req: NextRequest) {
   const token = process.env.SEO_PUBLISH_TOKEN
@@ -61,9 +64,22 @@ export async function GET(req: NextRequest) {
 
   const sanitized = sanitizeBody(normalizeBody(String(version?.body ?? '')))
   if (sanitized.removed.length) {
-    await seo.from('article_versions').update({
-      meta: { ...meta, sanitized: { at: new Date().toISOString(), removed: sanitized.removed } },
-    }).eq('id', version!.id).throwOnError()
+    meta.sanitized = { at: new Date().toISOString(), removed: sanitized.removed }
+    await seo.from('article_versions').update({ meta }).eq('id', version!.id).throwOnError()
+  }
+
+  // Статья выходит лендингом (формат от 23.10.2026): тексты блока заявки под
+  // эту статью. Считаются здесь, а не у агента — у агента нет ключей моделей.
+  // Один раз на версию: повторная выдача того же задания не платит заново.
+  // buildLanding не бросает — при сбое модели будет шаблон по рубрике.
+  let landing = meta.landing?.cta ? meta.landing : null
+  if (!landing) {
+    landing = await buildLanding(
+      { title: String(version?.title ?? ''), h1: String(brief.h1 ?? version?.title ?? ''), category: String(brief.category ?? ''), body: String(version?.body ?? '') },
+      { seo, jobId: job.id, articleId: job.article_id, traceId: `job:${job.id}` },
+    )
+    meta.landing = landing
+    await seo.from('article_versions').update({ meta }).eq('id', version!.id).throwOnError()
   }
 
   // Помечаем взятым, чтобы второй агент не сделал ту же работу
@@ -88,6 +104,8 @@ export async function GET(req: NextRequest) {
       // Картинки внутри статьи. Имена уже прописаны в теле, агент кладёт файлы
       // рядом с обложкой — иначе в тексте будут ссылки на пустоту.
       inline_images: (meta.images?.inline ?? []).map((im: any) => ({ name: im.name, base64: im.base64 })),
+      // inc/blog-meta/{slug}.json: по нему тема рендерит статью лендингом
+      landing_json: landingJson(landing),
       registry: {
         slug: meta.slug,
         title: String(version?.title ?? ''),
