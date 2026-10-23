@@ -105,7 +105,8 @@ export function BookingClient({ availableSlots, managerId, managerName }: Props)
 
   // Человек пришёл из формы в статье блога: имя и телефон он там уже ввёл.
   // Форма кладёт их в sessionStorage — /book отдаётся с того же домена
-  // goandstudy.com, — и анкета продолжается со второго шага. Дальше всё как
+  // goandstudy.com, — и на первом шаге они уже заполнены. Шаг не пропускаем:
+  // на нём ещё Телеграм, без него менеджеру писать некуда. Дальше всё как
   // обычно: вопросы, дата, время, та же запись в CRM. В адрес данные не кладём:
   // телефону нечего делать в истории браузера и в Метрике.
   useEffect(() => {
@@ -124,8 +125,8 @@ export function BookingClient({ availableSlots, managerId, managerName }: Props)
         client_phone: p.phone,
         ...(p.country ? { country: p.country } : {}),
       }))
-      setStep(1)
       reachGoal('booking_prefill_from_blog')
+      setTimeout(() => document.querySelector<HTMLInputElement>('input[name="client_telegram"]')?.focus(), 0)
     } catch { /* нет хранилища — анкета просто начнётся с контактов */ }
   }, [])
 
@@ -340,7 +341,7 @@ export function BookingClient({ availableSlots, managerId, managerName }: Props)
                   <div style={{ display: 'grid', gap: 12 }}>
                     <input value={answers.client_name || ''} onChange={e => setAnswer('client_name', e.target.value)} placeholder="Имя" autoComplete="name" style={inputStyle} />
                     <input value={answers.client_phone || ''} onChange={e => setAnswer('client_phone', e.target.value)} placeholder="+7 (000) 000-00-00" type="tel" autoComplete="tel" style={inputStyle} />
-                    <input value={answers.client_telegram || ''} onChange={e => setAnswer('client_telegram', e.target.value)} placeholder="Телеграмм логин (@.....)" style={inputStyle} />
+                    <input name="client_telegram" value={answers.client_telegram || ''} onChange={e => setAnswer('client_telegram', e.target.value)} placeholder="Телеграмм логин (@.....)" style={inputStyle} />
                   </div>
                 )}
 
