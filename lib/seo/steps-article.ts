@@ -738,9 +738,23 @@ registerStep('article_publish_blog', async (job: Job, seo: any): Promise<StepOut
   fs.writeFileSync(bodyPath, String(version.body ?? '').trimEnd() + '\n')
   fs.writeFileSync(coverPath, Buffer.from(meta.cover.base64, 'base64'))
 
+  // Статья выходит лендингом (формат от 23.10.2026): тексты блока заявки под
+  // эту статью. Считаются один раз на версию — повтор шага не платит заново.
+  const { buildLanding, landingJson } = await import('./landing')
+  const landing = meta.landing?.cta ? meta.landing : await buildLanding(
+    { title: entry.title, h1: String(brief.h1 ?? entry.title), category: entry.cat, body: String(version.body ?? '') },
+    { seo, jobId: job.id, articleId, traceId: `job:${job.id}` },
+  )
+  if (!meta.landing?.cta) {
+    meta.landing = landing
+    await seo.from('article_versions').update({ meta }).eq('id', version.id).throwOnError()
+  }
+  const landingPath = nodePath.join(tmp, `${slug}.json`)
+  fs.writeFileSync(landingPath, landingJson(landing))
+
   try {
-    const report = await publishToTheme(entry, { bodyPath, coverPath }, { dryRun })
-    if (dryRun) return { outcome: 'done', result: { dry_run: true, ...report, cost: 0 } }
+    const report = await publishToTheme(entry, { bodyPath, coverPath, landingPath }, { dryRun })
+    if (dryRun) return { outcome: 'done', result: { dry_run: true, ...report, landing: { source: landing.source, why: (landing as any).why ?? null, title: landing.cta.title }, cost: 0 } }
 
     await seo.from('articles').update({ status: 'published', published_at: new Date().toISOString() }).eq('id', articleId).throwOnError()
     await seo.from('article_versions').update({ meta: { ...meta, publish: { path: `/blog/${slug}/`, seed: report.seedTo, at: new Date().toISOString() } } }).eq('id', version.id).throwOnError()

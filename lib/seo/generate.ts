@@ -11,6 +11,7 @@ import { checkStandard, languageChecks, type Check } from './standard'
 import { checkBlogStandard, BLOG_CATEGORIES } from './blog-style'
 import { claimsBlock, findUnbackedNumbers, type Claim } from './claims'
 import { audienceBlock } from './audience'
+import { LANDING_PROMPT, LANDING_SCHEMA, type LandingAnswer } from './landing'
 export { summarize } from './standard'
 export type { Check, Level } from './standard'
 
@@ -902,4 +903,32 @@ brak, а не акцент. Пиши крючок: 3–7 слов, разгов�
 
   const text = res.content.filter((b: any) => b.type === 'text').map((b: any) => b.text).join('')
   return JSON.parse(text) as Scenes
+}
+
+/* ── Тексты блока заявки для статьи-лендинга ──────────────────────────────── */
+
+/**
+ * Заголовок, описание и пункты блока «Бесплатная консультация» под конкретную
+ * статью, плюс тон карточек по разделам. Роль та же, что у подбора сцен:
+ * ответ короткий, усилие низкое.
+ *
+ * Отсюда возвращается сырой ответ — проверку и запасной шаблон делает
+ * `buildLanding` в landing.ts, чтобы публикация не вставала из-за блока заявки.
+ */
+export async function planLanding(
+  input: { title: string; h1: string; category: string; lead: string; headings: string[] },
+  spend?: GenContext['spend'],
+): Promise<LandingAnswer> {
+  const ctx = { topicTitle: input.title, primaryKeyword: input.h1, cluster: null,
+                related: [], queries: [], spend } as GenContext
+  const res = await askModel(ctx, 'context_reviewer', {
+    max_tokens: 1500,
+    output_config: { effort: 'low', format: { type: 'json_schema', schema: LANDING_SCHEMA as any } },
+    system: LANDING_PROMPT,
+    messages: [{
+      role: 'user',
+      content: `Заголовок: ${input.title}\nРубрика: ${input.category}\n\nПервый абзац:\n${input.lead}\n\nРазделы:\n${input.headings.map((h) => `— ${h}`).join('\n')}`,
+    }],
+  })
+  return parseJson<LandingAnswer>(res, 'блок заявки')
 }

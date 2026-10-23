@@ -80,7 +80,7 @@ export type PublishReport = {
  */
 export async function publishToTheme(
   entry: BlogRegistryEntry,
-  files: { bodyPath: string; coverPath: string },
+  files: { bodyPath: string; coverPath: string; /** inc/blog-meta/{slug}.json — статья выйдет лендингом */ landingPath?: string },
   opts: { dryRun?: boolean } = {},
 ): Promise<PublishReport> {
   const steps: string[] = []
@@ -100,6 +100,7 @@ export async function publishToTheme(
 
   steps.push(`тело → ${THEME}/inc/blog-articles/${entry.slug}.html`)
   steps.push(`обложка → ${THEME}/assets/img/blog/${entry.slug}.jpg`)
+  if (files.landingPath) steps.push(`настройки лендинга → ${THEME}/inc/blog-meta/${entry.slug}.json`)
   steps.push(`строка в реестр inc/blog-data.php (в начало массива — карточка будет видна сразу)`)
   steps.push(`сид-флаг ${seedFrom} → ${seedTo} в двух местах functions.php`)
   steps.push('бамп GOANDSTUDY_VERSION, чтобы браузеры не отдали старый CSS из кэша')
@@ -136,6 +137,12 @@ export async function publishToTheme(
   // 1–2. Файлы
   await scp(files.bodyPath, `${THEME}/inc/blog-articles/${entry.slug}.html`)
   await scp(files.coverPath, `${THEME}/assets/img/blog/${entry.slug}.jpg`)
+  // Файл настроек кладётся до реестра: как только сид создаст страницу, она
+  // сразу выйдет лендингом, без промежуточного прежнего вида
+  if (files.landingPath) {
+    await ssh(`mkdir -p ${THEME}/inc/blog-meta`)
+    await scp(files.landingPath, `${THEME}/inc/blog-meta/${entry.slug}.json`)
+  }
 
   // 3. Реестр: вставляем первой строкой массива, чтобы карточка попала на первый экран
   const line = registryLine(entry).replace(/'/g, "'\\''")
